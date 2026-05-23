@@ -1,5 +1,5 @@
 import type { Env, Provider } from '../types';
-import { getSetting, getSecret, toBool } from './config';
+import { getSetting, getSecret, toBool, toInt } from './config';
 
 export interface OAuthProviderConfig {
   provider: Extract<Provider, 'google' | 'linuxdo'>;
@@ -44,9 +44,22 @@ export async function getOAuthConfig(env: Env, provider: 'google' | 'linuxdo'): 
   };
 }
 
-export function providerPriority(provider: Provider): number {
+export async function providerPriority(env: Env, provider: Provider): Promise<number> {
   if (provider === 'admin') return 100;
-  if (provider === 'linuxdo') return 20;
-  if (provider === 'google') return 10;
-  return 0;
+
+  let linuxdo = toInt(await getSetting(env, 'QUEUE_PRIORITY_LINUXDO', '20'), 20);
+  let google = toInt(await getSetting(env, 'QUEUE_PRIORITY_GOOGLE', '10'), 10);
+  const guest = toInt(await getSetting(env, 'QUEUE_PRIORITY_GUEST', '0'), 0);
+
+  if (google >= linuxdo) {
+    console.warn('QUEUE_PRIORITY_GOOGLE >= QUEUE_PRIORITY_LINUXDO, forcing correction');
+    google = linuxdo - 1;
+  }
+  if (guest >= google) {
+    console.warn('QUEUE_PRIORITY_GUEST >= QUEUE_PRIORITY_GOOGLE, forcing correction');
+  }
+
+  if (provider === 'linuxdo') return linuxdo;
+  if (provider === 'google') return google;
+  return guest;
 }

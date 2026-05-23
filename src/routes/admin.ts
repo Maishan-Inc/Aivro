@@ -24,6 +24,14 @@ adminRoutes.put('/settings/:key', async (c) => {
   const body = await c.req.json().catch(() => null) as null | { value?: string; valueType?: string; groupName?: string; description?: string; isPublic?: boolean };
   if (!body || body.value === undefined) return fail(c, 'BAD_REQUEST', 'value 不能为空。');
 
+  const priorityKeys = ['QUEUE_PRIORITY_LINUXDO', 'QUEUE_PRIORITY_GOOGLE', 'QUEUE_PRIORITY_GUEST'];
+  if (priorityKeys.includes(key)) {
+    const n = Number.parseInt(body.value, 10);
+    if (!Number.isFinite(n) || n < 0 || n > 99) {
+      return fail(c, 'INVALID_PRIORITY', '优先级必须是 0-99 的整数。', 400);
+    }
+  }
+
   const user = c.get('user')!;
   const old = await c.env.DB.prepare('SELECT value FROM app_settings WHERE key = ?').bind(key).first<{ value: string }>();
   await c.env.DB.prepare(`

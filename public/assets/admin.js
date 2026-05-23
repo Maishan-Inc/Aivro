@@ -309,6 +309,9 @@ async function loadSettings() {
     let html = '';
     for (const [group, rows] of Object.entries(groups)) {
       html += `<div class="group-section"><div class="group-title">${escapeHtml(group)}</div>`;
+      if (group === 'priority') {
+        html += `<p class="form-hint">Linux.DO 必须高于 Google，Google 必须高于 Guest。保存非法值会被强制纠正。</p>`;
+      }
       html += `<table class="data-table"><thead><tr><th>Key</th><th>Value</th><th>Public</th></tr></thead><tbody>`;
       for (const row of rows) {
         html += `<tr>

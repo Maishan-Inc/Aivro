@@ -159,7 +159,7 @@ export async function upsertUserFromOAuth(
   const ts = now();
   const isAdmin = isAdminEmail(env.ADMIN_BOOTSTRAP_EMAILS, profile.email);
   const role: 'admin' | 'user' = isAdmin ? 'admin' : 'user';
-  const priority = isAdmin ? providerPriority('admin') : providerPriority(provider);
+  const priority = await providerPriority(env, isAdmin ? 'admin' : provider);
   const profileJson = JSON.stringify(profile.raw ?? {});
 
   const existing = await env.DB.prepare(`
