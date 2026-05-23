@@ -31,6 +31,41 @@
         </section>
 
         <section class="card">
+          <h2>最近任务</h2>
+          <div id="jobsContainer">
+            <p style="color:var(--color-mute)">加载中...</p>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>用户管理</h2>
+          <div class="toolbar">
+            <input id="userSearch" class="text-input" placeholder="搜索 email / 名称 / ID" />
+            <button id="userSearchBtn" class="btn-subtle">搜索</button>
+          </div>
+          <div id="usersContainer">
+            <p style="color:var(--color-mute)">加载中...</p>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="admin-header">
+            <h2>封禁列表</h2>
+            <button id="addBanBtn" class="btn-danger">新增封禁</button>
+          </div>
+          <div id="bansContainer">
+            <p style="color:var(--color-mute)">加载中...</p>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>队列事件</h2>
+          <div id="eventsContainer">
+            <p style="color:var(--color-mute)">加载中...</p>
+          </div>
+        </section>
+
+        <section class="card">
           <h2>配置</h2>
           <div id="settingsContainer">
             <p style="color:var(--color-mute)">加载中...</p>
@@ -45,8 +80,8 @@
         </section>
 
         <section class="card">
-          <h2>最近任务</h2>
-          <div id="jobsContainer">
+          <h2>审计日志</h2>
+          <div id="auditContainer">
             <p style="color:var(--color-mute)">加载中...</p>
           </div>
         </section>
@@ -63,6 +98,56 @@
     </footer>
 
     <div id="toast" class="toast"></div>
+
+    <div id="jobModal" class="modal-backdrop">
+      <div class="modal-card">
+        <div class="modal-header">
+          <span class="modal-title">任务详情</span>
+          <button class="modal-close" data-close>&times;</button>
+        </div>
+        <div class="modal-body" id="jobModalBody"></div>
+        <div class="modal-actions" id="jobModalActions"></div>
+      </div>
+    </div>
+
+    <div id="userModal" class="modal-backdrop">
+      <div class="modal-card">
+        <div class="modal-header">
+          <span class="modal-title">编辑用户</span>
+          <button class="modal-close" data-close>&times;</button>
+        </div>
+        <div class="modal-body" id="userModalBody"></div>
+        <div class="modal-actions" id="userModalActions"></div>
+      </div>
+    </div>
+
+    <div id="banModal" class="modal-backdrop">
+      <div class="modal-card">
+        <div class="modal-header">
+          <span class="modal-title">新增封禁</span>
+          <button class="modal-close" data-close>&times;</button>
+        </div>
+        <div class="modal-body" id="banModalBody">
+          <div class="form-grid">
+            <label>类型</label>
+            <select id="banType" class="text-input">
+              <option value="user_id">user_id</option>
+              <option value="email">email</option>
+              <option value="ip">ip</option>
+              <option value="device_id">device_id</option>
+            </select>
+            <label>值</label>
+            <input id="banValue" class="text-input" placeholder="封禁目标" />
+            <label>原因</label>
+            <input id="banReason" class="text-input" placeholder="可选" />
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button id="banSubmitBtn" class="btn-primary">确认封禁</button>
+        </div>
+      </div>
+    </div>
+
     <script src="/assets/admin.js" type="module"></script>
   </body>
 </html>
