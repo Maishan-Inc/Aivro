@@ -50,6 +50,25 @@ generateRoutes.post('/', async (c) => {
 
   if (active) return fail(c, 'ACTIVE_JOB_EXISTS', `你已经有一个任务正在 ${active.status}。`, 409);
 
+  if (!user) {
+    const deviceId = body?.anonymousDeviceId;
+    if (deviceId) {
+      const byDevice = await c.env.DB.prepare(`
+        SELECT id FROM jobs WHERE anonymous_device_id = ? AND status IN ('queued', 'running') LIMIT 1
+      `).bind(deviceId).first<{ id: string }>();
+      if (byDevice) return fail(c, 'ACTIVE_JOB_EXISTS_DEVICE', '你或当前网络下已有一个生成中的任务，请等其完成。', 409);
+    }
+
+    const blockByIp = toBool(await getSetting(c.env, 'QUEUE_BLOCK_BY_IP', 'true'), true);
+    const clientIp = c.req.header('CF-Connecting-IP');
+    if (blockByIp && clientIp) {
+      const byIp = await c.env.DB.prepare(`
+        SELECT id FROM jobs WHERE client_ip = ? AND user_id IS NULL AND status IN ('queued', 'running') LIMIT 1
+      `).bind(clientIp).first<{ id: string }>();
+      if (byIp) return fail(c, 'ACTIVE_JOB_EXISTS_IP', '你或当前网络下已有一个生成中的任务，请等其完成。', 409);
+    }
+  }
+
   const model = await getSetting(c.env, 'OPENAI_IMAGE_MODEL', c.env.OPENAI_IMAGE_MODEL ?? 'gpt-image-2');
   const size = body?.size ?? await getSetting(c.env, 'OPENAI_IMAGE_SIZE', c.env.OPENAI_IMAGE_SIZE ?? '1024x1024');
   const quality = body?.quality ?? await getSetting(c.env, 'OPENAI_IMAGE_QUALITY', c.env.OPENAI_IMAGE_QUALITY ?? 'auto');
@@ -58,10 +77,11 @@ generateRoutes.post('/', async (c) => {
   const jobId = newId('job');
   const createdAt = now();
   const promptHash = await sha256Hex(prompt.toLowerCase());
+  const clientIp = c.req.header('CF-Connecting-IP') ?? null;
 
   await c.env.DB.prepare(`
-    INSERT INTO jobs(id, user_id, anonymous_device_id, provider, prompt, normalized_prompt_hash, status, priority, size, quality, model, created_at, queued_at)
-    VALUES (?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?)
+    INSERT INTO jobs(id, user_id, anonymous_device_id, provider, prompt, normalized_prompt_hash, status, priority, size, quality, model, client_ip, created_at, queued_at)
+    VALUES (?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?)
   `).bind(
     jobId,
     user?.id ?? null,
@@ -73,6 +93,7 @@ generateRoutes.post('/', async (c) => {
     size,
     quality,
     model,
+    clientIp,
     createdAt,
     createdAt
   ).run();

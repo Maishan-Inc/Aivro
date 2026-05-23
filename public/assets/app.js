@@ -110,7 +110,12 @@ form?.addEventListener('submit', async (e) => {
     showResult('queued', { rank: data.rank });
     startPolling();
   } catch (err) {
-    showResult('error', { message: err.message });
+    const msg = err.message || '';
+    if (msg.includes('已有一个') || msg.includes('生成中的任务')) {
+      showResult('error', { message: '你或当前网络下已有一个生成中的任务，请等其完成。' });
+    } else {
+      showResult('error', { message: msg });
+    }
   } finally {
     resetCaptcha();
   }
