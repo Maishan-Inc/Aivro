@@ -3,6 +3,7 @@ import { generateImage } from '../services/openai';
 import { saveGeneratedImage } from '../services/r2';
 import { getQueueConfig } from '../services/config';
 import { newId, now } from '../utils/ids';
+import { calculateInsertIndex, computeDelayedEvents, findActiveJob } from './queAlgo';
 
 type QueueState = {
   waiting: QueueJob[];
@@ -85,15 +86,15 @@ export class QueueCoordinator implements DurableObject {
   }
 
   private async submit(job: QueueJob) {
-    const active = this.queue.waiting.find((item) => sameOwner(item, job))
-      || Object.values(this.queue.running).find((item) => sameOwner(item, job));
+    const active = findActiveJob(this.queue.waiting, this.queue.running, job);
 
     if (active) {
       return { accepted: false, reason: 'ACTIVE_JOB_EXISTS', jobId: active.id, status: this.getStatus(active.id) };
     }
 
     const beforeRanks = new Map(this.queue.waiting.map((item, index) => [item.id, index + 1]));
-    const insertAt = this.calculateInsertIndex(job);
+    const config = this.queue.config ?? defaultQueueConfig();
+    const insertAt = calculateInsertIndex(this.queue.waiting, job, config);
     this.queue.waiting.splice(insertAt, 0, job);
     await this.rewriteRanksAndDelayedEvents(beforeRanks);
     await this.persist();
@@ -102,49 +103,27 @@ export class QueueCoordinator implements DurableObject {
     return { accepted: true, jobId: job.id, rank: insertAt + 1 };
   }
 
-  private calculateInsertIndex(job: QueueJob): number {
-    const config = this.queue.config ?? defaultQueueConfig();
-    const waiting = this.queue.waiting;
-
-    const isPriorityUser = job.priority > 0;
-    if (!isPriorityUser || waiting.length <= config.priorityTriggerLength) {
-      return waiting.length;
-    }
-
-    const minIndex = Math.max(0, config.priorityInsertStart - 1, config.protectedRank);
-    let index = minIndex;
-
-    while (index < waiting.length) {
-      const current = waiting[index];
-      if (current.priority < job.priority) return index;
-      if (current.priority === job.priority && current.createdAt > job.createdAt) return index;
-      index++;
-    }
-
-    return waiting.length;
-  }
-
   private async rewriteRanksAndDelayedEvents(beforeRanks: Map<string, number>) {
+    const events = computeDelayedEvents(this.queue.waiting, beforeRanks);
     const timestamp = now();
     for (let index = 0; index < this.queue.waiting.length; index++) {
       const job = this.queue.waiting[index];
       const newRank = index + 1;
-      const oldRank = beforeRanks.get(job.id);
       await this.env.DB.prepare('UPDATE jobs SET rank = ? WHERE id = ?').bind(newRank, job.id).run();
-      if (oldRank !== undefined && newRank > oldRank) {
-        await this.env.DB.prepare(`
-          INSERT INTO queue_events(id, job_id, user_id, event_type, old_rank, new_rank, message, created_at)
-          VALUES (?, ?, ?, 'delayed', ?, ?, ?, ?)
-        `).bind(
-          newId('evt'),
-          job.id,
-          job.userId ?? null,
-          oldRank,
-          newRank,
-          `你的请求已被延期。当前有更高优先级用户进入队列，你的新排名是 #${newRank}。`,
-          timestamp
-        ).run();
-      }
+    }
+    for (const ev of events) {
+      await this.env.DB.prepare(`
+        INSERT INTO queue_events(id, job_id, user_id, event_type, old_rank, new_rank, message, created_at)
+        VALUES (?, ?, ?, 'delayed', ?, ?, ?, ?)
+      `).bind(
+        newId('evt'),
+        ev.jobId,
+        ev.userId ?? null,
+        ev.oldRank,
+        ev.newRank,
+        `你的请求已被延期。当前有更高优先级用户进入队列，你的新排名是 #${ev.newRank}。`,
+        timestamp
+      ).run();
     }
   }
 
@@ -216,12 +195,6 @@ export class QueueCoordinator implements DurableObject {
   private json(data: unknown, status = 200) {
     return Response.json(data, { status });
   }
-}
-
-function sameOwner(a: QueueJob, b: QueueJob): boolean {
-  if (a.userId && b.userId) return a.userId === b.userId;
-  if (a.anonymousDeviceId && b.anonymousDeviceId) return a.anonymousDeviceId === b.anonymousDeviceId;
-  return false;
 }
 
 function defaultQueueConfig(): QueueConfig {
