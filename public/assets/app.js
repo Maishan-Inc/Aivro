@@ -244,7 +244,35 @@ function escapeHtml(str) {
 refreshOverview();
 setInterval(refreshOverview, 5000);
 initCaptcha();
+initAuthUI();
 
 if (currentJobId) {
   startPolling();
+}
+
+async function initAuthUI() {
+  try {
+    const data = await api('/api/auth/me');
+    const user = data.user;
+    if (!user) return;
+    const nav = document.querySelector('#navActions');
+    const loginLinuxdo = document.querySelector('#loginLinuxdo');
+    const loginGoogle = document.querySelector('#loginGoogle');
+    if (loginLinuxdo) loginLinuxdo.style.display = 'none';
+    if (loginGoogle) loginGoogle.style.display = 'none';
+
+    const avatar = user.avatarUrl
+      ? `<img src="${escapeHtml(user.avatarUrl)}" style="width:28px;height:28px;border-radius:50%;vertical-align:middle" />`
+      : '';
+    const name = escapeHtml(user.name || user.email || 'User');
+    const frag = document.createElement('div');
+    frag.style.cssText = 'display:flex;align-items:center;gap:8px';
+    frag.innerHTML = `${avatar}<span style="font-size:14px;font-weight:500">${name}</span><button id="logoutBtn" class="btn-subtle" style="font-size:13px;padding:6px 12px">登出</button>`;
+    nav.prepend(frag);
+
+    document.querySelector('#logoutBtn')?.addEventListener('click', async () => {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      location.reload();
+    });
+  } catch { /* not logged in */ }
 }
