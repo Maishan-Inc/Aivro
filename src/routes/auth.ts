@@ -15,6 +15,7 @@ import {
   SESSION_COOKIE,
   type OAuthUserProfile
 } from '../services/auth';
+import { isBanned } from '../services/bans';
 
 export const authRoutes = new Hono<AppContext>();
 
@@ -125,6 +126,20 @@ authRoutes.get('/:provider/callback', async (c) => {
   }
 
   const { userId } = await upsertUserFromOAuth(c.env, provider, profile);
+
+  const banCheck = await isBanned(c.env, {
+    userId,
+    email: profile.email,
+    ip: c.req.header('CF-Connecting-IP') ?? undefined
+  });
+  if (banCheck.banned) {
+    const existingToken = getCookie(c, SESSION_COOKIE);
+    if (existingToken) await revokeSession(c.env, existingToken);
+    c.header('Set-Cookie', clearOAuthStateCookie(), { append: true });
+    c.header('Set-Cookie', clearSessionCookie(), { append: true });
+    return c.redirect('/?error=banned');
+  }
+
   const session = await createSession(c.env, userId);
 
   c.header('Set-Cookie', clearOAuthStateCookie(), { append: true });

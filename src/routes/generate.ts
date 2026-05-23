@@ -6,6 +6,7 @@ import { getSetting, toBool, toInt } from '../services/config';
 import { providerPriority } from '../services/oauth';
 import { checkAndIncrementLimit } from '../services/rateLimit';
 import { verifyCaptcha } from '../services/captcha';
+import { isBanned } from '../services/bans';
 
 export const generateRoutes = new Hono<AppContext>();
 
@@ -28,6 +29,14 @@ generateRoutes.post('/', async (c) => {
 
   const captchaResult = await verifyCaptcha(c.env, body?.captchaToken, c.req.header('CF-Connecting-IP'));
   if (!captchaResult.ok) return fail(c, 'CAPTCHA_FAILED', '人机验证失败，请重试。', 403);
+
+  const banCheck = await isBanned(c.env, {
+    userId: user?.id,
+    email: user?.email,
+    ip: c.req.header('CF-Connecting-IP') ?? undefined,
+    deviceId: body?.anonymousDeviceId
+  });
+  if (banCheck.banned) return fail(c, 'BANED', '账号或设备已被封禁。', 403);
 
   const windowSeconds = toInt(await getSetting(c.env, 'QUEUE_GROUP_WINDOW_SECONDS', c.env.QUEUE_GROUP_WINDOW_SECONDS ?? '60'), 60);
   const maxRequests = toInt(await getSetting(c.env, 'QUEUE_GROUP_MAX_REQUESTS', c.env.QUEUE_GROUP_MAX_REQUESTS ?? '1'), 1);

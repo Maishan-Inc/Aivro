@@ -2,6 +2,7 @@ import type { Context, Next } from 'hono';
 import type { AppContext, AppUser } from '../types';
 import { getCookie } from 'hono/cookie';
 import { sha256Hex, now } from '../utils/ids';
+import { isBanned } from './bans';
 
 export async function loadUser(c: Context<AppContext>, next: Next) {
   const sid = getCookie(c, 'efi_session');
@@ -26,16 +27,23 @@ export async function loadUser(c: Context<AppContext>, next: Next) {
   }>();
 
   if (row) {
-    const user: AppUser = {
-      id: row.id,
+    const banCheck = await isBanned(c.env, {
+      userId: row.id,
       email: row.email,
-      name: row.name,
-      avatarUrl: row.avatar_url,
-      provider: row.provider ?? 'guest',
-      priority: row.priority,
-      role: row.role
-    };
-    c.set('user', user);
+      ip: c.req.header('CF-Connecting-IP') ?? undefined
+    });
+    if (!banCheck.banned) {
+      const user: AppUser = {
+        id: row.id,
+        email: row.email,
+        name: row.name,
+        avatarUrl: row.avatar_url,
+        provider: row.provider ?? 'guest',
+        priority: row.priority,
+        role: row.role
+      };
+      c.set('user', user);
+    }
   }
 
   await next();
