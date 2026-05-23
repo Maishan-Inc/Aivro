@@ -4,33 +4,65 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Admin · Edge-Fast-Image-Queue</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/assets/style.css" />
   </head>
   <body>
-    <main class="shell">
-      <section class="card admin-head">
-        <div>
-          <p class="eyebrow">Admin Control Plane</p>
-          <h1>Edge-Fast-Image-Queue 后台</h1>
-          <p class="lead">控制队列、模型、密钥、广告和任务。所有修改都应该进入审计日志。</p>
-        </div>
-        <div class="actions">
-          <button id="pauseBtn" class="button danger">暂停队列</button>
-          <button id="resumeBtn" class="button primary">恢复队列</button>
-        </div>
-      </section>
+    <nav class="nav">
+      <span class="nav-logo">Admin</span>
+      <div class="nav-actions">
+        <a href="/" class="btn-subtle">返回首页</a>
+      </div>
+    </nav>
 
-      <section class="grid">
+    <main class="shell">
+      <div class="admin-cards">
+        <section class="card">
+          <div class="admin-header">
+            <h2>队列控制</h2>
+            <div class="queue-controls">
+              <span id="queueStatus" class="badge">--</span>
+              <button id="resumeBtn" class="btn-primary">恢复队列</button>
+              <button id="pauseBtn" class="btn-danger">暂停队列</button>
+            </div>
+          </div>
+        </section>
+
         <section class="card">
           <h2>配置</h2>
-          <div id="settingsTable" class="table-placeholder">加载中...</div>
+          <div id="settingsContainer">
+            <p style="color:var(--color-mute)">加载中...</p>
+          </div>
         </section>
+
+        <section class="card">
+          <h2>密钥</h2>
+          <div id="secretsContainer">
+            <p style="color:var(--color-mute)">加载中...</p>
+          </div>
+        </section>
+
         <section class="card">
           <h2>最近任务</h2>
-          <div id="jobsTable" class="table-placeholder">加载中...</div>
+          <div id="jobsContainer">
+            <p style="color:var(--color-mute)">加载中...</p>
+          </div>
         </section>
-      </section>
+      </div>
     </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        <span class="footer-brand">Edge-Fast-Image-Queue</span>
+        <div class="footer-links">
+          <a href="/">首页</a>
+        </div>
+      </div>
+    </footer>
+
+    <div id="toast" class="toast"></div>
     <script src="/assets/admin.js" type="module"></script>
   </body>
 </html>
