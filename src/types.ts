@@ -43,6 +43,7 @@ export interface Env {
   ADSENSE_SLOT_RESULT?: string;
 
   TURNSTILE_SECRET_KEY?: string;
+  HCAPTCHA_SECRET_KEY?: string;
 
   DB: D1Database;
   IMAGES: R2Bucket;
