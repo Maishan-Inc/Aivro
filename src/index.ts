@@ -1,9 +1,9 @@
 import { Hono } from 'hono';
-import { cors } from 'hono/cors';
 import type { AppContext } from './types';
 import { QueueCoordinator } from './durable/QueueCoordinator';
 import { requestId } from './middleware/requestId';
 import { securityHeaders } from './middleware/security';
+import { corsPolicy } from './middleware/corsPolicy';
 import { loadUser } from './services/session';
 import { healthRoutes } from './routes/health';
 import { configRoutes } from './routes/config';
@@ -20,7 +20,7 @@ const app = new Hono<AppContext>();
 
 app.use('*', requestId);
 app.use('*', securityHeaders);
-app.use('/api/*', cors({ origin: '*', allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'] }));
+app.use('/api/*', corsPolicy());
 app.use('/api/*', loadUser);
 
 app.route('/api/health', healthRoutes);
