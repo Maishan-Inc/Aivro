@@ -21,6 +21,16 @@
       <div class="admin-cards">
         <section class="card">
           <div class="admin-header">
+            <h2>模型管理</h2>
+            <button id="addModelBtn" class="btn-primary">新增模型</button>
+          </div>
+          <div id="modelsContainer">
+            <p style="color:var(--color-mute)">加载中...</p>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="admin-header">
             <h2>队列控制</h2>
             <div class="queue-controls">
               <span id="queueStatus" class="badge">--</span>
@@ -144,6 +154,40 @@
         </div>
         <div class="modal-actions">
           <button id="banSubmitBtn" class="btn-primary">确认封禁</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="modelModal" class="modal-backdrop">
+      <div class="modal-card">
+        <div class="modal-header">
+          <span class="modal-title" id="modelModalTitle">新增模型</span>
+          <button class="modal-close" data-close>&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-grid">
+            <label>模型名称</label>
+            <input id="modelName" class="text-input" placeholder="gpt-image-2" />
+            <label>显示名称</label>
+            <input id="modelDisplayName" class="text-input" placeholder="GPT Image 2" />
+            <label>API 地址</label>
+            <input id="modelBaseUrl" class="text-input" placeholder="https://api.example.com/v1" />
+            <label>API 密钥</label>
+            <input id="modelApiKey" class="text-input" type="password" placeholder="sk-..." />
+            <label>支持尺寸</label>
+            <input id="modelSizes" class="text-input" placeholder="1024x1024,1024x1536,1536x1024" />
+            <label>支持质量</label>
+            <input id="modelQualities" class="text-input" placeholder="auto,high,medium" />
+            <label>默认尺寸</label>
+            <input id="modelDefaultSize" class="text-input" placeholder="1024x1024" />
+            <label>默认质量</label>
+            <input id="modelDefaultQuality" class="text-input" placeholder="auto" />
+            <label>排序</label>
+            <input id="modelSortOrder" class="text-input" type="number" value="0" />
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button id="modelSaveBtn" class="btn-primary">保存</button>
         </div>
       </div>
     </div>

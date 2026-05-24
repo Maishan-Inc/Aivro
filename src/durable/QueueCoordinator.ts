@@ -1,7 +1,8 @@
 import type { Env, QueueConfig, QueueJob } from '../types';
 import { generateImage } from '../services/openai';
 import { saveGeneratedImage } from '../services/r2';
-import { getQueueConfig } from '../services/config';
+import { getQueueConfig, getSetting, getSecret } from '../services/config';
+import { getModelById, getDefaultModel, getFirstEnabledModel, decryptModelApiKey } from '../services/models';
 import { newId, now } from '../utils/ids';
 import { calculateInsertIndex, computeDelayedEvents, findActiveJob } from './queAlgo';
 
@@ -167,9 +168,33 @@ export class QueueCoordinator implements DurableObject {
 
   private async runJob(job: QueueJob) {
     try {
-      const image = await generateImage(this.env, {
+      // Resolve model config: look up by name stored in job, fallback to default/env
+      let baseUrl: string;
+      let apiKey: string;
+      let modelName = job.model;
+
+      const modelRow = await this.env.DB.prepare(
+        'SELECT * FROM models WHERE name = ? AND enabled = 1 LIMIT 1'
+      ).bind(job.model).first() as { base_url: string; api_key_encrypted: string; api_key_iv: string; api_key_masked: string; name: string; id: string } | null;
+
+      if (modelRow) {
+        baseUrl = modelRow.base_url;
+        apiKey = await decryptModelApiKey(this.env, modelRow as unknown as Parameters<typeof decryptModelApiKey>[1]);
+      } else {
+        const fallback = await getDefaultModel(this.env) ?? await getFirstEnabledModel(this.env);
+        if (fallback) {
+          baseUrl = fallback.base_url;
+          apiKey = await decryptModelApiKey(this.env, fallback);
+          modelName = fallback.name;
+        } else {
+          baseUrl = await getSetting(this.env, 'OPENAI_BASE_URL', this.env.OPENAI_BASE_URL ?? '');
+          apiKey = await getSecret(this.env, 'OPENAI_API_KEY');
+          if (!baseUrl || !apiKey) throw new Error('No model configured and no env fallback available');
+        }
+      }
+
+      const image = await generateImage({ baseUrl, apiKey, modelName }, {
         prompt: job.prompt,
-        model: job.model,
         size: job.size,
         quality: job.quality
       });

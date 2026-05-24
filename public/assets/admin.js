@@ -427,7 +427,123 @@ function cancelEdit(td, originalValue, type) {
   td.textContent = type === 'secrets' ? '点击修改' : originalValue;
 }
 
+// Models
+let editingModelId = null;
+
+async function loadModels() {
+  const container = document.querySelector('#modelsContainer');
+  try {
+    const data = await api('/api/admin/models');
+    const models = data.models || [];
+    if (!models.length) { container.innerHTML = '<p style="color:var(--color-mute)">暂无模型，点击右上角新增</p>'; return; }
+    let html = `<table class="data-table"><thead><tr>
+      <th>名称</th><th>显示名</th><th>API 地址</th><th>密钥</th><th>默认</th><th>启用</th><th>操作</th>
+    </tr></thead><tbody>`;
+    for (const m of models) {
+      html += `<tr>
+        <td><code>${escapeHtml(m.name)}</code></td>
+        <td>${escapeHtml(m.displayName)}</td>
+        <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis">${escapeHtml(m.baseUrl)}</td>
+        <td><code>${escapeHtml(m.apiKeyMasked)}</code></td>
+        <td>${m.isDefault ? '✓' : ''}</td>
+        <td>${m.enabled ? '✓' : '✗'}</td>
+        <td style="white-space:nowrap">
+          <button class="btn-subtle" data-edit-model="${escapeHtml(m.id)}">编辑</button>
+          ${!m.isDefault ? `<button class="btn-subtle" data-default-model="${escapeHtml(m.id)}">设为默认</button>` : ''}
+          <button class="btn-danger" data-delete-model="${escapeHtml(m.id)}" style="font-size:12px;padding:4px 8px">删除</button>
+        </td>
+      </tr>`;
+    }
+    html += '</tbody></table>';
+    container.innerHTML = html;
+
+    container.querySelectorAll('[data-edit-model]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const model = models.find((m) => m.id === btn.dataset.editModel);
+        openModelEdit(model);
+      });
+    });
+    container.querySelectorAll('[data-default-model]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        try {
+          await api(`/api/admin/models/${btn.dataset.defaultModel}/set-default`, { method: 'POST' });
+          showToast('已设为默认模型', 'success');
+          loadModels();
+        } catch (err) { showToast(err.message); }
+      });
+    });
+    container.querySelectorAll('[data-delete-model]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('确定删除此模型？')) return;
+        try {
+          await api(`/api/admin/models/${btn.dataset.deleteModel}`, { method: 'DELETE' });
+          showToast('模型已删除', 'success');
+          loadModels();
+        } catch (err) { showToast(err.message); }
+      });
+    });
+  } catch (e) {
+    container.innerHTML = `<p style="color:var(--color-error)">${escapeHtml(e.message)}</p>`;
+  }
+}
+
+function openModelEdit(model) {
+  editingModelId = model ? model.id : null;
+  document.querySelector('#modelModalTitle').textContent = model ? '编辑模型' : '新增模型';
+  document.querySelector('#modelName').value = model ? model.name : '';
+  document.querySelector('#modelDisplayName').value = model ? model.displayName : '';
+  document.querySelector('#modelBaseUrl').value = model ? model.baseUrl : '';
+  document.querySelector('#modelApiKey').value = '';
+  document.querySelector('#modelApiKey').placeholder = model ? '留空则不修改密钥' : 'sk-...';
+  document.querySelector('#modelSizes').value = model ? model.supportedSizes : '1024x1024,1024x1536,1536x1024';
+  document.querySelector('#modelQualities').value = model ? model.supportedQualities : 'auto,high,medium';
+  document.querySelector('#modelDefaultSize').value = model ? model.defaultSize : '1024x1024';
+  document.querySelector('#modelDefaultQuality').value = model ? model.defaultQuality : 'auto';
+  document.querySelector('#modelSortOrder').value = model ? model.sortOrder : 0;
+  openModal('modelModal');
+}
+
+document.querySelector('#addModelBtn')?.addEventListener('click', () => openModelEdit(null));
+
+document.querySelector('#modelSaveBtn')?.addEventListener('click', async () => {
+  const name = document.querySelector('#modelName').value.trim();
+  const displayName = document.querySelector('#modelDisplayName').value.trim();
+  const baseUrl = document.querySelector('#modelBaseUrl').value.trim();
+  const apiKey = document.querySelector('#modelApiKey').value.trim();
+  const supportedSizes = document.querySelector('#modelSizes').value.trim();
+  const supportedQualities = document.querySelector('#modelQualities').value.trim();
+  const defaultSize = document.querySelector('#modelDefaultSize').value.trim();
+  const defaultQuality = document.querySelector('#modelDefaultQuality').value.trim();
+  const sortOrder = Number(document.querySelector('#modelSortOrder').value) || 0;
+
+  if (!name || !displayName || !baseUrl) {
+    showToast('模型名称、显示名称、API 地址必填');
+    return;
+  }
+  if (!editingModelId && !apiKey) {
+    showToast('新增模型时 API 密钥必填');
+    return;
+  }
+
+  const payload = { name, displayName, baseUrl, supportedSizes, supportedQualities, defaultSize, defaultQuality, sortOrder };
+  if (apiKey) payload.apiKey = apiKey;
+
+  try {
+    if (editingModelId) {
+      await api(`/api/admin/models/${editingModelId}`, { method: 'PUT', body: JSON.stringify(payload) });
+      showToast('模型已更新', 'success');
+    } else {
+      payload.apiKey = apiKey;
+      await api('/api/admin/models', { method: 'POST', body: JSON.stringify(payload) });
+      showToast('模型已创建', 'success');
+    }
+    closeModal('modelModal');
+    loadModels();
+  } catch (err) { showToast(err.message); }
+});
+
 // Init
+loadModels();
 loadJobs();
 loadUsers();
 loadBans();

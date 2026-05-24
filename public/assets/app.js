@@ -6,11 +6,15 @@ const resultBody = document.querySelector('#resultBody');
 const resultActions = document.querySelector('#resultActions');
 const waitingCount = document.querySelector('#waitingCount');
 const runningCount = document.querySelector('#runningCount');
+const modelSelect = document.querySelector('#modelSelect');
+const sizeSelect = document.querySelector('#size');
+const qualitySelect = document.querySelector('#quality');
 
 let currentJobId = localStorage.getItem('efi_current_job_id');
 let pollTimer = null;
 let captchaConfig = { enabled: false, provider: 'none', siteKey: '' };
 let captchaWidgetId = null;
+let modelsData = [];
 
 async function api(path, options) {
   const res = await fetch(path, {
@@ -29,6 +33,59 @@ function getDeviceId() {
     localStorage.setItem('efi_device_id', id);
   }
   return id;
+}
+
+async function loadModels() {
+  try {
+    const data = await api('/api/config/models');
+    modelsData = data.models || [];
+    if (!modelSelect) return;
+    modelSelect.innerHTML = '';
+    if (modelsData.length === 0) {
+      modelSelect.innerHTML = '<option value="">暂无可用模型</option>';
+      return;
+    }
+    for (const m of modelsData) {
+      const opt = document.createElement('option');
+      opt.value = m.id;
+      opt.textContent = m.displayName;
+      if (m.isDefault) opt.selected = true;
+      modelSelect.appendChild(opt);
+    }
+    updateSizeQualityOptions();
+  } catch { /* models optional on load */ }
+}
+
+function updateSizeQualityOptions() {
+  if (!modelSelect || !sizeSelect || !qualitySelect) return;
+  const selectedId = modelSelect.value;
+  const model = modelsData.find((m) => m.id === selectedId);
+  if (!model) return;
+
+  const currentSize = sizeSelect.value;
+  const currentQuality = qualitySelect.value;
+
+  sizeSelect.innerHTML = '';
+  for (const s of model.supportedSizes) {
+    const opt = document.createElement('option');
+    opt.value = s;
+    opt.textContent = s.replace('x', ' × ');
+    if (s === currentSize || s === model.defaultSize) opt.selected = true;
+    sizeSelect.appendChild(opt);
+  }
+
+  qualitySelect.innerHTML = '';
+  for (const q of model.supportedQualities) {
+    const opt = document.createElement('option');
+    opt.value = q;
+    opt.textContent = q;
+    if (q === currentQuality || q === model.defaultQuality) opt.selected = true;
+    qualitySelect.appendChild(opt);
+  }
+}
+
+if (modelSelect) {
+  modelSelect.addEventListener('change', updateSizeQualityOptions);
 }
 
 async function initCaptcha() {
@@ -98,6 +155,7 @@ form?.addEventListener('submit', async (e) => {
     prompt,
     size: form.querySelector('#size').value,
     quality: form.querySelector('#quality').value,
+    modelId: modelSelect ? modelSelect.value : undefined,
     anonymousDeviceId: getDeviceId(),
     captchaToken,
   };
@@ -248,6 +306,7 @@ function escapeHtml(str) {
 
 refreshOverview();
 setInterval(refreshOverview, 5000);
+loadModels();
 initCaptcha();
 initAuthUI();
 

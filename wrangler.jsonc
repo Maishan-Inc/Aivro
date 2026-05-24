@@ -1,54 +1,54 @@
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "edge-fast-image-queue",
-  "main": "src/index.ts",
-  "compatibility_date": "2026-05-23",
-  "compatibility_flags": ["nodejs_compat"],
-  "assets": {
-    "directory": "./public",
-    "binding": "ASSETS"
-  },
-  "vars": {
-    "APP_NAME": "Edge-Fast-Image-Queue",
-    "APP_ENV": "development",
-    "APP_URL": "http://localhost:8787",
-    "OPENAI_BASE_URL": "https://api.openai.com/v1",
-    "OPENAI_IMAGE_MODEL": "gpt-image-2",
-    "OPENAI_IMAGE_SIZE": "1024x1024",
-    "OPENAI_IMAGE_QUALITY": "auto",
-    "QUEUE_CONCURRENCY": "2",
-    "QUEUE_GROUP_WINDOW_SECONDS": "60",
-    "QUEUE_GROUP_MAX_REQUESTS": "1",
-    "QUEUE_PRIORITY_TRIGGER_LENGTH": "100",
-    "QUEUE_PROTECTED_RANK": "50",
-    "QUEUE_PRIORITY_INSERT_START": "51",
-    "QUEUE_ALLOW_GUEST": "false"
-  },
-  "durable_objects": {
-    "bindings": [
-      {
-        "name": "QUEUE_COORDINATOR",
-        "class_name": "QueueCoordinator"
-      }
-    ]
-  },
-  "migrations": [
-    {
-      "tag": "v1",
-      "new_sqlite_classes": ["QueueCoordinator"]
-    }
-  ],
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "edge-fast-image-queue-db",
-      "database_id": "REPLACE_WITH_CLOUDFLARE_D1_DATABASE_ID"
-    }
-  ],
-  "r2_buckets": [
-    {
-      "binding": "IMAGES",
-      "bucket_name": "edge-fast-image-queue-images"
-    }
-  ]
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "edge-fast-image-queue",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-05-23",
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	"assets": {
+		"directory": "./public",
+		"binding": "ASSETS"
+	},
+	"vars": {
+		"APP_NAME": "Edge-Fast-Image-Queue",
+		"APP_ENV": "production",
+		"APP_URL": "",
+		"QUEUE_CONCURRENCY": "2",
+		"QUEUE_GROUP_WINDOW_SECONDS": "60",
+		"QUEUE_GROUP_MAX_REQUESTS": "1",
+		"QUEUE_PRIORITY_TRIGGER_LENGTH": "100",
+		"QUEUE_PROTECTED_RANK": "50",
+		"QUEUE_PRIORITY_INSERT_START": "51",
+		"QUEUE_ALLOW_GUEST": "false"
+	},
+	"durable_objects": {
+		"bindings": [
+			{
+				"name": "QUEUE_COORDINATOR",
+				"class_name": "QueueCoordinator"
+			}
+		]
+	},
+	"migrations": [
+		{
+			"tag": "v1",
+			"new_sqlite_classes": [
+				"QueueCoordinator"
+			]
+		}
+	],
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "edge-fast-image-queue-db",
+			"database_id": "ad5d7c49-38d8-4b50-a0d9-7765a64911a3"
+		}
+	],
+	"r2_buckets": [
+		{
+			"binding": "IMAGES",
+			"bucket_name": "edge-fast-image-queue-images"
+		}
+	]
 }

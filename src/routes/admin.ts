@@ -4,6 +4,15 @@ import type { AppContext } from '../types';
 import { fail, ok } from '../utils/response';
 import { encryptSecret, maskSecret } from '../services/crypto';
 import { newId, now } from '../utils/ids';
+import {
+  listAllModels,
+  getModelById,
+  createModel,
+  updateModel,
+  deleteModel,
+  type CreateModelInput,
+  type UpdateModelInput
+} from '../services/models';
 
 export const adminRoutes = new Hono<AppContext>();
 
@@ -270,6 +279,113 @@ adminRoutes.get('/audit-logs', async (c) => {
     ORDER BY a.created_at DESC LIMIT ?
   `).bind(limit).all();
   return ok(c, { logs: logs.results ?? [] });
+});
+
+// === Model Management ===
+
+adminRoutes.get('/models', async (c) => {
+  const models = await listAllModels(c.env);
+  return ok(c, {
+    models: models.map((m) => ({
+      id: m.id,
+      name: m.name,
+      displayName: m.display_name,
+      baseUrl: m.base_url,
+      apiKeyMasked: m.api_key_masked,
+      supportedSizes: m.supported_sizes,
+      supportedQualities: m.supported_qualities,
+      defaultSize: m.default_size,
+      defaultQuality: m.default_quality,
+      isDefault: m.is_default === 1,
+      enabled: m.enabled === 1,
+      sortOrder: m.sort_order,
+      createdAt: m.created_at,
+      updatedAt: m.updated_at,
+    }))
+  });
+});
+
+adminRoutes.post('/models', async (c) => {
+  const body = await c.req.json().catch(() => null) as null | {
+    name?: string; displayName?: string; baseUrl?: string; apiKey?: string;
+    supportedSizes?: string; supportedQualities?: string;
+    defaultSize?: string; defaultQuality?: string;
+    isDefault?: boolean; enabled?: boolean; sortOrder?: number;
+  };
+  if (!body?.name || !body?.displayName || !body?.baseUrl || !body?.apiKey) {
+    return fail(c, 'BAD_REQUEST', 'name, displayName, baseUrl, apiKey 必填。');
+  }
+
+  const input: CreateModelInput = {
+    name: body.name,
+    displayName: body.displayName,
+    baseUrl: body.baseUrl,
+    apiKey: body.apiKey,
+    supportedSizes: body.supportedSizes,
+    supportedQualities: body.supportedQualities,
+    defaultSize: body.defaultSize,
+    defaultQuality: body.defaultQuality,
+    isDefault: body.isDefault,
+    enabled: body.enabled,
+    sortOrder: body.sortOrder,
+  };
+
+  const model = await createModel(c.env, input);
+  await audit(c, 'model.create', 'model', model.id, null, `${model.name} (${model.display_name})`);
+  return ok(c, { id: model.id, name: model.name }, 201);
+});
+
+adminRoutes.put('/models/:id', async (c) => {
+  const id = c.req.param('id');
+  const body = await c.req.json().catch(() => null) as null | {
+    name?: string; displayName?: string; baseUrl?: string; apiKey?: string;
+    supportedSizes?: string; supportedQualities?: string;
+    defaultSize?: string; defaultQuality?: string;
+    isDefault?: boolean; enabled?: boolean; sortOrder?: number;
+  };
+  if (!body) return fail(c, 'BAD_REQUEST', '请求体无效。');
+
+  const existing = await getModelById(c.env, id);
+  if (!existing) return fail(c, 'NOT_FOUND', '模型不存在。', 404);
+
+  const input: UpdateModelInput = {
+    name: body.name,
+    displayName: body.displayName,
+    baseUrl: body.baseUrl,
+    apiKey: body.apiKey,
+    supportedSizes: body.supportedSizes,
+    supportedQualities: body.supportedQualities,
+    defaultSize: body.defaultSize,
+    defaultQuality: body.defaultQuality,
+    isDefault: body.isDefault,
+    enabled: body.enabled,
+    sortOrder: body.sortOrder,
+  };
+
+  const updated = await updateModel(c.env, id, input);
+  await audit(c, 'model.update', 'model', id, existing.name, updated?.name ?? existing.name);
+  return ok(c, { id, name: updated?.name });
+});
+
+adminRoutes.delete('/models/:id', async (c) => {
+  const id = c.req.param('id');
+  const existing = await getModelById(c.env, id);
+  if (!existing) return fail(c, 'NOT_FOUND', '模型不存在。', 404);
+
+  await deleteModel(c.env, id);
+  await audit(c, 'model.delete', 'model', id, existing.name, null);
+  return ok(c, { id, deleted: true });
+});
+
+adminRoutes.post('/models/:id/set-default', async (c) => {
+  const id = c.req.param('id');
+  const existing = await getModelById(c.env, id);
+  if (!existing) return fail(c, 'NOT_FOUND', '模型不存在。', 404);
+
+  await c.env.DB.prepare('UPDATE models SET is_default = 0 WHERE is_default = 1').run();
+  await c.env.DB.prepare('UPDATE models SET is_default = 1, updated_at = ? WHERE id = ?').bind(now(), id).run();
+  await audit(c, 'model.set_default', 'model', id, null, existing.name);
+  return ok(c, { id, isDefault: true });
 });
 
 async function audit(c: Context<AppContext>, action: string, resourceType: string, resourceId: string, oldValue: string | null, newValue: string | null) {

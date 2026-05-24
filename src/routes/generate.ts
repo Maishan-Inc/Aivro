@@ -7,6 +7,8 @@ import { providerPriority } from '../services/oauth';
 import { checkAndIncrementLimit } from '../services/rateLimit';
 import { verifyCaptcha } from '../services/captcha';
 import { isBanned } from '../services/bans';
+import { getModelById, getDefaultModel, getFirstEnabledModel, decryptModelApiKey } from '../services/models';
+import { getSecret } from '../services/config';
 
 export const generateRoutes = new Hono<AppContext>();
 
@@ -15,6 +17,7 @@ generateRoutes.post('/', async (c) => {
     prompt?: string;
     size?: string;
     quality?: string;
+    modelId?: string;
     captchaToken?: string;
     anonymousDeviceId?: string;
   };
@@ -69,9 +72,45 @@ generateRoutes.post('/', async (c) => {
     }
   }
 
-  const model = await getSetting(c.env, 'OPENAI_IMAGE_MODEL', c.env.OPENAI_IMAGE_MODEL ?? 'gpt-image-2');
-  const size = body?.size ?? await getSetting(c.env, 'OPENAI_IMAGE_SIZE', c.env.OPENAI_IMAGE_SIZE ?? '1024x1024');
-  const quality = body?.quality ?? await getSetting(c.env, 'OPENAI_IMAGE_QUALITY', c.env.OPENAI_IMAGE_QUALITY ?? 'auto');
+  // --- Model resolution ---
+  let modelName: string;
+  let modelBaseUrl: string;
+  let modelApiKey: string;
+  let modelDefaultSize: string;
+  let modelDefaultQuality: string;
+
+  const requestedModelId = body?.modelId;
+  if (requestedModelId) {
+    const model = await getModelById(c.env, requestedModelId);
+    if (!model || !model.enabled) return fail(c, 'MODEL_NOT_FOUND', '所选模型不存在或已禁用。', 400);
+    modelName = model.name;
+    modelBaseUrl = model.base_url;
+    modelApiKey = await decryptModelApiKey(c.env, model);
+    modelDefaultSize = model.default_size;
+    modelDefaultQuality = model.default_quality;
+  } else {
+    const model = await getDefaultModel(c.env) ?? await getFirstEnabledModel(c.env);
+    if (model) {
+      modelName = model.name;
+      modelBaseUrl = model.base_url;
+      modelApiKey = await decryptModelApiKey(c.env, model);
+      modelDefaultSize = model.default_size;
+      modelDefaultQuality = model.default_quality;
+    } else {
+      // Fallback to env vars for backward compatibility
+      modelName = await getSetting(c.env, 'OPENAI_IMAGE_MODEL', c.env.OPENAI_IMAGE_MODEL ?? 'gpt-image-1');
+      modelBaseUrl = await getSetting(c.env, 'OPENAI_BASE_URL', c.env.OPENAI_BASE_URL ?? '');
+      modelApiKey = await getSecret(c.env, 'OPENAI_API_KEY');
+      modelDefaultSize = await getSetting(c.env, 'OPENAI_IMAGE_SIZE', c.env.OPENAI_IMAGE_SIZE ?? '1024x1024');
+      modelDefaultQuality = await getSetting(c.env, 'OPENAI_IMAGE_QUALITY', c.env.OPENAI_IMAGE_QUALITY ?? 'auto');
+      if (!modelBaseUrl || !modelApiKey) {
+        return fail(c, 'NO_MODEL_CONFIGURED', '没有可用的模型配置，请联系管理员。', 500);
+      }
+    }
+  }
+
+  const size = body?.size ?? modelDefaultSize;
+  const quality = body?.quality ?? modelDefaultQuality;
   const provider = user?.provider ?? 'guest';
   const priority = user?.priority ?? await providerPriority(c.env, provider);
   const jobId = newId('job');
@@ -92,7 +131,7 @@ generateRoutes.post('/', async (c) => {
     priority,
     size,
     quality,
-    model,
+    modelName,
     clientIp,
     createdAt,
     createdAt
@@ -105,7 +144,7 @@ generateRoutes.post('/', async (c) => {
     provider,
     priority,
     prompt,
-    model,
+    model: modelName,
     size,
     quality,
     createdAt
