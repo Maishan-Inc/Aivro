@@ -120,9 +120,13 @@ authRoutes.get('/:provider/callback', async (c) => {
     return fail(c, 'USERINFO_ERROR', '读取用户信息出错。', 502);
   }
 
+  if (c.env.APP_ENV === 'development') {
+    console.log('[oauth-debug]', provider, Object.keys(userInfoRaw));
+  }
+
   const profile = mapUserInfo(provider, userInfoRaw);
   if (!profile.providerUserId) {
-    return fail(c, 'USERINFO_INVALID', '用户信息缺少唯一标识。', 502);
+    return fail(c, 'OAUTH_BAD_PROFILE', '用户信息缺少唯一标识，无法完成登录。', 502);
   }
 
   const { userId } = await upsertUserFromOAuth(c.env, provider, profile);
@@ -165,14 +169,37 @@ function mapUserInfo(provider: 'google' | 'linuxdo', raw: Record<string, unknown
     };
   }
 
-  const idStr = typeof raw.id === 'string' ? raw.id : typeof raw.id === 'number' ? String(raw.id) : typeof raw.sub === 'string' ? raw.sub : '';
+  // Linux.DO (Discourse OIDC): prefer sub (string), fallback to id (may be number)
+  const sub = raw.sub;
+  const id = raw.id;
+  let providerUserId = '';
+  if (typeof sub === 'string' && sub.length > 0) {
+    providerUserId = sub;
+  } else if (typeof id === 'number' && Number.isFinite(id)) {
+    providerUserId = String(id);
+  } else if (typeof id === 'string' && id.length > 0) {
+    providerUserId = id;
+  }
+
+  // Avatar: prefer picture (full URL), then avatar_url, then avatar_template with {size} replaced
+  let avatarUrl: string | undefined;
+  if (typeof raw.picture === 'string' && raw.picture.length > 0) {
+    avatarUrl = raw.picture;
+  } else if (typeof raw.avatar_url === 'string' && raw.avatar_url.length > 0) {
+    avatarUrl = raw.avatar_url;
+  } else if (typeof raw.avatar_template === 'string' && raw.avatar_template.length > 0) {
+    avatarUrl = raw.avatar_template.replace('{size}', '96');
+  }
+
   const username = typeof raw.username === 'string' ? raw.username : undefined;
+  const preferredUsername = typeof raw.preferred_username === 'string' ? raw.preferred_username : undefined;
   const name = typeof raw.name === 'string' ? raw.name : undefined;
+
   return {
-    providerUserId: idStr,
+    providerUserId,
     email: typeof raw.email === 'string' ? raw.email : undefined,
-    name: name || username,
-    avatarUrl: typeof raw.avatar_url === 'string' ? raw.avatar_url : typeof raw.avatar_template === 'string' ? raw.avatar_template : undefined,
+    name: name || preferredUsername || username,
+    avatarUrl,
     raw
   };
 }

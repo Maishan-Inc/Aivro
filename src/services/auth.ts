@@ -161,6 +161,7 @@ export async function upsertUserFromOAuth(
   const role: 'admin' | 'user' = isAdmin ? 'admin' : 'user';
   const priority = await providerPriority(env, isAdmin ? 'admin' : provider);
   const profileJson = JSON.stringify(profile.raw ?? {});
+  const rawProfile = JSON.stringify(profile.raw ?? {});
 
   const existing = await env.DB.prepare(`
     SELECT id, user_id FROM oauth_accounts WHERE provider = ? AND provider_user_id = ? LIMIT 1
@@ -188,9 +189,9 @@ export async function upsertUserFromOAuth(
       ),
       env.DB.prepare(`
         UPDATE oauth_accounts
-        SET email = ?, profile_json = ?, updated_at = ?
+        SET email = ?, profile_json = ?, raw_profile = ?, updated_at = ?
         WHERE id = ?
-      `).bind(profile.email ?? null, profileJson, ts, existing.id)
+      `).bind(profile.email ?? null, profileJson, rawProfile, ts, existing.id)
     ]);
     return { userId: existing.user_id };
   }
@@ -212,9 +213,9 @@ export async function upsertUserFromOAuth(
       ts
     ),
     env.DB.prepare(`
-      INSERT INTO oauth_accounts (id, user_id, provider, provider_user_id, email, profile_json, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).bind(oauthId, userId, provider, profile.providerUserId, profile.email ?? null, profileJson, ts, ts)
+      INSERT INTO oauth_accounts (id, user_id, provider, provider_user_id, email, profile_json, raw_profile, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(oauthId, userId, provider, profile.providerUserId, profile.email ?? null, profileJson, rawProfile, ts, ts)
   ]);
 
   return { userId };
