@@ -15,6 +15,7 @@
 当前启动时执行 `AutoMigrate`，自动维护以下表：
 
 - `users`
+- `email_verifications`
 - `credit_logs`
 - `prompts`
 - `assets`
@@ -40,13 +41,31 @@
 | `aff_count`     | number | 已邀请用户数量，冗余统计字段           |
 | `inviter_id`    | string | 邀请人用户 ID                 |
 | `github_id`     | string | GitHub 用户 ID               |
+| `google_id`     | string | Google 用户 ID               |
 | `linux_do_id`   | string | Linux.do 用户 ID            |
+| `metamask_address` | string | MetaMask 钱包地址            |
 | `wechat_id`     | string | 微信用户 ID                   |
+| `auth_provider` | string | 主要登录来源：`password`、`google`、`github`、`linux-do`、`metamask` 等 |
+| `email_verified` | bool | 邮箱是否已验证                 |
 | `status`        | string | 用户状态：`active`、`ban`       |
 | `last_login_at` | string | 最近登录时间                   |
 | `extra`         | json   | 扩展信息，第三方资料按平台命名空间保存，如 `linuxDo` |
 | `created_at`    | string | 创建时间                     |
 | `updated_at`    | string | 更新时间                     |
+
+### email_verifications
+
+邮箱验证码表。用于注册绑定邮箱、找回密码和 MetaMask 首次登录绑定邮箱。
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | 主键 |
+| `purpose` | string | 用途：`register`、`reset`、`metamask` |
+| `target` | string | 邮箱地址 |
+| `code` | string | 验证码 |
+| `expires_at` | string | 过期时间 |
+| `used_at` | string | 使用时间，未使用为空 |
+| `created_at` | string | 创建时间 |
 
 ### prompts
 
@@ -127,11 +146,26 @@
 | `model` | string | 模型名称 |
 | `credits` | number | 每次后端模型接口调用前预扣的算力点，未配置默认不扣除 |
 
-`auth.linuxDo` 当前字段：
+`auth` 当前字段：
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `enabled` | bool | 是否开启 Linux.do 登录 |
+| `allowRegister` | bool | 是否允许用户注册 |
+| `emailVerification` | bool | 是否开启注册邮箱验证 |
+| `linuxDo` | object | Linux.do 登录公开配置 |
+| `google` | object | Google 登录公开配置 |
+| `github` | object | GitHub 登录公开配置 |
+| `metamask` | object | MetaMask 登录公开配置 |
+| `customProviders` | object[] | 自定义 OAuth 登录公开配置 |
+
+登录公开配置字段：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | 登录方式 ID |
+| `name` | string | 前台按钮显示名称 |
+| `iconUrl` | string | 前台按钮图标地址 |
+| `enabled` | bool | 是否在前台开启 |
 
 `private.value` 当前字段：
 
@@ -140,6 +174,7 @@
 | `channels` | object[] | 模型渠道配置列表 |
 | `promptSync` | object | GitHub 远程提示词定时同步配置 |
 | `auth` | object | 私有登录配置 |
+| `mail` | object | SMTP 邮件验证码配置 |
 
 `channels` 每项字段：
 
@@ -161,12 +196,34 @@
 | `enabled` | bool | 是否开启定时同步，默认开启 |
 | `cron` | string | Cron 表达式，默认每 5 分钟 |
 
-`auth.linuxDo` 当前字段：
+OAuth 私有配置字段：
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `clientId` | string | Linux.do OAuth App Client ID |
-| `clientSecret` | string | Linux.do OAuth App Client Secret，后台返回时隐藏 |
+| `id` | string | 登录方式 ID |
+| `name` | string | 管理后台显示名称 |
+| `iconUrl` | string | 前台按钮图标地址 |
+| `clientId` | string | OAuth Client ID |
+| `clientSecret` | string | OAuth Client Secret，后台返回时隐藏 |
+| `authorizeUrl` | string | OAuth 授权地址 |
+| `tokenUrl` | string | OAuth Token 地址 |
+| `userInfoUrl` | string | OAuth 用户信息地址 |
+| `scope` | string | OAuth scope |
+| `enabled` | bool | 服务端是否启用 |
+
+`mail` 当前字段：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `enabled` | bool | 是否开启 SMTP 邮件 |
+| `host` | string | SMTP Host |
+| `port` | number | SMTP 端口 |
+| `username` | string | SMTP 用户名 |
+| `password` | string | SMTP 密码，后台返回时隐藏 |
+| `fromEmail` | string | 发件邮箱 |
+| `fromName` | string | 发件名称 |
+| `codeExpireMin` | number | 验证码有效分钟数 |
+| `templates` | object | 注册、找回密码和 MetaMask 邮箱验证模板 |
 
 后端请求模型时，先按模型名筛选启用且包含该模型的渠道，再按 `weight` 加权随机选择一个渠道。
 

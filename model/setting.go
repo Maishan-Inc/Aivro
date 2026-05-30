@@ -46,12 +46,20 @@ type PublicSetting struct {
 }
 
 type PublicAuthSetting struct {
-	AllowRegister *bool                    `json:"allowRegister"`
-	LinuxDo       PublicLinuxDoAuthSetting `json:"linuxDo"`
+	AllowRegister     *bool                        `json:"allowRegister"`
+	EmailVerification *bool                        `json:"emailVerification"`
+	LinuxDo           PublicOAuthProviderSetting   `json:"linuxDo"`
+	Google            PublicOAuthProviderSetting   `json:"google"`
+	Github            PublicOAuthProviderSetting   `json:"github"`
+	MetaMask          PublicOAuthProviderSetting   `json:"metamask"`
+	CustomProviders   []PublicOAuthProviderSetting `json:"customProviders"`
 }
 
-type PublicLinuxDoAuthSetting struct {
-	Enabled bool `json:"enabled"`
+type PublicOAuthProviderSetting struct {
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	IconURL string `json:"iconUrl"`
+	Enabled bool   `json:"enabled"`
 }
 
 // PrivateSetting 私有配置。
@@ -59,6 +67,7 @@ type PrivateSetting struct {
 	Channels   []ModelChannel     `json:"channels"`
 	PromptSync PromptSyncSetting  `json:"promptSync"`
 	Auth       PrivateAuthSetting `json:"auth"`
+	Mail       MailSetting        `json:"mail"`
 }
 
 // PromptSyncSetting 提示词定时同步配置。
@@ -68,12 +77,51 @@ type PromptSyncSetting struct {
 }
 
 type PrivateAuthSetting struct {
-	LinuxDo PrivateLinuxDoAuthSetting `json:"linuxDo"`
+	LinuxDo         PrivateOAuthProviderSetting   `json:"linuxDo"`
+	Google          PrivateOAuthProviderSetting   `json:"google"`
+	Github          PrivateOAuthProviderSetting   `json:"github"`
+	MetaMask        PrivateMetaMaskAuthSetting    `json:"metamask"`
+	CustomProviders []PrivateOAuthProviderSetting `json:"customProviders"`
 }
 
-type PrivateLinuxDoAuthSetting struct {
+type PrivateOAuthProviderSetting struct {
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	IconURL      string `json:"iconUrl"`
 	ClientID     string `json:"clientId"`
 	ClientSecret string `json:"clientSecret"`
+	AuthorizeURL string `json:"authorizeUrl"`
+	TokenURL     string `json:"tokenUrl"`
+	UserInfoURL  string `json:"userInfoUrl"`
+	Scope        string `json:"scope"`
+	Enabled      bool   `json:"enabled"`
+}
+
+type PrivateMetaMaskAuthSetting struct {
+	Enabled bool `json:"enabled"`
+}
+
+type MailSetting struct {
+	Enabled       bool          `json:"enabled"`
+	Host          string        `json:"host"`
+	Port          int           `json:"port"`
+	Username      string        `json:"username"`
+	Password      string        `json:"password"`
+	FromEmail     string        `json:"fromEmail"`
+	FromName      string        `json:"fromName"`
+	CodeExpireMin int           `json:"codeExpireMin"`
+	Templates     MailTemplates `json:"templates"`
+}
+
+type MailTemplates struct {
+	Register MailTemplate `json:"register"`
+	Reset    MailTemplate `json:"reset"`
+	MetaMask MailTemplate `json:"metamask"`
+}
+
+type MailTemplate struct {
+	Subject string `json:"subject"`
+	Body    string `json:"body"`
 }
 
 // Setting 系统配置。

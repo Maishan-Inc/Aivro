@@ -17,25 +17,29 @@ const (
 
 // User 系统用户。
 type User struct {
-	ID          string     `json:"id" gorm:"primaryKey"`
-	Username    string     `json:"username" gorm:"uniqueIndex"`
-	Password    string     `json:"password,omitempty"`
-	Email       string     `json:"email"`
-	DisplayName string     `json:"displayName"`
-	AvatarURL   string     `json:"avatarUrl"`
-	Role        UserRole   `json:"role"`
-	Credits     int        `json:"credits"`
-	AffCode     string     `json:"affCode" gorm:"uniqueIndex"`
-	AffCount    int        `json:"affCount"`
-	InviterID   string     `json:"inviterId"`
-	GithubID    string     `json:"githubId"`
-	LinuxDoID   string     `json:"linuxDoId" gorm:"index"`
-	WechatID    string     `json:"wechatId"`
-	Status      UserStatus `json:"status"`
-	LastLoginAt string     `json:"lastLoginAt"`
-	Extra       string     `json:"extra" gorm:"type:text"`
-	CreatedAt   string     `json:"createdAt"`
-	UpdatedAt   string     `json:"updatedAt"`
+	ID              string     `json:"id" gorm:"primaryKey"`
+	Username        string     `json:"username" gorm:"uniqueIndex"`
+	Password        string     `json:"password,omitempty"`
+	Email           string     `json:"email"`
+	DisplayName     string     `json:"displayName"`
+	AvatarURL       string     `json:"avatarUrl"`
+	Role            UserRole   `json:"role"`
+	Credits         int        `json:"credits"`
+	AffCode         string     `json:"affCode" gorm:"uniqueIndex"`
+	AffCount        int        `json:"affCount"`
+	InviterID       string     `json:"inviterId"`
+	GithubID        string     `json:"githubId" gorm:"index"`
+	GoogleID        string     `json:"googleId" gorm:"index"`
+	LinuxDoID       string     `json:"linuxDoId" gorm:"index"`
+	MetaMaskAddress string     `json:"metamaskAddress" gorm:"index"`
+	WechatID        string     `json:"wechatId"`
+	AuthProvider    string     `json:"authProvider"`
+	EmailVerified   bool       `json:"emailVerified"`
+	Status          UserStatus `json:"status"`
+	LastLoginAt     string     `json:"lastLoginAt"`
+	Extra           string     `json:"extra" gorm:"type:text"`
+	CreatedAt       string     `json:"createdAt"`
+	UpdatedAt       string     `json:"updatedAt"`
 }
 
 // UserList 用户分页结果。
@@ -99,4 +103,15 @@ type CreditLog struct {
 type CreditLogList struct {
 	Items []CreditLog `json:"items"`
 	Total int         `json:"total"`
+}
+
+// EmailVerification 邮箱验证码。
+type EmailVerification struct {
+	ID        string `json:"id" gorm:"primaryKey"`
+	Purpose   string `json:"purpose" gorm:"index"`
+	Target    string `json:"target" gorm:"index"`
+	Code      string `json:"code"`
+	ExpiresAt string `json:"expiresAt" gorm:"index"`
+	UsedAt    string `json:"usedAt"`
+	CreatedAt string `json:"createdAt"`
 }

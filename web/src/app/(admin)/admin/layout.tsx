@@ -84,7 +84,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                 />
                 <Flex vertical gap={8} style={{ position: "absolute", bottom: 0, insetInline: 0, padding: 12, borderTop: `1px solid ${antToken.colorBorder}`, background: antToken.colorBgContainer }}>
                     <Button block icon={<HomeOutlined />} href="/canvas" target="_blank" rel="noreferrer">
-                        前往画布
+                        前往工作流
                     </Button>
                     <Button block icon={<LogoutOutlined />} onClick={logout}>
                         退出登录

@@ -2,14 +2,18 @@ package service
 
 import (
 	"bytes"
+	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"log"
+	"math/big"
 	"net/http"
+	"net/smtp"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -29,7 +33,11 @@ type TokenClaims struct {
 }
 
 type userExtra struct {
-	LinuxDo any `json:"linuxDo,omitempty"`
+	LinuxDo   any    `json:"linuxDo,omitempty"`
+	OAuth     any    `json:"oauth,omitempty"`
+	Wallet    string `json:"wallet,omitempty"`
+	Message   string `json:"message,omitempty"`
+	Signature string `json:"signature,omitempty"`
 }
 
 func EnsureDefaultAdmin() error {
@@ -58,7 +66,7 @@ func EnsureDefaultAdmin() error {
 	return err
 }
 
-func Register(username string, password string) (model.AuthSession, error) {
+func Register(username string, password string, email string, code string) (model.AuthSession, error) {
 	settings, err := repository.GetSettings()
 	if err != nil {
 		return model.AuthSession{}, err
@@ -74,25 +82,47 @@ func Register(username string, password string) (model.AuthSession, error) {
 	if username == "" || password == "" {
 		return model.AuthSession{}, safeMessageError{message: "用户名和密码不能为空"}
 	}
+	email = strings.TrimSpace(strings.ToLower(email))
+	emailVerified := false
+	if normalizedSettings.Public.Auth.EmailVerification != nil && *normalizedSettings.Public.Auth.EmailVerification {
+		if email == "" || code == "" {
+			return model.AuthSession{}, safeMessageError{message: "请先完成邮箱验证码验证"}
+		}
+		if err := verifyEmailCode("register", email, code); err != nil {
+			return model.AuthSession{}, err
+		}
+		emailVerified = true
+	}
 	if _, ok, err := repository.GetUserByUsername(username); err != nil || ok {
 		if err != nil {
 			return model.AuthSession{}, err
 		}
 		return model.AuthSession{}, safeMessageError{message: "用户名已存在"}
 	}
+	if email != "" {
+		if _, ok, err := repository.GetUserByEmail(email); err != nil || ok {
+			if err != nil {
+				return model.AuthSession{}, err
+			}
+			return model.AuthSession{}, safeMessageError{message: "邮箱已被使用"}
+		}
+	}
 	hash, err := hashPassword(password)
 	if err != nil {
 		return model.AuthSession{}, err
 	}
 	user, err := repository.SaveUser(model.User{
-		ID:        newID("user"),
-		Username:  username,
-		Password:  hash,
-		Role:      model.UserRoleUser,
-		AffCode:   newAffCode(),
-		Status:    model.UserStatusActive,
-		CreatedAt: now(),
-		UpdatedAt: now(),
+		ID:            newID("user"),
+		Username:      username,
+		Password:      hash,
+		Email:         email,
+		EmailVerified: emailVerified,
+		AuthProvider:  "password",
+		Role:          model.UserRoleUser,
+		AffCode:       newAffCode(),
+		Status:        model.UserStatusActive,
+		CreatedAt:     now(),
+		UpdatedAt:     now(),
 	})
 	if err != nil {
 		return model.AuthSession{}, err
@@ -101,7 +131,11 @@ func Register(username string, password string) (model.AuthSession, error) {
 }
 
 func Login(username string, password string) (model.AuthSession, error) {
-	user, ok, err := repository.GetUserByUsername(strings.TrimSpace(username))
+	account := strings.TrimSpace(username)
+	user, ok, err := repository.GetUserByUsername(account)
+	if err == nil && !ok && strings.Contains(account, "@") {
+		user, ok, err = repository.GetUserByEmail(strings.ToLower(account))
+	}
 	if err != nil {
 		return model.AuthSession{}, err
 	}
@@ -202,6 +236,158 @@ func LoginWithLinuxDo(r *http.Request, code string, state string) (model.AuthSes
 	return session, redirect, err
 }
 
+func OAuthAuthorizeURL(r *http.Request, provider string, redirect string) (string, error) {
+	settings, err := repository.GetSettings()
+	if err != nil {
+		return "", err
+	}
+	settings = normalizeSettings(settings)
+	publicProvider, privateProvider, ok := oauthProviderSettings(settings, provider)
+	if !ok || !publicProvider.Enabled || !privateProvider.Enabled {
+		return "", safeMessageError{message: "第三方登录未开启"}
+	}
+	if strings.TrimSpace(privateProvider.ClientID) == "" || strings.TrimSpace(privateProvider.ClientSecret) == "" || strings.TrimSpace(privateProvider.AuthorizeURL) == "" {
+		return "", safeMessageError{message: "第三方登录未配置"}
+	}
+	values := url.Values{}
+	values.Set("client_id", privateProvider.ClientID)
+	values.Set("redirect_uri", oauthRedirectURI(r, publicProvider.ID))
+	values.Set("response_type", "code")
+	if strings.TrimSpace(privateProvider.Scope) != "" {
+		values.Set("scope", privateProvider.Scope)
+	}
+	values.Set("state", base64.RawURLEncoding.EncodeToString([]byte(redirect)))
+	return privateProvider.AuthorizeURL + "?" + values.Encode(), nil
+}
+
+func LoginWithOAuth(r *http.Request, provider string, code string, state string) (model.AuthSession, string, error) {
+	redirect := decodeState(state)
+	settings, err := repository.GetSettings()
+	if err != nil {
+		return model.AuthSession{}, redirect, err
+	}
+	settings = normalizeSettings(settings)
+	publicProvider, privateProvider, ok := oauthProviderSettings(settings, provider)
+	if !ok || !publicProvider.Enabled || !privateProvider.Enabled {
+		return model.AuthSession{}, redirect, safeMessageError{message: "第三方登录未开启"}
+	}
+	token, err := oauthAccessToken(r, publicProvider.ID, code, privateProvider)
+	if err != nil {
+		return model.AuthSession{}, redirect, err
+	}
+	profile, err := oauthProfile(token, publicProvider.ID, privateProvider)
+	if err != nil {
+		return model.AuthSession{}, redirect, err
+	}
+	user, ok, err := findOAuthUser(publicProvider.ID, profile.ID)
+	if err != nil {
+		return model.AuthSession{}, redirect, err
+	}
+	if !ok && profile.Email != "" {
+		user, ok, err = repository.GetUserByEmail(profile.Email)
+		if err != nil {
+			return model.AuthSession{}, redirect, err
+		}
+	}
+	if !ok {
+		if settings.Public.Auth.AllowRegister != nil && !*settings.Public.Auth.AllowRegister {
+			return model.AuthSession{}, redirect, safeMessageError{message: "当前未开放注册"}
+		}
+		user = model.User{
+			ID:            newID("user"),
+			Username:      oauthUsername(publicProvider.ID, profile.Username, profile.ID),
+			Email:         profile.Email,
+			DisplayName:   firstNonEmpty(profile.Name, profile.Username),
+			AvatarURL:     profile.AvatarURL,
+			Role:          model.UserRoleUser,
+			AffCode:       newAffCode(),
+			Status:        model.UserStatusActive,
+			AuthProvider:  publicProvider.ID,
+			EmailVerified: profile.Email != "",
+			CreatedAt:     now(),
+		}
+	} else if user.Status == model.UserStatusBan {
+		return model.AuthSession{}, redirect, safeMessageError{message: "账号已被禁用"}
+	}
+	applyOAuthID(&user, publicProvider.ID, profile.ID)
+	user.DisplayName = firstNonEmpty(profile.Name, user.DisplayName)
+	user.AvatarURL = firstNonEmpty(profile.AvatarURL, user.AvatarURL)
+	if user.Email == "" {
+		user.Email = profile.Email
+	}
+	if profile.Email != "" {
+		user.EmailVerified = true
+	}
+	if user.AuthProvider == "" || user.AuthProvider == "password" {
+		user.AuthProvider = publicProvider.ID
+	}
+	user.LastLoginAt = now()
+	user.UpdatedAt = now()
+	extra, _ := json.Marshal(userExtra{OAuth: profile})
+	user.Extra = string(extra)
+	user, err = repository.SaveUser(user)
+	if err != nil {
+		return model.AuthSession{}, redirect, err
+	}
+	session, err := newSession(user)
+	return session, redirect, err
+}
+
+func LoginWithMetaMask(walletAddress string, message string, signature string, email string, code string) (model.AuthSession, error) {
+	settings, err := repository.GetSettings()
+	if err != nil {
+		return model.AuthSession{}, err
+	}
+	settings = normalizeSettings(settings)
+	if !settings.Public.Auth.MetaMask.Enabled || !settings.Private.Auth.MetaMask.Enabled {
+		return model.AuthSession{}, safeMessageError{message: "MetaMask 登录未开启"}
+	}
+	walletAddress = strings.ToLower(strings.TrimSpace(walletAddress))
+	if walletAddress == "" || strings.TrimSpace(signature) == "" {
+		return model.AuthSession{}, safeMessageError{message: "缺少钱包签名"}
+	}
+	user, ok, err := repository.GetUserByMetaMaskAddress(walletAddress)
+	if err != nil {
+		return model.AuthSession{}, err
+	}
+	if !ok {
+		if settings.Public.Auth.AllowRegister != nil && !*settings.Public.Auth.AllowRegister {
+			return model.AuthSession{}, safeMessageError{message: "当前未开放注册"}
+		}
+		email = strings.TrimSpace(strings.ToLower(email))
+		if email == "" || code == "" {
+			return model.AuthSession{}, safeMessageError{message: "请先验证邮箱"}
+		}
+		if err := verifyEmailCode("metamask", email, code); err != nil {
+			return model.AuthSession{}, err
+		}
+		user = model.User{
+			ID:              newID("user"),
+			Username:        metamaskUsername(walletAddress),
+			Email:           email,
+			EmailVerified:   true,
+			DisplayName:     "MetaMask " + shortWallet(walletAddress),
+			Role:            model.UserRoleUser,
+			AffCode:         newAffCode(),
+			Status:          model.UserStatusActive,
+			AuthProvider:    "metamask",
+			MetaMaskAddress: walletAddress,
+			CreatedAt:       now(),
+		}
+	} else if user.Status == model.UserStatusBan {
+		return model.AuthSession{}, safeMessageError{message: "账号已被禁用"}
+	}
+	user.LastLoginAt = now()
+	user.UpdatedAt = now()
+	extra, _ := json.Marshal(userExtra{Wallet: walletAddress, Message: message, Signature: signature})
+	user.Extra = string(extra)
+	user, err = repository.SaveUser(user)
+	if err != nil {
+		return model.AuthSession{}, err
+	}
+	return newSession(user)
+}
+
 func ParseToken(tokenText string) (TokenClaims, error) {
 	claims := TokenClaims{}
 	token, err := jwt.ParseWithClaims(tokenText, &claims, func(token *jwt.Token) (any, error) {
@@ -283,6 +469,18 @@ func SaveUser(user model.User, password string) (model.User, error) {
 		}
 		if user.LinuxDoID == "" {
 			user.LinuxDoID = saved.LinuxDoID
+		}
+		if user.GithubID == "" {
+			user.GithubID = saved.GithubID
+		}
+		if user.GoogleID == "" {
+			user.GoogleID = saved.GoogleID
+		}
+		if user.MetaMaskAddress == "" {
+			user.MetaMaskAddress = saved.MetaMaskAddress
+		}
+		if user.AuthProvider == "" {
+			user.AuthProvider = saved.AuthProvider
 		}
 		user.LastLoginAt = saved.LastLoginAt
 	}
@@ -470,7 +668,7 @@ type linuxDoUserResponse struct {
 	AvatarTemplate string `json:"avatar_template"`
 }
 
-func linuxDoAccessToken(r *http.Request, code string, setting model.PrivateLinuxDoAuthSetting) (string, error) {
+func linuxDoAccessToken(r *http.Request, code string, setting model.PrivateOAuthProviderSetting) (string, error) {
 	values := url.Values{}
 	values.Set("client_id", setting.ClientID)
 	values.Set("client_secret", setting.ClientSecret)
@@ -536,6 +734,331 @@ func linuxDoAvatar(template string) string {
 		template = "https://linux.do" + template
 	}
 	return strings.ReplaceAll(template, "{size}", "120")
+}
+
+type oauthProfileData struct {
+	ID        string
+	Username  string
+	Name      string
+	Email     string
+	AvatarURL string
+}
+
+func oauthProviderSettings(settings model.Settings, provider string) (model.PublicOAuthProviderSetting, model.PrivateOAuthProviderSetting, bool) {
+	provider = strings.TrimSpace(provider)
+	switch provider {
+	case "linux-do":
+		return settings.Public.Auth.LinuxDo, settings.Private.Auth.LinuxDo, true
+	case "google":
+		return settings.Public.Auth.Google, settings.Private.Auth.Google, true
+	case "github":
+		return settings.Public.Auth.Github, settings.Private.Auth.Github, true
+	}
+	for i, item := range settings.Public.Auth.CustomProviders {
+		if item.ID == provider {
+			if i < len(settings.Private.Auth.CustomProviders) {
+				return item, settings.Private.Auth.CustomProviders[i], true
+			}
+			for _, private := range settings.Private.Auth.CustomProviders {
+				if private.ID == provider {
+					return item, private, true
+				}
+			}
+		}
+	}
+	return model.PublicOAuthProviderSetting{}, model.PrivateOAuthProviderSetting{}, false
+}
+
+func oauthRedirectURI(r *http.Request, provider string) string {
+	return RequestOrigin(r) + "/api/auth/oauth/" + url.PathEscape(provider) + "/callback"
+}
+
+func oauthAccessToken(r *http.Request, provider string, code string, setting model.PrivateOAuthProviderSetting) (string, error) {
+	values := url.Values{}
+	values.Set("client_id", setting.ClientID)
+	values.Set("client_secret", setting.ClientSecret)
+	values.Set("grant_type", "authorization_code")
+	values.Set("code", code)
+	values.Set("redirect_uri", oauthRedirectURI(r, provider))
+	req, _ := http.NewRequest(http.MethodPost, setting.TokenURL, strings.NewReader(values.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Accept", "application/json")
+	var payload struct {
+		AccessToken string `json:"access_token"`
+		TokenType   string `json:"token_type"`
+	}
+	if err := doJSON(req, &payload, "第三方登录失败"); err != nil {
+		return "", err
+	}
+	if strings.TrimSpace(payload.AccessToken) == "" {
+		return "", safeMessageError{message: "第三方登录失败"}
+	}
+	return payload.AccessToken, nil
+}
+
+func oauthProfile(token string, provider string, setting model.PrivateOAuthProviderSetting) (oauthProfileData, error) {
+	req, _ := http.NewRequest(http.MethodGet, setting.UserInfoURL, nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Accept", "application/json")
+	var payload map[string]any
+	if err := doJSON(req, &payload, "读取第三方用户信息失败"); err != nil {
+		return oauthProfileData{}, err
+	}
+	id := firstNonEmpty(anyString(payload["sub"]), anyString(payload["id"]), anyString(payload["uid"]), anyString(payload["open_id"]), anyString(payload["user_id"]))
+	if id == "" {
+		return oauthProfileData{}, safeMessageError{message: "第三方用户信息无效"}
+	}
+	profile := oauthProfileData{
+		ID:        id,
+		Username:  firstNonEmpty(anyString(payload["login"]), anyString(payload["username"]), anyString(payload["preferred_username"]), id),
+		Name:      firstNonEmpty(anyString(payload["name"]), anyString(payload["nickname"])),
+		Email:     strings.ToLower(anyString(payload["email"])),
+		AvatarURL: firstNonEmpty(anyString(payload["avatar_url"]), anyString(payload["picture"]), anyString(payload["avatar"])),
+	}
+	if provider == "github" && profile.Email == "" {
+		profile.Email = githubPrimaryEmail(token)
+	}
+	return profile, nil
+}
+
+func githubPrimaryEmail(token string) string {
+	req, _ := http.NewRequest(http.MethodGet, "https://api.github.com/user/emails", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Accept", "application/json")
+	var payload []struct {
+		Email   string `json:"email"`
+		Primary bool   `json:"primary"`
+	}
+	if err := doJSON(req, &payload, ""); err != nil {
+		return ""
+	}
+	for _, item := range payload {
+		if item.Primary && strings.TrimSpace(item.Email) != "" {
+			return strings.ToLower(strings.TrimSpace(item.Email))
+		}
+	}
+	if len(payload) > 0 {
+		return strings.ToLower(strings.TrimSpace(payload[0].Email))
+	}
+	return ""
+}
+
+func doJSON(req *http.Request, payload any, fallback string) error {
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return safeMessageError{message: fallback}
+	}
+	return json.NewDecoder(bytes.NewReader(body)).Decode(payload)
+}
+
+func findOAuthUser(provider string, id string) (model.User, bool, error) {
+	switch provider {
+	case "linux-do":
+		return repository.GetUserByLinuxDoID(id)
+	case "google":
+		return repository.GetUserByGoogleID(id)
+	case "github":
+		return repository.GetUserByGithubID(id)
+	default:
+		return model.User{}, false, nil
+	}
+}
+
+func applyOAuthID(user *model.User, provider string, id string) {
+	switch provider {
+	case "linux-do":
+		user.LinuxDoID = id
+	case "google":
+		user.GoogleID = id
+	case "github":
+		user.GithubID = id
+	}
+}
+
+func oauthUsername(provider string, username string, id string) string {
+	base := strings.TrimSpace(username)
+	if base == "" {
+		base = provider + "-" + id
+	}
+	if _, ok, err := repository.GetUserByUsername(base); err != nil || !ok {
+		return base
+	}
+	return base + "-" + id
+}
+
+func anyString(value any) string {
+	switch typed := value.(type) {
+	case string:
+		return strings.TrimSpace(typed)
+	case float64:
+		return strconv.FormatInt(int64(typed), 10)
+	case int64:
+		return strconv.FormatInt(typed, 10)
+	case int:
+		return strconv.Itoa(typed)
+	default:
+		return ""
+	}
+}
+
+func metamaskUsername(wallet string) string {
+	base := "wallet-" + shortWallet(wallet)
+	if _, ok, err := repository.GetUserByUsername(base); err != nil || !ok {
+		return base
+	}
+	return base + "-" + uuid.NewString()[:6]
+}
+
+func shortWallet(wallet string) string {
+	if len(wallet) <= 10 {
+		return wallet
+	}
+	return wallet[:6] + wallet[len(wallet)-4:]
+}
+
+func SendEmailCode(email string, purpose string) error {
+	email = strings.TrimSpace(strings.ToLower(email))
+	purpose = strings.TrimSpace(purpose)
+	if email == "" {
+		return safeMessageError{message: "请输入邮箱"}
+	}
+	if purpose != "register" && purpose != "reset" && purpose != "metamask" {
+		return safeMessageError{message: "验证码用途无效"}
+	}
+	settings, err := repository.GetSettings()
+	if err != nil {
+		return err
+	}
+	settings = normalizeSettings(settings)
+	if purpose == "register" && settings.Public.Auth.EmailVerification != nil && !*settings.Public.Auth.EmailVerification {
+		return safeMessageError{message: "邮箱验证未开启"}
+	}
+	if purpose == "reset" {
+		if _, ok, err := repository.GetUserByEmail(email); err != nil || !ok {
+			if err != nil {
+				return err
+			}
+			return safeMessageError{message: "邮箱未绑定账号"}
+		}
+	}
+	if purpose == "metamask" && !settings.Public.Auth.MetaMask.Enabled {
+		return safeMessageError{message: "MetaMask 登录未开启"}
+	}
+	code, err := randomCode()
+	if err != nil {
+		return err
+	}
+	expireMinutes := settings.Private.Mail.CodeExpireMin
+	item := model.EmailVerification{
+		ID:        newID("mail"),
+		Purpose:   purpose,
+		Target:    email,
+		Code:      code,
+		ExpiresAt: time.Now().Add(time.Duration(expireMinutes) * time.Minute).Format(time.RFC3339),
+		CreatedAt: now(),
+	}
+	if _, err := repository.SaveEmailVerification(item); err != nil {
+		return err
+	}
+	return sendVerificationMail(settings.Private.Mail, email, purpose, code)
+}
+
+func ResetPassword(email string, code string, password string) error {
+	email = strings.TrimSpace(strings.ToLower(email))
+	if email == "" || code == "" || password == "" {
+		return safeMessageError{message: "邮箱、验证码和新密码不能为空"}
+	}
+	if err := verifyEmailCode("reset", email, code); err != nil {
+		return err
+	}
+	user, ok, err := repository.GetUserByEmail(email)
+	if err != nil || !ok {
+		if err != nil {
+			return err
+		}
+		return safeMessageError{message: "邮箱未绑定账号"}
+	}
+	hash, err := hashPassword(password)
+	if err != nil {
+		return err
+	}
+	user.Password = hash
+	user.UpdatedAt = now()
+	_, err = repository.SaveUser(user)
+	return err
+}
+
+func verifyEmailCode(purpose string, email string, code string) error {
+	item, ok, err := repository.GetActiveEmailVerification(purpose, strings.TrimSpace(strings.ToLower(email)), strings.TrimSpace(code), now())
+	if err != nil || !ok {
+		if err != nil {
+			return err
+		}
+		return safeMessageError{message: "验证码无效或已过期"}
+	}
+	item.UsedAt = now()
+	_, err = repository.SaveEmailVerification(item)
+	return err
+}
+
+func randomCode() (string, error) {
+	max := big.NewInt(1000000)
+	n, err := rand.Int(rand.Reader, max)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%06d", n.Int64()), nil
+}
+
+func sendVerificationMail(setting model.MailSetting, email string, purpose string, code string) error {
+	if !setting.Enabled {
+		return safeMessageError{message: "邮件服务未开启"}
+	}
+	if setting.Host == "" || setting.FromEmail == "" {
+		return safeMessageError{message: "SMTP 未配置"}
+	}
+	template := setting.Templates.Register
+	if purpose == "reset" {
+		template = setting.Templates.Reset
+	} else if purpose == "metamask" {
+		template = setting.Templates.MetaMask
+	}
+	subject := renderMailTemplate(template.Subject, email, code, setting.CodeExpireMin)
+	body := renderMailTemplate(template.Body, email, code, setting.CodeExpireMin)
+	from := setting.FromEmail
+	if strings.TrimSpace(setting.FromName) != "" {
+		from = fmt.Sprintf("%s <%s>", setting.FromName, setting.FromEmail)
+	}
+	message := strings.Join([]string{
+		"From: " + from,
+		"To: " + email,
+		"Subject: " + subject,
+		"MIME-Version: 1.0",
+		"Content-Type: text/plain; charset=UTF-8",
+		"",
+		body,
+	}, "\r\n")
+	addr := setting.Host + ":" + strconv.Itoa(setting.Port)
+	var auth smtp.Auth
+	if setting.Username != "" || setting.Password != "" {
+		auth = smtp.PlainAuth("", setting.Username, setting.Password, setting.Host)
+	}
+	return smtp.SendMail(addr, auth, setting.FromEmail, []string{email}, []byte(message))
+}
+
+func renderMailTemplate(template string, email string, code string, expireMinutes int) string {
+	replacer := strings.NewReplacer(
+		"{{code}}", code,
+		"{{email}}", email,
+		"{{expireMinutes}}", strconv.Itoa(expireMinutes),
+		"{{siteName}}", "边缘幻星",
+	)
+	return replacer.Replace(template)
 }
 
 func decodeState(state string) string {

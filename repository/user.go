@@ -18,7 +18,7 @@ func ListUsers(q model.Query) ([]model.User, int64, error) {
 	tx := db.Model(&model.User{})
 	if keyword := strings.TrimSpace(q.Keyword); keyword != "" {
 		like := "%" + keyword + "%"
-		tx = tx.Where("username LIKE ? OR display_name LIKE ? OR email LIKE ? OR linux_do_id LIKE ?", like, like, like, like)
+		tx = tx.Where("username LIKE ? OR display_name LIKE ? OR email LIKE ? OR linux_do_id LIKE ? OR github_id LIKE ? OR google_id LIKE ? OR metamask_address LIKE ?", like, like, like, like, like, like, like)
 	}
 
 	var total int64
@@ -68,6 +68,15 @@ func GetUserByUsername(username string) (model.User, bool, error) {
 		return model.User{}, false, err
 	}
 	return findUser(db, "username = ?", username)
+}
+
+// GetUserByEmail 根据邮箱查询用户。
+func GetUserByEmail(email string) (model.User, bool, error) {
+	db, err := DB()
+	if err != nil {
+		return model.User{}, false, err
+	}
+	return findUser(db, "email = ?", email)
 }
 
 // SaveUser 保存用户信息。
@@ -172,6 +181,51 @@ func GetUserByLinuxDoID(id string) (model.User, bool, error) {
 		return model.User{}, false, err
 	}
 	return findUser(db, "linux_do_id = ?", id)
+}
+
+func GetUserByGithubID(id string) (model.User, bool, error) {
+	db, err := DB()
+	if err != nil {
+		return model.User{}, false, err
+	}
+	return findUser(db, "github_id = ?", id)
+}
+
+func GetUserByGoogleID(id string) (model.User, bool, error) {
+	db, err := DB()
+	if err != nil {
+		return model.User{}, false, err
+	}
+	return findUser(db, "google_id = ?", id)
+}
+
+func GetUserByMetaMaskAddress(address string) (model.User, bool, error) {
+	db, err := DB()
+	if err != nil {
+		return model.User{}, false, err
+	}
+	return findUser(db, "metamask_address = ?", address)
+}
+
+func SaveEmailVerification(item model.EmailVerification) (model.EmailVerification, error) {
+	db, err := DB()
+	if err != nil {
+		return item, err
+	}
+	return item, db.Save(&item).Error
+}
+
+func GetActiveEmailVerification(purpose string, target string, code string, now string) (model.EmailVerification, bool, error) {
+	db, err := DB()
+	if err != nil {
+		return model.EmailVerification{}, false, err
+	}
+	item := model.EmailVerification{}
+	err = db.Where("purpose = ? AND target = ? AND code = ? AND used_at = '' AND expires_at > ?", purpose, target, code, now).Order("created_at desc").First(&item).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return model.EmailVerification{}, false, nil
+	}
+	return item, err == nil, err
 }
 
 // findUser 查询单个用户，并将未命中转换为 ok=false。

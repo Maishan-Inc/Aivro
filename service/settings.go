@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/basketikun/aivro/config"
 	"github.com/basketikun/aivro/model"
 	"github.com/basketikun/aivro/repository"
 )
@@ -55,6 +56,10 @@ func AdminTestChannelModel(index *int, channel model.ModelChannel, modelName str
 	return testAdminChannelModel(resolved, modelName)
 }
 
+func AdminUpdateDatabase() error {
+	return repository.UpdateDatabase()
+}
+
 func normalizeSettings(settings model.Settings) model.Settings {
 	settings.Public = normalizePublicSetting(settings.Public)
 	settings.Private = normalizePrivateSetting(settings.Private)
@@ -82,6 +87,17 @@ func normalizePublicSetting(setting model.PublicSetting) model.PublicSetting {
 		enabled := true
 		setting.Auth.AllowRegister = &enabled
 	}
+	if setting.Auth.EmailVerification == nil {
+		enabled := false
+		setting.Auth.EmailVerification = &enabled
+	}
+	setting.Auth.LinuxDo = normalizePublicAuthProvider(setting.Auth.LinuxDo, "linux-do", "Linux.do", "/icons/linuxdo.svg")
+	setting.Auth.Google = normalizePublicAuthProvider(setting.Auth.Google, "google", "Google", "")
+	setting.Auth.Github = normalizePublicAuthProvider(setting.Auth.Github, "github", "GitHub", "")
+	setting.Auth.MetaMask = normalizePublicAuthProvider(setting.Auth.MetaMask, "metamask", "MetaMask", "")
+	if setting.Auth.CustomProviders == nil {
+		setting.Auth.CustomProviders = []model.PublicOAuthProviderSetting{{ID: "o2", Name: "O2", Enabled: false}}
+	}
 	return setting
 }
 
@@ -104,6 +120,8 @@ func normalizePrivateSetting(setting model.PrivateSetting) model.PrivateSetting 
 		setting.Channels = []model.ModelChannel{}
 	}
 	setting.PromptSync = normalizePromptSyncSetting(setting.PromptSync)
+	setting.Auth = normalizePrivateAuthSetting(setting.Auth)
+	setting.Mail = normalizeMailSetting(setting.Mail)
 	for i := range setting.Channels {
 		if setting.Channels[i].Protocol == "" {
 			setting.Channels[i].Protocol = "openai"
@@ -123,6 +141,12 @@ func hidePrivateAPIKeys(settings model.Settings) model.Settings {
 		settings.Private.Channels[i].APIKey = ""
 	}
 	settings.Private.Auth.LinuxDo.ClientSecret = ""
+	settings.Private.Auth.Google.ClientSecret = ""
+	settings.Private.Auth.Github.ClientSecret = ""
+	for i := range settings.Private.Auth.CustomProviders {
+		settings.Private.Auth.CustomProviders[i].ClientSecret = ""
+	}
+	settings.Private.Mail.Password = ""
 	return settings
 }
 
@@ -141,6 +165,111 @@ func keepPrivateAuthSecrets(settings *model.Settings, saved model.Settings) {
 	if strings.TrimSpace(settings.Private.Auth.LinuxDo.ClientSecret) == "" {
 		settings.Private.Auth.LinuxDo.ClientSecret = saved.Private.Auth.LinuxDo.ClientSecret
 	}
+	if strings.TrimSpace(settings.Private.Auth.Google.ClientSecret) == "" {
+		settings.Private.Auth.Google.ClientSecret = saved.Private.Auth.Google.ClientSecret
+	}
+	if strings.TrimSpace(settings.Private.Auth.Github.ClientSecret) == "" {
+		settings.Private.Auth.Github.ClientSecret = saved.Private.Auth.Github.ClientSecret
+	}
+	for i := range settings.Private.Auth.CustomProviders {
+		if strings.TrimSpace(settings.Private.Auth.CustomProviders[i].ClientSecret) != "" {
+			continue
+		}
+		if provider, ok := findSavedAuthProvider(settings.Private.Auth.CustomProviders[i], saved.Private.Auth.CustomProviders, i); ok {
+			settings.Private.Auth.CustomProviders[i].ClientSecret = provider.ClientSecret
+		}
+	}
+	if strings.TrimSpace(settings.Private.Mail.Password) == "" {
+		settings.Private.Mail.Password = saved.Private.Mail.Password
+	}
+}
+
+func normalizePublicAuthProvider(provider model.PublicOAuthProviderSetting, id string, name string, iconURL string) model.PublicOAuthProviderSetting {
+	if provider.ID == "" {
+		provider.ID = id
+	}
+	if provider.Name == "" {
+		provider.Name = name
+	}
+	if provider.IconURL == "" {
+		provider.IconURL = iconURL
+	}
+	return provider
+}
+
+func normalizePrivateAuthSetting(setting model.PrivateAuthSetting) model.PrivateAuthSetting {
+	setting.LinuxDo = normalizePrivateAuthProvider(setting.LinuxDo, "linux-do", "Linux.do", config.Cfg.LinuxDoAuthorizeURL, config.Cfg.LinuxDoTokenURL, config.Cfg.LinuxDoUserInfoURL, "read")
+	setting.Google = normalizePrivateAuthProvider(setting.Google, "google", "Google", "https://accounts.google.com/o/oauth2/v2/auth", "https://oauth2.googleapis.com/token", "https://www.googleapis.com/oauth2/v3/userinfo", "openid email profile")
+	setting.Github = normalizePrivateAuthProvider(setting.Github, "github", "GitHub", "https://github.com/login/oauth/authorize", "https://github.com/login/oauth/access_token", "https://api.github.com/user", "read:user user:email")
+	if setting.CustomProviders == nil {
+		setting.CustomProviders = []model.PrivateOAuthProviderSetting{normalizePrivateAuthProvider(model.PrivateOAuthProviderSetting{}, "o2", "O2", "", "", "", "openid email profile")}
+	}
+	for i := range setting.CustomProviders {
+		setting.CustomProviders[i] = normalizePrivateAuthProvider(setting.CustomProviders[i], setting.CustomProviders[i].ID, setting.CustomProviders[i].Name, setting.CustomProviders[i].AuthorizeURL, setting.CustomProviders[i].TokenURL, setting.CustomProviders[i].UserInfoURL, setting.CustomProviders[i].Scope)
+	}
+	return setting
+}
+
+func normalizePrivateAuthProvider(provider model.PrivateOAuthProviderSetting, id string, name string, authorizeURL string, tokenURL string, userInfoURL string, scope string) model.PrivateOAuthProviderSetting {
+	if provider.ID == "" {
+		provider.ID = id
+	}
+	if provider.Name == "" {
+		provider.Name = name
+	}
+	if provider.AuthorizeURL == "" {
+		provider.AuthorizeURL = authorizeURL
+	}
+	if provider.TokenURL == "" {
+		provider.TokenURL = tokenURL
+	}
+	if provider.UserInfoURL == "" {
+		provider.UserInfoURL = userInfoURL
+	}
+	if provider.Scope == "" {
+		provider.Scope = scope
+	}
+	return provider
+}
+
+func normalizeMailSetting(setting model.MailSetting) model.MailSetting {
+	if setting.Port <= 0 {
+		setting.Port = 587
+	}
+	if setting.CodeExpireMin <= 0 {
+		setting.CodeExpireMin = 10
+	}
+	if setting.Templates.Register.Subject == "" {
+		setting.Templates.Register.Subject = "注册验证码：{{code}}"
+	}
+	if setting.Templates.Register.Body == "" {
+		setting.Templates.Register.Body = "你的注册验证码是 {{code}}，{{expireMinutes}} 分钟内有效。"
+	}
+	if setting.Templates.Reset.Subject == "" {
+		setting.Templates.Reset.Subject = "找回密码验证码：{{code}}"
+	}
+	if setting.Templates.Reset.Body == "" {
+		setting.Templates.Reset.Body = "你的找回密码验证码是 {{code}}，{{expireMinutes}} 分钟内有效。"
+	}
+	if setting.Templates.MetaMask.Subject == "" {
+		setting.Templates.MetaMask.Subject = "MetaMask 登录邮箱验证码：{{code}}"
+	}
+	if setting.Templates.MetaMask.Body == "" {
+		setting.Templates.MetaMask.Body = "你的 MetaMask 登录邮箱验证码是 {{code}}，{{expireMinutes}} 分钟内有效。"
+	}
+	return setting
+}
+
+func findSavedAuthProvider(provider model.PrivateOAuthProviderSetting, saved []model.PrivateOAuthProviderSetting, index int) (model.PrivateOAuthProviderSetting, bool) {
+	for _, item := range saved {
+		if item.ID == provider.ID && provider.ID != "" {
+			return item, true
+		}
+	}
+	if index < len(saved) {
+		return saved[index], true
+	}
+	return model.PrivateOAuthProviderSetting{}, false
 }
 
 func findSavedChannel(channel model.ModelChannel, saved []model.ModelChannel, index int) (model.ModelChannel, bool) {

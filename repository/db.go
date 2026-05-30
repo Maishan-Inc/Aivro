@@ -45,15 +45,29 @@ func DB() (*gorm.DB, error) {
 		if dbErr != nil {
 			return
 		}
-		dbErr = db.AutoMigrate(
-			&model.User{},
-			&model.CreditLog{},
-			&model.Prompt{},
-			&model.Asset{},
-			&model.Setting{},
-		)
+		dbErr = migrateModels(db)
 	})
 	return db, dbErr
+}
+
+// UpdateDatabase 重新执行当前模型的自动迁移，用于补齐新增表和新增字段。
+func UpdateDatabase() error {
+	db, err := DB()
+	if err != nil {
+		return err
+	}
+	return migrateModels(db)
+}
+
+func migrateModels(db *gorm.DB) error {
+	return db.AutoMigrate(
+		&model.User{},
+		&model.EmailVerification{},
+		&model.CreditLog{},
+		&model.Prompt{},
+		&model.Asset{},
+		&model.Setting{},
+	)
 }
 
 func dialector(driver string, dsn string) gorm.Dialector {

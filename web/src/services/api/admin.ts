@@ -21,7 +21,12 @@ export type AdminUser = {
     affCode: string;
     affCount: number;
     inviterId: string;
+    googleId: string;
+    githubId: string;
     linuxDoId: string;
+    metamaskAddress: string;
+    authProvider: string;
+    emailVerified: boolean;
     status: "active" | "ban";
     lastLoginAt: string;
     createdAt: string;
@@ -187,10 +192,20 @@ export type AdminPublicSettings = {
     modelChannel: AdminPublicModelChannelSettings;
     auth: {
         allowRegister: boolean;
-        linuxDo: {
-            enabled: boolean;
-        };
+        emailVerification: boolean;
+        linuxDo: AdminPublicAuthProvider;
+        google: AdminPublicAuthProvider;
+        github: AdminPublicAuthProvider;
+        metamask: AdminPublicAuthProvider;
+        customProviders: AdminPublicAuthProvider[];
     };
+};
+
+export type AdminPublicAuthProvider = {
+    id: string;
+    name: string;
+    iconUrl: string;
+    enabled: boolean;
 };
 
 export type AdminPrivateSettings = {
@@ -200,11 +215,43 @@ export type AdminPrivateSettings = {
         cron: string;
     };
     auth: {
-        linuxDo: {
-            clientId: string;
-            clientSecret: string;
-        };
+        linuxDo: AdminPrivateAuthProvider;
+        google: AdminPrivateAuthProvider;
+        github: AdminPrivateAuthProvider;
+        metamask: { enabled: boolean };
+        customProviders: AdminPrivateAuthProvider[];
     };
+    mail: AdminMailSettings;
+};
+
+export type AdminPrivateAuthProvider = AdminPublicAuthProvider & {
+    clientId: string;
+    clientSecret: string;
+    authorizeUrl: string;
+    tokenUrl: string;
+    userInfoUrl: string;
+    scope: string;
+};
+
+export type AdminMailSettings = {
+    enabled: boolean;
+    host: string;
+    port: number;
+    username: string;
+    password: string;
+    fromEmail: string;
+    fromName: string;
+    codeExpireMin: number;
+    templates: {
+        register: AdminMailTemplate;
+        reset: AdminMailTemplate;
+        metamask: AdminMailTemplate;
+    };
+};
+
+export type AdminMailTemplate = {
+    subject: string;
+    body: string;
 };
 
 export type AdminSettings = {
@@ -218,6 +265,10 @@ export async function fetchAdminSettings(token: string) {
 
 export async function saveAdminSettings(token: string, settings: AdminSettings) {
     return apiPost<AdminSettings>("/api/admin/settings", settings, token);
+}
+
+export async function updateDatabase(token: string) {
+    return apiPost<boolean>("/api/admin/settings/database-update", {}, token);
 }
 
 export type AdminChannelActionRequest = {

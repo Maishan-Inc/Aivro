@@ -18,16 +18,43 @@ type loginRequest struct {
 type registerRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
+	Email    string `json:"email"`
+	Code     string `json:"code"`
+}
+
+type emailCodeRequest struct {
+	Email   string `json:"email"`
+	Purpose string `json:"purpose"`
+}
+
+type resetPasswordRequest struct {
+	Email    string `json:"email"`
+	Code     string `json:"code"`
+	Password string `json:"password"`
+}
+
+type metamaskLoginRequest struct {
+	WalletAddress string `json:"walletAddress"`
+	Message       string `json:"message"`
+	Signature     string `json:"signature"`
+	Email         string `json:"email"`
+	Code          string `json:"code"`
 }
 
 type saveUserRequest struct {
-	ID          string           `json:"id"`
-	Username    string           `json:"username"`
-	Password    string           `json:"password"`
-	Email       string           `json:"email"`
-	DisplayName string           `json:"displayName"`
-	Role        model.UserRole   `json:"role"`
-	Status      model.UserStatus `json:"status"`
+	ID              string           `json:"id"`
+	Username        string           `json:"username"`
+	Password        string           `json:"password"`
+	Email           string           `json:"email"`
+	DisplayName     string           `json:"displayName"`
+	GithubID        string           `json:"githubId"`
+	GoogleID        string           `json:"googleId"`
+	LinuxDoID       string           `json:"linuxDoId"`
+	MetaMaskAddress string           `json:"metamaskAddress"`
+	AuthProvider    string           `json:"authProvider"`
+	EmailVerified   bool             `json:"emailVerified"`
+	Role            model.UserRole   `json:"role"`
+	Status          model.UserStatus `json:"status"`
 }
 
 type adjustUserCreditsRequest struct {
@@ -37,7 +64,38 @@ type adjustUserCreditsRequest struct {
 func Register(w http.ResponseWriter, r *http.Request) {
 	var request registerRequest
 	_ = json.NewDecoder(r.Body).Decode(&request)
-	session, err := service.Register(request.Username, request.Password)
+	session, err := service.Register(request.Username, request.Password, request.Email, request.Code)
+	if err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, session)
+}
+
+func SendEmailCode(w http.ResponseWriter, r *http.Request) {
+	var request emailCodeRequest
+	_ = json.NewDecoder(r.Body).Decode(&request)
+	if err := service.SendEmailCode(request.Email, request.Purpose); err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, true)
+}
+
+func ResetPassword(w http.ResponseWriter, r *http.Request) {
+	var request resetPasswordRequest
+	_ = json.NewDecoder(r.Body).Decode(&request)
+	if err := service.ResetPassword(request.Email, request.Code, request.Password); err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, true)
+}
+
+func MetaMaskLogin(w http.ResponseWriter, r *http.Request) {
+	var request metamaskLoginRequest
+	_ = json.NewDecoder(r.Body).Decode(&request)
+	session, err := service.LoginWithMetaMask(request.WalletAddress, request.Message, request.Signature, request.Email, request.Code)
 	if err != nil {
 		FailError(w, err)
 		return
@@ -63,6 +121,24 @@ func LinuxDoAuthorize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.Redirect(w, r, authURL, http.StatusFound)
+}
+
+func OAuthAuthorize(w http.ResponseWriter, r *http.Request, provider string) {
+	authURL, err := service.OAuthAuthorizeURL(r, provider, r.URL.Query().Get("redirect"))
+	if err != nil {
+		FailError(w, err)
+		return
+	}
+	http.Redirect(w, r, authURL, http.StatusFound)
+}
+
+func OAuthCallback(w http.ResponseWriter, r *http.Request, provider string) {
+	session, redirect, err := service.LoginWithOAuth(r, provider, r.URL.Query().Get("code"), r.URL.Query().Get("state"))
+	if err != nil {
+		http.Redirect(w, r, loginRedirect(r, redirect, "", err.Error()), http.StatusFound)
+		return
+	}
+	http.Redirect(w, r, loginRedirect(r, redirect, session.Token, ""), http.StatusFound)
 }
 
 func LinuxDoCallback(w http.ResponseWriter, r *http.Request) {
@@ -110,12 +186,18 @@ func AdminSaveUser(w http.ResponseWriter, r *http.Request) {
 	var request saveUserRequest
 	_ = json.NewDecoder(r.Body).Decode(&request)
 	user, err := service.SaveUser(model.User{
-		ID:          request.ID,
-		Username:    request.Username,
-		Email:       request.Email,
-		DisplayName: request.DisplayName,
-		Role:        request.Role,
-		Status:      request.Status,
+		ID:              request.ID,
+		Username:        request.Username,
+		Email:           request.Email,
+		DisplayName:     request.DisplayName,
+		GithubID:        request.GithubID,
+		GoogleID:        request.GoogleID,
+		LinuxDoID:       request.LinuxDoID,
+		MetaMaskAddress: request.MetaMaskAddress,
+		AuthProvider:    request.AuthProvider,
+		EmailVerified:   request.EmailVerified,
+		Role:            request.Role,
+		Status:          request.Status,
 	}, request.Password)
 	if err != nil {
 		FailError(w, err)

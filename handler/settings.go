@@ -43,6 +43,14 @@ func AdminSaveSettings(w http.ResponseWriter, r *http.Request) {
 	OK(w, result)
 }
 
+func AdminUpdateDatabase(w http.ResponseWriter, r *http.Request) {
+	if err := service.AdminUpdateDatabase(); err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, true)
+}
+
 func AdminChannelModels(w http.ResponseWriter, r *http.Request) {
 	var request adminChannelActionRequest
 	_ = json.NewDecoder(r.Body).Decode(&request)

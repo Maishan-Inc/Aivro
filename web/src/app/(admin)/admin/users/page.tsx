@@ -85,10 +85,17 @@ export default function AdminUsersPage() {
             render: (_, item) => <Typography.Text>{item.credits}</Typography.Text>,
         },
         {
-            title: "Linux.do",
-            dataIndex: "linuxDoId",
-            width: 140,
-            render: (_, item) => <Typography.Text type="secondary">{item.linuxDoId || "-"}</Typography.Text>,
+            title: "登录来源",
+            dataIndex: "authProvider",
+            width: 180,
+            render: (_, item) => (
+                <Space direction="vertical" size={0}>
+                    <Tag>{item.authProvider || "password"}</Tag>
+                    <Typography.Text type="secondary" ellipsis style={{ maxWidth: 150 }}>
+                        {item.metamaskAddress || item.googleId || item.githubId || item.linuxDoId || "-"}
+                    </Typography.Text>
+                </Space>
+            ),
         },
         {
             title: "最近登录",
@@ -124,7 +131,7 @@ export default function AdminUsersPage() {
                                 <Form.Item label="关键词">
                                     <Input.Search
                                         value={keywordText}
-                                        placeholder="搜索用户名、昵称、邮箱或 Linux.do ID"
+                                        placeholder="搜索用户名、昵称、邮箱或第三方 ID"
                                         allowClear
                                         enterButton={<SearchOutlined />}
                                         onSearch={() => searchUsers(keywordText)}
@@ -206,6 +213,41 @@ export default function AdminUsersPage() {
                         </Col>
                         <Col span={12}>
                             <Form.Item name="email" label="邮箱">
+                                <Input />
+                            </Form.Item>
+                        </Col>
+                        <Col span={12}>
+                            <Form.Item name="emailVerified" label="邮箱已验证">
+                                <Select
+                                    options={[
+                                        { label: "已验证", value: true },
+                                        { label: "未验证", value: false },
+                                    ]}
+                                />
+                            </Form.Item>
+                        </Col>
+                        <Col span={12}>
+                            <Form.Item name="authProvider" label="登录来源">
+                                <Input placeholder="password / google / github / linux-do / metamask" />
+                            </Form.Item>
+                        </Col>
+                        <Col span={12}>
+                            <Form.Item name="googleId" label="Google ID">
+                                <Input />
+                            </Form.Item>
+                        </Col>
+                        <Col span={12}>
+                            <Form.Item name="githubId" label="GitHub ID">
+                                <Input />
+                            </Form.Item>
+                        </Col>
+                        <Col span={12}>
+                            <Form.Item name="linuxDoId" label="Linux.do ID">
+                                <Input />
+                            </Form.Item>
+                        </Col>
+                        <Col span={12}>
+                            <Form.Item name="metamaskAddress" label="钱包地址">
                                 <Input />
                             </Form.Item>
                         </Col>

@@ -25,9 +25,12 @@
   },
   "auth": {
     "allowRegister": true,
-    "linuxDo": {
-      "enabled": false
-    }
+    "emailVerification": false,
+    "linuxDo": { "id": "linux-do", "name": "Linux.do", "iconUrl": "/icons/linuxdo.svg", "enabled": false },
+    "google": { "id": "google", "name": "Google", "iconUrl": "", "enabled": false },
+    "github": { "id": "github", "name": "GitHub", "iconUrl": "", "enabled": false },
+    "metamask": { "id": "metamask", "name": "MetaMask", "iconUrl": "", "enabled": false },
+    "customProviders": [{ "id": "o2", "name": "O2", "iconUrl": "", "enabled": false }]
   }
 }
 ```
@@ -68,7 +71,9 @@
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
 | `allowRegister` | boolean | 是否允许用户注册，默认允许；关闭后注册入口隐藏，注册接口拒绝新用户创建 |
-| `linuxDo.enabled` | boolean | 是否开启 Linux.do 登录 |
+| `emailVerification` | boolean | 是否开启注册邮箱验证码 |
+| `linuxDo` / `google` / `github` / `metamask` | object | 内置第三方登录公开配置 |
+| `customProviders` | object[] | 自定义 OAuth 登录公开配置 |
 
 ## private.value
 
@@ -89,6 +94,24 @@
   "promptSync": {
     "enabled": true,
     "cron": "*/5 * * * *"
+  },
+  "auth": {
+    "linuxDo": {},
+    "google": {},
+    "github": {},
+    "metamask": { "enabled": false },
+    "customProviders": []
+  },
+  "mail": {
+    "enabled": false,
+    "host": "",
+    "port": 587,
+    "username": "",
+    "password": "",
+    "fromEmail": "",
+    "fromName": "",
+    "codeExpireMin": 10,
+    "templates": {}
   }
 }
 ```
@@ -97,6 +120,8 @@
 | --- | --- | --- |
 | `channels` | object[] | 模型渠道列表 |
 | `promptSync` | object | GitHub 远程提示词定时同步配置 |
+| `auth` | object | OAuth、MetaMask 和自定义登录私有配置 |
+| `mail` | object | SMTP 验证码与邮件模板配置 |
 
 `channels` 每项字段：
 
