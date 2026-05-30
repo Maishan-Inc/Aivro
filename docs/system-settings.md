@@ -29,8 +29,21 @@
     "linuxDo": { "id": "linux-do", "name": "Linux.do", "iconUrl": "/icons/linuxdo.svg", "enabled": false },
     "google": { "id": "google", "name": "Google", "iconUrl": "/icons/google.svg", "enabled": false },
     "github": { "id": "github", "name": "GitHub", "iconUrl": "/icons/github.svg", "enabled": false },
-    "metamask": { "id": "metamask", "name": "MetaMask", "iconUrl": "/icons/metamask.svg", "enabled": false },
+    "metamask": { "id": "metamask", "name": "MetaMask", "iconUrl": "https://upload.wikimedia.org/wikipedia/commons/3/36/MetaMask_Fox.svg", "enabled": false },
     "customProviders": [{ "id": "o2", "name": "O2", "iconUrl": "", "enabled": false }]
+  },
+  "pages": {
+    "privacyTitle": "隐私政策",
+    "privacyContent": "隐私政策正文",
+    "termsTitle": "服务条款",
+    "termsContent": "服务条款正文"
+  },
+  "pageAccess": {
+    "canvasLoginRequired": false,
+    "imageLoginRequired": false,
+    "videoLoginRequired": false,
+    "promptsLoginRequired": false,
+    "assetsLoginRequired": false
   }
 }
 ```
@@ -39,6 +52,8 @@
 | --- | --- | --- |
 | `modelChannel` | object | 模型渠道公开配置组 |
 | `auth` | object | 认证相关公开配置 |
+| `pages` | object | 前台公开页面内容配置 |
+| `pageAccess` | object | 页面访问控制公开配置 |
 
 `modelChannel` 字段：
 
@@ -74,6 +89,29 @@
 | `emailVerification` | boolean | 是否开启注册邮箱验证码 |
 | `linuxDo` / `google` / `github` / `metamask` | object | 内置第三方登录公开配置 |
 | `customProviders` | object[] | 自定义 OAuth 登录公开配置 |
+
+`pages` 字段：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `privacyTitle` | string | 隐私政策页面标题，默认“隐私政策” |
+| `privacyContent` | string | 隐私政策页面正文，后台页面设置可编辑 |
+| `termsTitle` | string | 服务条款页面标题，默认“服务条款” |
+| `termsContent` | string | 服务条款页面正文，后台页面设置可编辑 |
+
+前台 `/privacy` 和 `/terms` 会读取该配置展示内容；登录/注册页会提示“登录/注册 Aivro，即代表同意隐私政策和服务条款”，并链接到这两个页面。
+
+`pageAccess` 字段：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `canvasLoginRequired` | boolean | 工作流页面是否需要登录访问，默认关闭 |
+| `imageLoginRequired` | boolean | 生图工作台页面是否需要登录访问，默认关闭 |
+| `videoLoginRequired` | boolean | 视频创作台页面是否需要登录访问，默认关闭 |
+| `promptsLoginRequired` | boolean | 提示词库页面是否需要登录访问，默认关闭 |
+| `assetsLoginRequired` | boolean | 我的素材页面是否需要登录访问，默认关闭 |
+
+这些开关位于管理后台系统设置的公开配置中；开启后，未登录用户访问对应页面会跳转到登录页，关闭时保持公开访问。
 
 ## private.value
 

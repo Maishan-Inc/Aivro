@@ -60,6 +60,15 @@ func AdminUpdateDatabase(w http.ResponseWriter, r *http.Request) {
 	OK(w, true)
 }
 
+func AdminDatabaseStatus(w http.ResponseWriter, r *http.Request) {
+	status, err := service.AdminDatabaseStatus()
+	if err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, status)
+}
+
 func AdminChannelModels(w http.ResponseWriter, r *http.Request) {
 	var request adminChannelActionRequest
 	_ = json.NewDecoder(r.Body).Decode(&request)

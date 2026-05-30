@@ -1,11 +1,12 @@
 "use client";
 
-import { BookOpen, CheckSquare, ClipboardPaste, Download, FolderPlus, History, ImagePlus, LoaderCircle, PenLine, Plus, SlidersHorizontal, Sparkles, Trash2, Upload } from "lucide-react";
+import { BookOpen, CheckSquare, ClipboardPaste, Download, FolderPlus, History, ImagePlus, PenLine, Plus, SlidersHorizontal, Sparkles, Trash2, Upload } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { App, Button, Checkbox, Drawer, Empty, Image, Input, Modal, Tag, Typography } from "antd";
 import localforage from "localforage";
 import { saveAs } from "file-saver";
 
+import { AivroDrawableLoader } from "@/components/aivro-drawable-loader";
 import { ImageSettingsPanel } from "@/components/image-settings-panel";
 import { ModelPicker } from "@/components/model-picker";
 import { PromptSelectDialog } from "@/components/prompts/prompt-select-dialog";
@@ -403,8 +404,15 @@ export default function ImagePage() {
                         </div>
 
                         <div className="mt-auto pt-6">
-                            <Button type="primary" size="large" block icon={<Sparkles className="size-4" />} loading={running} disabled={!canGenerate || running} onClick={() => void generate()}>
-                                开始生成
+                            <Button
+                                type="primary"
+                                size="large"
+                                block
+                                icon={running ? <AivroDrawableLoader compact className="h-4 w-14 text-white dark:text-white" /> : <Sparkles className="size-4" />}
+                                disabled={!canGenerate || running}
+                                onClick={() => void generate()}
+                            >
+                                {running ? "生成中" : "开始生成"}
                             </Button>
                         </div>
                     </div>
@@ -540,7 +548,7 @@ function PendingImageCard() {
                 }}
             />
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-sm text-stone-500 dark:text-stone-400">
-                <LoaderCircle className="size-6 animate-spin" />
+                <AivroDrawableLoader className="h-16 w-44 text-stone-900 dark:text-stone-100" />
                 <span>生成中</span>
             </div>
         </div>

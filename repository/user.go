@@ -41,6 +41,50 @@ func CountUsers() (int64, error) {
 	return total, db.Model(&model.User{}).Count(&total).Error
 }
 
+func CountAuthProviderUsers() (map[string]int64, error) {
+	db, err := DB()
+	if err != nil {
+		return nil, err
+	}
+	counts := map[string]int64{}
+	countProvider := func(key string, query string, args ...any) error {
+		var total int64
+		if err := db.Model(&model.User{}).Where(query, args...).Count(&total).Error; err != nil {
+			return err
+		}
+		counts[key] = total
+		return nil
+	}
+	if err := countProvider("linux-do", "linux_do_id <> '' OR auth_provider = ?", "linux-do"); err != nil {
+		return nil, err
+	}
+	if err := countProvider("google", "google_id <> '' OR auth_provider = ?", "google"); err != nil {
+		return nil, err
+	}
+	if err := countProvider("github", "github_id <> '' OR auth_provider = ?", "github"); err != nil {
+		return nil, err
+	}
+	if err := countProvider("metamask", "metamask_address <> '' OR auth_provider = ?", "metamask"); err != nil {
+		return nil, err
+	}
+	rows, err := db.Model(&model.User{}).Select("auth_provider, count(*) as total").Where("auth_provider <> ''").Group("auth_provider").Rows()
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var provider string
+		var total int64
+		if err := rows.Scan(&provider, &total); err != nil {
+			return nil, err
+		}
+		if provider != "" {
+			counts[provider] = total
+		}
+	}
+	return counts, rows.Err()
+}
+
 // HasAdmin 判断系统中是否存在管理员。
 func HasAdmin() (bool, error) {
 	db, err := DB()

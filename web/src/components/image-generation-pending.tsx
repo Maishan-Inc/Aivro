@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { LoaderCircle } from "lucide-react";
 
+import { AivroDrawableLoader } from "@/components/aivro-drawable-loader";
 import { formatDuration } from "@/lib/image-utils";
 import { cn } from "@/lib/utils";
 
@@ -30,7 +30,7 @@ export function ImageGenerationPending({ className, label, compact = false }: { 
                 }}
             />
             <div className="absolute left-4 top-4 flex items-center gap-2 text-[15px] font-medium text-stone-500 dark:text-stone-300">
-                <LoaderCircle className="size-4 animate-spin" />
+                <AivroDrawableLoader compact className="h-4 w-14 text-stone-700 dark:text-stone-100" />
                 <span>{label || pendingMessages[index]}</span>
             </div>
             <div className="absolute bottom-4 left-4 right-4">

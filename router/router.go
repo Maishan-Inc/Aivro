@@ -48,6 +48,7 @@ func New() *gin.Engine {
 
 	admin := api.Group("/admin", middleware.AdminAuth)
 	admin.GET("/users", gin.WrapF(handler.AdminUsers))
+	admin.GET("/users/auth-provider-stats", gin.WrapF(handler.AdminAuthProviderStats))
 	admin.POST("/users", gin.WrapF(handler.AdminSaveUser))
 	admin.POST("/users/:id/credits", func(c *gin.Context) {
 		handler.AdminAdjustUserCredits(c.Writer, c.Request, c.Param("id"))
@@ -62,6 +63,7 @@ func New() *gin.Engine {
 	})
 	admin.GET("/settings", gin.WrapF(handler.AdminSettings))
 	admin.POST("/settings", gin.WrapF(handler.AdminSaveSettings))
+	admin.GET("/database/status", gin.WrapF(handler.AdminDatabaseStatus))
 	admin.POST("/settings/database-update", gin.WrapF(handler.AdminUpdateDatabase))
 	admin.POST("/settings/channel-models", gin.WrapF(handler.AdminChannelModels))
 	admin.POST("/settings/channel-test", gin.WrapF(handler.AdminTestChannelModel))

@@ -21,6 +21,7 @@
 - `assets`
 - `settings`
 - `cloud_files`
+- `database_update_logs`
 
 后续新增表时再同步补充本文档，未实际使用的规划表不提前写入。
 
@@ -67,6 +68,19 @@
 | `expires_at` | string | 过期时间 |
 | `used_at` | string | 使用时间，未使用为空 |
 | `created_at` | string | 创建时间 |
+
+### database_update_logs
+
+数据库更新记录表。管理员在“数据库配置”页面执行数据库更新时写入，用于查看每次更新实际执行来源。
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | 主键 |
+| `source_file` | string | 本次更新执行来源文件，当前为 GORM AutoMigrate 相关 Go 文件 |
+| `models` | text | 本次 AutoMigrate 涉及的模型列表 |
+| `status` | string | 执行状态：`success`、`error` |
+| `error` | text | 失败原因，成功时为空 |
+| `created_at` | string | 执行时间 |
 
 ### prompts
 
@@ -126,6 +140,8 @@
 |-------------------|----------|----------------|
 | `modelChannel` | object | 模型渠道公开配置组 |
 | `auth` | object | 公开登录配置 |
+| `pages` | object | 隐私政策、服务条款等公开页面内容 |
+| `pageAccess` | object | 页面访问控制公开配置 |
 
 `modelChannel` 当前字段：
 
@@ -167,6 +183,25 @@
 | `name` | string | 前台按钮显示名称 |
 | `iconUrl` | string | 前台按钮图标地址 |
 | `enabled` | bool | 是否在前台开启 |
+
+`pages` 当前字段：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `privacyTitle` | string | 隐私政策页面标题 |
+| `privacyContent` | text | 隐私政策页面正文 |
+| `termsTitle` | string | 服务条款页面标题 |
+| `termsContent` | text | 服务条款页面正文 |
+
+`pageAccess` 当前字段：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `canvasLoginRequired` | bool | 工作流页面是否需要登录访问 |
+| `imageLoginRequired` | bool | 生图工作台页面是否需要登录访问 |
+| `videoLoginRequired` | bool | 视频创作台页面是否需要登录访问 |
+| `promptsLoginRequired` | bool | 提示词库页面是否需要登录访问 |
+| `assetsLoginRequired` | bool | 我的素材页面是否需要登录访问 |
 
 `private.value` 当前字段：
 

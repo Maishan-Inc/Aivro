@@ -7,7 +7,7 @@ import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
 import { EditorView } from "@uiw/react-codemirror";
 
-import { fetchAdminSettings, fetchChannelModels, saveAdminSettings, testChannelModel, testCloudStorage, testMailSettings, updateDatabase, type AdminCloudStorageSettings, type AdminModelChannel, type AdminModelCost, type AdminPrivateAuthProvider, type AdminPublicAuthProvider, type AdminSettings } from "@/services/api/admin";
+import { fetchAdminSettings, fetchAuthProviderStats, fetchChannelModels, saveAdminSettings, testChannelModel, testCloudStorage, testMailSettings, type AdminCloudStorageSettings, type AdminModelChannel, type AdminModelCost, type AdminPrivateAuthProvider, type AdminPublicAuthProvider, type AdminSettings } from "@/services/api/admin";
 import { useI18n } from "@/hooks/use-i18n";
 import { useUserStore } from "@/stores/use-user-store";
 
@@ -27,6 +27,44 @@ const jsonEditorTheme = EditorView.theme({
 
 const emptyPublicProvider = (id: string, name: string, iconUrl = ""): AdminPublicAuthProvider => ({ id, name, iconUrl, enabled: false });
 const emptyPrivateProvider = (id: string, name: string, iconUrl = ""): AdminPrivateAuthProvider => ({ ...emptyPublicProvider(id, name, iconUrl), clientId: "", clientSecret: "", authorizeUrl: "", tokenUrl: "", userInfoUrl: "", scope: "" });
+const defaultPrivacyContent = `欢迎使用 Aivro（边缘幻星）。我们重视你的隐私，并尽量只处理提供服务所必需的信息。
+
+一、我们处理的信息
+当你注册、登录或使用 Aivro 时，我们可能会处理用户名、邮箱、第三方登录标识、登录状态、算力点记录、生成请求、提示词、参考图片、生成结果地址以及你主动保存到素材或画布中的内容。当前个人素材、画布项目和生成历史主要保存在你的浏览器本地；如果管理员开启云存储，生成后的图片和视频会由后端转存到配置的 Cloudflare R2 或兼容 S3 存储，并在到期后按配置自动清理。
+
+二、信息用途
+这些信息用于完成账号登录、身份验证、生成服务、素材和历史记录管理、算力点扣减与返还、系统安全审计、故障排查以及必要的产品体验改进。
+
+三、第三方服务
+Aivro 可能接入 OpenAI 兼容模型渠道、Cloudflare R2 / S3 云存储、邮箱服务和第三方登录服务。你提交的生成内容可能会根据管理员配置发送给相应模型服务商处理。请不要提交你无权处理或不希望第三方服务处理的敏感内容。
+
+四、本地存储
+为提供连续创作体验，Aivro 会在浏览器本地保存用户配置、语言偏好、素材、画布项目和生成历史。你可以通过浏览器设置清理这些本地数据。
+
+五、你的选择
+你可以停止使用服务、清理浏览器本地数据，或联系站点管理员请求处理账号相关信息。管理员可在后台调整模型渠道、登录方式、邮件和云存储配置。
+
+六、政策更新
+我们可能根据功能变化更新本政策。更新后的内容会展示在本页面，继续使用 Aivro 表示你理解并同意更新后的政策。`;
+const defaultTermsContent = `欢迎使用 Aivro（边缘幻星）。使用、登录或注册 Aivro，即表示你同意遵守本服务条款。
+
+一、服务说明
+Aivro 提供图片、视频、文本、提示词、素材和画布相关的 AI 创作工具。具体能力取决于管理员配置的模型渠道、算力点规则、登录方式、邮件服务和云存储服务。
+
+二、账号与安全
+你应妥善保管账号、密码、邮箱验证码、第三方登录账号和钱包签名信息。通过你的账号发起的操作视为你本人行为；如发现异常，请及时停止使用并联系站点管理员。
+
+三、内容责任
+你应确保输入、上传、生成、保存和分享的内容合法合规，并拥有必要权利。请勿使用 Aivro 生成、保存或传播违法、侵权、欺诈、骚扰、恶意代码、侵犯隐私或违反模型服务商规则的内容。
+
+四、生成结果
+AI 生成结果可能存在不准确、不稳定或不符合预期的情况。你应自行判断生成内容是否适合用于商业、公开发布或其他重要场景，并承担相应责任。
+
+五、服务变更
+管理员可能根据运营需要调整模型、算力点、登录方式、云存储、自动清理策略或暂停部分能力。因第三方模型、存储、邮箱或登录服务异常导致的不可用，Aivro 会尽力恢复但不承诺绝对连续可用。
+
+六、条款更新
+我们可能根据功能和合规要求更新本条款。更新后的内容会展示在本页面，继续使用或登录 Aivro 表示你接受更新后的条款。`;
 
 const emptySettings: AdminSettings = {
     public: {
@@ -46,8 +84,21 @@ const emptySettings: AdminSettings = {
             linuxDo: emptyPublicProvider("linux-do", "Linux.do", "/icons/linuxdo.svg"),
             google: emptyPublicProvider("google", "Google", "/icons/google.svg"),
             github: emptyPublicProvider("github", "GitHub", "/icons/github.svg"),
-            metamask: emptyPublicProvider("metamask", "MetaMask", "/icons/metamask.svg"),
+            metamask: emptyPublicProvider("metamask", "MetaMask", "https://upload.wikimedia.org/wikipedia/commons/3/36/MetaMask_Fox.svg"),
             customProviders: [emptyPublicProvider("o2", "O2")],
+        },
+        pages: {
+            privacyTitle: "隐私政策",
+            privacyContent: defaultPrivacyContent,
+            termsTitle: "服务条款",
+            termsContent: defaultTermsContent,
+        },
+        pageAccess: {
+            canvasLoginRequired: false,
+            imageLoginRequired: false,
+            videoLoginRequired: false,
+            promptsLoginRequired: false,
+            assetsLoginRequired: false,
         },
     },
     private: {
@@ -95,10 +146,11 @@ const emptySettings: AdminSettings = {
 };
 const emptyChannel: AdminModelChannel = { protocol: "openai", name: "", baseUrl: "", apiKey: "", models: [], weight: 1, enabled: true, remark: "" };
 
-type SettingsTabKey = "public" | "private" | "mail" | "thirdParty" | "cloudStorage";
+type SettingsTabKey = "public" | "private" | "mail" | "thirdParty" | "cloudStorage" | "pages";
 type EditorMode = "visual" | "json";
 type ModelSelectTabKey = "new" | "current";
 type MailTemplateKey = "register" | "reset" | "metamask";
+type AuthProviderEditorState = { type: "oauth"; providerKey: "linuxDo" | "google" | "github" } | { type: "metamask" } | { type: "custom"; index: number };
 
 export default function AdminSettingsPage() {
     const token = useUserStore((state) => state.token);
@@ -127,17 +179,19 @@ export default function AdminSettingsPage() {
     const [isFetchingChannelModels, setIsFetchingChannelModels] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
-    const [isUpdatingDatabase, setIsUpdatingDatabase] = useState(false);
     const [isTestingCloudStorage, setIsTestingCloudStorage] = useState(false);
     const [isSendingTestMail, setIsSendingTestMail] = useState(false);
     const [mailTestEmail, setMailTestEmail] = useState("");
     const [editingMailTemplate, setEditingMailTemplate] = useState<MailTemplateKey | null>(null);
+    const [editingAuthProvider, setEditingAuthProvider] = useState<AuthProviderEditorState | null>(null);
+    const [authProviderStats, setAuthProviderStats] = useState<Record<string, number>>({});
     const [modelCosts, setModelCosts] = useState<AdminModelCost[]>([]);
     const [knownModels, setKnownModels] = useState<string[]>([]);
     const publicModels = Form.useWatch(["public", "modelChannel", "availableModels"], form) || [];
+    const customAuthProviders = Form.useWatch(["private", "auth", "customProviders"], form) || [];
     const channelModels = useMemo(() => collectChannelModels(channels), [channels]);
     const channelTableData = useMemo(() => channels.map((channel, index) => ({ ...channel, _index: index, _rowKey: `${index}-${channel.name}-${channel.baseUrl}` })), [channels]);
-    const activeMode = activeTab === "mail" || activeTab === "thirdParty" || activeTab === "cloudStorage" ? "visual" : editorMode[activeTab];
+    const activeMode = activeTab === "mail" || activeTab === "thirdParty" || activeTab === "cloudStorage" || activeTab === "pages" ? "visual" : editorMode[activeTab];
     const activeJsonText = jsonText[activeTab] || "";
     const jsonError = activeMode === "json" ? getJsonError(activeJsonText) : "";
     const modelSelectGroups = useMemo(() => buildModelSelectGroups(modelSelectSource, modelSelectExisting), [modelSelectSource, modelSelectExisting]);
@@ -160,6 +214,7 @@ export default function AdminSettingsPage() {
                 public: JSON.stringify(data.public, null, 2),
                 private: JSON.stringify(data.private, null, 2),
             });
+            setAuthProviderStats(await fetchAuthProviderStats(token));
         } catch (error) {
             message.error(error instanceof Error ? error.message : "读取设置失败");
         } finally {
@@ -201,19 +256,6 @@ export default function AdminSettingsPage() {
         }
     };
 
-    const updateDatabaseSchema = async () => {
-        if (!token) return;
-        setIsUpdatingDatabase(true);
-        try {
-            await updateDatabase(token);
-            message.success("数据库已更新");
-        } catch (error) {
-            message.error(error instanceof Error ? error.message : "数据库更新失败");
-        } finally {
-            setIsUpdatingDatabase(false);
-        }
-    };
-
     const sendTestMail = async () => {
         if (!token) return;
         const email = mailTestEmail.trim();
@@ -231,6 +273,13 @@ export default function AdminSettingsPage() {
         } finally {
             setIsSendingTestMail(false);
         }
+    };
+
+    const addCustomAuthProvider = () => {
+        const current = (form.getFieldValue(["private", "auth", "customProviders"]) || []) as AdminPrivateAuthProvider[];
+        const nextProvider = emptyPrivateProvider(`custom-${current.length + 1}`, `自定义登录 ${current.length + 1}`);
+        form.setFieldValue(["private", "auth", "customProviders"], [...current, nextProvider]);
+        setEditingAuthProvider({ type: "custom", index: current.length });
     };
 
     const testCurrentCloudStorage = async () => {
@@ -471,6 +520,7 @@ export default function AdminSettingsPage() {
                             onChange={(key) => changeTab(key as SettingsTabKey)}
                             items={[
                                 { key: "public", label: "公开配置（对外暴露）" },
+                                { key: "pages", label: "页面设置" },
                                 { key: "private", label: "私有配置（不会对外暴露）" },
                                 { key: "cloudStorage", label: t("cloud.tab") },
                                 { key: "mail", label: "邮件配置" },
@@ -478,9 +528,6 @@ export default function AdminSettingsPage() {
                             ]}
                         />
                         <Space>
-                            <Button loading={isUpdatingDatabase} onClick={() => void updateDatabaseSchema()}>
-                                更新数据库
-                            </Button>
                             <Button icon={<ReloadOutlined />} loading={isLoading} onClick={() => void loadSettings()}>
                                 刷新
                             </Button>
@@ -503,7 +550,7 @@ export default function AdminSettingsPage() {
                                 ]}
                             />
                         ) : (
-                            <Typography.Text type="secondary">{activeTab === "mail" ? "SMTP 验证码和邮件模板" : activeTab === "cloudStorage" ? t("cloud.description") : "OAuth、MetaMask 和自定义登录入口"}</Typography.Text>
+                            <Typography.Text type="secondary">{activeTab === "mail" ? "SMTP 验证码和邮件模板" : activeTab === "cloudStorage" ? t("cloud.description") : activeTab === "pages" ? "配置前台隐私政策和服务条款内容" : "OAuth、MetaMask 和自定义登录入口"}</Typography.Text>
                         )}
                         {activeMode === "json" ? (
                             <Space>
@@ -519,7 +566,7 @@ export default function AdminSettingsPage() {
                                 </Button>
                             </Space>
                         ) : (
-                            <Typography.Text type="secondary">{activeTab === "public" ? "这些配置会暴露给前端读取" : "这些配置只会在后台保存"}</Typography.Text>
+                            <Typography.Text type="secondary">{activeTab === "public" || activeTab === "pages" ? "这些配置会暴露给前端读取" : "这些配置只会在后台保存"}</Typography.Text>
                         )}
                     </Flex>
 
@@ -573,6 +620,40 @@ export default function AdminSettingsPage() {
                                         </Form.Item>
                                     </Col>
                                     <Col span={24}>
+                                        <Card size="small" title="页面访问控制">
+                                            <Typography.Paragraph type="secondary" style={{ marginTop: 0 }}>
+                                                开启后，对应页面需要登录才可以访问；关闭则保持公开访问。
+                                            </Typography.Paragraph>
+                                            <Row gutter={16}>
+                                                <Col xs={24} md={8} lg={4}>
+                                                    <Form.Item name={["public", "pageAccess", "canvasLoginRequired"]} label="工作流" valuePropName="checked">
+                                                        <Switch />
+                                                    </Form.Item>
+                                                </Col>
+                                                <Col xs={24} md={8} lg={5}>
+                                                    <Form.Item name={["public", "pageAccess", "imageLoginRequired"]} label="生图工作台" valuePropName="checked">
+                                                        <Switch />
+                                                    </Form.Item>
+                                                </Col>
+                                                <Col xs={24} md={8} lg={5}>
+                                                    <Form.Item name={["public", "pageAccess", "videoLoginRequired"]} label="视频创作台" valuePropName="checked">
+                                                        <Switch />
+                                                    </Form.Item>
+                                                </Col>
+                                                <Col xs={24} md={8} lg={5}>
+                                                    <Form.Item name={["public", "pageAccess", "promptsLoginRequired"]} label="提示词库" valuePropName="checked">
+                                                        <Switch />
+                                                    </Form.Item>
+                                                </Col>
+                                                <Col xs={24} md={8} lg={5}>
+                                                    <Form.Item name={["public", "pageAccess", "assetsLoginRequired"]} label="我的素材" valuePropName="checked">
+                                                        <Switch />
+                                                    </Form.Item>
+                                                </Col>
+                                            </Row>
+                                        </Card>
+                                    </Col>
+                                    <Col span={24}>
                                         <Typography.Title level={5}>模型算力点</Typography.Title>
                                         <Table
                                             rowKey="model"
@@ -615,6 +696,47 @@ export default function AdminSettingsPage() {
                                 />
                             </div>
                         )
+                    ) : activeTab === "pages" ? (
+                        <Form form={form} layout="vertical" initialValues={emptySettings} requiredMark={false}>
+                            <Row gutter={[16, 16]}>
+                                <Col xs={24} lg={12}>
+                                    <Card size="small" title="隐私政策">
+                                        <Form.Item name={["public", "pages", "privacyTitle"]} label="页面标题">
+                                            <Input placeholder="隐私政策" />
+                                        </Form.Item>
+                                        <Form.Item name={["public", "pages", "privacyContent"]} label="页面内容" extra="支持直接输入分段文本，前台会按换行保留排版。">
+                                            <Input.TextArea rows={18} />
+                                        </Form.Item>
+                                        <Button
+                                            onClick={() => {
+                                                form.setFieldValue(["public", "pages", "privacyTitle"], "隐私政策");
+                                                form.setFieldValue(["public", "pages", "privacyContent"], defaultPrivacyContent);
+                                            }}
+                                        >
+                                            恢复默认隐私政策
+                                        </Button>
+                                    </Card>
+                                </Col>
+                                <Col xs={24} lg={12}>
+                                    <Card size="small" title="服务条款">
+                                        <Form.Item name={["public", "pages", "termsTitle"]} label="页面标题">
+                                            <Input placeholder="服务条款" />
+                                        </Form.Item>
+                                        <Form.Item name={["public", "pages", "termsContent"]} label="页面内容" extra="登录和注册页会链接到此页面。">
+                                            <Input.TextArea rows={18} />
+                                        </Form.Item>
+                                        <Button
+                                            onClick={() => {
+                                                form.setFieldValue(["public", "pages", "termsTitle"], "服务条款");
+                                                form.setFieldValue(["public", "pages", "termsContent"], defaultTermsContent);
+                                            }}
+                                        >
+                                            恢复默认服务条款
+                                        </Button>
+                                    </Card>
+                                </Col>
+                            </Row>
+                        </Form>
                     ) : activeTab === "cloudStorage" ? (
                         <Form form={form} layout="vertical" initialValues={emptySettings} requiredMark={false}>
                             <Card
@@ -777,93 +899,21 @@ export default function AdminSettingsPage() {
                         </Form>
                     ) : activeTab === "thirdParty" ? (
                         <Form form={form} layout="vertical" initialValues={emptySettings} requiredMark={false}>
-                            <Flex vertical gap={12}>
-                                <OAuthProviderCard providerKey="linuxDo" title="Linux.do 登录" iconUrl="/icons/linuxdo.svg" />
-                                <OAuthProviderCard providerKey="google" title="Google 登录" iconUrl="/icons/google.svg" />
-                                <OAuthProviderCard providerKey="github" title="GitHub 登录" iconUrl="/icons/github.svg" />
-                                <Card size="small" title={<ProviderTitle title="MetaMask 登录" iconUrl="/icons/metamask.svg" />}>
-                                    <Row gutter={16}>
-                                        <Col xs={24} md={8}>
-                                            <Form.Item name={["public", "auth", "metamask", "enabled"]} label="开启 MetaMask 登录" valuePropName="checked">
-                                                <Switch />
-                                            </Form.Item>
-                                        </Col>
-                                        <Col xs={24} md={8}>
-                                            <Form.Item name={["private", "auth", "metamask", "enabled"]} label="服务端允许 MetaMask 登录" valuePropName="checked">
-                                                <Switch />
-                                            </Form.Item>
-                                        </Col>
-                                    </Row>
-                                    <Typography.Text type="secondary">首次 MetaMask 签名后会跳转到单独邮箱验证页面，验证完成后记录钱包地址用于后续签名登录。</Typography.Text>
-                                </Card>
-                                <Card size="small" title="自定义登录">
-                                    <Form.List name={["private", "auth", "customProviders"]}>
-                                        {(fields, { add, remove }) => (
-                                            <Flex vertical gap={12}>
-                                                {fields.map((field) => (
-                                                    <Card key={field.key} size="small" title={`自定义登录 ${field.name + 1}`} extra={<Button danger size="small" onClick={() => remove(field.name)}>删除</Button>}>
-                                                        <Row gutter={16}>
-                                                            <Col xs={24} md={4}>
-                                                                <Form.Item name={[field.name, "enabled"]} label="启用" valuePropName="checked">
-                                                                    <Switch />
-                                                                </Form.Item>
-                                                            </Col>
-                                                            <Col xs={24} md={5}>
-                                                                <Form.Item name={[field.name, "id"]} label="ID">
-                                                                    <Input placeholder="o2" />
-                                                                </Form.Item>
-                                                            </Col>
-                                                            <Col xs={24} md={5}>
-                                                                <Form.Item name={[field.name, "name"]} label="显示名称">
-                                                                    <Input placeholder="O2" />
-                                                                </Form.Item>
-                                                            </Col>
-                                                            <Col xs={24} md={10}>
-                                                                <Form.Item name={[field.name, "iconUrl"]} label="图片地址">
-                                                                    <Input placeholder="https://..." />
-                                                                </Form.Item>
-                                                            </Col>
-                                                            <Col xs={24} md={12}>
-                                                                <Form.Item name={[field.name, "clientId"]} label="Client ID">
-                                                                    <Input />
-                                                                </Form.Item>
-                                                            </Col>
-                                                            <Col xs={24} md={12}>
-                                                                <Form.Item name={[field.name, "clientSecret"]} label="Client Secret">
-                                                                    <Input.Password placeholder="留空则沿用已保存的密钥" />
-                                                                </Form.Item>
-                                                            </Col>
-                                                            <Col xs={24} md={12}>
-                                                                <Form.Item name={[field.name, "authorizeUrl"]} label="授权地址">
-                                                                    <Input />
-                                                                </Form.Item>
-                                                            </Col>
-                                                            <Col xs={24} md={12}>
-                                                                <Form.Item name={[field.name, "tokenUrl"]} label="Token 地址">
-                                                                    <Input />
-                                                                </Form.Item>
-                                                            </Col>
-                                                            <Col xs={24} md={12}>
-                                                                <Form.Item name={[field.name, "userInfoUrl"]} label="用户信息地址">
-                                                                    <Input />
-                                                                </Form.Item>
-                                                            </Col>
-                                                            <Col xs={24} md={12}>
-                                                                <Form.Item name={[field.name, "scope"]} label="Scope">
-                                                                    <Input />
-                                                                </Form.Item>
-                                                            </Col>
-                                                        </Row>
-                                                    </Card>
-                                                ))}
-                                                <Button icon={<PlusOutlined />} onClick={() => add(emptyPrivateProvider("o2", "O2"))}>
-                                                    新增自定义登录
-                                                </Button>
-                                            </Flex>
-                                        )}
-                                    </Form.List>
-                                </Card>
-                            </Flex>
+                            <Row gutter={[16, 16]}>
+                                <AuthProviderSummaryCard form={form} title="Linux.do 登录" iconUrl="/icons/linuxdo.svg" users={authProviderStats["linux-do"] || 0} enabledPath={["public", "auth", "linuxDo", "enabled"]} onEdit={() => setEditingAuthProvider({ type: "oauth", providerKey: "linuxDo" })} />
+                                <AuthProviderSummaryCard form={form} title="Google 登录" iconUrl="/icons/google.svg" users={authProviderStats.google || 0} enabledPath={["public", "auth", "google", "enabled"]} onEdit={() => setEditingAuthProvider({ type: "oauth", providerKey: "google" })} />
+                                <AuthProviderSummaryCard form={form} title="GitHub 登录" iconUrl="/icons/github.svg" users={authProviderStats.github || 0} enabledPath={["public", "auth", "github", "enabled"]} onEdit={() => setEditingAuthProvider({ type: "oauth", providerKey: "github" })} />
+                                <AuthProviderSummaryCard form={form} title="MetaMask 登录" iconUrl="https://upload.wikimedia.org/wikipedia/commons/3/36/MetaMask_Fox.svg" users={authProviderStats.metamask || 0} enabledPath={["public", "auth", "metamask", "enabled"]} onEdit={() => setEditingAuthProvider({ type: "metamask" })} />
+                                {customAuthProviders.map((provider: AdminPrivateAuthProvider, index: number) => (
+                                    <AuthProviderSummaryCard key={`${provider.id}-${index}`} form={form} title={provider.name || `自定义登录 ${index + 1}`} iconUrl={provider.iconUrl} users={authProviderStats[provider.id] || 0} enabledPath={["private", "auth", "customProviders", index, "enabled"]} onEdit={() => setEditingAuthProvider({ type: "custom", index })} />
+                                ))}
+                                <Col xs={24} md={12} xl={8}>
+                                    <Button block type="dashed" icon={<PlusOutlined />} style={{ height: 128 }} onClick={addCustomAuthProvider}>
+                                        新建第三方登录
+                                    </Button>
+                                </Col>
+                            </Row>
+                            <OAuthProviderEditorModal form={form} state={editingAuthProvider} onClose={() => setEditingAuthProvider(null)} />
                         </Form>
                     ) : activeMode === "visual" ? (
                         <Form form={form} layout="vertical" initialValues={emptySettings} requiredMark={false}>
@@ -1190,11 +1240,18 @@ function MailTemplateBlock({ form, name, title, onEdit }: { form: any; name: Mai
 function MailTemplateEditorModal({ form, name, onClose }: { form: any; name: MailTemplateKey | null; onClose: () => void }) {
     const activeName = name || "register";
     const title = mailTemplateTitles[activeName];
-    const subject = Form.useWatch(["private", "mail", "templates", activeName, "subject"], form) || "";
-    const body = Form.useWatch(["private", "mail", "templates", activeName, "body"], form) || "";
     const expireMinutes = Form.useWatch(["private", "mail", "codeExpireMin"], form) || 10;
+    const [subject, setSubject] = useState("");
+    const [body, setBody] = useState("");
     const preview = renderTemplatePreview(`${subject}\n\n${body}`, expireMinutes);
+    useEffect(() => {
+        if (!name) return;
+        setSubject(form.getFieldValue(["private", "mail", "templates", activeName, "subject"]) || "");
+        setBody(form.getFieldValue(["private", "mail", "templates", activeName, "body"]) || "");
+    }, [activeName, form, name]);
     const setTemplateField = (field: "subject" | "body", value: string) => {
+        if (field === "subject") setSubject(value);
+        else setBody(value);
         form.setFieldValue(["private", "mail", "templates", activeName, field], value);
     };
     return (
@@ -1230,56 +1287,201 @@ const mailTemplateTitles: Record<MailTemplateKey, string> = {
 
 const mailTemplateVariables = ["{{code}}", "{{email}}", "{{expireMinutes}}", "{{siteName}}", "{{ip}}", "{{country}}", "{{region}}"];
 
-function OAuthProviderCard({ providerKey, title, iconUrl }: { providerKey: "linuxDo" | "google" | "github"; title: string; iconUrl?: string }) {
+function AuthProviderSummaryCard({ form, title, iconUrl, users, enabledPath, onEdit }: { form: any; title: string; iconUrl?: string; users: number; enabledPath: (string | number)[]; onEdit: () => void }) {
+    const enabled = Form.useWatch(enabledPath, form);
     return (
-        <Card
-            size="small"
-            title={<ProviderTitle title={title} iconUrl={iconUrl} />}
-        >
-            <Row gutter={16}>
-                <Col xs={24} md={4}>
-                    <Form.Item name={["public", "auth", providerKey, "enabled"]} label="前台显示" valuePropName="checked">
-                        <Switch />
-                    </Form.Item>
-                </Col>
-                <Col xs={24} md={4}>
-                    <Form.Item name={["private", "auth", providerKey, "enabled"]} label="启用服务端" valuePropName="checked">
-                        <Switch />
-                    </Form.Item>
-                </Col>
-                <Col xs={24} md={8}>
-                    <Form.Item name={["private", "auth", providerKey, "clientId"]} label="Client ID">
-                        <Input />
-                    </Form.Item>
-                </Col>
-                <Col xs={24} md={8}>
-                    <Form.Item name={["private", "auth", providerKey, "clientSecret"]} label="Client Secret">
-                        <Input.Password placeholder="留空则沿用已保存的密钥" />
-                    </Form.Item>
-                </Col>
-                <Col xs={24} md={12}>
-                    <Form.Item name={["private", "auth", providerKey, "authorizeUrl"]} label="授权地址">
-                        <Input />
-                    </Form.Item>
-                </Col>
-                <Col xs={24} md={12}>
-                    <Form.Item name={["private", "auth", providerKey, "tokenUrl"]} label="Token 地址">
-                        <Input />
-                    </Form.Item>
-                </Col>
-                <Col xs={24} md={12}>
-                    <Form.Item name={["private", "auth", providerKey, "userInfoUrl"]} label="用户信息地址">
-                        <Input />
-                    </Form.Item>
-                </Col>
-                <Col xs={24} md={12}>
-                    <Form.Item name={["private", "auth", providerKey, "scope"]} label="Scope">
-                        <Input />
-                    </Form.Item>
-                </Col>
-            </Row>
-        </Card>
+        <Col xs={24} md={12} xl={8}>
+            <Card
+                size="small"
+                title={<ProviderTitle title={title} iconUrl={iconUrl} />}
+                extra={
+                    <Button size="small" icon={<EditOutlined />} onClick={onEdit}>
+                        编辑
+                    </Button>
+                }
+            >
+                <Flex vertical gap={12}>
+                    <Space>
+                        <Tag color={enabled ? "success" : "default"}>{enabled ? "已开启" : "未开启"}</Tag>
+                        <Typography.Text type="secondary">使用人数：{users}</Typography.Text>
+                    </Space>
+                    <Typography.Text type="secondary">点击编辑配置显示名称、图片地址和登录参数。</Typography.Text>
+                </Flex>
+            </Card>
+        </Col>
     );
+}
+
+function OAuthProviderEditorModal({ form, state, onClose }: { form: any; state: AuthProviderEditorState | null; onClose: () => void }) {
+    const title = authProviderEditorTitle(form, state);
+    const removeCustomProvider = () => {
+        if (!state || state.type !== "custom") return;
+        const current = [...((form.getFieldValue(["private", "auth", "customProviders"]) || []) as AdminPrivateAuthProvider[])];
+        current.splice(state.index, 1);
+        form.setFieldValue(["private", "auth", "customProviders"], current);
+        onClose();
+    };
+    return (
+        <Modal title={title} open={!!state} width={980} onCancel={onClose} footer={<Space>{state?.type === "custom" ? <Button danger onClick={removeCustomProvider}>删除</Button> : null}<Button type="primary" onClick={onClose}>完成</Button></Space>} destroyOnHidden>
+            {state?.type === "oauth" ? <OAuthProviderFields providerKey={state.providerKey} /> : null}
+            {state?.type === "metamask" ? <MetaMaskProviderFields /> : null}
+            {state?.type === "custom" ? <CustomProviderFields index={state.index} /> : null}
+        </Modal>
+    );
+}
+
+function OAuthProviderFields({ providerKey }: { providerKey: "linuxDo" | "google" | "github" }) {
+    return (
+        <Row gutter={16}>
+            <Col xs={24} md={6}>
+                <Form.Item name={["public", "auth", providerKey, "enabled"]} label="前台显示" valuePropName="checked">
+                    <Switch />
+                </Form.Item>
+            </Col>
+            <Col xs={24} md={6}>
+                <Form.Item name={["private", "auth", providerKey, "enabled"]} label="启用服务端" valuePropName="checked">
+                    <Switch />
+                </Form.Item>
+            </Col>
+            <Col xs={24} md={6}>
+                <Form.Item name={["public", "auth", providerKey, "name"]} label="显示名称">
+                    <Input />
+                </Form.Item>
+            </Col>
+            <Col xs={24} md={6}>
+                <Form.Item name={["public", "auth", providerKey, "iconUrl"]} label="图片地址">
+                    <Input />
+                </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+                <Form.Item name={["private", "auth", providerKey, "clientId"]} label="Client ID">
+                    <Input />
+                </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+                <Form.Item name={["private", "auth", providerKey, "clientSecret"]} label="Client Secret">
+                    <Input.Password placeholder="留空则沿用已保存的密钥" />
+                </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+                <Form.Item name={["private", "auth", providerKey, "authorizeUrl"]} label="授权地址">
+                    <Input />
+                </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+                <Form.Item name={["private", "auth", providerKey, "tokenUrl"]} label="Token 地址">
+                    <Input />
+                </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+                <Form.Item name={["private", "auth", providerKey, "userInfoUrl"]} label="用户信息地址">
+                    <Input />
+                </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+                <Form.Item name={["private", "auth", providerKey, "scope"]} label="Scope">
+                    <Input />
+                </Form.Item>
+            </Col>
+        </Row>
+    );
+}
+
+function MetaMaskProviderFields() {
+    return (
+        <Row gutter={16}>
+            <Col xs={24} md={6}>
+                <Form.Item name={["public", "auth", "metamask", "enabled"]} label="前台显示" valuePropName="checked">
+                    <Switch />
+                </Form.Item>
+            </Col>
+            <Col xs={24} md={6}>
+                <Form.Item name={["private", "auth", "metamask", "enabled"]} label="启用服务端" valuePropName="checked">
+                    <Switch />
+                </Form.Item>
+            </Col>
+            <Col xs={24} md={6}>
+                <Form.Item name={["public", "auth", "metamask", "name"]} label="显示名称">
+                    <Input />
+                </Form.Item>
+            </Col>
+            <Col xs={24} md={6}>
+                <Form.Item name={["public", "auth", "metamask", "iconUrl"]} label="图片地址">
+                    <Input />
+                </Form.Item>
+            </Col>
+            <Col span={24}>
+                <Typography.Text type="secondary">首次 MetaMask 签名后会跳转到单独邮箱验证页面，验证完成后记录钱包地址用于后续签名登录。</Typography.Text>
+            </Col>
+        </Row>
+    );
+}
+
+function CustomProviderFields({ index }: { index: number }) {
+    const base = ["private", "auth", "customProviders", index];
+    return (
+        <Row gutter={16}>
+            <Col xs={24} md={6}>
+                <Form.Item name={[...base, "enabled"]} label="启用" valuePropName="checked">
+                    <Switch />
+                </Form.Item>
+            </Col>
+            <Col xs={24} md={6}>
+                <Form.Item name={[...base, "id"]} label="ID">
+                    <Input placeholder="o2" />
+                </Form.Item>
+            </Col>
+            <Col xs={24} md={6}>
+                <Form.Item name={[...base, "name"]} label="显示名称">
+                    <Input placeholder="O2" />
+                </Form.Item>
+            </Col>
+            <Col xs={24} md={6}>
+                <Form.Item name={[...base, "iconUrl"]} label="图片地址">
+                    <Input placeholder="https://..." />
+                </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+                <Form.Item name={[...base, "clientId"]} label="Client ID">
+                    <Input />
+                </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+                <Form.Item name={[...base, "clientSecret"]} label="Client Secret">
+                    <Input.Password placeholder="留空则沿用已保存的密钥" />
+                </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+                <Form.Item name={[...base, "authorizeUrl"]} label="授权地址">
+                    <Input />
+                </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+                <Form.Item name={[...base, "tokenUrl"]} label="Token 地址">
+                    <Input />
+                </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+                <Form.Item name={[...base, "userInfoUrl"]} label="用户信息地址">
+                    <Input />
+                </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+                <Form.Item name={[...base, "scope"]} label="Scope">
+                    <Input />
+                </Form.Item>
+            </Col>
+        </Row>
+    );
+}
+
+function authProviderEditorTitle(form: any, state: AuthProviderEditorState | null) {
+    if (!state) return "第三方登录";
+    if (state.type === "metamask") return "MetaMask 登录";
+    if (state.type === "oauth") {
+        return ({ linuxDo: "Linux.do 登录", google: "Google 登录", github: "GitHub 登录" } as const)[state.providerKey];
+    }
+    return form.getFieldValue(["private", "auth", "customProviders", state.index, "name"]) || `自定义登录 ${state.index + 1}`;
 }
 
 function ProviderTitle({ title, iconUrl }: { title: string; iconUrl?: string }) {
@@ -1327,9 +1529,30 @@ function normalizePublicSetting(setting: Partial<AdminSettings["public"]> = {}):
             linuxDo: normalizePublicProvider(setting.auth?.linuxDo, "linux-do", "Linux.do", "/icons/linuxdo.svg"),
             google: normalizePublicProvider(setting.auth?.google, "google", "Google", "/icons/google.svg"),
             github: normalizePublicProvider(setting.auth?.github, "github", "GitHub", "/icons/github.svg"),
-            metamask: normalizePublicProvider(setting.auth?.metamask, "metamask", "MetaMask", "/icons/metamask.svg"),
+            metamask: normalizePublicProvider(setting.auth?.metamask, "metamask", "MetaMask", "https://upload.wikimedia.org/wikipedia/commons/3/36/MetaMask_Fox.svg"),
             customProviders: (setting.auth?.customProviders?.length ? setting.auth.customProviders : [emptyPublicProvider("o2", "O2")]).map((item) => normalizePublicProvider(item, item.id || "o2", item.name || "O2")),
         },
+        pages: normalizePublicPagesSetting(setting.pages),
+        pageAccess: normalizePublicPageAccessSetting(setting.pageAccess),
+    };
+}
+
+function normalizePublicPageAccessSetting(setting: Partial<AdminSettings["public"]["pageAccess"]> = {}): AdminSettings["public"]["pageAccess"] {
+    return {
+        canvasLoginRequired: setting.canvasLoginRequired === true,
+        imageLoginRequired: setting.imageLoginRequired === true,
+        videoLoginRequired: setting.videoLoginRequired === true,
+        promptsLoginRequired: setting.promptsLoginRequired === true,
+        assetsLoginRequired: setting.assetsLoginRequired === true,
+    };
+}
+
+function normalizePublicPagesSetting(setting: Partial<AdminSettings["public"]["pages"]> = {}): AdminSettings["public"]["pages"] {
+    return {
+        privacyTitle: setting.privacyTitle || "隐私政策",
+        privacyContent: setting.privacyContent || defaultPrivacyContent,
+        termsTitle: setting.termsTitle || "服务条款",
+        termsContent: setting.termsContent || defaultTermsContent,
     };
 }
 

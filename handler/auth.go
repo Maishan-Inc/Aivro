@@ -182,6 +182,15 @@ func AdminUsers(w http.ResponseWriter, r *http.Request) {
 	OK(w, users)
 }
 
+func AdminAuthProviderStats(w http.ResponseWriter, r *http.Request) {
+	counts, err := service.CountAuthProviderUsers()
+	if err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, counts)
+}
+
 func AdminSaveUser(w http.ResponseWriter, r *http.Request) {
 	var request saveUserRequest
 	_ = json.NewDecoder(r.Body).Decode(&request)

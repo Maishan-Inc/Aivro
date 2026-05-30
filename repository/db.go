@@ -5,10 +5,12 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/basketikun/aivro/config"
 	"github.com/basketikun/aivro/model"
 	"github.com/glebarez/sqlite"
+	"github.com/google/uuid"
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -29,6 +31,13 @@ var (
 	dbOnce sync.Once
 	dbErr  error
 )
+
+var databaseMigrationSources = []string{
+	"repository/db.go",
+	"model/user.go",
+	"model/content.go",
+	"model/setting.go",
+}
 
 // DB 初始化并返回全局数据库连接。
 func DB() (*gorm.DB, error) {
@@ -56,7 +65,43 @@ func UpdateDatabase() error {
 	if err != nil {
 		return err
 	}
-	return migrateModels(db)
+	err = migrateModels(db)
+	status := "success"
+	message := ""
+	if err != nil {
+		status = "error"
+		message = err.Error()
+	}
+	_ = db.Create(&model.DatabaseUpdateLog{
+		ID:         "db-update-" + uuid.NewString(),
+		SourceFile: strings.Join(databaseMigrationSources, "\n"),
+		Models:     strings.Join(databaseMigrationModels(), "\n"),
+		Status:     status,
+		Error:      message,
+		CreatedAt:  time.Now().Format(time.RFC3339),
+	}).Error
+	return err
+}
+
+func DatabaseStatus() (model.DatabaseStatus, error) {
+	db, err := DB()
+	if err != nil {
+		return model.DatabaseStatus{}, err
+	}
+	missing := make([]string, 0)
+	for _, item := range databaseMigrationModelItems() {
+		if !db.Migrator().HasTable(item.value) {
+			missing = append(missing, item.name)
+		}
+	}
+	logs := []model.DatabaseUpdateLog{}
+	_ = db.Order("created_at desc").Limit(30).Find(&logs).Error
+	return model.DatabaseStatus{
+		Updated:     len(missing) == 0,
+		SourceFiles: databaseMigrationSources,
+		Missing:     missing,
+		Logs:        logs,
+	}, nil
 }
 
 func migrateModels(db *gorm.DB) error {
@@ -68,7 +113,36 @@ func migrateModels(db *gorm.DB) error {
 		&model.Asset{},
 		&model.Setting{},
 		&model.CloudFile{},
+		&model.DatabaseUpdateLog{},
 	)
+}
+
+func databaseMigrationModels() []string {
+	items := databaseMigrationModelItems()
+	names := make([]string, 0, len(items))
+	for _, item := range items {
+		names = append(names, item.name)
+	}
+	return names
+}
+
+func databaseMigrationModelItems() []struct {
+	name  string
+	value any
+} {
+	return []struct {
+		name  string
+		value any
+	}{
+		{"model.User", &model.User{}},
+		{"model.EmailVerification", &model.EmailVerification{}},
+		{"model.CreditLog", &model.CreditLog{}},
+		{"model.Prompt", &model.Prompt{}},
+		{"model.Asset", &model.Asset{}},
+		{"model.Setting", &model.Setting{}},
+		{"model.CloudFile", &model.CloudFile{}},
+		{"model.DatabaseUpdateLog", &model.DatabaseUpdateLog{}},
+	}
 }
 
 func dialector(driver string, dsn string) gorm.Dialector {

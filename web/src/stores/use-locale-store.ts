@@ -12,6 +12,10 @@ type LocaleStore = {
     setLocale: (locale: Locale) => void;
 };
 
+function isLocale(value: unknown): value is Locale {
+    return value === "zh-CN" || value === "en-US";
+}
+
 function detectLocale(): Locale {
     if (typeof window === "undefined") return "zh-CN";
     try {
@@ -33,7 +37,10 @@ export const useLocaleStore = create<LocaleStore>()(
         {
             name: LOCALE_STORE_KEY,
             partialize: (state) => ({ locale: state.locale }),
-            merge: (persisted, current) => ({ ...current, ...((persisted as Partial<LocaleStore>) || {}) }),
+            merge: (persisted, current) => {
+                const locale = (persisted as Partial<LocaleStore> | undefined)?.locale;
+                return { ...current, ...(isLocale(locale) ? { locale } : {}) };
+            },
         },
     ),
 );

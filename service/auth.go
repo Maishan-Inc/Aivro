@@ -436,6 +436,10 @@ func ListUsers(q model.Query) (model.UserList, error) {
 	return model.UserList{Items: users, Total: int(total)}, nil
 }
 
+func CountAuthProviderUsers() (map[string]int64, error) {
+	return repository.CountAuthProviderUsers()
+}
+
 func SaveUser(user model.User, password string) (model.User, error) {
 	user.Username = strings.TrimSpace(user.Username)
 	if strings.ContainsAny(user.Username, " \t\r\n") {

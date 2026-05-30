@@ -43,6 +43,23 @@ type PublicModelChannelSetting struct {
 type PublicSetting struct {
 	ModelChannel PublicModelChannelSetting `json:"modelChannel"`
 	Auth         PublicAuthSetting         `json:"auth"`
+	Pages        PublicPagesSetting        `json:"pages"`
+	PageAccess   PublicPageAccessSetting   `json:"pageAccess"`
+}
+
+type PublicPagesSetting struct {
+	PrivacyTitle   string `json:"privacyTitle"`
+	PrivacyContent string `json:"privacyContent"`
+	TermsTitle     string `json:"termsTitle"`
+	TermsContent   string `json:"termsContent"`
+}
+
+type PublicPageAccessSetting struct {
+	CanvasLoginRequired  bool `json:"canvasLoginRequired"`
+	ImageLoginRequired   bool `json:"imageLoginRequired"`
+	VideoLoginRequired   bool `json:"videoLoginRequired"`
+	PromptsLoginRequired bool `json:"promptsLoginRequired"`
+	AssetsLoginRequired  bool `json:"assetsLoginRequired"`
 }
 
 type PublicAuthSetting struct {
@@ -149,6 +166,22 @@ type Setting struct {
 	Value     json.RawMessage `json:"value" gorm:"serializer:json"`
 	CreatedAt string          `json:"createdAt"`
 	UpdatedAt string          `json:"updatedAt"`
+}
+
+type DatabaseUpdateLog struct {
+	ID         string `json:"id" gorm:"primaryKey"`
+	SourceFile string `json:"sourceFile"`
+	Models     string `json:"models"`
+	Status     string `json:"status"`
+	Error      string `json:"error"`
+	CreatedAt  string `json:"createdAt"`
+}
+
+type DatabaseStatus struct {
+	Updated     bool                `json:"updated"`
+	SourceFiles []string            `json:"sourceFiles"`
+	Missing     []string            `json:"missing"`
+	Logs        []DatabaseUpdateLog `json:"logs"`
 }
 
 // Settings 系统公开和私有配置。

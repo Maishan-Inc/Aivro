@@ -65,6 +65,10 @@ export async function fetchAdminUsers(token: string, query: AdminUserQuery = {})
     return apiGet<AdminUserListResponse>("/api/admin/users", compactApiParams(query), token);
 }
 
+export async function fetchAuthProviderStats(token: string) {
+    return apiGet<Record<string, number>>("/api/admin/users/auth-provider-stats", undefined, token);
+}
+
 export async function saveAdminUser(token: string, user: Partial<AdminUser> & { password?: string }) {
     return apiPost<AdminUser>("/api/admin/users", user, token);
 }
@@ -199,6 +203,23 @@ export type AdminPublicSettings = {
         metamask: AdminPublicAuthProvider;
         customProviders: AdminPublicAuthProvider[];
     };
+    pages: AdminPublicPagesSettings;
+    pageAccess: AdminPublicPageAccessSettings;
+};
+
+export type AdminPublicPagesSettings = {
+    privacyTitle: string;
+    privacyContent: string;
+    termsTitle: string;
+    termsContent: string;
+};
+
+export type AdminPublicPageAccessSettings = {
+    canvasLoginRequired: boolean;
+    imageLoginRequired: boolean;
+    videoLoginRequired: boolean;
+    promptsLoginRequired: boolean;
+    assetsLoginRequired: boolean;
 };
 
 export type AdminPublicAuthProvider = {
@@ -277,6 +298,22 @@ export type AdminSettings = {
     private: AdminPrivateSettings;
 };
 
+export type AdminDatabaseUpdateLog = {
+    id: string;
+    sourceFile: string;
+    models: string;
+    status: "success" | "error";
+    error: string;
+    createdAt: string;
+};
+
+export type AdminDatabaseStatus = {
+    updated: boolean;
+    sourceFiles: string[];
+    missing: string[];
+    logs: AdminDatabaseUpdateLog[];
+};
+
 export async function fetchAdminSettings(token: string) {
     return apiGet<AdminSettings>("/api/admin/settings", undefined, token);
 }
@@ -287,6 +324,10 @@ export async function saveAdminSettings(token: string, settings: AdminSettings) 
 
 export async function updateDatabase(token: string) {
     return apiPost<boolean>("/api/admin/settings/database-update", {}, token);
+}
+
+export async function fetchDatabaseStatus(token: string) {
+    return apiGet<AdminDatabaseStatus>("/api/admin/database/status", undefined, token);
 }
 
 export type AdminChannelActionRequest = {
