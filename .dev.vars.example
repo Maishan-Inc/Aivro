@@ -1,9 +1,0 @@
-# Copy to .dev.vars for local development. Do not commit .dev.vars.
-APP_SESSION_SECRET=replace-with-random-long-string
-APP_CONFIG_ENCRYPTION_KEY=replace-with-32-byte-base64-key
-ADMIN_BOOTSTRAP_EMAILS=admin@example.com
-
-OPENAI_API_KEY=sk-replace-me
-GOOGLE_OAUTH_CLIENT_SECRET=
-LINUXDO_OAUTH_CLIENT_SECRET=
-TURNSTILE_SECRET_KEY=

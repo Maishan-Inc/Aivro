@@ -1,0 +1,11 @@
+services:
+  app:
+    image: ghcr.io/basketikun/aivro:latest
+    container_name: aivro
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
