@@ -4,9 +4,10 @@ import { LockOutlined, MailOutlined, UserOutlined } from "@ant-design/icons";
 import { App, Button, Form, Input, Segmented, Space } from "antd";
 import { AnimatePresence, motion } from "motion/react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 
 import { AivroDrawableLoader } from "@/components/aivro-drawable-loader";
+import { TurnstileField } from "@/components/turnstile-field";
 import { useAuthLoadingOverlay } from "@/hooks/use-auth-loading-overlay";
 import { fetchCurrentUser, sendEmailCode } from "@/services/api/auth";
 import type { AdminPublicAuthProvider } from "@/services/api/admin";
@@ -33,6 +34,11 @@ export default function LoginPage() {
     );
 }
 
+function safeRedirect(value: string) {
+    if (!value.startsWith("/") || value.startsWith("//") || value.includes("\\")) return "/";
+    return value;
+}
+
 function LoginContent() {
     const { message } = App.useApp();
     const [form] = Form.useForm<LoginFormValues>();
@@ -45,11 +51,18 @@ function LoginContent() {
     const authSettings = useConfigStore((state) => state.publicSettings?.auth);
     const linuxDoEnabled = authSettings?.linuxDo?.enabled === true;
     const emailVerification = authSettings?.emailVerification === true;
+    const turnstileSiteKey = authSettings?.turnstileSiteKey || "";
     const allowRegister = useConfigStore((state) => state.publicSettings?.auth?.allowRegister !== false);
     const { overlay, runWithOverlay } = useAuthLoadingOverlay();
     const [mode, setMode] = useState<"login" | "register">("login");
     const [sendingCode, setSendingCode] = useState(false);
-    const redirect = searchParams.get("redirect") || "/";
+    const [turnstileToken, setTurnstileToken] = useState("");
+    const [turnstileResetKey, setTurnstileResetKey] = useState(0);
+    const redirect = safeRedirect(searchParams.get("redirect") || "/");
+    const resetTurnstile = useCallback(() => {
+        setTurnstileToken("");
+        setTurnstileResetKey((value) => value + 1);
+    }, []);
     const thirdPartyProviders = ([
         authSettings?.google,
         authSettings?.github,
@@ -65,7 +78,7 @@ function LoginContent() {
         void fetchCurrentUser(token).then((user) => {
             setSession(token, user);
             message.success("登录成功");
-            router.replace(redirect.startsWith("/") ? redirect : "/");
+            router.replace(redirect);
             router.refresh();
         });
     }, [message, redirect, router, searchParams, setSession]);
@@ -85,13 +98,15 @@ function LoginContent() {
                 return;
             }
             const action = mode === "register" ? register : login;
-            const user = await runWithOverlay(mode === "register" ? "正在注册" : "正在登录", () => action({ username: values.username, password: values.password, email: values.email, code: values.code }));
+            const user = await runWithOverlay(mode === "register" ? "正在注册" : "正在登录", () => action({ username: values.username, password: values.password, email: values.email, code: values.code, turnstileToken }));
             message.success(mode === "register" ? "注册成功" : "登录成功");
-            router.replace(redirect.startsWith("/") ? redirect : "/");
+            router.replace(redirect);
             router.refresh();
             if (user.role !== "admin") router.replace("/");
         } catch (error) {
             message.error(error instanceof Error ? error.message : "登录失败");
+        } finally {
+            resetTurnstile();
         }
     };
 
@@ -102,12 +117,13 @@ function LoginContent() {
         }
         setSendingCode(true);
         try {
-            await sendEmailCode(formEmail, "register");
+            await sendEmailCode(formEmail, "register", turnstileToken);
             message.success("验证码已发送");
         } catch (error) {
             message.error(error instanceof Error ? error.message : "发送失败");
         } finally {
             setSendingCode(false);
+            resetTurnstile();
         }
     };
 
@@ -194,6 +210,7 @@ function LoginContent() {
                             ) : null}
                         </motion.div>
                     </AnimatePresence>
+                    <TurnstileField siteKey={turnstileSiteKey} resetKey={turnstileResetKey} onVerify={setTurnstileToken} />
                     <Space orientation="vertical" size={12} style={{ width: "100%" }}>
                         <Button
                             block

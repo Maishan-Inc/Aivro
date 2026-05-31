@@ -511,13 +511,16 @@ func imageItemBytes(ctx context.Context, item map[string]any) ([]byte, string, s
 		return content, "image/png", ".png", nil
 	}
 	if value, ok := item["url"].(string); ok && strings.HasPrefix(value, "http") {
+		if !IsPublicHTTPURL(value) {
+			return nil, "", "", errors.New("上游图片地址不安全")
+		}
 		req, _ := http.NewRequestWithContext(ctx, http.MethodGet, value, nil)
-		resp, err := http.DefaultClient.Do(req)
+		resp, err := publicHTTPClient().Do(req)
 		if err != nil {
 			return nil, "", "", err
 		}
 		defer resp.Body.Close()
-		if resp.StatusCode >= http.StatusBadRequest {
+		if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 			return nil, "", "", errors.New("下载上游图片失败")
 		}
 		content, err := io.ReadAll(io.LimitReader(resp.Body, 64<<20))

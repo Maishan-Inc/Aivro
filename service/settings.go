@@ -17,7 +17,16 @@ import (
 
 func PublicSettings() (model.PublicSetting, error) {
 	settings, err := repository.GetSettings()
-	return normalizePublicSetting(settings.Public), err
+	if err != nil {
+		return model.PublicSetting{}, err
+	}
+	settings = normalizeSettings(settings)
+	if settings.Private.Turnstile.Enabled && strings.TrimSpace(settings.Private.Turnstile.SiteKey) != "" && strings.TrimSpace(settings.Private.Turnstile.SecretKey) != "" {
+		settings.Public.Auth.TurnstileSiteKey = settings.Private.Turnstile.SiteKey
+	} else {
+		settings.Public.Auth.TurnstileSiteKey = ""
+	}
+	return settings.Public, nil
 }
 
 func AdminSettings() (model.Settings, error) {
@@ -113,6 +122,7 @@ func normalizePublicSetting(setting model.PublicSetting) model.PublicSetting {
 		enabled := false
 		setting.Auth.EmailVerification = &enabled
 	}
+	setting.Auth.TurnstileSiteKey = ""
 	setting.Auth.LinuxDo = normalizePublicAuthProvider(setting.Auth.LinuxDo, "linux-do", "Linux.do", "/icons/linuxdo.svg")
 	setting.Auth.Google = normalizePublicAuthProvider(setting.Auth.Google, "google", "Google", "/icons/google.svg")
 	setting.Auth.Github = normalizePublicAuthProvider(setting.Auth.Github, "github", "GitHub", "/icons/github.svg")
@@ -208,6 +218,7 @@ func normalizePrivateSetting(setting model.PrivateSetting) model.PrivateSetting 
 		setting.Channels = []model.ModelChannel{}
 	}
 	setting.PromptSync = normalizePromptSyncSetting(setting.PromptSync)
+	setting.Turnstile = normalizeTurnstileSetting(setting.Turnstile)
 	setting.Auth = normalizePrivateAuthSetting(setting.Auth)
 	setting.Mail = normalizeMailSetting(setting.Mail)
 	setting.CloudStorage = normalizeCloudStorageSetting(setting.CloudStorage)
@@ -224,6 +235,12 @@ func normalizePrivateSetting(setting model.PrivateSetting) model.PrivateSetting 
 			setting.Channels[i].Weight = 1
 		}
 	}
+	return setting
+}
+
+func normalizeTurnstileSetting(setting model.TurnstileSetting) model.TurnstileSetting {
+	setting.SiteKey = strings.TrimSpace(setting.SiteKey)
+	setting.SecretKey = strings.TrimSpace(setting.SecretKey)
 	return setting
 }
 
@@ -258,6 +275,7 @@ func hidePrivateAPIKeys(settings model.Settings) model.Settings {
 		settings.Private.Auth.CustomProviders[i].ClientSecret = ""
 	}
 	settings.Private.Mail.Password = ""
+	settings.Private.Turnstile.SecretKey = ""
 	settings.Private.CloudStorage.SecretAccessKey = ""
 	settings.Private.Stripe.SecretKey = ""
 	settings.Private.Stripe.WebhookSecret = ""
@@ -297,6 +315,9 @@ func keepPrivateAuthSecrets(settings *model.Settings, saved model.Settings) {
 	}
 	if strings.TrimSpace(settings.Private.Mail.Password) == "" {
 		settings.Private.Mail.Password = saved.Private.Mail.Password
+	}
+	if strings.TrimSpace(settings.Private.Turnstile.SecretKey) == "" {
+		settings.Private.Turnstile.SecretKey = saved.Private.Turnstile.SecretKey
 	}
 }
 

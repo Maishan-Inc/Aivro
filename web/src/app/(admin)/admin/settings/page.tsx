@@ -80,6 +80,7 @@ const emptySettings: AdminSettings = {
         auth: {
             allowRegister: true,
             emailVerification: false,
+            turnstileSiteKey: "",
             linuxDo: emptyPublicProvider("linux-do", "Linux.do", "/icons/linuxdo.svg"),
             google: emptyPublicProvider("google", "Google", "/icons/google.svg"),
             github: emptyPublicProvider("github", "GitHub", "/icons/github.svg"),
@@ -103,6 +104,7 @@ const emptySettings: AdminSettings = {
     private: {
         channels: [],
         promptSync: { enabled: true, cron: "*/5 * * * *" },
+        turnstile: { enabled: false, siteKey: "", secretKey: "" },
         auth: {
             linuxDo: emptyPrivateProvider("linux-do", "Linux.do", "/icons/linuxdo.svg"),
             google: emptyPrivateProvider("google", "Google", "/icons/google.svg"),
@@ -1027,6 +1029,25 @@ export default function AdminSettingsPage() {
                                         </Col>
                                     </Row>
                                 </Card>
+                                <Card size="small" title="Cloudflare Turnstile">
+                                    <Row gutter={16}>
+                                        <Col xs={24} md={8}>
+                                            <Form.Item name={["private", "turnstile", "enabled"]} label="启用人机验证" valuePropName="checked">
+                                                <Switch />
+                                            </Form.Item>
+                                        </Col>
+                                        <Col xs={24} md={8}>
+                                            <Form.Item name={["private", "turnstile", "siteKey"]} label="Site Key" extra="启用后会通过公开设置下发给前端。">
+                                                <Input placeholder="0x..." />
+                                            </Form.Item>
+                                        </Col>
+                                        <Col xs={24} md={8}>
+                                            <Form.Item name={["private", "turnstile", "secretKey"]} label="Secret Key" extra="后台返回时隐藏；留空保存表示沿用已保存密钥。">
+                                                <Input.Password placeholder="0x..." />
+                                            </Form.Item>
+                                        </Col>
+                                    </Row>
+                                </Card>
                                 <Button type="primary" icon={<PlusOutlined />} onClick={() => openChannelDrawer(null)}>
                                     新增渠道
                                 </Button>
@@ -1626,6 +1647,7 @@ function normalizePublicSetting(setting: Partial<AdminSettings["public"]> = {}):
         auth: {
             allowRegister: setting.auth?.allowRegister !== false,
             emailVerification: setting.auth?.emailVerification === true,
+            turnstileSiteKey: setting.auth?.turnstileSiteKey || "",
             linuxDo: normalizePublicProvider(setting.auth?.linuxDo, "linux-do", "Linux.do", "/icons/linuxdo.svg"),
             google: normalizePublicProvider(setting.auth?.google, "google", "Google", "/icons/google.svg"),
             github: normalizePublicProvider(setting.auth?.github, "github", "GitHub", "/icons/github.svg"),
@@ -1666,6 +1688,13 @@ function normalizePrivateSetting(setting: Partial<AdminSettings["private"]> = {}
         promptSync: {
             enabled: setting.promptSync?.enabled !== false,
             cron: setting.promptSync?.cron || "*/5 * * * *",
+        },
+        turnstile: {
+            ...emptySettings.private.turnstile,
+            ...(setting.turnstile || {}),
+            enabled: setting.turnstile?.enabled === true,
+            siteKey: setting.turnstile?.siteKey || "",
+            secretKey: setting.turnstile?.secretKey || "",
         },
         auth: {
             linuxDo: normalizePrivateProvider(setting.auth?.linuxDo, "linux-do", "Linux.do", "/icons/linuxdo.svg"),
@@ -1762,6 +1791,10 @@ function mergeSavedSecrets(currentSettings: AdminSettings, saved: AdminSettings)
         private: {
             ...saved.private,
             channels,
+            turnstile: {
+                ...saved.private.turnstile,
+                secretKey: currentSettings.private.turnstile.secretKey || saved.private.turnstile.secretKey,
+            },
             cloudStorage: { ...saved.private.cloudStorage, secretAccessKey: currentSettings.private.cloudStorage.secretAccessKey || saved.private.cloudStorage.secretAccessKey },
             stripe: {
                 ...saved.private.stripe,

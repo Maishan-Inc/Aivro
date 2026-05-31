@@ -37,6 +37,7 @@ type User struct {
 	AuthProvider          string     `json:"authProvider"`
 	EmailVerified         bool       `json:"emailVerified"`
 	Status                UserStatus `json:"status"`
+	TokenVersion          int        `json:"tokenVersion"`
 	LastLoginAt           string     `json:"lastLoginAt"`
 	Extra                 string     `json:"extra" gorm:"type:text"`
 	CreatedAt             string     `json:"createdAt"`
@@ -122,6 +123,7 @@ type EmailVerification struct {
 	Purpose   string `json:"purpose" gorm:"index"`
 	Target    string `json:"target" gorm:"index"`
 	Code      string `json:"code"`
+	Attempts  int    `json:"attempts"`
 	ExpiresAt string `json:"expiresAt" gorm:"index"`
 	UsedAt    string `json:"usedAt"`
 	CreatedAt string `json:"createdAt"`

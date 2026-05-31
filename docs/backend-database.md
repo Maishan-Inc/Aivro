@@ -60,6 +60,7 @@
 | `auth_provider` | string | 主要登录来源：`password`、`google`、`github`、`linux-do`、`metamask` 等 |
 | `email_verified` | bool | 邮箱是否已验证                 |
 | `status`        | string | 用户状态：`active`、`ban`       |
+| `token_version` | number | 登录令牌版本，改密码后递增并让旧 JWT 失效 |
 | `last_login_at` | string | 最近登录时间                   |
 | `extra`         | json   | 扩展信息，第三方资料按平台命名空间保存，如 `linuxDo` |
 | `created_at`    | string | 创建时间                     |
@@ -75,6 +76,7 @@
 | `purpose` | string | 用途：`register`、`reset`、`metamask` |
 | `target` | string | 邮箱地址 |
 | `code` | string | 验证码 |
+| `attempts` | number | 验证失败次数，超过限制后需要重新获取 |
 | `expires_at` | string | 过期时间 |
 | `used_at` | string | 使用时间，未使用为空 |
 | `created_at` | string | 创建时间 |
@@ -178,6 +180,7 @@
 | --- | --- | --- |
 | `allowRegister` | bool | 是否允许用户注册 |
 | `emailVerification` | bool | 是否开启注册邮箱验证 |
+| `turnstileSiteKey` | string | Cloudflare Turnstile 前端站点 Key，启用后由私有配置派生公开下发 |
 | `linuxDo` | object | Linux.do 登录公开配置 |
 | `google` | object | Google 登录公开配置 |
 | `github` | object | GitHub 登录公开配置 |
@@ -218,6 +221,7 @@
 |------------|----------|----------|
 | `channels` | object[] | 模型渠道配置列表 |
 | `promptSync` | object | GitHub 远程提示词定时同步配置 |
+| `turnstile` | object | Cloudflare Turnstile 人机验证私有配置，包含启用状态、Site Key 和 Secret Key |
 | `auth` | object | 私有登录配置 |
 | `mail` | object | SMTP 邮件验证码配置 |
 | `cloudStorage` | object | Cloudflare R2 / S3 兼容云存储配置 |

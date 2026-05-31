@@ -26,6 +26,7 @@ export type AuthPayload = {
     password: string;
     email?: string;
     code?: string;
+    turnstileToken?: string;
 };
 
 export type EmailCodePurpose = "register" | "reset" | "metamask";
@@ -42,14 +43,14 @@ export async function fetchCurrentUser(token?: string) {
     return apiGet<AuthUser>("/api/auth/me", undefined, token);
 }
 
-export async function sendEmailCode(email: string, purpose: EmailCodePurpose) {
-    return apiPost<boolean>("/api/auth/email-code", { email, purpose });
+export async function sendEmailCode(email: string, purpose: EmailCodePurpose, turnstileToken?: string) {
+    return apiPost<boolean>("/api/auth/email-code", { email, purpose, turnstileToken });
 }
 
-export async function resetPassword(payload: { email: string; code: string; password: string }) {
+export async function resetPassword(payload: { email: string; code: string; password: string; turnstileToken?: string }) {
     return apiPost<boolean>("/api/auth/reset-password", payload);
 }
 
-export async function loginWithMetaMask(payload: { walletAddress: string; message: string; signature: string; email: string; code: string }) {
+export async function loginWithMetaMask(payload: { walletAddress: string; message: string; signature: string; email: string; code: string; turnstileToken?: string }) {
     return apiPost<AuthSession>("/api/auth/metamask/login", payload);
 }

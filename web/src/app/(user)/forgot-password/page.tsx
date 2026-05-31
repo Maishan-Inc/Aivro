@@ -4,11 +4,13 @@ import { LockOutlined, MailOutlined } from "@ant-design/icons";
 import { App, Button, Form, Input, Space } from "antd";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 
 import { AivroDrawableLoader } from "@/components/aivro-drawable-loader";
+import { TurnstileField } from "@/components/turnstile-field";
 import { useAuthLoadingOverlay } from "@/hooks/use-auth-loading-overlay";
 import { resetPassword, sendEmailCode } from "@/services/api/auth";
+import { useConfigStore } from "@/stores/use-config-store";
 
 type ForgotPasswordValues = {
     email: string;
@@ -23,7 +25,14 @@ export default function ForgotPasswordPage() {
     const [form] = Form.useForm<ForgotPasswordValues>();
     const [sendingCode, setSendingCode] = useState(false);
     const [submitting, setSubmitting] = useState(false);
+    const [turnstileToken, setTurnstileToken] = useState("");
+    const [turnstileResetKey, setTurnstileResetKey] = useState(0);
+    const turnstileSiteKey = useConfigStore((state) => state.publicSettings?.auth?.turnstileSiteKey || "");
     const { overlay, runWithOverlay } = useAuthLoadingOverlay();
+    const resetTurnstile = useCallback(() => {
+        setTurnstileToken("");
+        setTurnstileResetKey((value) => value + 1);
+    }, []);
 
     const requestCode = async () => {
         const email = form.getFieldValue("email");
@@ -33,12 +42,13 @@ export default function ForgotPasswordPage() {
         }
         setSendingCode(true);
         try {
-            await sendEmailCode(email, "reset");
+            await sendEmailCode(email, "reset", turnstileToken);
             message.success("验证码已发送");
         } catch (error) {
             message.error(error instanceof Error ? error.message : "发送失败");
         } finally {
             setSendingCode(false);
+            resetTurnstile();
         }
     };
 
@@ -49,13 +59,14 @@ export default function ForgotPasswordPage() {
         }
         setSubmitting(true);
         try {
-            await runWithOverlay("正在重置密码", () => resetPassword({ email: values.email, code: values.code, password: values.password }));
+            await runWithOverlay("正在重置密码", () => resetPassword({ email: values.email, code: values.code, password: values.password, turnstileToken }));
             message.success("密码已重置");
             router.replace("/login");
         } catch (error) {
             message.error(error instanceof Error ? error.message : "重置失败");
         } finally {
             setSubmitting(false);
+            resetTurnstile();
         }
     };
 
@@ -86,6 +97,7 @@ export default function ForgotPasswordPage() {
                     <Form.Item name="confirmPassword" label="确认密码" rules={[{ required: true, message: "请再次输入新密码" }]}>
                         <Input.Password prefix={<LockOutlined />} autoComplete="new-password" />
                     </Form.Item>
+                    <TurnstileField siteKey={turnstileSiteKey} resetKey={turnstileResetKey} onVerify={setTurnstileToken} />
                     <Space orientation="vertical" size={12} style={{ width: "100%" }}>
                         <Button block type="primary" htmlType="submit" loading={submitting} icon={submitting ? <AivroDrawableLoader compact className="h-4 w-14 text-white dark:text-white" /> : undefined}>
                             {submitting ? "处理中" : "重置密码"}

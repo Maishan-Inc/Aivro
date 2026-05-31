@@ -205,6 +205,7 @@ export type AdminPublicSettings = {
     auth: {
         allowRegister: boolean;
         emailVerification: boolean;
+        turnstileSiteKey: string;
         linuxDo: AdminPublicAuthProvider;
         google: AdminPublicAuthProvider;
         github: AdminPublicAuthProvider;
@@ -243,6 +244,7 @@ export type AdminPrivateSettings = {
         enabled: boolean;
         cron: string;
     };
+    turnstile: AdminTurnstileSettings;
     auth: {
         linuxDo: AdminPrivateAuthProvider;
         google: AdminPrivateAuthProvider;
@@ -254,6 +256,12 @@ export type AdminPrivateSettings = {
     cloudStorage: AdminCloudStorageSettings;
     stripe: AdminStripeSettings;
     kyc: AdminKycSettings;
+};
+
+export type AdminTurnstileSettings = {
+    enabled: boolean;
+    siteKey: string;
+    secretKey: string;
 };
 
 export type AdminStripeSettings = {

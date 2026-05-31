@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,19 +18,22 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/basketikun/aivro/config"
 	"github.com/basketikun/aivro/model"
 	"github.com/basketikun/aivro/repository"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type TokenClaims struct {
-	UserID   string         `json:"userId"`
-	Username string         `json:"username"`
-	Role     model.UserRole `json:"role"`
+	UserID       string         `json:"userId"`
+	Username     string         `json:"username"`
+	Role         model.UserRole `json:"role"`
+	TokenVersion int            `json:"tokenVersion"`
 	jwt.RegisteredClaims
 }
 
@@ -51,9 +55,17 @@ func EnsureDefaultAdmin() error {
 	if strings.TrimSpace(config.Cfg.AdminUsername) == "" || strings.TrimSpace(config.Cfg.AdminPassword) == "" {
 		return nil
 	}
-	WarnDefaultSecurityConfig()
 	hasAdmin, err := repository.HasAdmin()
-	if err != nil || hasAdmin {
+	if err != nil {
+		return err
+	}
+	if hasAdmin {
+		return upgradeDefaultAdminPassword()
+	}
+	if isDefaultAdminCredential(config.Cfg.AdminUsername, config.Cfg.AdminPassword) {
+		return safeMessageError{message: "首次启动前请设置安全的 ADMIN_USERNAME 和 ADMIN_PASSWORD"}
+	}
+	if err := validatePassword(config.Cfg.AdminPassword); err != nil {
 		return err
 	}
 	hash, err := hashPassword(config.Cfg.AdminPassword)
@@ -73,6 +85,31 @@ func EnsureDefaultAdmin() error {
 	return err
 }
 
+func upgradeDefaultAdminPassword() error {
+	if strings.TrimSpace(config.Cfg.AdminPassword) == "" || strings.TrimSpace(config.Cfg.AdminPassword) == "aivro" {
+		return nil
+	}
+	user, ok, err := repository.GetUserByUsername("admin")
+	if err != nil || !ok || user.Role != model.UserRoleAdmin {
+		return err
+	}
+	if bcrypt.CompareHashAndPassword([]byte(user.Password), []byte("aivro")) != nil {
+		return nil
+	}
+	if err := validatePassword(config.Cfg.AdminPassword); err != nil {
+		return err
+	}
+	hash, err := hashPassword(config.Cfg.AdminPassword)
+	if err != nil {
+		return err
+	}
+	user.Password = hash
+	user.TokenVersion++
+	user.UpdatedAt = now()
+	_, err = repository.SaveUser(user)
+	return err
+}
+
 func Register(username string, password string, email string, code string) (model.AuthSession, error) {
 	settings, err := repository.GetSettings()
 	if err != nil {
@@ -88,6 +125,9 @@ func Register(username string, password string, email string, code string) (mode
 	}
 	if username == "" || password == "" {
 		return model.AuthSession{}, safeMessageError{message: "用户名和密码不能为空"}
+	}
+	if err := validatePassword(password); err != nil {
+		return model.AuthSession{}, err
 	}
 	email = strings.TrimSpace(strings.ToLower(email))
 	emailVerified := false
@@ -149,6 +189,9 @@ func Login(username string, password string) (model.AuthSession, error) {
 	if !ok || bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)) != nil {
 		return model.AuthSession{}, safeMessageError{message: "用户名或密码错误"}
 	}
+	if user.Role == model.UserRoleAdmin && isDefaultAdminCredential(user.Username, password) {
+		return model.AuthSession{}, safeMessageError{message: "默认管理员密码已禁用，请重置管理员密码"}
+	}
 	if user.Status == model.UserStatusBan {
 		return model.AuthSession{}, safeMessageError{message: "账号已被禁用"}
 	}
@@ -162,7 +205,7 @@ func Login(username string, password string) (model.AuthSession, error) {
 	return newSession(user)
 }
 
-func LinuxDoAuthorizeURL(r *http.Request, redirect string) (string, error) {
+func LinuxDoAuthorizeURL(w http.ResponseWriter, r *http.Request, redirect string) (string, error) {
 	settings, err := repository.GetSettings()
 	if err != nil {
 		return "", err
@@ -180,12 +223,15 @@ func LinuxDoAuthorizeURL(r *http.Request, redirect string) (string, error) {
 	values.Set("redirect_uri", linuxDoRedirectURI(r))
 	values.Set("response_type", "code")
 	values.Set("scope", "read")
-	values.Set("state", base64.RawURLEncoding.EncodeToString([]byte(redirect)))
+	values.Set("state", newOAuthState(w, r, "linux-do", redirect))
 	return config.Cfg.LinuxDoAuthorizeURL + "?" + values.Encode(), nil
 }
 
 func LoginWithLinuxDo(r *http.Request, code string, state string) (model.AuthSession, string, error) {
-	redirect := decodeState(state)
+	redirect, err := decodeState(r, "linux-do", state)
+	if err != nil {
+		return model.AuthSession{}, redirect, err
+	}
 	settings, err := repository.GetSettings()
 	if err != nil {
 		return model.AuthSession{}, redirect, err
@@ -243,7 +289,7 @@ func LoginWithLinuxDo(r *http.Request, code string, state string) (model.AuthSes
 	return session, redirect, err
 }
 
-func OAuthAuthorizeURL(r *http.Request, provider string, redirect string) (string, error) {
+func OAuthAuthorizeURL(w http.ResponseWriter, r *http.Request, provider string, redirect string) (string, error) {
 	settings, err := repository.GetSettings()
 	if err != nil {
 		return "", err
@@ -263,12 +309,15 @@ func OAuthAuthorizeURL(r *http.Request, provider string, redirect string) (strin
 	if strings.TrimSpace(privateProvider.Scope) != "" {
 		values.Set("scope", privateProvider.Scope)
 	}
-	values.Set("state", base64.RawURLEncoding.EncodeToString([]byte(redirect)))
+	values.Set("state", newOAuthState(w, r, publicProvider.ID, redirect))
 	return privateProvider.AuthorizeURL + "?" + values.Encode(), nil
 }
 
 func LoginWithOAuth(r *http.Request, provider string, code string, state string) (model.AuthSession, string, error) {
-	redirect := decodeState(state)
+	redirect, err := decodeState(r, provider, state)
+	if err != nil {
+		return model.AuthSession{}, redirect, err
+	}
 	settings, err := repository.GetSettings()
 	if err != nil {
 		return model.AuthSession{}, redirect, err
@@ -353,6 +402,9 @@ func LoginWithMetaMask(walletAddress string, message string, signature string, e
 	if walletAddress == "" || strings.TrimSpace(signature) == "" {
 		return model.AuthSession{}, safeMessageError{message: "缺少钱包签名"}
 	}
+	if !validMetaMaskSignature(walletAddress, message, signature) {
+		return model.AuthSession{}, safeMessageError{message: "MetaMask 签名无效"}
+	}
 	user, ok, err := repository.GetUserByMetaMaskAddress(walletAddress)
 	if err != nil {
 		return model.AuthSession{}, err
@@ -419,6 +471,9 @@ func CurrentAuthUser(tokenText string) (model.AuthUser, bool) {
 		return model.AuthUser{}, false
 	}
 	if user.Status == model.UserStatusBan {
+		return model.AuthUser{}, false
+	}
+	if claims.TokenVersion != user.TokenVersion {
 		return model.AuthUser{}, false
 	}
 	return model.PublicUser(user), true
@@ -497,11 +552,15 @@ func SaveUser(user model.User, password string) (model.User, error) {
 		user.LastLoginAt = saved.LastLoginAt
 	}
 	if password != "" {
+		if err := validatePassword(password); err != nil {
+			return user, err
+		}
 		hash, err := hashPassword(password)
 		if err != nil {
 			return user, err
 		}
 		user.Password = hash
+		user.TokenVersion++
 	}
 	if isCreate && user.Password == "" {
 		return user, safeMessageError{message: "密码不能为空"}
@@ -512,7 +571,7 @@ func SaveUser(user model.User, password string) (model.User, error) {
 	return user, err
 }
 
-func AdjustUserCredits(id string, credits int) (model.User, error) {
+func AdjustUserCredits(id string, credits int, operator model.AuthUser) (model.User, error) {
 	user, ok, err := repository.GetUserByID(id)
 	if err != nil || !ok {
 		if err != nil {
@@ -525,6 +584,10 @@ func AdjustUserCredits(id string, credits int) (model.User, error) {
 	user.UpdatedAt = now()
 	user, err = repository.SaveUser(user)
 	if err == nil && oldCredits != credits {
+		extra, _ := json.Marshal(map[string]string{
+			"operatorId":       operator.ID,
+			"operatorUsername": operator.Username,
+		})
 		_, err = repository.SaveCreditLog(model.CreditLog{
 			ID:        newID("credit"),
 			UserID:    user.ID,
@@ -532,6 +595,7 @@ func AdjustUserCredits(id string, credits int) (model.User, error) {
 			Amount:    credits - oldCredits,
 			Balance:   credits,
 			Remark:    "后台手动调整",
+			Extra:     string(extra),
 			CreatedAt: now(),
 		})
 	}
@@ -631,9 +695,10 @@ func newToken(user model.User) (string, error) {
 		expireHours = 168
 	}
 	claims := TokenClaims{
-		UserID:   user.ID,
-		Username: user.Username,
-		Role:     user.Role,
+		UserID:       user.ID,
+		Username:     user.Username,
+		Role:         user.Role,
+		TokenVersion: user.TokenVersion,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Duration(expireHours) * time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -646,6 +711,51 @@ func newToken(user model.User) (string, error) {
 func hashPassword(password string) (string, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	return string(hash), err
+}
+
+func validatePassword(password string) error {
+	if len([]rune(password)) < 8 {
+		return safeMessageError{message: "密码至少需要 8 个字符"}
+	}
+	hasLetter := false
+	hasDigit := false
+	for _, r := range password {
+		if unicode.IsLetter(r) {
+			hasLetter = true
+		}
+		if unicode.IsDigit(r) {
+			hasDigit = true
+		}
+	}
+	if !hasLetter || !hasDigit {
+		return safeMessageError{message: "密码需要同时包含字母和数字"}
+	}
+	return nil
+}
+
+func validMetaMaskSignature(walletAddress string, message string, signature string) bool {
+	walletAddress = strings.ToLower(strings.TrimSpace(walletAddress))
+	if walletAddress == "" || strings.TrimSpace(message) == "" {
+		return false
+	}
+	sig := strings.TrimPrefix(strings.TrimSpace(signature), "0x")
+	sigBytes, err := hex.DecodeString(sig)
+	if err != nil || len(sigBytes) != 65 {
+		return false
+	}
+	if sigBytes[64] >= 27 {
+		sigBytes[64] -= 27
+	}
+	if sigBytes[64] > 1 {
+		return false
+	}
+	prefix := fmt.Sprintf("\x19Ethereum Signed Message:\n%d%s", len(message), message)
+	hash := crypto.Keccak256Hash([]byte(prefix))
+	pubKey, err := crypto.SigToPub(hash.Bytes(), sigBytes)
+	if err != nil {
+		return false
+	}
+	return strings.EqualFold(crypto.PubkeyToAddress(*pubKey).Hex(), walletAddress)
 }
 
 func now() string {
@@ -985,6 +1095,9 @@ func ResetPassword(email string, code string, password string) error {
 	if email == "" || code == "" || password == "" {
 		return safeMessageError{message: "邮箱、验证码和新密码不能为空"}
 	}
+	if err := validatePassword(password); err != nil {
+		return err
+	}
 	if err := verifyEmailCode("reset", email, code); err != nil {
 		return err
 	}
@@ -1000,17 +1113,26 @@ func ResetPassword(email string, code string, password string) error {
 		return err
 	}
 	user.Password = hash
+	user.TokenVersion++
 	user.UpdatedAt = now()
 	_, err = repository.SaveUser(user)
 	return err
 }
 
 func verifyEmailCode(purpose string, email string, code string) error {
-	item, ok, err := repository.GetActiveEmailVerification(purpose, strings.TrimSpace(strings.ToLower(email)), strings.TrimSpace(code), now())
-	if err != nil || !ok {
-		if err != nil {
-			return err
-		}
+	item, ok, err := repository.GetLatestActiveEmailVerification(purpose, strings.TrimSpace(strings.ToLower(email)), now())
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return safeMessageError{message: "验证码无效或已过期"}
+	}
+	if item.Attempts >= 5 {
+		return safeMessageError{message: "验证码错误次数过多，请重新获取"}
+	}
+	if strings.TrimSpace(item.Code) != strings.TrimSpace(code) {
+		item.Attempts++
+		_, _ = repository.SaveEmailVerification(item)
 		return safeMessageError{message: "验证码无效或已过期"}
 	}
 	item.UsedAt = now()
@@ -1114,16 +1236,61 @@ func requestIP(r *http.Request) string {
 	return strings.TrimSpace(r.RemoteAddr)
 }
 
-func decodeState(state string) string {
+type oauthStatePayload struct {
+	Redirect string `json:"redirect"`
+	Nonce    string `json:"nonce"`
+}
+
+func newOAuthState(w http.ResponseWriter, r *http.Request, provider string, redirect string) string {
+	nonce := mustRandomToken(24)
+	payload := oauthStatePayload{Redirect: SafeRedirectPath(redirect), Nonce: nonce}
+	body, _ := json.Marshal(payload)
+	http.SetCookie(w, &http.Cookie{
+		Name:     oauthStateCookie(provider),
+		Value:    nonce,
+		Path:     "/api/auth",
+		MaxAge:   600,
+		HttpOnly: true,
+		Secure:   strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https") || r.TLS != nil,
+		SameSite: http.SameSiteLaxMode,
+	})
+	return base64.RawURLEncoding.EncodeToString(body)
+}
+
+func decodeState(r *http.Request, provider string, state string) (string, error) {
 	data, err := base64.RawURLEncoding.DecodeString(state)
 	if err != nil {
-		return "/"
+		return "/", safeMessageError{message: "第三方登录状态无效"}
 	}
-	redirect := string(data)
-	if !strings.HasPrefix(redirect, "/") {
-		return "/"
+	payload := oauthStatePayload{}
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return "/", safeMessageError{message: "第三方登录状态无效"}
 	}
-	return redirect
+	cookie, err := r.Cookie(oauthStateCookie(provider))
+	if err != nil || strings.TrimSpace(cookie.Value) == "" || cookie.Value != payload.Nonce {
+		return SafeRedirectPath(payload.Redirect), safeMessageError{message: "第三方登录状态已过期，请重试"}
+	}
+	return SafeRedirectPath(payload.Redirect), nil
+}
+
+func ClearOAuthState(w http.ResponseWriter, r *http.Request, provider string) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     oauthStateCookie(provider),
+		Value:    "",
+		Path:     "/api/auth",
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https") || r.TLS != nil,
+		SameSite: http.SameSiteLaxMode,
+	})
+}
+
+func oauthStateCookie(provider string) string {
+	provider = strings.NewReplacer("/", "_", "\\", "_", ":", "_").Replace(strings.TrimSpace(provider))
+	if provider == "" {
+		provider = "oauth"
+	}
+	return "aivro_oauth_state_" + provider
 }
 
 func RequestOrigin(r *http.Request) string {
@@ -1151,4 +1318,8 @@ func WarnDefaultSecurityConfig() {
 	if config.Cfg.AdminUsername == "admin" && config.Cfg.AdminPassword == "aivro" {
 		log.Println("WARNING: using default admin credentials, please set ADMIN_USERNAME and ADMIN_PASSWORD to safer values before deployment")
 	}
+}
+
+func isDefaultAdminCredential(username string, password string) bool {
+	return strings.TrimSpace(username) == "admin" && strings.TrimSpace(password) == "aivro"
 }

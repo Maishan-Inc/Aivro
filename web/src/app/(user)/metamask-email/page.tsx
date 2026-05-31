@@ -3,11 +3,13 @@
 import { MailOutlined } from "@ant-design/icons";
 import { App, Button, Form, Input, Space, Typography } from "antd";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, useCallback, useState } from "react";
 
 import { AivroDrawableLoader } from "@/components/aivro-drawable-loader";
+import { TurnstileField } from "@/components/turnstile-field";
 import { useAuthLoadingOverlay } from "@/hooks/use-auth-loading-overlay";
 import { fetchCurrentUser, loginWithMetaMask, sendEmailCode } from "@/services/api/auth";
+import { useConfigStore } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
 
 type MetaMaskEmailValues = {
@@ -31,11 +33,18 @@ function MetaMaskEmailContent() {
     const setSession = useUserStore((state) => state.setSession);
     const [sendingCode, setSendingCode] = useState(false);
     const [submitting, setSubmitting] = useState(false);
+    const [turnstileToken, setTurnstileToken] = useState("");
+    const [turnstileResetKey, setTurnstileResetKey] = useState(0);
+    const turnstileSiteKey = useConfigStore((state) => state.publicSettings?.auth?.turnstileSiteKey || "");
     const { overlay, runWithOverlay } = useAuthLoadingOverlay();
     const walletAddress = searchParams.get("walletAddress") || "";
     const signMessage = searchParams.get("message") || "";
     const signature = searchParams.get("signature") || "";
-    const redirect = searchParams.get("redirect") || "/";
+    const redirect = safeRedirect(searchParams.get("redirect") || "/");
+    const resetTurnstile = useCallback(() => {
+        setTurnstileToken("");
+        setTurnstileResetKey((value) => value + 1);
+    }, []);
 
     const requestCode = async () => {
         const email = form.getFieldValue("email");
@@ -45,12 +54,13 @@ function MetaMaskEmailContent() {
         }
         setSendingCode(true);
         try {
-            await sendEmailCode(email, "metamask");
+            await sendEmailCode(email, "metamask", turnstileToken);
             message.success("验证码已发送");
         } catch (error) {
             message.error(error instanceof Error ? error.message : "发送失败");
         } finally {
             setSendingCode(false);
+            resetTurnstile();
         }
     };
 
@@ -61,16 +71,17 @@ function MetaMaskEmailContent() {
         }
         setSubmitting(true);
         try {
-            const session = await runWithOverlay("正在完成登录", () => loginWithMetaMask({ walletAddress, message: signMessage, signature, email: values.email, code: values.code }));
+            const session = await runWithOverlay("正在完成登录", () => loginWithMetaMask({ walletAddress, message: signMessage, signature, email: values.email, code: values.code, turnstileToken }));
             const user = await fetchCurrentUser(session.token);
             setSession(session.token, user);
             message.success("登录成功");
-            router.replace(redirect.startsWith("/") ? redirect : "/");
+            router.replace(redirect);
             router.refresh();
         } catch (error) {
             message.error(error instanceof Error ? error.message : "登录失败");
         } finally {
             setSubmitting(false);
+            resetTurnstile();
         }
     };
 
@@ -96,6 +107,7 @@ function MetaMaskEmailContent() {
                             </Button>
                         </Space.Compact>
                     </Form.Item>
+                    <TurnstileField siteKey={turnstileSiteKey} resetKey={turnstileResetKey} onVerify={setTurnstileToken} />
                     <Button block type="primary" htmlType="submit" loading={submitting} icon={submitting ? <AivroDrawableLoader compact className="h-4 w-14 text-white dark:text-white" /> : undefined}>
                         {submitting ? "处理中" : "完成登录"}
                     </Button>
@@ -104,4 +116,9 @@ function MetaMaskEmailContent() {
             {overlay}
         </main>
     );
+}
+
+function safeRedirect(value: string) {
+    if (!value.startsWith("/") || value.startsWith("//") || value.includes("\\")) return "/";
+    return value;
 }

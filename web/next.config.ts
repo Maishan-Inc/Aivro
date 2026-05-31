@@ -14,10 +14,7 @@ export default function nextConfig(phase: string): NextConfig {
     const releases = parseChangelog(localChangelog);
 
     return {
-        allowedDevOrigins: isDev ? ["*.*.*.*"] : [],
-        typescript: {
-            ignoreBuildErrors: true,
-        },
+        allowedDevOrigins: isDev ? ["127.0.0.1", "localhost"] : [],
         env: {
             NEXT_PUBLIC_APP_VERSION: localVersion,
             NEXT_PUBLIC_APP_RELEASES: JSON.stringify(releases),

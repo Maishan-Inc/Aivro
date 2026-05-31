@@ -122,7 +122,10 @@ func HandleDiditWebhook(r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	if strings.TrimSpace(kyc.DiditWebhookSecret) != "" && !validDiditSignature(r, body, kyc.DiditWebhookSecret) {
+	if strings.TrimSpace(kyc.DiditWebhookSecret) == "" {
+		return safeMessageError{message: "Didit webhook 签名未配置"}
+	}
+	if !validDiditSignature(r, body, kyc.DiditWebhookSecret) {
 		return safeMessageError{message: "Didit webhook 签名无效"}
 	}
 	var payload map[string]any
@@ -142,16 +145,7 @@ func HandleDiditWebhook(r *http.Request) error {
 	return db.Transaction(func(tx *gorm.DB) error {
 		item := model.KYCVerification{}
 		if err := tx.Where("provider_session_id = ?", sessionID).First(&item).Error; err != nil {
-			if userID == "" {
-				return nil
-			}
-			item = model.KYCVerification{
-				ID:                newID("kyc"),
-				UserID:            userID,
-				Provider:          "didit",
-				ProviderSessionID: sessionID,
-				CreatedAt:         now(),
-			}
+			return nil
 		}
 		item.Status = status
 		item.RawPayload = body

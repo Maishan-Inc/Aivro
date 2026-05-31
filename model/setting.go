@@ -64,6 +64,7 @@ type PublicPageAccessSetting struct {
 type PublicAuthSetting struct {
 	AllowRegister     *bool                        `json:"allowRegister"`
 	EmailVerification *bool                        `json:"emailVerification"`
+	TurnstileSiteKey  string                       `json:"turnstileSiteKey"`
 	LinuxDo           PublicOAuthProviderSetting   `json:"linuxDo"`
 	Google            PublicOAuthProviderSetting   `json:"google"`
 	Github            PublicOAuthProviderSetting   `json:"github"`
@@ -82,11 +83,18 @@ type PublicOAuthProviderSetting struct {
 type PrivateSetting struct {
 	Channels     []ModelChannel      `json:"channels"`
 	PromptSync   PromptSyncSetting   `json:"promptSync"`
+	Turnstile    TurnstileSetting    `json:"turnstile"`
 	Auth         PrivateAuthSetting  `json:"auth"`
 	Mail         MailSetting         `json:"mail"`
 	CloudStorage CloudStorageSetting `json:"cloudStorage"`
 	Stripe       StripeSetting       `json:"stripe"`
 	KYC          KYCSetting          `json:"kyc"`
+}
+
+type TurnstileSetting struct {
+	Enabled   bool   `json:"enabled"`
+	SiteKey   string `json:"siteKey"`
+	SecretKey string `json:"secretKey"`
 }
 
 type StripeSetting struct {

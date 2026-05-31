@@ -11,34 +11,39 @@ import (
 )
 
 type loginRequest struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
+	Username       string `json:"username"`
+	Password       string `json:"password"`
+	TurnstileToken string `json:"turnstileToken"`
 }
 
 type registerRequest struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-	Email    string `json:"email"`
-	Code     string `json:"code"`
+	Username       string `json:"username"`
+	Password       string `json:"password"`
+	Email          string `json:"email"`
+	Code           string `json:"code"`
+	TurnstileToken string `json:"turnstileToken"`
 }
 
 type emailCodeRequest struct {
-	Email   string `json:"email"`
-	Purpose string `json:"purpose"`
+	Email          string `json:"email"`
+	Purpose        string `json:"purpose"`
+	TurnstileToken string `json:"turnstileToken"`
 }
 
 type resetPasswordRequest struct {
-	Email    string `json:"email"`
-	Code     string `json:"code"`
-	Password string `json:"password"`
+	Email          string `json:"email"`
+	Code           string `json:"code"`
+	Password       string `json:"password"`
+	TurnstileToken string `json:"turnstileToken"`
 }
 
 type metamaskLoginRequest struct {
-	WalletAddress string `json:"walletAddress"`
-	Message       string `json:"message"`
-	Signature     string `json:"signature"`
-	Email         string `json:"email"`
-	Code          string `json:"code"`
+	WalletAddress  string `json:"walletAddress"`
+	Message        string `json:"message"`
+	Signature      string `json:"signature"`
+	Email          string `json:"email"`
+	Code           string `json:"code"`
+	TurnstileToken string `json:"turnstileToken"`
 }
 
 type saveUserRequest struct {
@@ -64,6 +69,10 @@ type adjustUserCreditsRequest struct {
 func Register(w http.ResponseWriter, r *http.Request) {
 	var request registerRequest
 	_ = json.NewDecoder(r.Body).Decode(&request)
+	if err := service.VerifyTurnstile(r, request.TurnstileToken); err != nil {
+		FailError(w, err)
+		return
+	}
 	session, err := service.Register(request.Username, request.Password, request.Email, request.Code)
 	if err != nil {
 		FailError(w, err)
@@ -75,6 +84,10 @@ func Register(w http.ResponseWriter, r *http.Request) {
 func SendEmailCode(w http.ResponseWriter, r *http.Request) {
 	var request emailCodeRequest
 	_ = json.NewDecoder(r.Body).Decode(&request)
+	if err := service.VerifyTurnstile(r, request.TurnstileToken); err != nil {
+		FailError(w, err)
+		return
+	}
 	if err := service.SendEmailCode(request.Email, request.Purpose, service.MailTemplateContextFromRequest(r)); err != nil {
 		FailError(w, err)
 		return
@@ -85,6 +98,10 @@ func SendEmailCode(w http.ResponseWriter, r *http.Request) {
 func ResetPassword(w http.ResponseWriter, r *http.Request) {
 	var request resetPasswordRequest
 	_ = json.NewDecoder(r.Body).Decode(&request)
+	if err := service.VerifyTurnstile(r, request.TurnstileToken); err != nil {
+		FailError(w, err)
+		return
+	}
 	if err := service.ResetPassword(request.Email, request.Code, request.Password); err != nil {
 		FailError(w, err)
 		return
@@ -95,6 +112,10 @@ func ResetPassword(w http.ResponseWriter, r *http.Request) {
 func MetaMaskLogin(w http.ResponseWriter, r *http.Request) {
 	var request metamaskLoginRequest
 	_ = json.NewDecoder(r.Body).Decode(&request)
+	if err := service.VerifyTurnstile(r, request.TurnstileToken); err != nil {
+		FailError(w, err)
+		return
+	}
 	session, err := service.LoginWithMetaMask(request.WalletAddress, request.Message, request.Signature, request.Email, request.Code)
 	if err != nil {
 		FailError(w, err)
@@ -106,6 +127,10 @@ func MetaMaskLogin(w http.ResponseWriter, r *http.Request) {
 func Login(w http.ResponseWriter, r *http.Request) {
 	var request loginRequest
 	_ = json.NewDecoder(r.Body).Decode(&request)
+	if err := service.VerifyTurnstile(r, request.TurnstileToken); err != nil {
+		FailError(w, err)
+		return
+	}
 	session, err := service.Login(request.Username, request.Password)
 	if err != nil {
 		FailError(w, err)
@@ -115,7 +140,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
 }
 
 func LinuxDoAuthorize(w http.ResponseWriter, r *http.Request) {
-	authURL, err := service.LinuxDoAuthorizeURL(r, r.URL.Query().Get("redirect"))
+	authURL, err := service.LinuxDoAuthorizeURL(w, r, r.URL.Query().Get("redirect"))
 	if err != nil {
 		FailError(w, err)
 		return
@@ -124,7 +149,7 @@ func LinuxDoAuthorize(w http.ResponseWriter, r *http.Request) {
 }
 
 func OAuthAuthorize(w http.ResponseWriter, r *http.Request, provider string) {
-	authURL, err := service.OAuthAuthorizeURL(r, provider, r.URL.Query().Get("redirect"))
+	authURL, err := service.OAuthAuthorizeURL(w, r, provider, r.URL.Query().Get("redirect"))
 	if err != nil {
 		FailError(w, err)
 		return
@@ -134,6 +159,7 @@ func OAuthAuthorize(w http.ResponseWriter, r *http.Request, provider string) {
 
 func OAuthCallback(w http.ResponseWriter, r *http.Request, provider string) {
 	session, redirect, err := service.LoginWithOAuth(r, provider, r.URL.Query().Get("code"), r.URL.Query().Get("state"))
+	service.ClearOAuthState(w, r, provider)
 	if err != nil {
 		http.Redirect(w, r, loginRedirect(r, redirect, "", err.Error()), http.StatusFound)
 		return
@@ -143,6 +169,7 @@ func OAuthCallback(w http.ResponseWriter, r *http.Request, provider string) {
 
 func LinuxDoCallback(w http.ResponseWriter, r *http.Request) {
 	session, redirect, err := service.LoginWithLinuxDo(r, r.URL.Query().Get("code"), r.URL.Query().Get("state"))
+	service.ClearOAuthState(w, r, "linux-do")
 	if err != nil {
 		http.Redirect(w, r, loginRedirect(r, redirect, "", err.Error()), http.StatusFound)
 		return
@@ -153,6 +180,10 @@ func LinuxDoCallback(w http.ResponseWriter, r *http.Request) {
 func AdminLogin(w http.ResponseWriter, r *http.Request) {
 	var request loginRequest
 	_ = json.NewDecoder(r.Body).Decode(&request)
+	if err := service.VerifyTurnstile(r, request.TurnstileToken); err != nil {
+		FailError(w, err)
+		return
+	}
 	session, err := service.Login(request.Username, request.Password)
 	if err != nil {
 		FailError(w, err)
@@ -218,7 +249,8 @@ func AdminSaveUser(w http.ResponseWriter, r *http.Request) {
 func AdminAdjustUserCredits(w http.ResponseWriter, r *http.Request, id string) {
 	var request adjustUserCreditsRequest
 	_ = json.NewDecoder(r.Body).Decode(&request)
-	user, err := service.AdjustUserCredits(id, request.Credits)
+	admin, _ := service.UserFromContext(r.Context())
+	user, err := service.AdjustUserCredits(id, request.Credits, admin)
 	if err != nil {
 		FailError(w, err)
 		return

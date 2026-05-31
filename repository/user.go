@@ -259,13 +259,13 @@ func SaveEmailVerification(item model.EmailVerification) (model.EmailVerificatio
 	return item, db.Save(&item).Error
 }
 
-func GetActiveEmailVerification(purpose string, target string, code string, now string) (model.EmailVerification, bool, error) {
+func GetLatestActiveEmailVerification(purpose string, target string, now string) (model.EmailVerification, bool, error) {
 	db, err := DB()
 	if err != nil {
 		return model.EmailVerification{}, false, err
 	}
 	item := model.EmailVerification{}
-	err = db.Where("purpose = ? AND target = ? AND code = ? AND used_at = '' AND expires_at > ?", purpose, target, code, now).Order("created_at desc").First(&item).Error
+	err = db.Where("purpose = ? AND target = ? AND used_at = '' AND expires_at > ?", purpose, target, now).Order("created_at desc").First(&item).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return model.EmailVerification{}, false, nil
 	}
