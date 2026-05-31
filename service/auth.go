@@ -53,6 +53,11 @@ type MailTemplateContext struct {
 	Region  string
 }
 
+type RegisterProfileInput struct {
+	AccountType model.UserAccountType
+	Name        string
+}
+
 func EnsureDefaultAdmin() error {
 	if strings.TrimSpace(config.Cfg.AdminUsername) == "" || strings.TrimSpace(config.Cfg.AdminPassword) == "" {
 		return nil
@@ -75,14 +80,16 @@ func EnsureDefaultAdmin() error {
 		return err
 	}
 	_, err = repository.SaveUser(model.User{
-		ID:        newID("user"),
-		Username:  strings.TrimSpace(config.Cfg.AdminUsername),
-		Password:  hash,
-		Role:      model.UserRoleAdmin,
-		AffCode:   newAffCode(),
-		Status:    model.UserStatusActive,
-		CreatedAt: now(),
-		UpdatedAt: now(),
+		ID:               newID("user"),
+		Username:         strings.TrimSpace(config.Cfg.AdminUsername),
+		Password:         hash,
+		AccountType:      model.UserAccountTypePersonal,
+		ProfileCompleted: true,
+		Role:             model.UserRoleAdmin,
+		AffCode:          newAffCode(),
+		Status:           model.UserStatusActive,
+		CreatedAt:        now(),
+		UpdatedAt:        now(),
 	})
 	return err
 }
@@ -112,7 +119,7 @@ func upgradeDefaultAdminPassword() error {
 	return err
 }
 
-func Register(username string, password string, email string, code string) (model.AuthSession, error) {
+func Register(username string, password string, email string, code string, profile RegisterProfileInput) (model.AuthSession, error) {
 	settings, err := repository.GetSettings()
 	if err != nil {
 		return model.AuthSession{}, err
@@ -128,19 +135,16 @@ func Register(username string, password string, email string, code string) (mode
 	if username == "" || password == "" {
 		return model.AuthSession{}, safeMessageError{message: "用户名和密码不能为空"}
 	}
+	profile = normalizeRegisterProfile(profile, username)
 	if err := validatePassword(password); err != nil {
 		return model.AuthSession{}, err
 	}
 	email = strings.TrimSpace(strings.ToLower(email))
-	emailVerified := false
-	if normalizedSettings.Public.Auth.EmailVerification != nil && *normalizedSettings.Public.Auth.EmailVerification {
-		if email == "" || code == "" {
-			return model.AuthSession{}, safeMessageError{message: "请先完成邮箱验证码验证"}
-		}
-		if err := verifyEmailCode("register", email, code); err != nil {
-			return model.AuthSession{}, err
-		}
-		emailVerified = true
+	if email == "" || code == "" {
+		return model.AuthSession{}, safeMessageError{message: "请先完成邮箱验证码验证"}
+	}
+	if err := verifyEmailCode("register", email, code); err != nil {
+		return model.AuthSession{}, err
 	}
 	if _, ok, err := repository.GetUserByUsername(username); err != nil || ok {
 		if err != nil {
@@ -161,22 +165,45 @@ func Register(username string, password string, email string, code string) (mode
 		return model.AuthSession{}, err
 	}
 	user, err := repository.SaveUser(model.User{
-		ID:            newID("user"),
-		Username:      username,
-		Password:      hash,
-		Email:         email,
-		EmailVerified: emailVerified,
-		AuthProvider:  "password",
-		Role:          model.UserRoleUser,
-		AffCode:       newAffCode(),
-		Status:        model.UserStatusActive,
-		CreatedAt:     now(),
-		UpdatedAt:     now(),
+		ID:               newID("user"),
+		Username:         username,
+		Password:         hash,
+		Email:            email,
+		DisplayName:      profile.Name,
+		AccountType:      profile.AccountType,
+		ProfileCompleted: true,
+		EmailVerified:    true,
+		AuthProvider:     "password",
+		Role:             model.UserRoleUser,
+		AffCode:          newAffCode(),
+		Status:           model.UserStatusActive,
+		CreatedAt:        now(),
+		UpdatedAt:        now(),
 	})
 	if err != nil {
 		return model.AuthSession{}, err
 	}
 	return newSession(user)
+}
+
+func CompleteUserProfile(user model.AuthUser, accountType model.UserAccountType, name string) (model.AuthUser, error) {
+	saved, ok, err := repository.GetUserByID(user.ID)
+	if err != nil || !ok {
+		if err != nil {
+			return model.AuthUser{}, err
+		}
+		return model.AuthUser{}, safeMessageError{message: "用户不存在"}
+	}
+	profile := normalizeRegisterProfile(RegisterProfileInput{AccountType: accountType, Name: name}, saved.Username)
+	saved.AccountType = profile.AccountType
+	saved.DisplayName = profile.Name
+	saved.ProfileCompleted = true
+	saved.UpdatedAt = now()
+	saved, err = repository.SaveUser(saved)
+	if err != nil {
+		return model.AuthUser{}, err
+	}
+	return model.PublicUser(saved), nil
 }
 
 func Login(username string, password string) (model.AuthSession, error) {
@@ -264,20 +291,24 @@ func LoginWithLinuxDo(r *http.Request, code string, state string) (model.AuthSes
 			return model.AuthSession{}, redirect, safeMessageError{message: "当前未开放注册"}
 		}
 		user = model.User{
-			ID:          newID("user"),
-			Username:    linuxDoUsername(profile.Username, linuxDoID),
-			DisplayName: strings.TrimSpace(profile.Name),
-			AvatarURL:   linuxDoAvatar(profile.AvatarTemplate),
-			Role:        model.UserRoleUser,
-			AffCode:     newAffCode(),
-			LinuxDoID:   linuxDoID,
-			Status:      model.UserStatusActive,
-			CreatedAt:   now(),
+			ID:               newID("user"),
+			Username:         linuxDoUsername(profile.Username, linuxDoID),
+			DisplayName:      "",
+			AccountType:      model.UserAccountTypePersonal,
+			ProfileCompleted: false,
+			AvatarURL:        linuxDoAvatar(profile.AvatarTemplate),
+			Role:             model.UserRoleUser,
+			AffCode:          newAffCode(),
+			LinuxDoID:        linuxDoID,
+			Status:           model.UserStatusActive,
+			CreatedAt:        now(),
 		}
 	} else if user.Status == model.UserStatusBan {
 		return model.AuthSession{}, redirect, safeMessageError{message: "账号已被禁用"}
 	}
-	user.DisplayName = firstNonEmpty(profile.Name, user.DisplayName)
+	if user.ProfileCompleted {
+		user.DisplayName = firstNonEmpty(profile.Name, user.DisplayName)
+	}
 	user.AvatarURL = firstNonEmpty(linuxDoAvatar(profile.AvatarTemplate), user.AvatarURL)
 	user.LastLoginAt = now()
 	user.UpdatedAt = now()
@@ -352,23 +383,27 @@ func LoginWithOAuth(r *http.Request, provider string, code string, state string)
 			return model.AuthSession{}, redirect, safeMessageError{message: "当前未开放注册"}
 		}
 		user = model.User{
-			ID:            newID("user"),
-			Username:      oauthUsername(publicProvider.ID, profile.Username, profile.ID),
-			Email:         profile.Email,
-			DisplayName:   firstNonEmpty(profile.Name, profile.Username),
-			AvatarURL:     profile.AvatarURL,
-			Role:          model.UserRoleUser,
-			AffCode:       newAffCode(),
-			Status:        model.UserStatusActive,
-			AuthProvider:  publicProvider.ID,
-			EmailVerified: profile.Email != "",
-			CreatedAt:     now(),
+			ID:               newID("user"),
+			Username:         oauthUsername(publicProvider.ID, profile.Username, profile.ID),
+			Email:            profile.Email,
+			DisplayName:      "",
+			AccountType:      model.UserAccountTypePersonal,
+			ProfileCompleted: false,
+			AvatarURL:        profile.AvatarURL,
+			Role:             model.UserRoleUser,
+			AffCode:          newAffCode(),
+			Status:           model.UserStatusActive,
+			AuthProvider:     publicProvider.ID,
+			EmailVerified:    profile.Email != "",
+			CreatedAt:        now(),
 		}
 	} else if user.Status == model.UserStatusBan {
 		return model.AuthSession{}, redirect, safeMessageError{message: "账号已被禁用"}
 	}
 	applyOAuthID(&user, publicProvider.ID, profile.ID)
-	user.DisplayName = firstNonEmpty(profile.Name, user.DisplayName)
+	if user.ProfileCompleted {
+		user.DisplayName = firstNonEmpty(profile.Name, user.DisplayName)
+	}
 	user.AvatarURL = firstNonEmpty(profile.AvatarURL, user.AvatarURL)
 	if user.Email == "" {
 		user.Email = profile.Email
@@ -423,17 +458,19 @@ func LoginWithMetaMask(walletAddress string, message string, signature string, e
 			return model.AuthSession{}, err
 		}
 		user = model.User{
-			ID:              newID("user"),
-			Username:        metamaskUsername(walletAddress),
-			Email:           email,
-			EmailVerified:   true,
-			DisplayName:     "MetaMask " + shortWallet(walletAddress),
-			Role:            model.UserRoleUser,
-			AffCode:         newAffCode(),
-			Status:          model.UserStatusActive,
-			AuthProvider:    "metamask",
-			MetaMaskAddress: walletAddress,
-			CreatedAt:       now(),
+			ID:               newID("user"),
+			Username:         metamaskUsername(walletAddress),
+			Email:            email,
+			EmailVerified:    true,
+			DisplayName:      "",
+			AccountType:      model.UserAccountTypePersonal,
+			ProfileCompleted: false,
+			Role:             model.UserRoleUser,
+			AffCode:          newAffCode(),
+			Status:           model.UserStatusActive,
+			AuthProvider:     "metamask",
+			MetaMaskAddress:  walletAddress,
+			CreatedAt:        now(),
 		}
 	} else if user.Status == model.UserStatusBan {
 		return model.AuthSession{}, safeMessageError{message: "账号已被禁用"}
@@ -511,6 +548,9 @@ func SaveUser(user model.User, password string) (model.User, error) {
 	if user.Status == "" {
 		user.Status = model.UserStatusActive
 	}
+	if user.AccountType == "" {
+		user.AccountType = model.UserAccountTypePersonal
+	}
 	if saved, ok, err := repository.GetUserByUsername(user.Username); err != nil {
 		return user, err
 	} else if ok && saved.ID != user.ID {
@@ -518,6 +558,7 @@ func SaveUser(user model.User, password string) (model.User, error) {
 	}
 	isCreate := user.ID == ""
 	if isCreate {
+		user.ProfileCompleted = strings.TrimSpace(user.DisplayName) != ""
 		user.ID = newID("user")
 		user.AffCode = newAffCode()
 		user.CreatedAt = now()
@@ -688,6 +729,7 @@ func newSession(user model.User) (model.AuthSession, error) {
 	if err != nil {
 		return model.AuthSession{}, err
 	}
+	normalizeUserDefaults(&user)
 	return model.AuthSession{Token: token, User: model.PublicUser(user)}, nil
 }
 
@@ -776,9 +818,26 @@ func normalizeUserDefaults(user *model.User) {
 	if user.Status == "" {
 		user.Status = model.UserStatusActive
 	}
+	if user.AccountType == "" {
+		user.AccountType = model.UserAccountTypePersonal
+	}
 	if user.AffCode == "" {
 		user.AffCode = newAffCode()
 	}
+}
+
+func normalizeRegisterProfile(profile RegisterProfileInput, fallbackName string) RegisterProfileInput {
+	if profile.AccountType != model.UserAccountTypeCompany {
+		profile.AccountType = model.UserAccountTypePersonal
+	}
+	profile.Name = strings.TrimSpace(profile.Name)
+	if profile.Name == "" {
+		profile.Name = strings.TrimSpace(fallbackName)
+	}
+	if profile.Name == "" {
+		profile.Name = "Aivro User"
+	}
+	return profile
 }
 
 type linuxDoTokenResponse struct {
@@ -1054,14 +1113,16 @@ func SendEmailCode(email string, purpose string, context MailTemplateContext) er
 	if purpose != "register" && purpose != "reset" && purpose != "metamask" {
 		return safeMessageError{message: "验证码用途无效"}
 	}
+	if purpose == "register" {
+		if err := RegisterEmailAvailable(email); err != nil {
+			return err
+		}
+	}
 	settings, err := repository.GetSettings()
 	if err != nil {
 		return err
 	}
 	settings = normalizeSettings(settings)
-	if purpose == "register" && settings.Public.Auth.EmailVerification != nil && !*settings.Public.Auth.EmailVerification {
-		return safeMessageError{message: "邮箱验证未开启"}
-	}
 	if purpose == "reset" {
 		if _, ok, err := repository.GetUserByEmail(email); err != nil || !ok {
 			if err != nil {
@@ -1078,6 +1139,13 @@ func SendEmailCode(email string, purpose string, context MailTemplateContext) er
 		return err
 	}
 	expireMinutes := settings.Private.Mail.CodeExpireMin
+	if last, ok, err := repository.GetLatestEmailVerification(purpose, email); err != nil {
+		return err
+	} else if ok {
+		if createdAt, err := time.Parse(time.RFC3339, last.CreatedAt); err == nil && time.Since(createdAt) < time.Minute {
+			return safeMessageError{message: "验证码发送太频繁，请稍后再试"}
+		}
+	}
 	item := model.EmailVerification{
 		ID:        newID("mail"),
 		Purpose:   purpose,
@@ -1090,6 +1158,20 @@ func SendEmailCode(email string, purpose string, context MailTemplateContext) er
 		return err
 	}
 	return sendVerificationMail(settings.Private.Mail, email, purpose, code, context)
+}
+
+func RegisterEmailAvailable(email string) error {
+	email = strings.TrimSpace(strings.ToLower(email))
+	if email == "" {
+		return safeMessageError{message: "请输入邮箱"}
+	}
+	if _, ok, err := repository.GetUserByEmail(email); err != nil || ok {
+		if err != nil {
+			return err
+		}
+		return safeMessageError{message: "邮箱已被使用"}
+	}
+	return nil
 }
 
 func ResetPassword(email string, code string, password string) error {
@@ -1235,7 +1317,7 @@ func renderMailTemplate(template string, email string, code string, expireMinute
 		"{{code}}", code,
 		"{{email}}", email,
 		"{{expireMinutes}}", strconv.Itoa(expireMinutes),
-		"{{siteName}}", "边缘幻星",
+		"{{siteName}}", "Aivro",
 		"{{ip}}", context.IP,
 		"{{country}}", context.Country,
 		"{{region}}", context.Region,

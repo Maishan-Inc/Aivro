@@ -25,6 +25,7 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
     const setLocale = useLocaleStore((state) => state.setLocale);
     const isUserReady = useUserStore((state) => state.isReady);
     const isLoginPage = pathname === "/login" || pathname === "/admin/login";
+    const isProfileSetupPage = pathname === "/profile/setup";
 
     useEffect(() => {
         void loadPublicSettings();
@@ -48,6 +49,11 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
         if (!isLoginRequiredPath(pathname, publicSettings.pageAccess)) return;
         router.replace(`/login?redirect=${encodeURIComponent(pathname)}`);
     }, [isLoginPage, isPublicSettingsLoading, isUserReady, pathname, publicSettings, router, user]);
+
+    useEffect(() => {
+        if (!isUserReady || !user || user.role === "guest" || user.profileCompleted || isProfileSetupPage || isLoginPage) return;
+        router.replace(`/profile/setup?redirect=${encodeURIComponent(pathname)}`);
+    }, [isLoginPage, isProfileSetupPage, isUserReady, pathname, router, user]);
 
     return <>{children}</>;
 }

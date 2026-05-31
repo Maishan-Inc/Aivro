@@ -272,6 +272,19 @@ func GetLatestActiveEmailVerification(purpose string, target string, now string)
 	return item, err == nil, err
 }
 
+func GetLatestEmailVerification(purpose string, target string) (model.EmailVerification, bool, error) {
+	db, err := DB()
+	if err != nil {
+		return model.EmailVerification{}, false, err
+	}
+	item := model.EmailVerification{}
+	err = db.Where("purpose = ? AND target = ?", purpose, target).Order("created_at desc").First(&item).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return model.EmailVerification{}, false, nil
+	}
+	return item, err == nil, err
+}
+
 // findUser 查询单个用户，并将未命中转换为 ok=false。
 func findUser(db *gorm.DB, query string, args ...any) (model.User, bool, error) {
 	user := model.User{}

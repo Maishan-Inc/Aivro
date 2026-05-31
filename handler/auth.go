@@ -17,11 +17,13 @@ type loginRequest struct {
 }
 
 type registerRequest struct {
-	Username       string `json:"username"`
-	Password       string `json:"password"`
-	Email          string `json:"email"`
-	Code           string `json:"code"`
-	TurnstileToken string `json:"turnstileToken"`
+	Username       string                `json:"username"`
+	Password       string                `json:"password"`
+	Email          string                `json:"email"`
+	Code           string                `json:"code"`
+	AccountType    model.UserAccountType `json:"accountType"`
+	DisplayName    string                `json:"displayName"`
+	TurnstileToken string                `json:"turnstileToken"`
 }
 
 type emailCodeRequest struct {
@@ -46,20 +48,31 @@ type metamaskLoginRequest struct {
 	TurnstileToken string `json:"turnstileToken"`
 }
 
+type registerCheckRequest struct {
+	Email string `json:"email"`
+}
+
+type completeProfileRequest struct {
+	AccountType model.UserAccountType `json:"accountType"`
+	DisplayName string                `json:"displayName"`
+}
+
 type saveUserRequest struct {
-	ID              string           `json:"id"`
-	Username        string           `json:"username"`
-	Password        string           `json:"password"`
-	Email           string           `json:"email"`
-	DisplayName     string           `json:"displayName"`
-	GithubID        string           `json:"githubId"`
-	GoogleID        string           `json:"googleId"`
-	LinuxDoID       string           `json:"linuxDoId"`
-	MetaMaskAddress string           `json:"metamaskAddress"`
-	AuthProvider    string           `json:"authProvider"`
-	EmailVerified   bool             `json:"emailVerified"`
-	Role            model.UserRole   `json:"role"`
-	Status          model.UserStatus `json:"status"`
+	ID               string                `json:"id"`
+	Username         string                `json:"username"`
+	Password         string                `json:"password"`
+	Email            string                `json:"email"`
+	DisplayName      string                `json:"displayName"`
+	AccountType      model.UserAccountType `json:"accountType"`
+	ProfileCompleted bool                  `json:"profileCompleted"`
+	GithubID         string                `json:"githubId"`
+	GoogleID         string                `json:"googleId"`
+	LinuxDoID        string                `json:"linuxDoId"`
+	MetaMaskAddress  string                `json:"metamaskAddress"`
+	AuthProvider     string                `json:"authProvider"`
+	EmailVerified    bool                  `json:"emailVerified"`
+	Role             model.UserRole        `json:"role"`
+	Status           model.UserStatus      `json:"status"`
 }
 
 type adjustUserCreditsRequest struct {
@@ -69,16 +82,22 @@ type adjustUserCreditsRequest struct {
 func Register(w http.ResponseWriter, r *http.Request) {
 	var request registerRequest
 	_ = json.NewDecoder(r.Body).Decode(&request)
-	if err := service.VerifyTurnstile(r, request.TurnstileToken); err != nil {
-		FailError(w, err)
-		return
-	}
-	session, err := service.Register(request.Username, request.Password, request.Email, request.Code)
+	session, err := service.Register(request.Username, request.Password, request.Email, request.Code, service.RegisterProfileInput{AccountType: request.AccountType, Name: request.DisplayName})
 	if err != nil {
 		FailError(w, err)
 		return
 	}
 	OK(w, session)
+}
+
+func CheckRegisterEmail(w http.ResponseWriter, r *http.Request) {
+	var request registerCheckRequest
+	_ = json.NewDecoder(r.Body).Decode(&request)
+	if err := service.RegisterEmailAvailable(request.Email); err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, true)
 }
 
 func SendEmailCode(w http.ResponseWriter, r *http.Request) {
@@ -89,6 +108,24 @@ func SendEmailCode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := service.SendEmailCode(request.Email, request.Purpose, service.MailTemplateContextFromRequest(r)); err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, true)
+}
+
+func SendRegisterEmailCode(w http.ResponseWriter, r *http.Request) {
+	var request emailCodeRequest
+	_ = json.NewDecoder(r.Body).Decode(&request)
+	if err := service.VerifyTurnstile(r, request.TurnstileToken); err != nil {
+		FailError(w, err)
+		return
+	}
+	if err := service.RegisterEmailAvailable(request.Email); err != nil {
+		FailError(w, err)
+		return
+	}
+	if err := service.SendEmailCode(request.Email, "register", service.MailTemplateContextFromRequest(r)); err != nil {
 		FailError(w, err)
 		return
 	}
@@ -112,10 +149,6 @@ func ResetPassword(w http.ResponseWriter, r *http.Request) {
 func MetaMaskLogin(w http.ResponseWriter, r *http.Request) {
 	var request metamaskLoginRequest
 	_ = json.NewDecoder(r.Body).Decode(&request)
-	if err := service.VerifyTurnstile(r, request.TurnstileToken); err != nil {
-		FailError(w, err)
-		return
-	}
 	session, err := service.LoginWithMetaMask(request.WalletAddress, request.Message, request.Signature, request.Email, request.Code)
 	if err != nil {
 		FailError(w, err)
@@ -204,6 +237,22 @@ func CurrentUser(w http.ResponseWriter, r *http.Request) {
 	OK(w, service.GuestUser())
 }
 
+func CompleteProfile(w http.ResponseWriter, r *http.Request) {
+	user, ok := service.UserFromContext(r.Context())
+	if !ok {
+		Fail(w, "未登录或权限不足")
+		return
+	}
+	var request completeProfileRequest
+	_ = json.NewDecoder(r.Body).Decode(&request)
+	result, err := service.CompleteUserProfile(user, request.AccountType, request.DisplayName)
+	if err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, result)
+}
+
 func AdminUsers(w http.ResponseWriter, r *http.Request) {
 	users, err := service.ListUsers(parseQuery(r))
 	if err != nil {
@@ -226,18 +275,20 @@ func AdminSaveUser(w http.ResponseWriter, r *http.Request) {
 	var request saveUserRequest
 	_ = json.NewDecoder(r.Body).Decode(&request)
 	user, err := service.SaveUser(model.User{
-		ID:              request.ID,
-		Username:        request.Username,
-		Email:           request.Email,
-		DisplayName:     request.DisplayName,
-		GithubID:        request.GithubID,
-		GoogleID:        request.GoogleID,
-		LinuxDoID:       request.LinuxDoID,
-		MetaMaskAddress: request.MetaMaskAddress,
-		AuthProvider:    request.AuthProvider,
-		EmailVerified:   request.EmailVerified,
-		Role:            request.Role,
-		Status:          request.Status,
+		ID:               request.ID,
+		Username:         request.Username,
+		Email:            request.Email,
+		DisplayName:      request.DisplayName,
+		AccountType:      request.AccountType,
+		ProfileCompleted: request.ProfileCompleted,
+		GithubID:         request.GithubID,
+		GoogleID:         request.GoogleID,
+		LinuxDoID:        request.LinuxDoID,
+		MetaMaskAddress:  request.MetaMaskAddress,
+		AuthProvider:     request.AuthProvider,
+		EmailVerified:    request.EmailVerified,
+		Role:             request.Role,
+		Status:           request.Status,
 	}, request.Password)
 	if err != nil {
 		FailError(w, err)

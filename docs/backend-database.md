@@ -45,6 +45,8 @@
 | `password`      | string | 密码哈希                     |
 | `email`         | string | 邮箱                       |
 | `display_name`  | string | 昵称                       |
+| `account_type`  | string | 账户类型：`personal`、`company`，默认 `personal` |
+| `profile_completed` | bool | 是否已完成账户类型和名称资料 |
 | `avatar_url`    | string | 头像地址                     |
 | `role`          | string | 角色：`user`、`admin`        |
 | `credits`       | number | 算力点余额                    |

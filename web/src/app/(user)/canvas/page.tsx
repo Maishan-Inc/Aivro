@@ -58,7 +58,7 @@ export default function CanvasPage() {
         setIsCreating(true);
         try {
             const workflow = await createWorkflow(token, {
-                title: `边缘幻星 ${projects.length + 1}`,
+                title: `Aivro ${projects.length + 1}`,
                 nodes: [],
                 connections: [],
                 chatSessions: [],
@@ -120,7 +120,7 @@ export default function CanvasPage() {
                 <header className="flex flex-wrap items-end justify-between gap-4 border-b border-stone-200 pb-6 dark:border-stone-800">
                     <div>
                         <p className="text-xs text-stone-500">云端工作流库</p>
-                        <h1 className="mt-3 text-3xl font-semibold">边缘幻星</h1>
+                        <h1 className="mt-3 text-3xl font-semibold">Aivro</h1>
                         <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-stone-500">
                             <Tag color="blue">剩余创建次数 {user?.workflowCreateCredits ?? 0}</Tag>
                             <span>所有工作流已保存到云端数据库。</span>

@@ -869,7 +869,7 @@ function InfiniteCanvasPage() {
         if (!token) return router.push("/login?redirect=/canvas");
         try {
             const workflow = await createWorkflow(token, {
-                title: `边缘幻星 ${useCanvasStore.getState().projects.length + 1}`,
+                title: `Aivro ${useCanvasStore.getState().projects.length + 1}`,
                 nodes: [],
                 connections: [],
                 chatSessions: [],

@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export const metadata: Metadata = {
-    title: "边缘幻星",
+    title: "Aivro",
     description: "Aivro - AI 驱动的无限画布创作工具",
     icons: {
         icon: "/logo.svg",

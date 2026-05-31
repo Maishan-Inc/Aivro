@@ -3,7 +3,7 @@
 import { MailOutlined } from "@ant-design/icons";
 import { App, Button, Form, Input, Space, Typography } from "antd";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 
 import { AivroDrawableLoader } from "@/components/aivro-drawable-loader";
 import { useAuthLoadingOverlay } from "@/hooks/use-auth-loading-overlay";
@@ -33,6 +33,7 @@ function MetaMaskEmailContent() {
     const setSession = useUserStore((state) => state.setSession);
     const [sendingCode, setSendingCode] = useState(false);
     const [submitting, setSubmitting] = useState(false);
+    const [codeSeconds, setCodeSeconds] = useState(0);
     const publicSettings = useConfigStore((state) => state.publicSettings);
     const turnstileSiteKey = publicSettings?.auth?.turnstileSiteKey || "";
     const { overlay, runWithOverlay } = useAuthLoadingOverlay();
@@ -41,6 +42,13 @@ function MetaMaskEmailContent() {
     const signMessage = searchParams.get("message") || "";
     const signature = searchParams.get("signature") || "";
     const redirect = safeRedirect(searchParams.get("redirect") || "/");
+
+    useEffect(() => {
+        if (codeSeconds <= 0) return;
+        const timer = window.setInterval(() => setCodeSeconds((value) => Math.max(0, value - 1)), 1000);
+        return () => window.clearInterval(timer);
+    }, [codeSeconds]);
+
     const requestCode = async () => {
         const email = form.getFieldValue("email");
         if (!email) {
@@ -51,10 +59,12 @@ function MetaMaskEmailContent() {
             message.warning("认证配置加载中，请稍后再试");
             return;
         }
+        if (codeSeconds > 0) return;
         setSendingCode(true);
         try {
             const turnstileToken = await verifyTurnstile();
             await sendEmailCode(email, "metamask", turnstileToken);
+            setCodeSeconds(60);
             message.success("验证码已发送");
         } catch (error) {
             message.error(error instanceof Error ? error.message : "发送失败");
@@ -79,7 +89,7 @@ function MetaMaskEmailContent() {
             const user = await fetchCurrentUser(session.token);
             setSession(session.token, user);
             message.success("登录成功");
-            router.replace(redirect);
+            router.replace(user.profileCompleted ? redirect : `/profile/setup?redirect=${encodeURIComponent(redirect)}`);
             router.refresh();
         } catch (error) {
             message.error(error instanceof Error ? error.message : "登录失败");
@@ -105,8 +115,8 @@ function MetaMaskEmailContent() {
                             <Form.Item name="code" noStyle rules={[{ required: true, message: "请输入验证码" }]}>
                                 <Input autoComplete="one-time-code" />
                             </Form.Item>
-                            <Button loading={sendingCode} disabled={!publicSettings} onClick={() => void requestCode()}>
-                                发送验证码
+                            <Button loading={sendingCode} disabled={!publicSettings || codeSeconds > 0} onClick={() => void requestCode()}>
+                                {codeSeconds > 0 ? `${codeSeconds}s` : "发送验证码"}
                             </Button>
                         </Space.Compact>
                     </Form.Item>

@@ -21,6 +21,16 @@ const statusOptions = [
     { label: "禁用", value: "ban" },
 ];
 
+const accountTypeOptions = [
+    { label: "个人", value: "personal" },
+    { label: "公司", value: "company" },
+];
+
+const profileCompletedOptions = [
+    { label: "已完成", value: true },
+    { label: "未完成", value: false },
+];
+
 export default function AdminUsersPage() {
     const { users, keyword, page, pageSize, total, isLoading, searchUsers, changePage, changePageSize, resetFilters, refreshUsers, saveUser: saveAdminUser, adjustCredits, deleteUser } = useAdminUsers();
     const [form] = Form.useForm<UserFormValues>();
@@ -31,7 +41,7 @@ export default function AdminUsersPage() {
     useEffect(() => setKeywordText(keyword), [keyword]);
 
     useEffect(() => {
-        if (editingUser) form.setFieldsValue({ role: "user", status: "active", ...editingUser, password: "" });
+        if (editingUser) form.setFieldsValue({ role: "user", status: "active", accountType: "personal", profileCompleted: false, ...editingUser, password: "" });
     }, [editingUser, form]);
 
     const saveUser = async () => {
@@ -77,6 +87,18 @@ export default function AdminUsersPage() {
             dataIndex: "status",
             width: 90,
             render: (_, item) => <Tag color={item.status === "ban" ? "red" : "green"}>{item.status === "ban" ? "禁用" : "正常"}</Tag>,
+        },
+        {
+            title: "类型",
+            dataIndex: "accountType",
+            width: 90,
+            render: (_, item) => <Tag>{item.accountType === "company" ? "公司" : "个人"}</Tag>,
+        },
+        {
+            title: "资料",
+            dataIndex: "profileCompleted",
+            width: 90,
+            render: (_, item) => <Tag color={item.profileCompleted ? "green" : "orange"}>{item.profileCompleted ? "已完成" : "未完成"}</Tag>,
         },
         {
             title: "算力点",
@@ -176,7 +198,7 @@ export default function AdminUsersPage() {
                     }
                     options={{ density: true, setting: true, reload: () => void refreshUsers() }}
                     toolBarRender={() => [
-                        <Button key="add" type="primary" icon={<PlusOutlined />} onClick={() => setEditingUser({ role: "user", status: "active" })}>
+                        <Button key="add" type="primary" icon={<PlusOutlined />} onClick={() => setEditingUser({ role: "user", status: "active", accountType: "personal", profileCompleted: false })}>
                             新增
                         </Button>,
                     ]}
@@ -214,6 +236,16 @@ export default function AdminUsersPage() {
                         <Col span={12}>
                             <Form.Item name="email" label="邮箱">
                                 <Input />
+                            </Form.Item>
+                        </Col>
+                        <Col span={12}>
+                            <Form.Item name="accountType" label="账户类型">
+                                <Select options={accountTypeOptions} />
+                            </Form.Item>
+                        </Col>
+                        <Col span={12}>
+                            <Form.Item name="profileCompleted" label="资料状态">
+                                <Select options={profileCompletedOptions} />
                             </Form.Item>
                         </Col>
                         <Col span={12}>

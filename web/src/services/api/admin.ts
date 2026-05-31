@@ -16,6 +16,8 @@ export type AdminUser = {
     username: string;
     email: string;
     displayName: string;
+    accountType: "personal" | "company";
+    profileCompleted: boolean;
     avatarUrl: string;
     role: "user" | "admin";
     credits: number;

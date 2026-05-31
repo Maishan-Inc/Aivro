@@ -36,7 +36,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
 
     useEffect(() => {
         document.documentElement.lang = locale;
-        document.title = locale === "en-US" ? "Aivro" : "边缘幻星";
+        document.title = "Aivro";
     }, [locale]);
 
     return (

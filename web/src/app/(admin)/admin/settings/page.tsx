@@ -27,7 +27,7 @@ const jsonEditorTheme = EditorView.theme({
 
 const emptyPublicProvider = (id: string, name: string, iconUrl = ""): AdminPublicAuthProvider => ({ id, name, iconUrl, enabled: false });
 const emptyPrivateProvider = (id: string, name: string, iconUrl = ""): AdminPrivateAuthProvider => ({ ...emptyPublicProvider(id, name, iconUrl), clientId: "", clientSecret: "", authorizeUrl: "", tokenUrl: "", userInfoUrl: "", scope: "" });
-const defaultPrivacyContent = `欢迎使用 Aivro（边缘幻星）。我们重视你的隐私，并尽量只处理提供服务所必需的信息。
+const defaultPrivacyContent = `欢迎使用 Aivro。我们重视你的隐私，并尽量只处理提供服务所必需的信息。
 
 一、我们处理的信息
 当你注册、登录或使用 Aivro 时，我们可能会处理用户名、邮箱、第三方登录标识、登录状态、算力点记录、生成请求、提示词、参考图片、生成结果地址以及你主动保存到素材或画布中的内容。生成历史保存在数据库中，并跟随云存储文件有效期展示；如果管理员开启云存储，生成后的图片和视频会由后端转存到配置的 Cloudflare R2 或兼容 S3 存储，并在到期后按配置自动清理。
@@ -46,7 +46,7 @@ Aivro 会在浏览器本地保存语言偏好、界面状态等少量配置；�
 
 六、政策更新
 我们可能根据功能变化更新本政策。更新后的内容会展示在本页面，继续使用 Aivro 表示你理解并同意更新后的政策。`;
-const defaultTermsContent = `欢迎使用 Aivro（边缘幻星）。使用、登录或注册 Aivro，即表示你同意遵守本服务条款。
+const defaultTermsContent = `欢迎使用 Aivro。使用、登录或注册 Aivro，即表示你同意遵守本服务条款。
 
 一、服务说明
 Aivro 提供图片、视频、文本、提示词、素材和画布相关的 AI 创作工具。具体能力取决于管理员配置的模型渠道、算力点规则、登录方式、邮件服务和云存储服务。
@@ -122,7 +122,7 @@ const emptySettings: AdminSettings = {
             linuxDo: emptyPublicProvider("linux-do", "Linux.do", "/icons/linuxdo.svg"),
             google: emptyPublicProvider("google", "Google", "/icons/google.svg"),
             github: emptyPublicProvider("github", "GitHub", "/icons/github.svg"),
-            metamask: emptyPublicProvider("metamask", "MetaMask", "https://upload.wikimedia.org/wikipedia/commons/3/36/MetaMask_Fox.svg"),
+            metamask: emptyPublicProvider("metamask", "MetaMask", "/icons/metamask.svg"),
             customProviders: [emptyPublicProvider("o2", "O2")],
         },
         pages: {
@@ -1020,7 +1020,7 @@ export default function AdminSettingsPage() {
                                             </Col>
                                             <Col xs={24} md={12}>
                                                 <Form.Item name={["private", "mail", "fromName"]} label="发件名称">
-                                                    <Input placeholder="边缘幻星" />
+                                                    <Input placeholder="Aivro" />
                                                 </Form.Item>
                                             </Col>
                                             <Col xs={24} md={12}>
@@ -1058,7 +1058,7 @@ export default function AdminSettingsPage() {
                                 <AuthProviderSummaryCard form={form} title="Linux.do 登录" iconUrl="/icons/linuxdo.svg" users={authProviderStats["linux-do"] || 0} enabledPath={["public", "auth", "linuxDo", "enabled"]} onEdit={() => setEditingAuthProvider({ type: "oauth", providerKey: "linuxDo" })} />
                                 <AuthProviderSummaryCard form={form} title="Google 登录" iconUrl="/icons/google.svg" users={authProviderStats.google || 0} enabledPath={["public", "auth", "google", "enabled"]} onEdit={() => setEditingAuthProvider({ type: "oauth", providerKey: "google" })} />
                                 <AuthProviderSummaryCard form={form} title="GitHub 登录" iconUrl="/icons/github.svg" users={authProviderStats.github || 0} enabledPath={["public", "auth", "github", "enabled"]} onEdit={() => setEditingAuthProvider({ type: "oauth", providerKey: "github" })} />
-                                <AuthProviderSummaryCard form={form} title="MetaMask 登录" iconUrl="https://upload.wikimedia.org/wikipedia/commons/3/36/MetaMask_Fox.svg" users={authProviderStats.metamask || 0} enabledPath={["public", "auth", "metamask", "enabled"]} onEdit={() => setEditingAuthProvider({ type: "metamask" })} />
+                                <AuthProviderSummaryCard form={form} title="MetaMask 登录" iconUrl="/icons/metamask.svg" users={authProviderStats.metamask || 0} enabledPath={["public", "auth", "metamask", "enabled"]} onEdit={() => setEditingAuthProvider({ type: "metamask" })} />
                                 {customAuthProviders.map((provider: AdminPrivateAuthProvider, index: number) => (
                                     <AuthProviderSummaryCard key={`${provider.id}-${index}`} form={form} title={provider.name || `自定义登录 ${index + 1}`} iconUrl={provider.iconUrl} users={authProviderStats[provider.id] || 0} enabledPath={["private", "auth", "customProviders", index, "enabled"]} onEdit={() => setEditingAuthProvider({ type: "custom", index })} />
                                 ))}
@@ -1672,7 +1672,7 @@ function renderTemplatePreview(template: string, expireMinutes: number) {
         .replaceAll("{{code}}", "123456")
         .replaceAll("{{email}}", "user@example.com")
         .replaceAll("{{expireMinutes}}", String(expireMinutes))
-        .replaceAll("{{siteName}}", "边缘幻星")
+        .replaceAll("{{siteName}}", "Aivro")
         .replaceAll("{{ip}}", "203.0.113.8")
         .replaceAll("{{country}}", "CN")
         .replaceAll("{{region}}", "Shanghai");
@@ -1709,7 +1709,7 @@ function normalizePublicSetting(setting: Partial<AdminSettings["public"]> = {}):
             linuxDo: normalizePublicProvider(setting.auth?.linuxDo, "linux-do", "Linux.do", "/icons/linuxdo.svg"),
             google: normalizePublicProvider(setting.auth?.google, "google", "Google", "/icons/google.svg"),
             github: normalizePublicProvider(setting.auth?.github, "github", "GitHub", "/icons/github.svg"),
-            metamask: normalizePublicProvider(setting.auth?.metamask, "metamask", "MetaMask", "https://upload.wikimedia.org/wikipedia/commons/3/36/MetaMask_Fox.svg"),
+            metamask: normalizePublicProvider(setting.auth?.metamask, "metamask", "MetaMask", "/icons/metamask.svg"),
             customProviders: (setting.auth?.customProviders?.length ? setting.auth.customProviders : [emptyPublicProvider("o2", "O2")]).map((item) => normalizePublicProvider(item, item.id || "o2", item.name || "O2")),
         },
         pages: normalizePublicPagesSetting(setting.pages),

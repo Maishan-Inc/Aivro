@@ -8,6 +8,8 @@ export type AuthUser = {
     id: string;
     username: string;
     displayName: string;
+    accountType: "personal" | "company";
+    profileCompleted: boolean;
     avatarUrl: string;
     role: UserRole;
     credits: number;
@@ -26,6 +28,8 @@ export type AuthPayload = {
     password: string;
     email?: string;
     code?: string;
+    accountType?: "personal" | "company";
+    displayName?: string;
     turnstileToken?: string;
 };
 
@@ -37,6 +41,14 @@ export async function login(payload: AuthPayload) {
 
 export async function register(payload: AuthPayload) {
     return apiPost<AuthSession>("/api/auth/register", payload);
+}
+
+export async function checkRegisterEmail(email: string) {
+    return apiPost<boolean>("/api/auth/register/check", { email });
+}
+
+export async function sendRegisterEmailCode(email: string, turnstileToken?: string) {
+    return apiPost<boolean>("/api/auth/register/code", { email, turnstileToken });
 }
 
 export async function fetchCurrentUser(token?: string) {
@@ -53,4 +65,8 @@ export async function resetPassword(payload: { email: string; code: string; pass
 
 export async function loginWithMetaMask(payload: { walletAddress: string; message: string; signature: string; email: string; code: string; turnstileToken?: string }) {
     return apiPost<AuthSession>("/api/auth/metamask/login", payload);
+}
+
+export async function completeProfile(token: string, payload: { accountType: "personal" | "company"; displayName: string }) {
+    return apiPost<AuthUser>("/api/v1/profile", payload, token);
 }

@@ -131,7 +131,17 @@ func migrateModels(db *gorm.DB) error {
 	if err != nil {
 		return err
 	}
+	if err := backfillUserProfileFields(db); err != nil {
+		return err
+	}
 	return ensureDefaultPlans(db)
+}
+
+func backfillUserProfileFields(db *gorm.DB) error {
+	if err := db.Model(&model.User{}).Where("account_type IS NULL OR account_type = ''").Update("account_type", model.UserAccountTypePersonal).Error; err != nil {
+		return err
+	}
+	return db.Model(&model.User{}).Where("profile_completed = ? AND (display_name <> '' OR role = ?)", false, model.UserRoleAdmin).Update("profile_completed", true).Error
 }
 
 func databaseMigrationModels() []string {

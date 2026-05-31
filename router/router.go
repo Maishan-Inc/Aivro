@@ -17,6 +17,8 @@ func New() *gin.Engine {
 		c.String(http.StatusOK, "ok")
 	})
 	api.POST("/auth/register", gin.WrapF(handler.Register))
+	api.POST("/auth/register/check", gin.WrapF(handler.CheckRegisterEmail))
+	api.POST("/auth/register/code", gin.WrapF(handler.SendRegisterEmailCode))
 	api.POST("/auth/login", gin.WrapF(handler.Login))
 	api.POST("/auth/email-code", gin.WrapF(handler.SendEmailCode))
 	api.POST("/auth/reset-password", gin.WrapF(handler.ResetPassword))
@@ -53,6 +55,7 @@ func New() *gin.Engine {
 	})
 	v1.GET("/preferences", gin.WrapF(handler.UserPreference))
 	v1.POST("/preferences", gin.WrapF(handler.SaveUserPreference))
+	v1.POST("/profile", gin.WrapF(handler.CompleteProfile))
 	v1.GET("/workflows", gin.WrapF(handler.Workflows))
 	v1.POST("/workflows", gin.WrapF(handler.CreateWorkflow))
 	v1.GET("/workflows/:id", func(c *gin.Context) {

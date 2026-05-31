@@ -7,7 +7,7 @@ export const localeLabels: Record<Locale, string> = {
 
 export const messages = {
     "zh-CN": {
-        "app.name": "边缘幻星",
+        "app.name": "Aivro",
         "locale.switch": "切换语言",
         "locale.current": "当前语言",
         "nav.title": "导航",
