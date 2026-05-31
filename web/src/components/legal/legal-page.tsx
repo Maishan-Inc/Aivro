@@ -90,31 +90,21 @@ export function LegalPage({ type }: { type: "privacy" | "terms" }) {
     const pages = useConfigStore((state) => state.publicSettings?.pages);
     const locale = useLocaleStore((state) => state.locale);
     const isPrivacy = type === "privacy";
-    const title = isPrivacy ? pages?.privacyTitle || "隐私政策" : pages?.termsTitle || "服务条款";
+    const title = locale === "en-US" ? (isPrivacy ? pages?.privacyTitleEn || "Privacy Policy" : pages?.termsTitleEn || "Terms of Service") : isPrivacy ? pages?.privacyTitle || "隐私政策" : pages?.termsTitle || "服务条款";
     const fallbackContent = locale === "en-US" ? (isPrivacy ? fallbackPrivacyContentEn : fallbackTermsContentEn) : isPrivacy ? fallbackPrivacyContent : fallbackTermsContent;
-    const content = isPrivacy ? pages?.privacyContent || fallbackContent : pages?.termsContent || fallbackContent;
+    const content = locale === "en-US" ? (isPrivacy ? pages?.privacyContentEn || fallbackContent : pages?.termsContentEn || fallbackContent) : isPrivacy ? pages?.privacyContent || fallbackContent : pages?.termsContent || fallbackContent;
 
     return (
-        <main className="h-full overflow-y-auto bg-background bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] px-6 py-10 [background-size:16px_16px] dark:bg-[radial-gradient(rgba(245,245,244,.16)_1px,transparent_1px)]">
-            <section className="mx-auto max-w-4xl">
-                <Button href="/login" icon={<ArrowLeft className="size-4" />} type="text" className="mb-8">
-                    返回登录
+        <main className="h-full overflow-y-auto bg-black px-6 py-10 text-stone-100">
+            <section className="mx-auto max-w-3xl">
+                <Button href="/login" icon={<ArrowLeft className="size-4" />} type="text" className="mb-8 !text-stone-300 hover:!bg-white/10 hover:!text-white">
+                    {locale === "en-US" ? "Back to sign in" : "返回登录"}
                 </Button>
-                <div className="border-y border-stone-200 bg-background/80 py-10 backdrop-blur dark:border-stone-800">
-                    <div className="mb-8 flex items-center gap-3">
-                        <span
-                            className="size-9 shrink-0 bg-stone-950 dark:bg-stone-100"
-                            style={{
-                                mask: "url(/logo.svg) center / contain no-repeat",
-                                WebkitMask: "url(/logo.svg) center / contain no-repeat",
-                            }}
-                        />
-                        <div>
-                            <div className="text-sm text-stone-500 dark:text-stone-400">Aivro / 边缘幻星</div>
-                            <h1 className="mt-1 text-4xl font-semibold tracking-normal text-stone-950 dark:text-stone-100">{title}</h1>
-                        </div>
+                <div className="py-8">
+                    <div className="mb-9">
+                        <h1 className="text-4xl font-semibold tracking-normal text-white sm:text-5xl">{title}</h1>
                     </div>
-                    <article className="whitespace-pre-line text-base leading-8 text-stone-700 dark:text-stone-300">{content}</article>
+                    <article className="whitespace-pre-line text-base leading-8 text-stone-300">{content}</article>
                 </div>
             </section>
         </main>

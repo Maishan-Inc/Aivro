@@ -4,6 +4,7 @@ import { useEffect, useId, useMemo, useState } from "react";
 import { Cpu } from "lucide-react";
 
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
+import { useI18n } from "@/hooks/use-i18n";
 import { cn } from "@/lib/utils";
 import type { AiConfig } from "@/stores/use-config-store";
 
@@ -18,6 +19,7 @@ type ModelPickerProps = {
 };
 
 export function ModelPicker({ config, value, onChange, className, fullWidth = false, placeholder = "选择模型", onMissingConfig }: ModelPickerProps) {
+    const { locale } = useI18n();
     const pickerId = useId();
     const [open, setOpen] = useState(false);
     const options = useMemo(() => Array.from(new Set(config.models.filter(Boolean))), [config.models]);
@@ -57,7 +59,7 @@ export function ModelPicker({ config, value, onChange, className, fullWidth = fa
                 title={current || placeholder}
             >
                 <ModelIcon model={current} />
-                <span className="canvas-model-picker-text min-w-0 flex-1 truncate text-left">{current || placeholder}</span>
+                <span className="canvas-model-picker-text min-w-0 flex-1 truncate text-left">{current || (locale === "en-US" && placeholder === "选择模型" ? "Select model" : placeholder)}</span>
             </SelectTrigger>
             <SelectContent
                 data-canvas-no-zoom
@@ -77,7 +79,7 @@ export function ModelPicker({ config, value, onChange, className, fullWidth = fa
                     ))
                 ) : (
                     <SelectItem value="__empty__" disabled>
-                        管理员尚未配置可用模型
+                        {locale === "en-US" ? "No available model is configured" : "管理员尚未配置可用模型"}
                     </SelectItem>
                 )}
             </SelectContent>

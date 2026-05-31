@@ -25,7 +25,9 @@ export function MobileNavDrawer({ open, activeToolSlug, onClose }: MobileNavDraw
                     return (
                         <Link
                             key={tool.slug}
-                            href={`/${tool.slug}`}
+                            href={tool.href || `/${tool.slug}`}
+                            target={tool.external ? "_blank" : undefined}
+                            rel={tool.external ? "noreferrer" : undefined}
                             onClick={onClose}
                             className={cn(
                                 "flex items-center gap-3 rounded-lg px-3 py-3 text-base transition",

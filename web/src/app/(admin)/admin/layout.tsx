@@ -102,7 +102,10 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                         <UserStatusActions />
                     </Flex>
                 </Layout.Header>
-                <Layout.Content style={{ minHeight: 0, overflow: "auto" }}>{children}</Layout.Content>
+                <Layout.Content style={{ minHeight: 0, overflow: "auto" }}>
+                    {children}
+                    <div style={{ padding: "12px 24px", textAlign: "center", color: antToken.colorTextTertiary, fontSize: 12 }}>Copyright © 2026 Maishan Inc. All rights reserved Aivro</div>
+                </Layout.Content>
             </Layout>
         </Layout>
     );

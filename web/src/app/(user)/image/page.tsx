@@ -10,6 +10,7 @@ import { ImageSettingsPanel } from "@/components/image-settings-panel";
 import { ModelPicker } from "@/components/model-picker";
 import { PromptSelectDialog } from "@/components/prompts/prompt-select-dialog";
 import { AssetPickerModal, type InsertAssetPayload } from "@/app/(user)/canvas/components/asset-picker-modal";
+import { useI18n } from "@/hooks/use-i18n";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
 import { useThemeStore } from "@/stores/use-theme-store";
@@ -68,6 +69,7 @@ type UpdateAiConfig = <K extends keyof AiConfig>(key: K, value: AiConfig[K]) => 
 
 export default function ImagePage() {
     const { message } = App.useApp();
+    const { locale } = useI18n();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const config = useConfigStore((state) => state.config);
     const effectiveConfig = useEffectiveConfig();
@@ -343,14 +345,14 @@ export default function ImagePage() {
                         <div>
                             <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0">
-                                    <h1 className="text-2xl font-semibold text-stone-950 dark:text-stone-100">生图工作台</h1>
+                                    <h1 className="text-2xl font-semibold text-stone-950 dark:text-stone-100">{locale === "en-US" ? "Image Studio" : "生图工作台"}</h1>
                                 </div>
                                 <div className="flex shrink-0 gap-2 lg:hidden">
                                     <Button icon={<History className="size-4" />} onClick={() => setLogsOpen(true)}>
-                                        记录
+                                        {locale === "en-US" ? "History" : "记录"}
                                     </Button>
                                     <Button icon={<SlidersHorizontal className="size-4" />} onClick={() => setSettingsOpen(true)}>
-                                        参数
+                                        {locale === "en-US" ? "Settings" : "参数"}
                                     </Button>
                                 </div>
                             </div>
@@ -359,28 +361,28 @@ export default function ImagePage() {
                         <div className="mt-6 space-y-5">
                             <div>
                                 <div className="mb-2 flex items-center justify-between gap-3">
-                                    <span className="text-base font-semibold">提示词</span>
+                                    <span className="text-base font-semibold">{locale === "en-US" ? "Prompt" : "提示词"}</span>
                                     <div className="flex gap-2">
                                         <Button size="small" icon={<BookOpen className="size-3.5" />} onClick={() => setPromptDialogOpen(true)}>
-                                            查看提示词库
+                                            {locale === "en-US" ? "Prompt Library" : "查看提示词库"}
                                         </Button>
                                         <Button size="small" icon={<FolderPlus className="size-3.5" />} onClick={() => setAssetPickerOpen(true)}>
-                                            查看我的素材
+                                            {locale === "en-US" ? "My Assets" : "查看我的素材"}
                                         </Button>
                                     </div>
                                 </div>
-                                <Input.TextArea value={prompt} onChange={(event) => setPrompt(event.target.value)} rows={7} placeholder="描述画面主体、风格、构图、光线和用途" />
+                                <Input.TextArea value={prompt} onChange={(event) => setPrompt(event.target.value)} rows={7} placeholder={locale === "en-US" ? "Describe the subject, style, composition, lighting, and usage" : "描述画面主体、风格、构图、光线和用途"} />
                             </div>
 
                             <div className="min-w-0">
                                 <div className="mb-2 flex items-center justify-between gap-3">
-                                    <span className="text-base font-semibold">参考图</span>
+                                    <span className="text-base font-semibold">{locale === "en-US" ? "Reference images" : "参考图"}</span>
                                     <div className="flex gap-2">
                                         <Button size="small" icon={<ClipboardPaste className="size-3.5" />} onClick={() => void addReferencesFromClipboard()}>
-                                            剪切板
+                                            {locale === "en-US" ? "Clipboard" : "剪切板"}
                                         </Button>
                                         <Button size="small" icon={<Upload className="size-3.5" />} onClick={() => fileInputRef.current?.click()}>
-                                            上传
+                                            {locale === "en-US" ? "Upload" : "上传"}
                                         </Button>
                                     </div>
                                 </div>
@@ -405,7 +407,7 @@ export default function ImagePage() {
                                             </button>
                                         </div>
                                     ))}
-                                    {!references.length ? <div className="flex min-w-full items-center justify-center text-sm text-stone-500">暂无参考图</div> : null}
+                                    {!references.length ? <div className="flex min-w-full items-center justify-center text-sm text-stone-500">{locale === "en-US" ? "No reference images" : "暂无参考图"}</div> : null}
                                 </div>
                             </div>
 
@@ -414,7 +416,7 @@ export default function ImagePage() {
                                     {model} · {effectiveConfig.size} · {effectiveConfig.quality}
                                 </span>
                                 <Button size="small" type="text" icon={<SlidersHorizontal className="size-4" />} onClick={() => setSettingsOpen(true)}>
-                                    调整
+                                    {locale === "en-US" ? "Adjust" : "调整"}
                                 </Button>
                             </div>
 
@@ -432,7 +434,7 @@ export default function ImagePage() {
                                 disabled={!canGenerate || running}
                                 onClick={() => void generate()}
                             >
-                                {running ? "生成中" : "开始生成"}
+                                {running ? (locale === "en-US" ? "Generating" : "生成中") : locale === "en-US" ? "Generate" : "开始生成"}
                             </Button>
                         </div>
                     </div>
@@ -440,9 +442,9 @@ export default function ImagePage() {
                     <div className="thin-scrollbar rounded-lg border border-stone-200 bg-card p-4 shadow-sm dark:border-stone-800 lg:min-h-0 lg:overflow-y-auto lg:p-5">
                         <div className="mb-4 flex items-center justify-between gap-3">
                             <div>
-                                <h2 className="text-xl font-semibold">生成结果</h2>
+                                <h2 className="text-xl font-semibold">{locale === "en-US" ? "Results" : "生成结果"}</h2>
                             </div>
-                            {running ? <Tag className="m-0 px-2 py-1">等待 {formatDuration(elapsedMs)}</Tag> : null}
+                            {running ? <Tag className="m-0 px-2 py-1">{locale === "en-US" ? "Waiting" : "等待"} {formatDuration(elapsedMs)}</Tag> : null}
                         </div>
                         {results.length ? (
                             <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-3">
@@ -459,7 +461,7 @@ export default function ImagePage() {
                         ) : (
                             <div className="flex min-h-[320px] flex-col items-center justify-center rounded-lg border border-dashed border-stone-300 text-center dark:border-stone-700 lg:min-h-[560px]">
                                 <ImagePlus className="mb-4 size-11 text-stone-400" />
-                                <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="还没有生成图片" />
+                                <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={locale === "en-US" ? "No images yet" : "还没有生成图片"} />
                             </div>
                         )}
                     </div>
@@ -476,7 +478,7 @@ export default function ImagePage() {
                     event.target.value = "";
                 }}
             />
-            <Drawer title="生成记录" placement="bottom" size="large" open={logsOpen} onClose={() => setLogsOpen(false)}>
+            <Drawer title={locale === "en-US" ? "History" : "生成记录"} placement="bottom" size="large" open={logsOpen} onClose={() => setLogsOpen(false)}>
                 <LogPanel
                     logs={visibleLogs}
                     selectedLogIds={selectedLogIds}
@@ -487,7 +489,7 @@ export default function ImagePage() {
                     onPreviewLog={(log) => void previewGenerationLog(log)}
                 />
             </Drawer>
-            <Drawer title="参数" placement="bottom" height="82vh" open={settingsOpen} onClose={() => setSettingsOpen(false)}>
+            <Drawer title={locale === "en-US" ? "Settings" : "参数"} placement="bottom" height="82vh" open={settingsOpen} onClose={() => setSettingsOpen(false)}>
                 <div className="grid grid-cols-2 gap-3 pb-4">
                     <GenerationSettings config={effectiveConfig} model={model} updateConfig={updateConfig} onMissingConfig={() => message.warning("管理员尚未配置可用模型")} />
                 </div>
@@ -502,12 +504,13 @@ export default function ImagePage() {
 }
 
 function GenerationSettings({ config, model, updateConfig, onMissingConfig }: { config: AiConfig; model: string; updateConfig: UpdateAiConfig; onMissingConfig: () => void }) {
+    const { locale } = useI18n();
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
 
     return (
         <>
             <label className="col-span-2 block min-w-0 sm:col-span-1">
-                <span className="mb-1.5 block text-sm font-semibold sm:mb-2 sm:text-base">模型</span>
+                <span className="mb-1.5 block text-sm font-semibold sm:mb-2 sm:text-base">{locale === "en-US" ? "Model" : "模型"}</span>
                 <ModelPicker config={config} value={model} onChange={(value) => updateConfig("imageModel", value)} fullWidth onMissingConfig={onMissingConfig} />
             </label>
             <div className="col-span-2">

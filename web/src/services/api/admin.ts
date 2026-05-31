@@ -219,8 +219,12 @@ export type AdminPublicSettings = {
 export type AdminPublicPagesSettings = {
     privacyTitle: string;
     privacyContent: string;
+    privacyTitleEn: string;
+    privacyContentEn: string;
     termsTitle: string;
     termsContent: string;
+    termsTitleEn: string;
+    termsContentEn: string;
 };
 
 export type AdminPublicPageAccessSettings = {

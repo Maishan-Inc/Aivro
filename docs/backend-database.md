@@ -202,8 +202,12 @@
 | --- | --- | --- |
 | `privacyTitle` | string | 隐私政策页面标题 |
 | `privacyContent` | text | 隐私政策页面正文 |
+| `privacyTitleEn` | string | 隐私政策英文页面标题 |
+| `privacyContentEn` | text | 隐私政策英文页面正文 |
 | `termsTitle` | string | 服务条款页面标题 |
 | `termsContent` | text | 服务条款页面正文 |
+| `termsTitleEn` | string | 服务条款英文页面标题 |
+| `termsContentEn` | text | 服务条款英文页面正文 |
 
 `pageAccess` 当前字段：
 

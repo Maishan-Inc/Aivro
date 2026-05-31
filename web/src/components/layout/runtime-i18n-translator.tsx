@@ -6,7 +6,9 @@ import { runtimeEnglishTranslations } from "@/i18n/runtime-translations";
 import { useLocaleStore } from "@/stores/use-locale-store";
 
 const textOriginals = new WeakMap<Text, string>();
+const textTranslations = new WeakMap<Text, string>();
 const attrOriginals = new WeakMap<Element, Map<string, string>>();
+const attrTranslations = new WeakMap<Element, Map<string, string>>();
 const translatableAttrs = ["placeholder", "title", "aria-label", "alt"];
 const skipSelector = "script,style,textarea,input,pre,code,kbd,samp,[contenteditable='true'],[data-i18n-skip]";
 const hasChinese = /[\u3400-\u9fff]/;
@@ -63,13 +65,14 @@ function translateTextNode(node: Text, locale: string) {
             return;
         }
         const original = textOriginals.get(node);
-        if (original && current !== original) node.nodeValue = original;
+        if (original && textTranslations.get(node) === current && current !== original) node.nodeValue = original;
         return;
     }
-    const source = hasChinese.test(current) ? current : textOriginals.get(node);
+    const source = hasChinese.test(current) ? current : textTranslations.get(node) === current ? textOriginals.get(node) : "";
     if (!source || !hasChinese.test(source)) return;
     textOriginals.set(node, source);
     const translated = translateUIText(source);
+    textTranslations.set(node, translated);
     if (translated !== current) node.nodeValue = translated;
 }
 
@@ -80,19 +83,22 @@ function translateElementAttrs(element: Element, locale: string) {
         if (!current) continue;
         const originals = attrOriginals.get(element) || new Map<string, string>();
         if (!attrOriginals.has(element)) attrOriginals.set(element, originals);
+        const translations = attrTranslations.get(element) || new Map<string, string>();
+        if (!attrTranslations.has(element)) attrTranslations.set(element, translations);
         if (locale !== "en-US") {
             if (hasChinese.test(current)) {
                 originals.set(attr, current);
                 continue;
             }
             const original = originals.get(attr);
-            if (original && current !== original) element.setAttribute(attr, original);
+            if (original && translations.get(attr) === current && current !== original) element.setAttribute(attr, original);
             continue;
         }
-        const source = hasChinese.test(current) ? current : originals.get(attr);
+        const source = hasChinese.test(current) ? current : translations.get(attr) === current ? originals.get(attr) : "";
         if (!source || !hasChinese.test(source)) continue;
         originals.set(attr, source);
         const translated = translateUIText(source);
+        translations.set(attr, translated);
         if (translated !== current) element.setAttribute(attr, translated);
     }
 }
@@ -125,6 +131,7 @@ function translateUIText(value: string) {
         .replace(/更新：(.+)/g, "Updated: $1");
 
     for (const [zh, en] of sortedTranslations) {
+        if (zh.length <= 1) continue;
         output = output.replaceAll(zh, en);
     }
     return `${leading}${output}${trailing}`;

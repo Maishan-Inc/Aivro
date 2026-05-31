@@ -143,14 +143,26 @@ func normalizePublicPagesSetting(setting model.PublicPagesSetting) model.PublicP
 	if strings.TrimSpace(setting.PrivacyTitle) == "" {
 		setting.PrivacyTitle = "隐私政策"
 	}
+	if strings.TrimSpace(setting.PrivacyTitleEn) == "" {
+		setting.PrivacyTitleEn = "Privacy Policy"
+	}
 	if strings.TrimSpace(setting.TermsTitle) == "" {
 		setting.TermsTitle = "服务条款"
+	}
+	if strings.TrimSpace(setting.TermsTitleEn) == "" {
+		setting.TermsTitleEn = "Terms of Service"
 	}
 	if strings.TrimSpace(setting.PrivacyContent) == "" {
 		setting.PrivacyContent = defaultPrivacyPolicyContent()
 	}
+	if strings.TrimSpace(setting.PrivacyContentEn) == "" {
+		setting.PrivacyContentEn = defaultPrivacyPolicyContentEn()
+	}
 	if strings.TrimSpace(setting.TermsContent) == "" {
 		setting.TermsContent = defaultTermsContent()
+	}
+	if strings.TrimSpace(setting.TermsContentEn) == "" {
+		setting.TermsContentEn = defaultTermsContentEn()
 	}
 	return setting
 }
@@ -197,6 +209,50 @@ AI 生成结果可能存在不准确、不稳定或不符合预期的情况。�
 
 六、条款更新
 我们可能根据功能和合规要求更新本条款。更新后的内容会展示在本页面，继续使用或登录 Aivro 表示你接受更新后的条款。`)
+}
+
+func defaultPrivacyPolicyContentEn() string {
+	return strings.TrimSpace(`Welcome to Aivro. We respect your privacy and only process information needed to provide the service.
+
+1. Information we process
+When you register, sign in, or use Aivro, we may process your username, email address, third-party login identifier, login state, credit records, generation requests, prompts, reference images, generated result URLs, and content you actively save to assets or canvas projects. Generation history is stored in the database and displayed according to the retention period of cloud storage files. If cloud storage is enabled by the administrator, generated images and videos are stored by the backend in Cloudflare R2 or S3-compatible storage and cleaned up after expiration based on the configured policy.
+
+2. How we use information
+This information is used for account login, identity verification, generation services, asset and history management, credit deduction and refund, security auditing, troubleshooting, and necessary product experience improvements.
+
+3. Third-party services
+Aivro may integrate OpenAI-compatible model providers, Cloudflare R2 / S3 cloud storage, email services, and third-party login services. Your generation content may be sent to the configured model provider. Do not submit sensitive content that you are not authorized to process or do not want third-party services to process.
+
+4. Local storage and cloud workflows
+Aivro stores a small amount of preference data such as language and UI state in the browser. Workflow projects are stored in the cloud database. Model providers are configured centrally by the administrator, and users do not store or enter API keys on the client side. You can clear local preference data through your browser settings.
+
+5. Your choices
+You may stop using the service, clear local browser data, or contact the site administrator to request handling of account-related information. Administrators can adjust model providers, login methods, email configuration, and cloud storage settings in the admin console.
+
+6. Policy updates
+We may update this policy as features change. Updated content will be shown on this page. Continuing to use Aivro means you understand and agree to the updated policy.`)
+}
+
+func defaultTermsContentEn() string {
+	return strings.TrimSpace(`Welcome to Aivro. By using, signing in to, or registering for Aivro, you agree to these Terms of Service.
+
+1. Service description
+Aivro provides AI creative tools for images, videos, text, prompts, assets, and canvas workflows. Available capabilities depend on the administrator's model provider, credit rules, login methods, email service, and cloud storage configuration.
+
+2. Account and security
+You are responsible for protecting your account, password, email verification codes, third-party login account, and wallet signature information. Actions initiated through your account are treated as your own. If you notice abnormal activity, stop using the service and contact the site administrator.
+
+3. Content responsibility
+You must ensure that content you input, upload, generate, save, and share is lawful and that you have the necessary rights. Do not use Aivro to generate, store, or distribute illegal, infringing, fraudulent, harassing, malicious, privacy-invasive, or model-policy-violating content.
+
+4. Generated results
+AI-generated results may be inaccurate, unstable, or different from expectations. You are responsible for deciding whether generated content is suitable for commercial use, public publishing, or other important scenarios.
+
+5. Service changes
+Administrators may adjust models, credits, login methods, cloud storage, automatic cleanup policies, or suspend some capabilities for operational reasons. Aivro will try to recover from third-party model, storage, email, or login service failures but does not guarantee uninterrupted availability.
+
+6. Terms updates
+We may update these terms for feature and compliance reasons. Updated content will be shown on this page. Continuing to use or sign in to Aivro means you accept the updated terms.`)
 }
 
 func ModelCost(modelName string) (int, error) {

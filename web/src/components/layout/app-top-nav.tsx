@@ -73,7 +73,9 @@ export function AppTopNav() {
                                 return (
                                     <Link
                                         key={tool.slug}
-                                        href={`/${tool.slug}`}
+                                        href={tool.href || `/${tool.slug}`}
+                                        target={tool.external ? "_blank" : undefined}
+                                        rel={tool.external ? "noreferrer" : undefined}
                                         className={cn(
                                             "relative flex h-16 shrink-0 items-center gap-2 text-sm leading-6 transition after:absolute after:inset-x-0 after:bottom-0 after:h-px",
                                             active

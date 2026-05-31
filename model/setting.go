@@ -47,10 +47,14 @@ type PublicSetting struct {
 }
 
 type PublicPagesSetting struct {
-	PrivacyTitle   string `json:"privacyTitle"`
-	PrivacyContent string `json:"privacyContent"`
-	TermsTitle     string `json:"termsTitle"`
-	TermsContent   string `json:"termsContent"`
+	PrivacyTitle     string `json:"privacyTitle"`
+	PrivacyContent   string `json:"privacyContent"`
+	PrivacyTitleEn   string `json:"privacyTitleEn"`
+	PrivacyContentEn string `json:"privacyContentEn"`
+	TermsTitle       string `json:"termsTitle"`
+	TermsContent     string `json:"termsContent"`
+	TermsTitleEn     string `json:"termsTitleEn"`
+	TermsContentEn   string `json:"termsContentEn"`
 }
 
 type PublicPageAccessSetting struct {
