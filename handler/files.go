@@ -45,6 +45,10 @@ func FileContent(w http.ResponseWriter, r *http.Request, id string) {
 	if file.ContentType != "" {
 		w.Header().Set("Content-Type", file.ContentType)
 	}
-	w.Header().Set("Cache-Control", "private, max-age=300")
+	w.Header().Set("Cache-Control", "no-store, no-cache, max-age=0, must-revalidate, proxy-revalidate")
+	w.Header().Set("CDN-Cache-Control", "no-store")
+	w.Header().Set("Surrogate-Control", "no-store")
+	w.Header().Set("Pragma", "no-cache")
+	w.Header().Set("Expires", "0")
 	_, _ = io.Copy(w, content)
 }

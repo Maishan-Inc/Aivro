@@ -1,7 +1,7 @@
 "use client";
 
 import { Dropdown } from "antd";
-import { Check, Languages, Menu } from "lucide-react";
+import { Check, Languages, Menu, WalletCards } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
@@ -111,7 +111,13 @@ export function AppTopNav() {
                                 </button>
                             </Dropdown>
                             {isReady && user ? (
-                                <UserStatusActions />
+                                <>
+                                    <Link href="/pricing" className="hidden h-8 items-center gap-1.5 px-1 text-sm font-medium text-stone-600 transition hover:text-stone-950 sm:inline-flex dark:text-stone-300 dark:hover:text-stone-100">
+                                        <WalletCards className="size-4" />
+                                        <span>{locale === "en-US" ? "Plans" : "套餐"}</span>
+                                    </Link>
+                                    <UserStatusActions />
+                                </>
                             ) : (
                                 <>
                                     <AnimatedThemeToggler

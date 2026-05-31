@@ -3,11 +3,11 @@
 import { MailOutlined } from "@ant-design/icons";
 import { App, Button, Form, Input, Space, Typography } from "antd";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useCallback, useState } from "react";
+import { Suspense, useState } from "react";
 
 import { AivroDrawableLoader } from "@/components/aivro-drawable-loader";
-import { TurnstileField } from "@/components/turnstile-field";
 import { useAuthLoadingOverlay } from "@/hooks/use-auth-loading-overlay";
+import { useTurnstileChallenge } from "@/hooks/use-turnstile-challenge";
 import { fetchCurrentUser, loginWithMetaMask, sendEmailCode } from "@/services/api/auth";
 import { useConfigStore } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
@@ -33,34 +33,33 @@ function MetaMaskEmailContent() {
     const setSession = useUserStore((state) => state.setSession);
     const [sendingCode, setSendingCode] = useState(false);
     const [submitting, setSubmitting] = useState(false);
-    const [turnstileToken, setTurnstileToken] = useState("");
-    const [turnstileResetKey, setTurnstileResetKey] = useState(0);
-    const turnstileSiteKey = useConfigStore((state) => state.publicSettings?.auth?.turnstileSiteKey || "");
+    const publicSettings = useConfigStore((state) => state.publicSettings);
+    const turnstileSiteKey = publicSettings?.auth?.turnstileSiteKey || "";
     const { overlay, runWithOverlay } = useAuthLoadingOverlay();
+    const { verify: verifyTurnstile, challenge: turnstileChallenge } = useTurnstileChallenge(turnstileSiteKey);
     const walletAddress = searchParams.get("walletAddress") || "";
     const signMessage = searchParams.get("message") || "";
     const signature = searchParams.get("signature") || "";
     const redirect = safeRedirect(searchParams.get("redirect") || "/");
-    const resetTurnstile = useCallback(() => {
-        setTurnstileToken("");
-        setTurnstileResetKey((value) => value + 1);
-    }, []);
-
     const requestCode = async () => {
         const email = form.getFieldValue("email");
         if (!email) {
             message.warning("请先输入邮箱");
             return;
         }
+        if (!publicSettings) {
+            message.warning("认证配置加载中，请稍后再试");
+            return;
+        }
         setSendingCode(true);
         try {
+            const turnstileToken = await verifyTurnstile();
             await sendEmailCode(email, "metamask", turnstileToken);
             message.success("验证码已发送");
         } catch (error) {
             message.error(error instanceof Error ? error.message : "发送失败");
         } finally {
             setSendingCode(false);
-            resetTurnstile();
         }
     };
 
@@ -69,8 +68,13 @@ function MetaMaskEmailContent() {
             message.error("缺少 MetaMask 签名信息");
             return;
         }
+        if (!publicSettings) {
+            message.warning("认证配置加载中，请稍后再试");
+            return;
+        }
         setSubmitting(true);
         try {
+            const turnstileToken = await verifyTurnstile();
             const session = await runWithOverlay("正在完成登录", () => loginWithMetaMask({ walletAddress, message: signMessage, signature, email: values.email, code: values.code, turnstileToken }));
             const user = await fetchCurrentUser(session.token);
             setSession(session.token, user);
@@ -81,7 +85,6 @@ function MetaMaskEmailContent() {
             message.error(error instanceof Error ? error.message : "登录失败");
         } finally {
             setSubmitting(false);
-            resetTurnstile();
         }
     };
 
@@ -102,17 +105,17 @@ function MetaMaskEmailContent() {
                             <Form.Item name="code" noStyle rules={[{ required: true, message: "请输入验证码" }]}>
                                 <Input autoComplete="one-time-code" />
                             </Form.Item>
-                            <Button loading={sendingCode} onClick={() => void requestCode()}>
+                            <Button loading={sendingCode} disabled={!publicSettings} onClick={() => void requestCode()}>
                                 发送验证码
                             </Button>
                         </Space.Compact>
                     </Form.Item>
-                    <TurnstileField siteKey={turnstileSiteKey} resetKey={turnstileResetKey} onVerify={setTurnstileToken} />
-                    <Button block type="primary" htmlType="submit" loading={submitting} icon={submitting ? <AivroDrawableLoader compact className="h-4 w-14 text-white dark:text-white" /> : undefined}>
+                    <Button block type="primary" htmlType="submit" loading={submitting} disabled={!publicSettings} icon={submitting ? <AivroDrawableLoader compact className="h-4 w-14 text-white dark:text-white" /> : undefined}>
                         {submitting ? "处理中" : "完成登录"}
                     </Button>
                 </Form>
             </section>
+            {turnstileChallenge}
             {overlay}
         </main>
     );

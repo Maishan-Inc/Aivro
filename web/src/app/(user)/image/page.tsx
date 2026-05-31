@@ -257,9 +257,15 @@ export default function ImagePage() {
     };
 
     const saveLog = async (log: GenerationLog) => {
-        if (!token) return;
+        if (!token) {
+            message.warning("请先登录后再保存云端生成记录");
+            return;
+        }
         const media = log.images.map(imageToHistoryMedia).filter((item): item is GenerationHistoryMedia => Boolean(item));
-        if (!media.length) return;
+        if (!media.length) {
+            message.warning("生成结果未转存到云端，无法同步生成记录");
+            return;
+        }
         await saveGenerationHistory(token, {
             type: "image",
             title: log.title,

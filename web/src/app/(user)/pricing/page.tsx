@@ -6,6 +6,7 @@ import { App, Button, Card, Tag } from "antd";
 import { BadgeCheck, ShieldCheck } from "lucide-react";
 
 import { createKycSession, createStripeCheckout, fetchKycStatus, fetchPlans, type Plan } from "@/services/api/billing";
+import { useI18n } from "@/hooks/use-i18n";
 import { useUserStore } from "@/stores/use-user-store";
 
 export default function PricingPage() {
@@ -20,6 +21,7 @@ function PricingContent() {
     const router = useRouter();
     const search = useSearchParams();
     const { message } = App.useApp();
+    const { locale } = useI18n();
     const token = useUserStore((state) => state.token);
     const isReady = useUserStore((state) => state.isReady);
     const [plans, setPlans] = useState<Plan[]>([]);
@@ -67,29 +69,29 @@ function PricingContent() {
     };
 
     return (
-        <main className="min-h-screen bg-[#f6f1e8] px-6 py-10 text-stone-950 dark:bg-stone-950 dark:text-stone-100">
+        <main className="min-h-screen bg-background px-6 py-10 text-stone-950 dark:text-stone-100">
             <div className="mx-auto max-w-6xl">
                 <section className={`mb-8 rounded-xl border bg-white p-5 shadow-sm dark:bg-stone-900 ${focusKyc ? "ring-2 ring-emerald-500" : ""}`}>
                     <div className="flex flex-wrap items-center justify-between gap-4">
                         <div className="flex items-center gap-3">
                             <ShieldCheck className="size-7 text-emerald-600" />
                             <div>
-                                <h1 className="text-xl font-semibold">KYC 身份认证</h1>
-                                <p className="mt-1 text-sm text-stone-500">认证通过后可获得 {kyc?.rewards.credits ?? 0} 算力点和 {kyc?.rewards.workflowCreateCredits ?? 0} 次工作流创建次数。</p>
+                                <h1 className="text-xl font-semibold">{locale === "en-US" ? "KYC Verification" : "KYC 身份认证"}</h1>
+                                <p className="mt-1 text-sm text-stone-500">{locale === "en-US" ? `After approval, you receive ${kyc?.rewards.credits ?? 0} credits and ${kyc?.rewards.workflowCreateCredits ?? 0} workflow creation quota.` : `认证通过后可获得 ${kyc?.rewards.credits ?? 0} 算力点和 ${kyc?.rewards.workflowCreateCredits ?? 0} 次工作流创建次数。`}</p>
                             </div>
                         </div>
                         <div className="flex items-center gap-3">
-                            <Tag color={kyc?.status === "approved" ? "success" : kyc?.status === "pending" ? "processing" : "default"}>{kycStatusText(kyc?.status)}</Tag>
+                            <Tag color={kyc?.status === "approved" ? "success" : kyc?.status === "pending" ? "processing" : "default"}>{kycStatusText(kyc?.status, locale)}</Tag>
                             <Button type="primary" disabled={!kyc?.enabled || kyc?.status === "approved"} onClick={startKyc}>
-                                开始认证
+                                {locale === "en-US" ? "Start verification" : "开始认证"}
                             </Button>
                         </div>
                     </div>
                 </section>
 
                 <header className="mb-8">
-                    <p className="text-sm text-stone-500">套餐购买</p>
-                    <h2 className="mt-2 text-3xl font-semibold">获取算力点和云端工作流创建次数</h2>
+                    <p className="text-sm text-stone-500">{locale === "en-US" ? "Plans" : "套餐购买"}</p>
+                    <h2 className="mt-2 text-3xl font-semibold">{locale === "en-US" ? "Get credits and cloud workflow quota" : "获取算力点和云端工作流创建次数"}</h2>
                 </header>
 
                 <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
@@ -97,7 +99,7 @@ function PricingContent() {
                         <Card key={plan.id} className="h-full" styles={{ body: { minHeight: 320, display: "flex", flexDirection: "column" } }}>
                             <div className="mb-4 flex items-center justify-between gap-3">
                                 <h3 className="text-2xl font-semibold">{plan.name}</h3>
-                                {plan.recommended ? <Tag color="gold">推荐</Tag> : null}
+                                {plan.recommended ? <Tag color="gold">{locale === "en-US" ? "Recommended" : "推荐"}</Tag> : null}
                             </div>
                             <p className="text-sm text-stone-500">{plan.description}</p>
                             <div className="my-6">
@@ -105,11 +107,11 @@ function PricingContent() {
                                 <span className="ml-1 text-sm text-stone-500">{plan.currency}</span>
                             </div>
                             <div className="mb-6 grid gap-2 text-sm">
-                                <span className="inline-flex items-center gap-2"><BadgeCheck className="size-4 text-emerald-600" />{plan.credits} 算力点</span>
-                                <span className="inline-flex items-center gap-2"><BadgeCheck className="size-4 text-emerald-600" />{plan.workflowCreateCredits} 次工作流创建次数</span>
+                                <span className="inline-flex items-center gap-2"><BadgeCheck className="size-4 text-emerald-600" />{plan.credits} {locale === "en-US" ? "credits" : "算力点"}</span>
+                                <span className="inline-flex items-center gap-2"><BadgeCheck className="size-4 text-emerald-600" />{plan.workflowCreateCredits} {locale === "en-US" ? "workflow creations" : "次工作流创建次数"}</span>
                             </div>
                             <Button type={plan.recommended ? "primary" : "default"} block className="mt-auto" loading={loadingPlanId === plan.id} onClick={() => void buy(plan)}>
-                                购买套餐
+                                {locale === "en-US" ? "Buy plan" : "购买套餐"}
                             </Button>
                         </Card>
                     ))}
@@ -119,9 +121,10 @@ function PricingContent() {
     );
 }
 
-function kycStatusText(status?: string) {
-    if (status === "approved") return "已通过";
-    if (status === "pending") return "认证中";
-    if (status === "rejected") return "未通过";
-    return "未认证";
+function kycStatusText(status: string | undefined, locale: string) {
+    const en = locale === "en-US";
+    if (status === "approved") return en ? "Approved" : "已通过";
+    if (status === "pending") return en ? "Pending" : "认证中";
+    if (status === "rejected") return en ? "Rejected" : "未通过";
+    return en ? "Not verified" : "未认证";
 }

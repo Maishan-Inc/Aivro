@@ -237,9 +237,15 @@ export default function VideoPage() {
     };
 
     const saveLog = (log: GenerationLog) => {
-        if (!token || !log.video) return;
+        if (!token || !log.video) {
+            if (!token && log.video) message.warning("请先登录后再保存云端生成记录");
+            return;
+        }
         const media = videoToHistoryMedia(log.video);
-        if (!media) return;
+        if (!media) {
+            message.warning("生成结果未转存到云端，无法同步生成记录");
+            return;
+        }
         void saveGenerationHistory(token, {
             type: "video",
             title: log.title,

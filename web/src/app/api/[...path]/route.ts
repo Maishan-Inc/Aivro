@@ -22,6 +22,11 @@ function responseHeaders(response: Response) {
     headers.delete("content-length");
     headers.delete("content-encoding");
     headers.delete("transfer-encoding");
+    headers.set("Cache-Control", "no-store, no-cache, max-age=0, must-revalidate, proxy-revalidate");
+    headers.set("CDN-Cache-Control", "no-store");
+    headers.set("Surrogate-Control", "no-store");
+    headers.set("Pragma", "no-cache");
+    headers.set("Expires", "0");
     return headers;
 }
 
@@ -36,6 +41,7 @@ async function proxy(request: NextRequest, context: RouteContext) {
             method: request.method,
             headers: proxyHeaders(request),
             body: hasBody ? request.body : undefined,
+            cache: "no-store",
             duplex: hasBody ? "half" : undefined,
             redirect: "manual",
         } as RequestInit & { duplex?: "half" });

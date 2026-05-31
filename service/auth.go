@@ -3,6 +3,7 @@ package service
 import (
 	"bytes"
 	"crypto/rand"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -11,6 +12,7 @@ import (
 	"io"
 	"log"
 	"math/big"
+	"mime"
 	"net"
 	"net/http"
 	"net/smtp"
@@ -1166,12 +1168,12 @@ func sendVerificationMail(setting model.MailSetting, email string, purpose strin
 	body := renderMailTemplate(template.Body, email, code, setting.CodeExpireMin, context)
 	from := setting.FromEmail
 	if strings.TrimSpace(setting.FromName) != "" {
-		from = fmt.Sprintf("%s <%s>", setting.FromName, setting.FromEmail)
+		from = fmt.Sprintf("%s <%s>", mimeHeader(setting.FromName), setting.FromEmail)
 	}
 	message := strings.Join([]string{
 		"From: " + from,
 		"To: " + email,
-		"Subject: " + subject,
+		"Subject: " + mimeHeader(subject),
 		"MIME-Version: 1.0",
 		"Content-Type: text/plain; charset=UTF-8",
 		"",
@@ -1182,7 +1184,49 @@ func sendVerificationMail(setting model.MailSetting, email string, purpose strin
 	if setting.Username != "" || setting.Password != "" {
 		auth = smtp.PlainAuth("", setting.Username, setting.Password, setting.Host)
 	}
+	if setting.Port == 465 {
+		return sendMailTLS(addr, setting.Host, auth, setting.FromEmail, []string{email}, []byte(message))
+	}
 	return smtp.SendMail(addr, auth, setting.FromEmail, []string{email}, []byte(message))
+}
+
+func sendMailTLS(addr string, host string, auth smtp.Auth, from string, to []string, msg []byte) error {
+	conn, err := tls.Dial("tcp", addr, &tls.Config{ServerName: host, MinVersion: tls.VersionTLS12})
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	client, err := smtp.NewClient(conn, host)
+	if err != nil {
+		return err
+	}
+	defer client.Quit()
+	if auth != nil {
+		if err := client.Auth(auth); err != nil {
+			return err
+		}
+	}
+	if err := client.Mail(from); err != nil {
+		return err
+	}
+	for _, recipient := range to {
+		if err := client.Rcpt(recipient); err != nil {
+			return err
+		}
+	}
+	writer, err := client.Data()
+	if err != nil {
+		return err
+	}
+	if _, err := writer.Write(msg); err != nil {
+		_ = writer.Close()
+		return err
+	}
+	return writer.Close()
+}
+
+func mimeHeader(value string) string {
+	return mime.QEncoding.Encode("UTF-8", value)
 }
 
 func renderMailTemplate(template string, email string, code string, expireMinutes int, context MailTemplateContext) string {

@@ -5,6 +5,9 @@ import "antd/dist/reset.css";
 import "./globals.css";
 import React from "react";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export const metadata: Metadata = {
     title: "边缘幻星",
     description: "Aivro - AI 驱动的无限画布创作工具",
