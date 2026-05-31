@@ -9,6 +9,7 @@ import enUS from "antd/locale/en_US";
 import zhCN from "antd/locale/zh_CN";
 
 import { ClientRootInit } from "@/components/layout/client-root-init";
+import { RuntimeI18nTranslator } from "@/components/layout/runtime-i18n-translator";
 import { getAntThemeConfig } from "@/lib/app-theme";
 import { useLocaleStore } from "@/stores/use-locale-store";
 import { useThemeStore } from "@/stores/use-theme-store";
@@ -35,6 +36,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
 
     useEffect(() => {
         document.documentElement.lang = locale;
+        document.title = locale === "en-US" ? "Aivro" : "边缘幻星";
     }, [locale]);
 
     return (
@@ -42,6 +44,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
             <ProConfigProvider dark={dark}>
                 <App>
                     <QueryClientProvider client={queryClient}>
+                        <RuntimeI18nTranslator />
                         <ClientRootInit>{children}</ClientRootInit>
                     </QueryClientProvider>
                 </App>

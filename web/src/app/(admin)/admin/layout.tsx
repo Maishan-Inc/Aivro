@@ -1,14 +1,16 @@
 "use client";
 
-import { DatabaseOutlined, FileTextOutlined, HomeOutlined, LogoutOutlined, PictureOutlined, ShoppingOutlined, SettingOutlined, TransactionOutlined, UserOutlined } from "@ant-design/icons";
-import { Button, Flex, Layout, Menu, Typography, theme } from "antd";
+import { DatabaseOutlined, FileTextOutlined, GlobalOutlined, HomeOutlined, LogoutOutlined, PictureOutlined, ShoppingOutlined, SettingOutlined, TransactionOutlined, UserOutlined } from "@ant-design/icons";
+import { Button, Dropdown, Flex, Layout, Menu, Typography, theme } from "antd";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useEffect } from "react";
 
 import { UserStatusActions } from "@/components/layout/user-status-actions";
+import { localeLabels, type Locale } from "@/i18n/messages";
 import { adminLayoutStyle } from "@/lib/app-theme";
+import { useLocaleStore } from "@/stores/use-locale-store";
 import { useUserStore } from "@/stores/use-user-store";
 
 const adminMenus = [
@@ -29,8 +31,11 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     const user = useUserStore((state) => state.user);
     const isReady = useUserStore((state) => state.isReady);
     const logout = useUserStore((state) => state.clearSession);
+    const locale = useLocaleStore((state) => state.locale);
+    const setLocale = useLocaleStore((state) => state.setLocale);
     const activeKey = adminMenus.find((item) => pathname.startsWith(item.key))?.key || "";
     const pageTitle = pathname.startsWith("/admin/settings") ? "系统设置" : pathname.startsWith("/admin/database") ? "数据库配置" : pathname.startsWith("/admin/assets") ? "素材库管理" : pathname.startsWith("/admin/prompts") ? "提示词管理" : pathname.startsWith("/admin/plans") ? "套餐管理" : pathname.startsWith("/admin/credit-logs") ? "算力点日志" : "用户管理";
+    const languageItems = (Object.keys(localeLabels) as Locale[]).map((item) => ({ key: item, label: localeLabels[item] }));
 
     useEffect(() => {
         if (!isReady) return;
@@ -91,6 +96,9 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                         {pageTitle}
                     </Typography.Title>
                     <Flex align="center" gap={4}>
+                        <Dropdown menu={{ items: languageItems, selectable: true, selectedKeys: [locale], onClick: ({ key }) => setLocale(key as Locale) }} trigger={["click"]}>
+                            <Button icon={<GlobalOutlined />}>{localeLabels[locale]}</Button>
+                        </Dropdown>
                         <UserStatusActions />
                     </Flex>
                 </Layout.Header>
