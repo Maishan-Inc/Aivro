@@ -96,18 +96,19 @@ function parseImagePayload(payload: ImageApiResponse): ImageApiResult[] {
     }
     const images =
         payload.data
-            ?.map((item) => {
+            ?.map((item): ImageApiResult | null => {
                 const dataUrl = resolveImageDataUrl(item);
                 if (!dataUrl) return null;
-                return {
+                const image: ImageApiResult = {
                     id: nanoid(),
                     dataUrl,
-                    storageKey: typeof item.storage_key === "string" ? item.storage_key : undefined,
-                    cloudFileId: typeof item.cloud_file_id === "string" ? item.cloud_file_id : undefined,
-                    bytes: typeof item.size === "number" ? item.size : undefined,
-                    mimeType: typeof item.content_type === "string" ? item.content_type : undefined,
-                    expiresAt: typeof item.expires_at === "string" ? item.expires_at : undefined,
                 };
+                if (typeof item.storage_key === "string") image.storageKey = item.storage_key;
+                if (typeof item.cloud_file_id === "string") image.cloudFileId = item.cloud_file_id;
+                if (typeof item.size === "number") image.bytes = item.size;
+                if (typeof item.content_type === "string") image.mimeType = item.content_type;
+                if (typeof item.expires_at === "string") image.expiresAt = item.expires_at;
+                return image;
             })
             .filter((value): value is ImageApiResult => Boolean(value)) || [];
 
