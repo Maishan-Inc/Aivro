@@ -88,14 +88,12 @@ function normalizeVideoResolution(value: string) {
     return `${resolution}p`;
 }
 
-function unwrapVideoResponse(payload: ApiVideoResponse) {
+function unwrapVideoResponse(payload: ApiVideoResponse): VideoResponse {
     if (!payload) throw new Error("接口没有返回视频任务");
-    if ("code" in payload && typeof payload.code === "number") {
-        if (payload.code !== 0) throw new Error(payload.msg || "请求失败");
-        if (!payload.data) throw new Error("接口没有返回视频任务");
-        return payload.data;
-    }
-    return payload;
+    if ("id" in payload) return payload;
+    if (typeof payload.code === "number" && payload.code !== 0) throw new Error(payload.msg || "请求失败");
+    if (!payload.data) throw new Error("接口没有返回视频任务");
+    return payload.data;
 }
 
 function readAxiosError(error: unknown, fallback: string) {

@@ -57,7 +57,7 @@ type GenerationLog = {
     imageCount: number;
     size: string;
     quality: string;
-    status: "成功" | "失败";
+    status: "生成中" | "成功" | "失败";
     images: GeneratedImage[];
     thumbnails: string[];
 };
@@ -79,6 +79,7 @@ export default function ImagePage() {
     const [references, setReferences] = useState<ReferenceImage[]>([]);
     const [results, setResults] = useState<GenerationResult[]>([]);
     const [logs, setLogs] = useState<GenerationLog[]>([]);
+    const [pendingLog, setPendingLog] = useState<GenerationLog | null>(null);
     const [running, setRunning] = useState(false);
     const [logsOpen, setLogsOpen] = useState(false);
     const [settingsOpen, setSettingsOpen] = useState(false);
@@ -93,6 +94,7 @@ export default function ImagePage() {
     const model = effectiveConfig.imageModel || effectiveConfig.model;
     const canGenerate = Boolean(prompt.trim());
     const generationCount = Math.max(1, Math.min(10, Number(config.count) || 1));
+    const visibleLogs = pendingLog ? [pendingLog, ...logs] : logs;
 
     useEffect(() => {
         if (!running || !startedAt) return;
@@ -153,6 +155,7 @@ export default function ImagePage() {
         setElapsedMs(0);
         setRunning(true);
         setPreviewLog(null);
+        setPendingLog(buildPendingLog({ prompt: text, model, config: { ...snapshot.config, count: String(generationCount) }, references: snapshot.references, imageCount: generationCount }));
         setResults(Array.from({ length: generationCount }, () => ({ id: nanoid(), status: "pending" })));
         const batchStartedAt = performance.now();
         setStartedAt(batchStartedAt);
@@ -172,7 +175,7 @@ export default function ImagePage() {
                     return { ...image, dataUrl: stored.url, storageKey: stored.storageKey, width: stored.width, height: stored.height, bytes: stored.bytes, mimeType: stored.mimeType };
                 }),
             );
-            saveLog(
+            await saveLog(
                 buildLog({
                     prompt: text,
                     model,
@@ -186,7 +189,10 @@ export default function ImagePage() {
                 }),
             );
             successCount ? message.success("图片已生成") : message.error(failed?.reason instanceof Error ? failed.reason.message : "生成失败");
+        } catch (error) {
+            message.error(error instanceof Error ? error.message : "生成记录保存失败");
         } finally {
+            setPendingLog(null);
             setRunning(false);
         }
     };
@@ -248,11 +254,11 @@ export default function ImagePage() {
         setDeleteConfirmOpen(false);
     };
 
-    const saveLog = (log: GenerationLog) => {
+    const saveLog = async (log: GenerationLog) => {
         if (!token) return;
         const media = log.images.map(imageToHistoryMedia).filter((item): item is GenerationHistoryMedia => Boolean(item));
         if (!media.length) return;
-        void saveGenerationHistory(token, {
+        await saveGenerationHistory(token, {
             type: "image",
             title: log.title,
             prompt: log.prompt,
@@ -266,10 +272,11 @@ export default function ImagePage() {
             },
             references: log.references.map((item) => ({ name: item.name, type: item.type, url: item.dataUrl, storageKey: item.storageKey || "" })),
             media,
-            status: log.status,
+            status: log.status === "生成中" ? "失败" : log.status,
             error: "",
             durationMs: Math.round(log.durationMs),
-        }).then(refreshLogs);
+        });
+        await refreshLogs();
     };
 
     const refreshLogs = async () => {
@@ -284,12 +291,6 @@ export default function ImagePage() {
     const previewGenerationLog = async (log: GenerationLog) => {
         setPreviewLog(log);
         setLogsOpen(false);
-        setPrompt(log.prompt);
-        setReferences(log.references || []);
-        if (log.config.imageModel || log.model) updateConfig("imageModel", log.config.imageModel || log.model);
-        if (log.config.quality) updateConfig("quality", log.config.quality);
-        if (log.config.size) updateConfig("size", log.config.size);
-        if (log.config.count) updateConfig("count", log.config.count);
         setResults(log.images.map((image) => ({ id: image.id, status: "success", image })));
     };
 
@@ -322,20 +323,12 @@ export default function ImagePage() {
         }
     };
 
-    const retryResult = (index: number) => {
-        const snapshot = buildRequestSnapshot();
-        if (!snapshot) return;
-        setPreviewLog(null);
-        setResults((value) => updateResultAt(value, index, { status: "pending", error: undefined, image: undefined }));
-        void runGenerationSlot(index, snapshot).catch(() => {});
-    };
-
     return (
         <div className="flex h-full flex-col overflow-hidden bg-stone-50 text-stone-900 dark:bg-stone-950 dark:text-stone-100">
             <main className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-y-auto p-3 lg:grid-cols-[300px_minmax(0,1fr)] lg:overflow-hidden xl:grid-cols-[320px_minmax(0,1fr)]">
                 <aside className="thin-scrollbar hidden min-h-0 overflow-y-auto rounded-lg border border-stone-200 bg-card p-4 shadow-sm dark:border-stone-800 lg:block">
                     <LogPanel
-                        logs={logs}
+                        logs={visibleLogs}
                         selectedLogIds={selectedLogIds}
                         activeLogId={previewLog?.id}
                         onSelectedLogIdsChange={setSelectedLogIds}
@@ -457,7 +450,7 @@ export default function ImagePage() {
                                     result.status === "success" && result.image ? (
                                         <ResultImageCard key={result.id} image={result.image} index={index} onEdit={addResultToReferences} onDownload={downloadImage} onSaveAsset={saveResultToAssets} />
                                     ) : result.status === "failed" ? (
-                                        <FailedImageCard key={result.id} error={result.error || "生成失败"} onRetry={() => retryResult(index)} />
+                                        <FailedImageCard key={result.id} error={result.error || "生成失败"} />
                                     ) : (
                                         <PendingImageCard key={result.id} />
                                     ),
@@ -485,7 +478,7 @@ export default function ImagePage() {
             />
             <Drawer title="生成记录" placement="bottom" size="large" open={logsOpen} onClose={() => setLogsOpen(false)}>
                 <LogPanel
-                    logs={logs}
+                    logs={visibleLogs}
                     selectedLogIds={selectedLogIds}
                     activeLogId={previewLog?.id}
                     onSelectedLogIdsChange={setSelectedLogIds}
@@ -567,15 +560,14 @@ function ResultImageCard({
 function PendingImageCard() {
     return (
         <div className="relative aspect-square overflow-hidden rounded-lg border border-dashed border-stone-300 bg-stone-50 dark:border-stone-700 dark:bg-stone-900">
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-stone-500 dark:text-stone-400">
-                <AivroDrawableLoader className="h-24 w-72 text-stone-900 dark:text-stone-100" />
-                <span>生成中</span>
+            <div className="absolute inset-0 flex items-center justify-center text-stone-500 dark:text-stone-400">
+                <AivroDrawableLoader className="h-28 w-80 text-stone-900 dark:text-stone-100" />
             </div>
         </div>
     );
 }
 
-function FailedImageCard({ error, onRetry }: { error: string; onRetry: () => void }) {
+function FailedImageCard({ error }: { error: string }) {
     return (
         <div className="overflow-hidden rounded-lg border border-red-200 bg-red-50 dark:border-red-950 dark:bg-red-950/20">
             <div className="flex aspect-square flex-col items-center justify-center gap-3 p-5 text-center">
@@ -583,11 +575,6 @@ function FailedImageCard({ error, onRetry }: { error: string; onRetry: () => voi
                 <Typography.Paragraph ellipsis={{ rows: 4 }} className="!mb-0 !text-xs !text-red-500 dark:!text-red-300">
                     {error}
                 </Typography.Paragraph>
-            </div>
-            <div className="flex justify-end border-t border-red-200 p-3 dark:border-red-950">
-                <Button size="small" danger onClick={onRetry}>
-                    重试
-                </Button>
             </div>
         </div>
     );
@@ -614,8 +601,9 @@ function LogPanel({
     onDeleteSelected: () => void;
     onPreviewLog: (log: GenerationLog) => void;
 }) {
-    const allSelected = Boolean(logs.length) && selectedLogIds.length === logs.length;
-    const toggleAll = () => onSelectedLogIdsChange(allSelected ? [] : logs.map((log) => log.id));
+    const selectableLogs = logs.filter((log) => log.status !== "生成中");
+    const allSelected = Boolean(selectableLogs.length) && selectedLogIds.length === selectableLogs.length;
+    const toggleAll = () => onSelectedLogIdsChange(allSelected ? [] : selectableLogs.map((log) => log.id));
 
     return (
         <>
@@ -630,7 +618,7 @@ function LogPanel({
                 <Button size="small" icon={<Plus className="size-3.5" />} onClick={onCreateSession}>
                     新建
                 </Button>
-                <Button size="small" icon={<CheckSquare className="size-3.5" />} disabled={!logs.length} onClick={toggleAll}>
+                <Button size="small" icon={<CheckSquare className="size-3.5" />} disabled={!selectableLogs.length} onClick={toggleAll}>
                     {allSelected ? "取消" : "全选"}
                 </Button>
                 <Button size="small" danger icon={<Trash2 className="size-3.5" />} disabled={!selectedLogIds.length} onClick={onDeleteSelected}>
@@ -655,6 +643,14 @@ function LogPanel({
 }
 
 function LogCard({ log, selected, active, onSelectedChange, onClick }: { log: GenerationLog; selected: boolean; active: boolean; onSelectedChange: (checked: boolean) => void; onClick: () => void }) {
+    if (log.status === "生成中") {
+        return (
+            <div className="flex h-28 w-full items-center justify-center rounded-lg border border-dashed border-stone-300 bg-background p-2 text-stone-900 dark:border-stone-700 dark:text-stone-100">
+                <AivroDrawableLoader className="h-20 w-56 text-stone-900 dark:text-stone-100" />
+            </div>
+        );
+    }
+
     return (
         <button
             type="button"
@@ -771,6 +767,35 @@ function normalizeLogConfig(log: Partial<GenerationLog>): GenerationLogConfig {
     };
 }
 
+function buildPendingLog({ prompt, model, config, references, imageCount }: { prompt: string; model: string; config: GenerationLogConfig; references: ReferenceImage[]; imageCount: number }): GenerationLog {
+    const logConfig = {
+        model: config.model,
+        imageModel: config.imageModel,
+        quality: config.quality,
+        size: config.size,
+        count: config.count,
+    };
+    return {
+        id: nanoid(),
+        createdAt: Date.now(),
+        title: prompt.slice(0, 12) || "未命名",
+        prompt,
+        time: "",
+        model,
+        config: logConfig,
+        references,
+        durationMs: 0,
+        successCount: 0,
+        failCount: 0,
+        imageCount,
+        size: logConfig.size,
+        quality: logConfig.quality,
+        status: "生成中",
+        images: [],
+        thumbnails: [],
+    };
+}
+
 function buildLog({
     prompt,
     model,
@@ -789,7 +814,7 @@ function buildLog({
     durationMs: number;
     successCount: number;
     failCount: number;
-    status: GenerationLog["status"];
+    status: Exclude<GenerationLog["status"], "生成中">;
     images: GeneratedImage[];
 }): GenerationLog {
     const logConfig = {
