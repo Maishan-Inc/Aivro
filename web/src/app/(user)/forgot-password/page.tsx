@@ -6,6 +6,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { AivroDrawableLoader } from "@/components/aivro-drawable-loader";
+import { useAuthLoadingOverlay } from "@/hooks/use-auth-loading-overlay";
 import { resetPassword, sendEmailCode } from "@/services/api/auth";
 
 type ForgotPasswordValues = {
@@ -21,6 +23,7 @@ export default function ForgotPasswordPage() {
     const [form] = Form.useForm<ForgotPasswordValues>();
     const [sendingCode, setSendingCode] = useState(false);
     const [submitting, setSubmitting] = useState(false);
+    const { overlay, runWithOverlay } = useAuthLoadingOverlay();
 
     const requestCode = async () => {
         const email = form.getFieldValue("email");
@@ -46,7 +49,7 @@ export default function ForgotPasswordPage() {
         }
         setSubmitting(true);
         try {
-            await resetPassword({ email: values.email, code: values.code, password: values.password });
+            await runWithOverlay("正在重置密码", () => resetPassword({ email: values.email, code: values.code, password: values.password }));
             message.success("密码已重置");
             router.replace("/login");
         } catch (error) {
@@ -84,8 +87,8 @@ export default function ForgotPasswordPage() {
                         <Input.Password prefix={<LockOutlined />} autoComplete="new-password" />
                     </Form.Item>
                     <Space orientation="vertical" size={12} style={{ width: "100%" }}>
-                        <Button block type="primary" htmlType="submit" loading={submitting}>
-                            重置密码
+                        <Button block type="primary" htmlType="submit" loading={submitting} icon={submitting ? <AivroDrawableLoader compact className="h-4 w-14 text-white dark:text-white" /> : undefined}>
+                            {submitting ? "处理中" : "重置密码"}
                         </Button>
                         <Link className="block text-center text-sm text-stone-500 underline-offset-4 hover:underline dark:text-stone-400" href="/login">
                             返回登录
@@ -93,6 +96,7 @@ export default function ForgotPasswordPage() {
                     </Space>
                 </Form>
             </section>
+            {overlay}
         </main>
     );
 }

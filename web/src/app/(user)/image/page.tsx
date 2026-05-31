@@ -565,15 +565,8 @@ function ResultImageCard({
 function PendingImageCard() {
     return (
         <div className="relative aspect-square overflow-hidden rounded-lg border border-dashed border-stone-300 bg-stone-50 dark:border-stone-700 dark:bg-stone-900">
-            <div
-                className="absolute inset-0 opacity-60"
-                style={{
-                    backgroundImage: "radial-gradient(circle, rgba(120,113,108,0.35) 1.4px, transparent 1.6px)",
-                    backgroundSize: "16px 16px",
-                }}
-            />
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-sm text-stone-500 dark:text-stone-400">
-                <AivroDrawableLoader className="h-16 w-44 text-stone-900 dark:text-stone-100" />
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-stone-500 dark:text-stone-400">
+                <AivroDrawableLoader className="h-24 w-72 text-stone-900 dark:text-stone-100" />
                 <span>生成中</span>
             </div>
         </div>

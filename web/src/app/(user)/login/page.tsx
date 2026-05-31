@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 
 import { AivroDrawableLoader } from "@/components/aivro-drawable-loader";
+import { useAuthLoadingOverlay } from "@/hooks/use-auth-loading-overlay";
 import { fetchCurrentUser, sendEmailCode } from "@/services/api/auth";
 import type { AdminPublicAuthProvider } from "@/services/api/admin";
 import { useConfigStore } from "@/stores/use-config-store";
@@ -45,6 +46,7 @@ function LoginContent() {
     const linuxDoEnabled = authSettings?.linuxDo?.enabled === true;
     const emailVerification = authSettings?.emailVerification === true;
     const allowRegister = useConfigStore((state) => state.publicSettings?.auth?.allowRegister !== false);
+    const { overlay, runWithOverlay } = useAuthLoadingOverlay();
     const [mode, setMode] = useState<"login" | "register">("login");
     const [sendingCode, setSendingCode] = useState(false);
     const redirect = searchParams.get("redirect") || "/";
@@ -83,7 +85,7 @@ function LoginContent() {
                 return;
             }
             const action = mode === "register" ? register : login;
-            const user = await action({ username: values.username, password: values.password, email: values.email, code: values.code });
+            const user = await runWithOverlay(mode === "register" ? "正在注册" : "正在登录", () => action({ username: values.username, password: values.password, email: values.email, code: values.code }));
             message.success(mode === "register" ? "注册成功" : "登录成功");
             router.replace(redirect.startsWith("/") ? redirect : "/");
             router.refresh();
@@ -238,6 +240,7 @@ function LoginContent() {
                     </Space>
                 </Form>
             </section>
+            {overlay}
         </main>
     );
 }

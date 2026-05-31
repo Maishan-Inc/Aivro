@@ -5,6 +5,8 @@ import { App, Button, Form, Input, Space, Typography } from "antd";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 
+import { AivroDrawableLoader } from "@/components/aivro-drawable-loader";
+import { useAuthLoadingOverlay } from "@/hooks/use-auth-loading-overlay";
 import { fetchCurrentUser, loginWithMetaMask, sendEmailCode } from "@/services/api/auth";
 import { useUserStore } from "@/stores/use-user-store";
 
@@ -29,6 +31,7 @@ function MetaMaskEmailContent() {
     const setSession = useUserStore((state) => state.setSession);
     const [sendingCode, setSendingCode] = useState(false);
     const [submitting, setSubmitting] = useState(false);
+    const { overlay, runWithOverlay } = useAuthLoadingOverlay();
     const walletAddress = searchParams.get("walletAddress") || "";
     const signMessage = searchParams.get("message") || "";
     const signature = searchParams.get("signature") || "";
@@ -58,7 +61,7 @@ function MetaMaskEmailContent() {
         }
         setSubmitting(true);
         try {
-            const session = await loginWithMetaMask({ walletAddress, message: signMessage, signature, email: values.email, code: values.code });
+            const session = await runWithOverlay("正在完成登录", () => loginWithMetaMask({ walletAddress, message: signMessage, signature, email: values.email, code: values.code }));
             const user = await fetchCurrentUser(session.token);
             setSession(session.token, user);
             message.success("登录成功");
@@ -93,11 +96,12 @@ function MetaMaskEmailContent() {
                             </Button>
                         </Space.Compact>
                     </Form.Item>
-                    <Button block type="primary" htmlType="submit" loading={submitting}>
-                        完成登录
+                    <Button block type="primary" htmlType="submit" loading={submitting} icon={submitting ? <AivroDrawableLoader compact className="h-4 w-14 text-white dark:text-white" /> : undefined}>
+                        {submitting ? "处理中" : "完成登录"}
                     </Button>
                 </Form>
             </section>
+            {overlay}
         </main>
     );
 }
