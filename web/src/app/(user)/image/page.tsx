@@ -304,14 +304,14 @@ export default function ImagePage() {
         return { text, config: { ...effectiveConfig, model, count: "1" }, references: [...references] };
     };
 
-    const runGenerationSlot = async (index: number, snapshot: { text: string; config: AiConfig; references: ReferenceImage[] }) => {
+    const runGenerationSlot = async (index: number, snapshot: { text: string; config: AiConfig; references: ReferenceImage[] }): Promise<GeneratedImage> => {
         const itemStartedAt = performance.now();
         try {
             const result = snapshot.references.length ? await requestEdit(snapshot.config, snapshot.text, snapshot.references) : await requestGeneration(snapshot.config, snapshot.text);
             const image = result[0];
             if (!image) throw new Error("接口没有返回图片");
             const meta = await readImageMeta(image.dataUrl);
-            const nextImage = { id: image.id, dataUrl: image.dataUrl, storageKey: image.storageKey, cloudFileId: image.cloudFileId, expiresAt: image.expiresAt, durationMs: performance.now() - itemStartedAt, width: meta.width, height: meta.height, bytes: image.bytes ?? getDataUrlByteSize(image.dataUrl), mimeType: image.mimeType };
+            const nextImage: GeneratedImage = { id: image.id, dataUrl: image.dataUrl, storageKey: image.storageKey, cloudFileId: image.cloudFileId, expiresAt: image.expiresAt, durationMs: performance.now() - itemStartedAt, width: meta.width, height: meta.height, bytes: image.bytes ?? getDataUrlByteSize(image.dataUrl), mimeType: image.mimeType };
             setResults((value) => updateResultAt(value, index, { status: "success", image: nextImage }));
             return nextImage;
         } catch (error) {
