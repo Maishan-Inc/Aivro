@@ -6,7 +6,6 @@ import { AnimatePresence, motion } from "motion/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 
-import { AivroDrawableLoader } from "@/components/aivro-drawable-loader";
 import { useAuthLoadingOverlay } from "@/hooks/use-auth-loading-overlay";
 import { useI18n } from "@/hooks/use-i18n";
 import { useTurnstileChallenge } from "@/hooks/use-turnstile-challenge";
@@ -214,7 +213,7 @@ function LoginContent() {
                         </motion.div>
                     </AnimatePresence>
                     <Space orientation="vertical" size={12} style={{ width: "100%" }}>
-                        <Button block type="primary" htmlType="submit" disabled={isLoading || !publicSettings} icon={isLoading || sendingCode ? <AivroDrawableLoader compact className="h-4 w-14 text-white dark:text-white" /> : undefined}>
+                        <Button block type="primary" htmlType="submit" loading={isLoading || sendingCode} disabled={!publicSettings}>
                             {isLoading || sendingCode ? (locale === "en-US" ? "Processing" : "处理中") : registerButtonText(mode, registerStep, locale)}
                         </Button>
                         <p className="m-0 text-center text-xs leading-5 text-stone-500 dark:text-stone-400">

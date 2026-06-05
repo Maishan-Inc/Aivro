@@ -436,7 +436,8 @@ export default function ImagePage() {
                                 type="primary"
                                 size="large"
                                 block
-                                icon={running ? <AivroDrawableLoader compact className="h-4 w-14 text-white dark:text-white" /> : <Sparkles className="size-4" />}
+                                loading={running}
+                                icon={running ? undefined : <Sparkles className="size-4" />}
                                 disabled={!canGenerate || running}
                                 onClick={() => void generate()}
                             >

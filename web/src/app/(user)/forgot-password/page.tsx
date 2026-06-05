@@ -6,7 +6,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { AivroDrawableLoader } from "@/components/aivro-drawable-loader";
 import { useAuthLoadingOverlay } from "@/hooks/use-auth-loading-overlay";
 import { useI18n } from "@/hooks/use-i18n";
 import { useTurnstileChallenge } from "@/hooks/use-turnstile-challenge";
@@ -104,7 +103,7 @@ export default function ForgotPasswordPage() {
                         <Input.Password prefix={<LockOutlined />} autoComplete="new-password" />
                     </Form.Item>
                     <Space orientation="vertical" size={12} style={{ width: "100%" }}>
-                        <Button block type="primary" htmlType="submit" loading={submitting} disabled={!publicSettings} icon={submitting ? <AivroDrawableLoader compact className="h-4 w-14 text-white dark:text-white" /> : undefined}>
+                        <Button block type="primary" htmlType="submit" loading={submitting} disabled={!publicSettings}>
                             {submitting ? (locale === "en-US" ? "Processing" : "处理中") : locale === "en-US" ? "Reset password" : "重置密码"}
                         </Button>
                         <Link className="block text-center text-sm text-stone-500 underline-offset-4 hover:underline dark:text-stone-400" href="/login">

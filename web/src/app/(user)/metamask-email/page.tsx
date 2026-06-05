@@ -5,7 +5,6 @@ import { App, Button, Form, Input, Space, Typography } from "antd";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 
-import { AivroDrawableLoader } from "@/components/aivro-drawable-loader";
 import { useAuthLoadingOverlay } from "@/hooks/use-auth-loading-overlay";
 import { useTurnstileChallenge } from "@/hooks/use-turnstile-challenge";
 import { fetchCurrentUser, loginWithMetaMask, sendEmailCode } from "@/services/api/auth";
@@ -120,7 +119,7 @@ function MetaMaskEmailContent() {
                             </Button>
                         </Space.Compact>
                     </Form.Item>
-                    <Button block type="primary" htmlType="submit" loading={submitting} disabled={!publicSettings} icon={submitting ? <AivroDrawableLoader compact className="h-4 w-14 text-white dark:text-white" /> : undefined}>
+                    <Button block type="primary" htmlType="submit" loading={submitting} disabled={!publicSettings}>
                         {submitting ? "处理中" : "完成登录"}
                     </Button>
                 </Form>
