@@ -146,6 +146,7 @@ const emptySettings: AdminSettings = {
     private: {
         channels: [],
         promptSync: { enabled: true, cron: "*/5 * * * *" },
+        aiQueue: { enabled: true, backend: "database", redisUrl: "", defaultPerMinute: 50, modelPerMinute: [], maxQueuedPerUser: 20, taskRetentionHours: 24 },
         turnstile: { enabled: false, siteKey: "", secretKey: "" },
         auth: {
             linuxDo: emptyPrivateProvider("linux-do", "Linux.do", "/icons/linuxdo.svg"),
@@ -1087,6 +1088,60 @@ export default function AdminSettingsPage() {
                                         </Col>
                                     </Row>
                                 </Card>
+                                <Card size="small" title="AI 队列 / 按模型限流">
+                                    <Row gutter={16}>
+                                        <Col xs={24} md={6}>
+                                            <Form.Item name={["private", "aiQueue", "enabled"]} label="启用队列" valuePropName="checked">
+                                                <Switch />
+                                            </Form.Item>
+                                        </Col>
+                                        <Col xs={24} md={6}>
+                                            <Form.Item name={["private", "aiQueue", "defaultPerMinute"]} label="默认每分钟请求数">
+                                                <InputNumber min={1} style={{ width: "100%" }} />
+                                            </Form.Item>
+                                        </Col>
+                                        <Col xs={24} md={6}>
+                                            <Form.Item name={["private", "aiQueue", "maxQueuedPerUser"]} label="单用户最大排队数">
+                                                <InputNumber min={1} style={{ width: "100%" }} />
+                                            </Form.Item>
+                                        </Col>
+                                        <Col xs={24} md={6}>
+                                            <Form.Item name={["private", "aiQueue", "taskRetentionHours"]} label="任务保留小时">
+                                                <InputNumber min={1} style={{ width: "100%" }} />
+                                            </Form.Item>
+                                        </Col>
+                                    </Row>
+                                    <Form.Item name={["private", "aiQueue", "backend"]} label="队列后端" extra="第一版固定使用 database；Redis 为后续 PostgreSQL/MySQL 多实例加速预留。">
+                                        <Segmented options={[{ label: "Database", value: "database" }, { label: "Redis（预留）", value: "redis", disabled: true }]} />
+                                    </Form.Item>
+                                    <Form.List name={["private", "aiQueue", "modelPerMinute"]}>
+                                        {(fields, { add, remove }) => (
+                                            <Space direction="vertical" style={{ width: "100%" }} size={8}>
+                                                <Flex justify="space-between" align="center">
+                                                    <Typography.Text strong>模型单独限流</Typography.Text>
+                                                    <Button size="small" onClick={() => add({ model: "", perMinute: 50 })}>新增模型限流</Button>
+                                                </Flex>
+                                                {fields.map((field) => (
+                                                    <Row key={field.key} gutter={8} align="middle">
+                                                        <Col xs={24} md={14}>
+                                                            <Form.Item {...field} name={[field.name, "model"]} label="模型" rules={[{ required: true, message: "请输入模型名称" }]}>
+                                                                <Select showSearch allowClear options={channelModels.map((item) => ({ label: item, value: item }))} placeholder="选择或输入模型" />
+                                                            </Form.Item>
+                                                        </Col>
+                                                        <Col xs={18} md={8}>
+                                                            <Form.Item {...field} name={[field.name, "perMinute"]} label="每分钟请求数">
+                                                                <InputNumber min={1} style={{ width: "100%" }} />
+                                                            </Form.Item>
+                                                        </Col>
+                                                        <Col xs={6} md={2}>
+                                                            <Button danger onClick={() => remove(field.name)}>删除</Button>
+                                                        </Col>
+                                                    </Row>
+                                                ))}
+                                            </Space>
+                                        )}
+                                    </Form.List>
+                                </Card>
                                 <Card size="small" title="Cloudflare Turnstile">
                                     <Row gutter={16}>
                                         <Col xs={24} md={8}>
@@ -1750,6 +1805,19 @@ function normalizePrivateSetting(setting: Partial<AdminSettings["private"]> = {}
         promptSync: {
             enabled: setting.promptSync?.enabled !== false,
             cron: setting.promptSync?.cron || "*/5 * * * *",
+        },
+        aiQueue: {
+            ...emptySettings.private.aiQueue,
+            ...(setting.aiQueue || {}),
+            enabled: setting.aiQueue?.enabled !== false,
+            backend: "database",
+            redisUrl: setting.aiQueue?.redisUrl || "",
+            defaultPerMinute: Math.max(1, Number(setting.aiQueue?.defaultPerMinute) || 50),
+            modelPerMinute: (setting.aiQueue?.modelPerMinute || [])
+                .filter((item) => item.model?.trim())
+                .map((item) => ({ model: item.model.trim(), perMinute: Math.max(1, Number(item.perMinute) || 50) })),
+            maxQueuedPerUser: Math.max(1, Number(setting.aiQueue?.maxQueuedPerUser) || 20),
+            taskRetentionHours: Math.max(1, Number(setting.aiQueue?.taskRetentionHours) || 24),
         },
         turnstile: {
             ...emptySettings.private.turnstile,

@@ -26,9 +26,9 @@ func SaveGenerationHistory(user model.AuthUser, input GenerationHistoryInput) (m
 		return model.GenerationHistory{}, err
 	}
 	if len(media) == 0 {
-		return model.GenerationHistory{}, safeMessageError{message: "没有可保存的云端图片或视频"}
+		return model.GenerationHistory{}, safeMessageError{message: "没有可保存的云端图片、视频或 3D 模型"}
 	}
-	if input.Type != model.GenerationHistoryTypeVideo {
+	if input.Type != model.GenerationHistoryTypeVideo && input.Type != model.GenerationHistoryTypeModel3D {
 		input.Type = model.GenerationHistoryTypeImage
 	}
 	title := strings.TrimSpace(input.Title)

@@ -1,6 +1,6 @@
 import { apiDelete, apiGet, apiPost, compactApiParams } from "@/services/api/request";
 
-export type GenerationHistoryType = "image" | "video";
+export type GenerationHistoryType = "image" | "video" | "model3d";
 
 export type GenerationHistoryMedia = {
     cloudFileId: string;

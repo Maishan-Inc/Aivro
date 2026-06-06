@@ -3,8 +3,9 @@ package model
 type CloudFileType string
 
 const (
-	CloudFileTypeImage CloudFileType = "image"
-	CloudFileTypeVideo CloudFileType = "video"
+	CloudFileTypeImage   CloudFileType = "image"
+	CloudFileTypeVideo   CloudFileType = "video"
+	CloudFileTypeModel3D CloudFileType = "model3d"
 )
 
 type CloudFilePurpose string

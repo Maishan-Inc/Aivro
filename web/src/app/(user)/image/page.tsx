@@ -16,7 +16,7 @@ import { useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-
 import { useThemeStore } from "@/stores/use-theme-store";
 import { nanoid } from "nanoid";
 import { formatBytes, formatDuration, getDataUrlByteSize, readImageMeta } from "@/lib/image-utils";
-import { requestEdit, requestGeneration } from "@/services/api/image";
+import { cancelGenerationTask, requestEdit, requestGeneration, type GenerationQueueUpdate } from "@/services/api/image";
 import { deleteGenerationHistory, fetchGenerationHistories, saveGenerationHistory, type GenerationHistory, type GenerationHistoryMedia } from "@/services/api/generation-history";
 import { storeGeneratedImage, uploadImage } from "@/services/image-storage";
 import { useAssetStore } from "@/stores/use-asset-store";
@@ -38,9 +38,12 @@ type GeneratedImage = {
 
 type GenerationResult = {
     id: string;
-    status: "pending" | "success" | "failed";
+    status: "pending" | "queued" | "executing" | "success" | "failed";
     image?: GeneratedImage;
     error?: string;
+    taskId?: string;
+    queuePosition?: number;
+    aheadCount?: number;
 };
 
 type GenerationLog = {
@@ -199,6 +202,17 @@ export default function ImagePage() {
         }
     };
 
+    const cancelQueuedResult = async (result: GenerationResult) => {
+        if (!result.taskId) return;
+        try {
+            await cancelGenerationTask({ ...effectiveConfig, model }, result.taskId);
+            setResults((value) => value.map((item) => (item.id === result.id ? { ...item, status: "failed", error: "任务已撤销" } : item)));
+            message.success("已撤销排队任务");
+        } catch (error) {
+            message.error(error instanceof Error ? error.message : "撤销失败");
+        }
+    };
+
     const downloadImage = (image: GeneratedImage, index: number) => {
         saveAs(image.dataUrl, `image-${index + 1}.png`);
     };
@@ -318,7 +332,17 @@ export default function ImagePage() {
     const runGenerationSlot = async (index: number, snapshot: { text: string; config: AiConfig; references: ReferenceImage[] }): Promise<GeneratedImage> => {
         const itemStartedAt = performance.now();
         try {
-            const result = snapshot.references.length ? await requestEdit(snapshot.config, snapshot.text, snapshot.references) : await requestGeneration(snapshot.config, snapshot.text);
+            const onQueue = (update: GenerationQueueUpdate) => {
+                setResults((value) =>
+                    updateResultAt(value, index, {
+                        status: update.status === "queued" ? "queued" : "executing",
+                        taskId: update.taskId,
+                        queuePosition: update.queuePosition,
+                        aheadCount: update.aheadCount,
+                    }),
+                );
+            };
+            const result = snapshot.references.length ? await requestEdit(snapshot.config, snapshot.text, snapshot.references, onQueue) : await requestGeneration(snapshot.config, snapshot.text, onQueue);
             const image = result[0];
             if (!image) throw new Error("接口没有返回图片");
             const meta = await readImageMeta(image.dataUrl);
@@ -460,6 +484,10 @@ export default function ImagePage() {
                                         <ResultImageCard key={result.id} image={result.image} index={index} onEdit={addResultToReferences} onDownload={downloadImage} onSaveAsset={saveResultToAssets} />
                                     ) : result.status === "failed" ? (
                                         <FailedImageCard key={result.id} error={result.error || "生成失败"} />
+                                    ) : result.status === "queued" ? (
+                                        <QueuedImageCard key={result.id} aheadCount={result.aheadCount ?? 0} queuePosition={result.queuePosition ?? 0} onCancel={() => void cancelQueuedResult(result)} />
+                                    ) : result.status === "executing" ? (
+                                        <PendingImageCard key={result.id} label="生成中" />
                                     ) : (
                                         <PendingImageCard key={result.id} />
                                     ),
@@ -567,11 +595,25 @@ function ResultImageCard({
     );
 }
 
-function PendingImageCard() {
+function PendingImageCard({ label = "生成中" }: { label?: string }) {
     return (
         <div className="relative aspect-square overflow-hidden rounded-lg border border-dashed border-stone-300 bg-stone-50 dark:border-stone-700 dark:bg-stone-900">
-            <div className="absolute inset-0 flex items-center justify-center text-stone-500 dark:text-stone-400">
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-stone-500 dark:text-stone-400">
                 <AivroDrawableLoader className="h-28 w-80 text-stone-900 dark:text-stone-100" />
+                <span className="text-sm">{label}</span>
+            </div>
+        </div>
+    );
+}
+
+function QueuedImageCard({ aheadCount, queuePosition, onCancel }: { aheadCount: number; queuePosition: number; onCancel: () => void }) {
+    return (
+        <div className="relative aspect-square overflow-hidden rounded-lg border border-dashed border-blue-300 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/20">
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-5 text-center text-blue-700 dark:text-blue-200">
+                <AivroDrawableLoader className="h-24 w-72 text-blue-700 dark:text-blue-200" />
+                <div className="text-sm font-medium">排队中</div>
+                <div className="text-xs text-blue-600 dark:text-blue-300">前方 {aheadCount} 位 · 当前第 {queuePosition} 位</div>
+                <Button size="small" danger onClick={onCancel}>撤销任务</Button>
             </div>
         </div>
     );

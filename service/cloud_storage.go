@@ -28,7 +28,7 @@ import (
 	"github.com/basketikun/aivro/repository"
 )
 
-const maxUserUploadBytes = 5 << 20
+const maxUserUploadBytes = 50 << 20
 
 type CloudObjectUpload struct {
 	User        model.AuthUser
@@ -466,11 +466,17 @@ func normalizeCloudStorageSetting(setting model.CloudStorageSetting) model.Cloud
 	if strings.TrimSpace(setting.VideoPathTemplate) == "" {
 		setting.VideoPathTemplate = "{username}/videos/{yyyy}/{mm}/{dd}/{filename}"
 	}
+	if strings.TrimSpace(setting.Model3DPathTemplate) == "" {
+		setting.Model3DPathTemplate = "{username}/models/{yyyy}/{mm}/{dd}/{filename}"
+	}
 	if setting.ImageExpireDays <= 0 {
 		setting.ImageExpireDays = 7
 	}
 	if setting.VideoExpireDays <= 0 {
 		setting.VideoExpireDays = 7
+	}
+	if setting.Model3DExpireDays <= 0 {
+		setting.Model3DExpireDays = 7
 	}
 	if setting.AutoCleanupEnabled == nil {
 		enabled := true
@@ -487,6 +493,9 @@ func (storage *CloudStorageService) ObjectKey(fileType model.CloudFileType, user
 	template := storage.setting.ImagePathTemplate
 	if fileType == model.CloudFileTypeVideo {
 		template = storage.setting.VideoPathTemplate
+	}
+	if fileType == model.CloudFileTypeModel3D {
+		template = storage.setting.Model3DPathTemplate
 	}
 	username = sanitizePathPart(username)
 	if username == "" {
@@ -542,6 +551,9 @@ func cloudExpiresAt(setting model.CloudStorageSetting, fileType model.CloudFileT
 	if fileType == model.CloudFileTypeVideo {
 		days = setting.VideoExpireDays
 	}
+	if fileType == model.CloudFileTypeModel3D {
+		days = setting.Model3DExpireDays
+	}
 	return time.Now().Add(time.Duration(days) * 24 * time.Hour).Format(time.RFC3339)
 }
 
@@ -558,7 +570,7 @@ func validateUploadContent(filename string, body []byte, contentType string) (st
 		return "", "", "", safeMessageError{message: "文件不能为空"}
 	}
 	if len(body) > maxUserUploadBytes {
-		return "", "", "", safeMessageError{message: "文件不能超过 5MB"}
+		return "", "", "", safeMessageError{message: "文件不能超过 50MB"}
 	}
 	mediaType, _, _ := mime.ParseMediaType(contentType)
 	if mediaType == "" || mediaType == "application/octet-stream" {
@@ -593,8 +605,28 @@ func validateUploadContent(filename string, body []byte, contentType string) (st
 		return mediaType, model.CloudFileTypeVideo, ".webm", nil
 	case "video/quicktime":
 		return mediaType, model.CloudFileTypeVideo, ".mov", nil
+	case "model/gltf-binary":
+		if ext != ".glb" {
+			return "", "", "", safeMessageError{message: "GLB 文件扩展名不匹配"}
+		}
+		return mediaType, model.CloudFileTypeModel3D, ".glb", nil
+	case "model/gltf+json":
+		if ext != ".gltf" {
+			return "", "", "", safeMessageError{message: "GLTF 文件扩展名不匹配"}
+		}
+		return mediaType, model.CloudFileTypeModel3D, ".gltf", nil
+	case "application/json":
+		if ext == ".gltf" {
+			return "model/gltf+json", model.CloudFileTypeModel3D, ".gltf", nil
+		}
+		return "", "", "", safeMessageError{message: "文件内容类型不匹配"}
+	case "application/octet-stream":
+		if ext == ".glb" && len(body) >= 4 && string(body[:4]) == "glTF" {
+			return "model/gltf-binary", model.CloudFileTypeModel3D, ".glb", nil
+		}
+		return "", "", "", safeMessageError{message: "文件内容类型不匹配"}
 	default:
-		if ext == ".jpg" || ext == ".jpeg" || ext == ".png" || ext == ".webp" || ext == ".gif" || ext == ".mp4" || ext == ".webm" || ext == ".mov" {
+		if ext == ".jpg" || ext == ".jpeg" || ext == ".png" || ext == ".webp" || ext == ".gif" || ext == ".mp4" || ext == ".webm" || ext == ".mov" || ext == ".glb" || ext == ".gltf" {
 			return "", "", "", safeMessageError{message: "文件内容类型不匹配"}
 		}
 		return "", "", "", safeMessageError{message: "只支持安全的图片或视频文件"}
@@ -636,6 +668,9 @@ func localObjectKey(fileType model.CloudFileType, username string, filename stri
 	folder := "images"
 	if fileType == model.CloudFileTypeVideo {
 		folder = "videos"
+	}
+	if fileType == model.CloudFileTypeModel3D {
+		folder = "models"
 	}
 	username = sanitizePathPart(username)
 	if username == "" {

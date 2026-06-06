@@ -9,6 +9,22 @@ const (
 	SettingKeyPrivate SettingKey = "private"
 )
 
+type ModelRateLimit struct {
+	Model     string `json:"model"`
+	PerMinute int    `json:"perMinute"`
+}
+
+// AIQueueSetting 控制 AI 请求按模型限流和排队。
+type AIQueueSetting struct {
+	Enabled            *bool            `json:"enabled"`
+	Backend            string           `json:"backend"`
+	RedisURL           string           `json:"redisUrl"`
+	DefaultPerMinute   int              `json:"defaultPerMinute"`
+	ModelPerMinute     []ModelRateLimit `json:"modelPerMinute"`
+	MaxQueuedPerUser   int              `json:"maxQueuedPerUser"`
+	TaskRetentionHours int              `json:"taskRetentionHours"`
+}
+
 // ModelChannel 模型渠道配置。
 type ModelChannel struct {
 	Protocol string   `json:"protocol"`
@@ -87,6 +103,7 @@ type PublicOAuthProviderSetting struct {
 type PrivateSetting struct {
 	Channels     []ModelChannel      `json:"channels"`
 	PromptSync   PromptSyncSetting   `json:"promptSync"`
+	AIQueue      AIQueueSetting      `json:"aiQueue"`
 	Turnstile    TurnstileSetting    `json:"turnstile"`
 	Auth         PrivateAuthSetting  `json:"auth"`
 	Mail         MailSetting         `json:"mail"`
@@ -131,11 +148,13 @@ type CloudStorageSetting struct {
 	SecretAccessKey    string `json:"secretAccessKey"`
 	Bucket             string `json:"bucket"`
 	PublicBaseURL      string `json:"publicBaseUrl"`
-	ImagePathTemplate  string `json:"imagePathTemplate"`
-	VideoPathTemplate  string `json:"videoPathTemplate"`
-	ImageExpireDays    int    `json:"imageExpireDays"`
-	VideoExpireDays    int    `json:"videoExpireDays"`
-	AutoCleanupEnabled *bool  `json:"autoCleanupEnabled"`
+	ImagePathTemplate   string `json:"imagePathTemplate"`
+	VideoPathTemplate   string `json:"videoPathTemplate"`
+	Model3DPathTemplate string `json:"model3dPathTemplate"`
+	ImageExpireDays     int    `json:"imageExpireDays"`
+	VideoExpireDays     int    `json:"videoExpireDays"`
+	Model3DExpireDays   int    `json:"model3dExpireDays"`
+	AutoCleanupEnabled  *bool  `json:"autoCleanupEnabled"`
 	PathStyleEndpoint  *bool  `json:"pathStyleEndpoint"`
 }
 

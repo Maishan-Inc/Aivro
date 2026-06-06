@@ -4,6 +4,7 @@ import (
 	"log"
 
 	"github.com/basketikun/aivro/config"
+	"github.com/basketikun/aivro/handler"
 	"github.com/basketikun/aivro/router"
 	"github.com/basketikun/aivro/service"
 )
@@ -20,5 +21,7 @@ func main() {
 	}
 	service.StartPromptSyncScheduler()
 	service.StartCloudStorageCleanupScheduler()
+	service.RegisterAIProxyExecutor(handler.ExecuteAIProxyTask)
+	service.StartGenerationQueueScheduler()
 	log.Fatal(router.New().Run(":" + config.Cfg.Port))
 }

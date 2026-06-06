@@ -250,6 +250,7 @@ export type AdminPrivateSettings = {
         enabled: boolean;
         cron: string;
     };
+    aiQueue: AdminAIQueueSettings;
     turnstile: AdminTurnstileSettings;
     auth: {
         linuxDo: AdminPrivateAuthProvider;
@@ -268,6 +269,16 @@ export type AdminTurnstileSettings = {
     enabled: boolean;
     siteKey: string;
     secretKey: string;
+};
+
+export type AdminAIQueueSettings = {
+    enabled: boolean;
+    backend: "database" | "redis";
+    redisUrl: string;
+    defaultPerMinute: number;
+    modelPerMinute: Array<{ model: string; perMinute: number }>;
+    maxQueuedPerUser: number;
+    taskRetentionHours: number;
 };
 
 export type AdminStripeSettings = {

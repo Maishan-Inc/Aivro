@@ -1,4 +1,4 @@
-import { FileText, ImagePlus, Images, Maximize2, SearchCheck, Video } from "lucide-react";
+import { Box, FileText, ImagePlus, Images, Maximize2, SearchCheck, Video } from "lucide-react";
 
 export const navigationTools = [
     {
@@ -24,6 +24,14 @@ export const navigationTools = [
         href: undefined,
         external: false,
         icon: Video,
+    },
+    {
+        slug: "model-3d",
+        label: "3D 模型工作台",
+        labelKey: "nav.model3d",
+        href: undefined,
+        external: false,
+        icon: Box,
     },
     {
         slug: "prompts",

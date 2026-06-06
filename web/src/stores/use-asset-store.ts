@@ -8,11 +8,12 @@ import { localForageStorage } from "@/lib/localforage-storage";
 import { cleanupUnusedImages, resolveImageUrl, uploadImage } from "@/services/image-storage";
 import { cleanupUnusedMedia, resolveMediaUrl } from "@/services/file-storage";
 
-export type AssetKind = "text" | "image" | "video";
+export type AssetKind = "text" | "image" | "video" | "model3d";
 export type TextAsset = AssetBase<"text"> & { data: { content: string } };
 export type ImageAsset = AssetBase<"image"> & { data: { dataUrl: string; storageKey?: string; width: number; height: number; bytes: number; mimeType: string } };
 export type VideoAsset = AssetBase<"video"> & { data: { url: string; storageKey?: string; width: number; height: number; bytes: number; mimeType: string } };
-export type Asset = TextAsset | ImageAsset | VideoAsset;
+export type Model3DAsset = AssetBase<"model3d"> & { data: { url: string; storageKey?: string; bytes: number; mimeType: string; thumbnailUrl?: string; vertices?: number; faces?: number } };
+export type Asset = TextAsset | ImageAsset | VideoAsset | Model3DAsset;
 
 type AssetBase<T extends AssetKind> = {
     id: string;

@@ -3,8 +3,9 @@ package model
 type GenerationHistoryType string
 
 const (
-	GenerationHistoryTypeImage GenerationHistoryType = "image"
-	GenerationHistoryTypeVideo GenerationHistoryType = "video"
+	GenerationHistoryTypeImage   GenerationHistoryType = "image"
+	GenerationHistoryTypeVideo   GenerationHistoryType = "video"
+	GenerationHistoryTypeModel3D GenerationHistoryType = "model3d"
 )
 
 type GenerationHistoryMedia struct {

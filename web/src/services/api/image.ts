@@ -13,11 +13,39 @@ export type ChatCompletionMessage = {
 };
 
 type ImageApiResponse = {
-    data?: Array<Record<string, unknown>>;
+    data?: Array<Record<string, unknown>> | GenerationTaskSubmitResult;
     error?: { message?: string };
     code?: number;
     msg?: string;
 };
+
+export type GenerationTaskSubmitResult = {
+    queued: boolean;
+    taskId: string;
+    status: string;
+    queuePosition: number;
+    aheadCount: number;
+    model: string;
+    path: string;
+};
+
+export type GenerationTaskView = {
+    id: string;
+    model: string;
+    path: string;
+    status: "queued" | "executing" | "succeeded" | "failed" | "canceled";
+    queuePosition: number;
+    aheadCount: number;
+    credits: number;
+    error: string;
+    createdAt: string;
+    startedAt: string;
+    finishedAt: string;
+    resultAvailable: boolean;
+    responseStatus: number;
+};
+
+export type GenerationQueueUpdate = Pick<GenerationTaskView, "status" | "queuePosition" | "aheadCount"> & { taskId: string };
 
 export type ImageApiResult = {
     id: string;
@@ -65,7 +93,7 @@ function resolveSize(quality: string, ratio: string): string | undefined {
 
     const longSideRaw = Math.sqrt(targetPixels * longRatio);
     const longSide = Math.floor(longSideRaw / 16) * 16;
-    const shortSide = Math.round((longSide / longRatio) / 16) * 16;
+    const shortSide = Math.round(longSide / longRatio / 16) * 16;
 
     const width = isLandscape ? longSide : shortSide;
     const height = isLandscape ? shortSide : longSide;
@@ -94,23 +122,23 @@ function parseImagePayload(payload: ImageApiResponse): ImageApiResult[] {
     if (typeof payload.code === "number" && payload.code !== 0) {
         throw new Error(payload.msg || "请求失败");
     }
-    const images =
-        payload.data
-            ?.map((item): ImageApiResult | null => {
-                const dataUrl = resolveImageDataUrl(item);
-                if (!dataUrl) return null;
-                const image: ImageApiResult = {
-                    id: nanoid(),
-                    dataUrl,
-                };
-                if (typeof item.storage_key === "string") image.storageKey = item.storage_key;
-                if (typeof item.cloud_file_id === "string") image.cloudFileId = item.cloud_file_id;
-                if (typeof item.size === "number") image.bytes = item.size;
-                if (typeof item.content_type === "string") image.mimeType = item.content_type;
-                if (typeof item.expires_at === "string") image.expiresAt = item.expires_at;
-                return image;
-            })
-            .filter((value): value is ImageApiResult => Boolean(value)) || [];
+    const data = Array.isArray(payload.data) ? payload.data : [];
+    const images = data
+        .map((item): ImageApiResult | null => {
+            const dataUrl = resolveImageDataUrl(item);
+            if (!dataUrl) return null;
+            const image: ImageApiResult = {
+                id: nanoid(),
+                dataUrl,
+            };
+            if (typeof item.storage_key === "string") image.storageKey = item.storage_key;
+            if (typeof item.cloud_file_id === "string") image.cloudFileId = item.cloud_file_id;
+            if (typeof item.size === "number") image.bytes = item.size;
+            if (typeof item.content_type === "string") image.mimeType = item.content_type;
+            if (typeof item.expires_at === "string") image.expiresAt = item.expires_at;
+            return image;
+        })
+        .filter((value): value is ImageApiResult => Boolean(value));
 
     if (images.length === 0) {
         throw new Error("接口没有返回图片");
@@ -120,8 +148,10 @@ function parseImagePayload(payload: ImageApiResponse): ImageApiResult[] {
 }
 
 function readAxiosError(error: unknown, fallback: string) {
-    if (axios.isAxiosError<{ error?: { message?: string }; msg?: string; code?: number }>(error)) {
-        const responseData = error.response?.data;
+    if (axios.isAxiosError(error)) {
+        const queued = parseQueuedEnvelope(error.response?.data);
+        if (queued) return "";
+        const responseData = error.response?.data as { error?: { message?: string }; msg?: string; code?: number } | undefined;
         return responseData?.msg || responseData?.error?.message || (error.response?.status ? `${fallback}：${error.response.status}` : fallback);
     }
     return error instanceof Error ? error.message : fallback;
@@ -167,7 +197,47 @@ function withSystemMessage(config: AiConfig, messages: ChatCompletionMessage[]) 
     return systemPrompt ? [{ role: "system" as const, content: systemPrompt }, ...messages] : messages;
 }
 
-export async function requestGeneration(config: AiConfig, prompt: string) {
+function parseQueuedEnvelope(payload: unknown): GenerationTaskSubmitResult | null {
+    if (!payload || typeof payload !== "object") return null;
+    const data = (payload as { data?: unknown }).data;
+    if (!data || typeof data !== "object") return null;
+    const task = data as Partial<GenerationTaskSubmitResult>;
+    return task.queued && task.taskId ? (task as GenerationTaskSubmitResult) : null;
+}
+
+function isQueuedEnvelope(payload: ImageApiResponse): payload is ImageApiResponse & { data: GenerationTaskSubmitResult } {
+    return Boolean(parseQueuedEnvelope(payload));
+}
+
+async function resolveQueuedImages(config: AiConfig, task: GenerationTaskSubmitResult, onQueue?: (update: GenerationQueueUpdate) => void) {
+    onQueue?.({ taskId: task.taskId, status: "queued", queuePosition: task.queuePosition, aheadCount: task.aheadCount });
+    for (;;) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        const current = await fetchGenerationTask(config, task.taskId);
+        onQueue?.({ taskId: current.id, status: current.status, queuePosition: current.queuePosition, aheadCount: current.aheadCount });
+        if (current.status === "succeeded") {
+            const payload = await fetchGenerationTaskResult(config, task.taskId);
+            refreshRemoteUser(config);
+            return payload;
+        }
+        if (current.status === "failed" || current.status === "canceled") {
+            refreshRemoteUser(config);
+            throw new Error(current.error || (current.status === "canceled" ? "任务已撤销" : "生成失败"));
+        }
+    }
+}
+
+async function unwrapImageResponse(config: AiConfig, payload: ImageApiResponse, onQueue?: (update: GenerationQueueUpdate) => void) {
+    if (isQueuedEnvelope(payload)) {
+        const queuedPayload = await resolveQueuedImages(config, payload.data, onQueue);
+        return parseImagePayload(queuedPayload);
+    }
+    const images = parseImagePayload(payload);
+    refreshRemoteUser(config);
+    return images;
+}
+
+export async function requestGeneration(config: AiConfig, prompt: string, onQueue?: (update: GenerationQueueUpdate) => void) {
     const n = Math.max(1, Math.min(15, Math.floor(Math.abs(Number(config.count)) || 1)));
     const quality = normalizeQuality(config.quality);
     const requestSize = resolveRequestSize(quality, config.size);
@@ -186,15 +256,13 @@ export async function requestGeneration(config: AiConfig, prompt: string) {
                 headers: aiHeaders(config, "application/json"),
             },
         );
-        const images = parseImagePayload(response.data);
-        refreshRemoteUser(config);
-        return images;
+        return await unwrapImageResponse(config, response.data, onQueue);
     } catch (error) {
-        throw new Error(readAxiosError(error, "请求失败"));
+        throw new Error(readAxiosError(error, "请求失败") || "请求失败");
     }
 }
 
-export async function requestEdit(config: AiConfig, prompt: string, references: ReferenceImage[]) {
+export async function requestEdit(config: AiConfig, prompt: string, references: ReferenceImage[], onQueue?: (update: GenerationQueueUpdate) => void) {
     const n = Math.max(1, Math.min(15, Math.floor(Math.abs(Number(config.count)) || 1)));
     const quality = normalizeQuality(config.quality);
     const requestSize = resolveRequestSize(quality, config.size);
@@ -214,12 +282,67 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
 
     try {
         const response = await axios.post<ImageApiResponse>(aiApiUrl(config, "/images/edits"), formData, { headers: aiHeaders(config) });
-        const images = parseImagePayload(response.data);
-        refreshRemoteUser(config);
-        return images;
+        return await unwrapImageResponse(config, response.data, onQueue);
     } catch (error) {
-        throw new Error(readAxiosError(error, "请求失败"));
+        throw new Error(readAxiosError(error, "请求失败") || "请求失败");
     }
+}
+
+export async function fetchGenerationTask(config: AiConfig, id: string) {
+    const response = await axios.get<{ code?: number; data?: GenerationTaskView; msg?: string }>(aiApiUrl(config, `/generation-tasks/${encodeURIComponent(id)}`), { headers: aiHeaders(config) });
+    if (typeof response.data.code === "number" && response.data.code !== 0) throw new Error(response.data.msg || "任务查询失败");
+    if (!response.data.data) throw new Error("任务不存在");
+    return response.data.data;
+}
+
+export async function fetchGenerationTaskResult(config: AiConfig, id: string) {
+    const response = await axios.get<ImageApiResponse>(aiApiUrl(config, `/generation-tasks/${encodeURIComponent(id)}/result`), { headers: aiHeaders(config) });
+    return response.data;
+}
+
+export async function cancelGenerationTask(config: AiConfig, id: string) {
+    const response = await axios.delete<{ code?: number; msg?: string }>(aiApiUrl(config, `/generation-tasks/${encodeURIComponent(id)}`), { headers: aiHeaders(config) });
+    if (typeof response.data.code === "number" && response.data.code !== 0) throw new Error(response.data.msg || "撤销失败");
+    refreshRemoteUser(config);
+}
+
+async function resolveQueuedChat(config: AiConfig, task: GenerationTaskSubmitResult, onDelta: (text: string) => void) {
+    for (;;) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        const current = await fetchGenerationTask(config, task.taskId);
+        if (current.status === "succeeded") {
+            const response = await axios.get<string>(aiApiUrl(config, `/generation-tasks/${encodeURIComponent(task.taskId)}/result`), { headers: aiHeaders(config), responseType: "text" });
+            const answer = parseChatPayload(String(response.data), onDelta);
+            refreshRemoteUser(config);
+            return answer;
+        }
+        if (current.status === "failed" || current.status === "canceled") {
+            refreshRemoteUser(config);
+            throw new Error(current.error || (current.status === "canceled" ? "任务已撤销" : "请求失败"));
+        }
+    }
+}
+
+function parseChatPayload(payload: string, onDelta: (text: string) => void) {
+    let answer = "";
+    if (payload.includes("data: ")) {
+        for (const chunk of payload.split("\n\n")) {
+            parseStreamChunk(chunk, (delta) => {
+                answer += delta;
+                onDelta(answer);
+            });
+        }
+        return answer;
+    }
+    try {
+        const data = JSON.parse(payload) as { choices?: Array<{ message?: { content?: string }; delta?: { content?: string } }> };
+        answer = data.choices?.[0]?.message?.content || data.choices?.[0]?.delta?.content || "";
+        if (answer) onDelta(answer);
+    } catch {
+        answer = payload.trim();
+        if (answer) onDelta(answer);
+    }
+    return answer;
 }
 
 export async function requestImageQuestion(config: AiConfig, messages: ChatCompletionMessage[], onDelta: (text: string) => void) {
@@ -263,6 +386,8 @@ export async function requestImageQuestion(config: AiConfig, messages: ChatCompl
             let apiError = "";
             try {
                 const payload = JSON.parse(response.data) as { code?: number; msg?: string };
+                const queued = parseQueuedEnvelope(payload);
+                if (queued) return await resolveQueuedChat(config, queued, onDelta);
                 if (typeof payload.code === "number" && payload.code !== 0) {
                     apiError = payload.msg || "请求失败";
                 }
@@ -278,7 +403,11 @@ export async function requestImageQuestion(config: AiConfig, messages: ChatCompl
             });
         }
     } catch (error) {
-        throw new Error(readAxiosError(error, "请求失败"));
+        if (axios.isAxiosError(error)) {
+            const queued = parseQueuedEnvelope(error.response?.data);
+            if (queued) return await resolveQueuedChat(config, queued, onDelta);
+        }
+        throw new Error(readAxiosError(error, "请求失败") || "请求失败");
     }
     refreshRemoteUser(config);
     return answer || "没有返回内容";

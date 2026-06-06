@@ -48,6 +48,20 @@ func New() *gin.Engine {
 	v1.GET("/videos/:id/content", func(c *gin.Context) {
 		handler.AIVideoContent(c.Writer, c.Request, c.Param("id"))
 	})
+	v1.POST("/model-3d/generations", gin.WrapF(handler.AIModel3DGenerations))
+	v1.GET("/model-3d/generations/:id", func(c *gin.Context) {
+		handler.AIModel3DGeneration(c.Writer, c.Request, c.Param("id"))
+	})
+	v1.GET("/generation-tasks", gin.WrapF(handler.GenerationTasks))
+	v1.GET("/generation-tasks/:id", func(c *gin.Context) {
+		handler.GenerationTask(c.Writer, c.Request, c.Param("id"))
+	})
+	v1.GET("/generation-tasks/:id/result", func(c *gin.Context) {
+		handler.GenerationTaskResult(c.Writer, c.Request, c.Param("id"))
+	})
+	v1.DELETE("/generation-tasks/:id", func(c *gin.Context) {
+		handler.CancelGenerationTask(c.Writer, c.Request, c.Param("id"))
+	})
 	v1.GET("/generation-histories", gin.WrapF(handler.GenerationHistories))
 	v1.POST("/generation-histories", gin.WrapF(handler.SaveGenerationHistory))
 	v1.DELETE("/generation-histories/:id", func(c *gin.Context) {

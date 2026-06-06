@@ -14,14 +14,14 @@ func UploadFile(w http.ResponseWriter, r *http.Request) {
 		Fail(w, "未登录或权限不足")
 		return
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, 6<<20)
+	r.Body = http.MaxBytesReader(w, r.Body, 51<<20)
 	file, header, err := r.FormFile("file")
 	if err != nil {
 		Fail(w, "请选择文件")
 		return
 	}
 	defer file.Close()
-	body, err := io.ReadAll(io.LimitReader(file, 5<<20+1))
+	body, err := io.ReadAll(io.LimitReader(file, 50<<20+1))
 	if err != nil {
 		Fail(w, "读取文件失败")
 		return

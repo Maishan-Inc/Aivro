@@ -29,5 +29,28 @@ services:
       retries: 5
     restart: unless-stopped
 
+  # ============================================================
+  #  Redis 缓存容器（第二阶段预留，默认禁用）
+  #  启用方法：
+  #    1. 取消注释下方 redis 服务
+  #    2. 在 .env 中设置 REDIS_URL=redis://redis:6379/0
+  #    3. 管理后台将队列后端改为 redis
+  #  注意：Redis 队列后端仅支持 PostgreSQL/MySQL，不支持 SQLite
+  # ============================================================
+
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: aivro-redis
+  #   command: redis-server --appendonly yes
+  #   volumes:
+  #     - redis_data:/data
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 5s
+  #     timeout: 3s
+  #     retries: 5
+  #   restart: unless-stopped
+
 volumes:
   pg_data:
+  # redis_data:

@@ -280,6 +280,7 @@ func normalizePrivateSetting(setting model.PrivateSetting) model.PrivateSetting 
 		setting.Channels = []model.ModelChannel{}
 	}
 	setting.PromptSync = normalizePromptSyncSetting(setting.PromptSync)
+	setting.AIQueue = normalizeAIQueueSetting(setting.AIQueue)
 	setting.Turnstile = normalizeTurnstileSetting(setting.Turnstile)
 	setting.Auth = normalizePrivateAuthSetting(setting.Auth)
 	setting.Mail = normalizeMailSetting(setting.Mail)
@@ -295,6 +296,40 @@ func normalizePrivateSetting(setting model.PrivateSetting) model.PrivateSetting 
 		}
 		if setting.Channels[i].Weight <= 0 {
 			setting.Channels[i].Weight = 1
+		}
+	}
+	return setting
+}
+
+func normalizeAIQueueSetting(setting model.AIQueueSetting) model.AIQueueSetting {
+	if setting.Enabled == nil {
+		enabled := true
+		setting.Enabled = &enabled
+	}
+	setting.Backend = strings.TrimSpace(setting.Backend)
+	if setting.Backend == "" {
+		setting.Backend = "database"
+	}
+	if setting.Backend != "database" {
+		setting.Backend = "database"
+	}
+	setting.RedisURL = strings.TrimSpace(setting.RedisURL)
+	if setting.DefaultPerMinute <= 0 {
+		setting.DefaultPerMinute = 50
+	}
+	if setting.MaxQueuedPerUser <= 0 {
+		setting.MaxQueuedPerUser = 20
+	}
+	if setting.TaskRetentionHours <= 0 {
+		setting.TaskRetentionHours = 24
+	}
+	if setting.ModelPerMinute == nil {
+		setting.ModelPerMinute = []model.ModelRateLimit{}
+	}
+	for i := range setting.ModelPerMinute {
+		setting.ModelPerMinute[i].Model = strings.TrimSpace(setting.ModelPerMinute[i].Model)
+		if setting.ModelPerMinute[i].PerMinute <= 0 {
+			setting.ModelPerMinute[i].PerMinute = setting.DefaultPerMinute
 		}
 	}
 	return setting
@@ -675,6 +710,10 @@ func readAdminChannelError(body []byte, statusCode int, fallback string) error {
 		return safeMessageError{message: fmt.Sprintf("%s：%d", fallback, statusCode)}
 	}
 	return safeMessageError{message: fallback}
+}
+
+func SafeAIError(message string) error {
+	return safeMessageError{message: message}
 }
 
 type safeMessageError struct {

@@ -119,6 +119,7 @@ func migrateModels(db *gorm.DB) error {
 		&model.Setting{},
 		&model.CloudFile{},
 		&model.GenerationHistory{},
+		&model.GenerationTask{},
 		&model.Workflow{},
 		&model.WorkflowShare{},
 		&model.WorkflowShareCopy{},
@@ -132,6 +133,9 @@ func migrateModels(db *gorm.DB) error {
 		return err
 	}
 	if err := backfillUserProfileFields(db); err != nil {
+		return err
+	}
+	if err := createOptimizedIndexes(db); err != nil {
 		return err
 	}
 	return ensureDefaultPlans(db)
@@ -170,6 +174,7 @@ func databaseMigrationModelItems() []struct {
 		{"model.Setting", &model.Setting{}},
 		{"model.CloudFile", &model.CloudFile{}},
 		{"model.GenerationHistory", &model.GenerationHistory{}},
+		{"model.GenerationTask", &model.GenerationTask{}},
 		{"model.Workflow", &model.Workflow{}},
 		{"model.WorkflowShare", &model.WorkflowShare{}},
 		{"model.WorkflowShareCopy", &model.WorkflowShareCopy{}},
