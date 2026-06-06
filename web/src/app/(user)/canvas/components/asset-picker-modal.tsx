@@ -184,6 +184,10 @@ async function remoteImageToDataUrl(url: string) {
     });
 }
 
+function isSupportedAsset(asset: Asset): asset is SupportedAsset {
+    return asset.kind === "text" || asset.kind === "image" || asset.kind === "video";
+}
+
 function MyAssetsTab({ onInsert }: { onInsert: (payload: InsertAssetPayload) => void }) {
     const assets = useAssetStore((state) => state.assets);
     const [keyword, setKeyword] = useState("");
