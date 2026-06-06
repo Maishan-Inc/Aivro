@@ -23,6 +23,7 @@ type AssetFormValues = {
 };
 
 type ImageDraft = ImageAsset["data"] | null;
+type SupportedAsset = Extract<Asset, { kind: "text" | "image" | "video" }>;
 
 const kindOptions = [
     { label: "全部", value: "all" },
@@ -46,17 +47,17 @@ export default function AssetsPage() {
     const [kindFilter, setKindFilter] = useState<AssetKind | "all">("all");
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
-    const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
+    const [editingAsset, setEditingAsset] = useState<SupportedAsset | null>(null);
     const [isAssetOpen, setIsAssetOpen] = useState(false);
-    const [previewAsset, setPreviewAsset] = useState<Asset | null>(null);
-    const [deletingAsset, setDeletingAsset] = useState<Asset | null>(null);
+    const [previewAsset, setPreviewAsset] = useState<SupportedAsset | null>(null);
+    const [deletingAsset, setDeletingAsset] = useState<SupportedAsset | null>(null);
     const [formKind, setFormKind] = useState<AssetKind>("text");
     const [imageDraft, setImageDraft] = useState<ImageDraft>(null);
     const coverUrl = Form.useWatch("coverUrl", form) || "";
     const title = Form.useWatch("title", form) || "";
     const tags = Form.useWatch("tags", form) || [];
     const content = Form.useWatch("content", form) || "";
-    const validAssets = useMemo(() => assets.filter((asset) => asset.kind === "text" || asset.kind === "image" || asset.kind === "video"), [assets]);
+    const validAssets = useMemo(() => assets.filter(isSupportedAsset), [assets]);
 
     const filteredAssets = useMemo(() => {
         const query = keyword.trim().toLowerCase();
@@ -85,7 +86,7 @@ export default function AssetsPage() {
         setIsAssetOpen(true);
     };
 
-    const openEdit = (asset: Asset) => {
+    const openEdit = (asset: SupportedAsset) => {
         setEditingAsset(asset);
         setFormKind(asset.kind);
         setImageDraft(asset.kind === "image" ? asset.data : null);
@@ -143,12 +144,12 @@ export default function AssetsPage() {
         if (!form.getFieldValue("title")) form.setFieldValue("title", file.name);
     };
 
-    const copyAssetText = async (asset: Asset) => {
+    const copyAssetText = async (asset: SupportedAsset) => {
         if (asset.kind !== "text") return;
         copyText(asset.data.content, "文本已复制");
     };
 
-    const downloadImage = (asset: Asset) => {
+    const downloadImage = (asset: SupportedAsset) => {
         if (asset.kind !== "image" && asset.kind !== "video") return;
         saveAs(asset.kind === "video" ? asset.data.url : asset.data.dataUrl, `${asset.title || "asset"}.${asset.data.mimeType.split("/")[1] || "png"}`);
     };
@@ -404,7 +405,11 @@ export default function AssetsPage() {
     );
 }
 
-function AssetCard({ asset, onOpen, onEdit, onCopy, onDownload, onDelete }: { asset: Asset; onOpen: () => void; onEdit: () => void; onCopy: (asset: Asset) => void; onDownload: (asset: Asset) => void; onDelete: () => void }) {
+function isSupportedAsset(asset: Asset): asset is SupportedAsset {
+    return asset.kind === "text" || asset.kind === "image" || asset.kind === "video";
+}
+
+function AssetCard({ asset, onOpen, onEdit, onCopy, onDownload, onDelete }: { asset: SupportedAsset; onOpen: () => void; onEdit: () => void; onCopy: (asset: SupportedAsset) => void; onDownload: (asset: SupportedAsset) => void; onDelete: () => void }) {
     const cover = asset.coverUrl || (asset.kind === "image" ? asset.data.dataUrl : "");
     const summary = assetSummary(asset);
     return (
@@ -473,7 +478,7 @@ function AssetCard({ asset, onOpen, onEdit, onCopy, onDownload, onDelete }: { as
     );
 }
 
-function AssetDrawer({ asset, onClose, onCopy, onDownload }: { asset: Asset | null; onClose: () => void; onCopy: (asset: Asset) => void; onDownload: (asset: Asset) => void }) {
+function AssetDrawer({ asset, onClose, onCopy, onDownload }: { asset: SupportedAsset | null; onClose: () => void; onCopy: (asset: SupportedAsset) => void; onDownload: (asset: SupportedAsset) => void }) {
     const cover = asset ? asset.coverUrl || (asset.kind === "image" ? asset.data.dataUrl : "") : "";
     return (
         <Drawer title="素材详情" open={Boolean(asset)} size="large" onClose={onClose}>
@@ -533,11 +538,11 @@ function AssetDrawer({ asset, onClose, onCopy, onDownload }: { asset: Asset | nu
     );
 }
 
-function assetSummary(asset: Asset) {
+function assetSummary(asset: SupportedAsset) {
     if (asset.kind === "text") return asset.data.content;
     return `${asset.data.width}x${asset.data.height} · ${formatBytes(asset.data.bytes)} · ${asset.data.mimeType}`;
 }
 
-function assetSearchText(asset: Asset) {
+function assetSearchText(asset: SupportedAsset) {
     return [asset.title, asset.source || "", asset.note || "", (asset.tags || []).join(" "), asset.kind === "text" ? asset.data.content : asset.data.mimeType].join(" ").toLowerCase();
 }
