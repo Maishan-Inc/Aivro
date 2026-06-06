@@ -1,8 +1,6 @@
 "use client";
 
-import { useState, useRef, Suspense } from "react";
-import { Canvas } from "@react-three/fiber";
-import { OrbitControls, Environment, Center, useGLTF } from "@react-three/drei";
+import { useState, useRef } from "react";
 import { Button, Segmented, Slider, InputNumber, Switch, Drawer, Modal, Spin } from "antd";
 import { Download, Loader2, Box } from "lucide-react";
 import { useUserStore } from "@/stores/use-user-store";
@@ -15,40 +13,46 @@ import { nanoid } from "nanoid";
 
 type ViewMode = "default" | "wireframe" | "white";
 
-function Model3DViewer({ url, mode }: { url: string; mode: ViewMode }) {
-    const { scene } = useGLTF(url);
-    const clonedScene = scene.clone();
+type UploadedReference = {
+    id: string;
+    name: string;
+    type: string;
+    url: string;
+    dataUrl: string;
+    storageKey: string;
+    width: number;
+    height: number;
+};
 
-    if (mode === "wireframe") {
-        clonedScene.traverse((child: any) => {
-            if (child.isMesh) {
-                child.material = child.material.clone();
-                child.material.wireframe = true;
-            }
-        });
-    } else if (mode === "white") {
-        clonedScene.traverse((child: any) => {
-            if (child.isMesh) {
-                child.material = child.material.clone();
-                child.material.color.set("#ffffff");
-                child.material.map = null;
-                child.material.normalMap = null;
-                child.material.roughnessMap = null;
-                child.material.metalnessMap = null;
-            }
-        });
-    }
-
-    return <primitive object={clonedScene} />;
+function ModelPreview({ result, mode }: { result: Model3DGenerationResult | null; mode: ViewMode }) {
+    const file = result?.results[0];
+    return (
+        <div className="flex h-full w-full flex-col items-center justify-center bg-[radial-gradient(circle_at_center,#1f2937_0,#020617_62%,#000_100%)] text-white">
+            <div className="relative mb-8 h-56 w-56 [perspective:800px]">
+                <div
+                    className={`absolute inset-8 rotate-45 rounded-2xl border ${mode === "wireframe" ? "border-cyan-300 bg-transparent" : mode === "white" ? "border-white bg-white/80" : "border-emerald-300 bg-gradient-to-br from-emerald-400/80 via-cyan-500/70 to-blue-700/80"} shadow-2xl shadow-cyan-500/20 [transform:rotateX(55deg)_rotateZ(45deg)]`}
+                />
+                <div
+                    className={`absolute inset-16 rounded-xl border ${mode === "wireframe" ? "border-cyan-200 bg-transparent" : mode === "white" ? "border-stone-100 bg-stone-100/80" : "border-blue-200 bg-gradient-to-br from-blue-400/80 to-purple-700/80"} [transform:rotateX(55deg)_rotateZ(45deg)_translateZ(70px)]`}
+                />
+            </div>
+            <div className="rounded-full border border-white/10 bg-white/10 px-4 py-2 text-sm backdrop-blur">
+                {file?.url ? "模型已生成，可下载查看" : "上传图片或输入文字后生成 3D 模型"}
+            </div>
+            {file?.url ? (
+                <Button className="mt-4" icon={<Download className="size-4" />} onClick={() => window.open(file.url, "_blank")}>下载模型文件</Button>
+            ) : null}
+        </div>
+    );
 }
 
 export default function Model3DPage() {
-    const { user, token } = useUserStore();
+    const { token } = useUserStore();
     const { addAsset } = useAssetStore();
 
     const [mode, setMode] = useState<"image" | "multi_image" | "text">("image");
     const [prompt, setPrompt] = useState("");
-    const [images, setImages] = useState<{ id: string; name: string; type: string; url: string; dataUrl: string; storageKey: string; width: number; height: number }[]>([]);
+    const [images, setImages] = useState<UploadedReference[]>([]);
     const [textureEnabled, setTextureEnabled] = useState(true);
     const [pbrEnabled, setPbrEnabled] = useState(true);
     const [meshQuality, setMeshQuality] = useState<"standard" | "high" | "ultra">("standard");
@@ -79,7 +83,7 @@ export default function Model3DPage() {
                 const meta = await readImageMeta(dataUrl);
                 const result = await uploadImage(dataUrl);
                 return { id: nanoid(), name: file.name, type: file.type, url: result.url, dataUrl, storageKey: result.storageKey, width: meta.width, height: meta.height };
-            })
+            }),
         );
         setImages((prev) => [...prev, ...uploaded]);
     };
@@ -160,27 +164,9 @@ export default function Model3DPage() {
 
     return (
         <div className="relative h-screen w-full overflow-hidden bg-black">
-            <Canvas camera={{ position: [0, 1, 3], fov: 50 }}>
-                <color attach="background" args={["#0a0a0a"]} />
-                <ambientLight intensity={0.5} />
-                <directionalLight position={[5, 5, 5]} intensity={1} />
-                <Suspense fallback={null}>
-                    {currentResult?.results[0]?.url ? (
-                        <Center>
-                            <Model3DViewer url={currentResult.results[0].url} mode={viewMode} />
-                        </Center>
-                    ) : (
-                        <mesh>
-                            <boxGeometry args={[1, 1, 1]} />
-                            <meshStandardMaterial color="#333333" wireframe />
-                        </mesh>
-                    )}
-                </Suspense>
-                <OrbitControls />
-                <Environment preset="studio" />
-            </Canvas>
+            <ModelPreview result={currentResult} mode={viewMode} />
 
-            <div className="absolute left-6 top-6 bottom-6 w-96 rounded-2xl border border-white/10 bg-black/40 p-6 backdrop-blur-lg overflow-y-auto">
+            <div className="absolute bottom-6 left-6 top-6 w-96 overflow-y-auto rounded-2xl border border-white/10 bg-black/40 p-6 backdrop-blur-lg">
                 <h2 className="mb-4 text-xl font-bold text-white">生成模型 Pro</h2>
                 <Segmented
                     value={mode}
@@ -222,14 +208,8 @@ export default function Model3DPage() {
                 )}
 
                 <div className="mb-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                        <span className="text-sm text-white">纹理</span>
-                        <Switch checked={textureEnabled} onChange={setTextureEnabled} />
-                    </div>
-                    <div className="flex items-center justify-between">
-                        <span className="text-sm text-white">PBR</span>
-                        <Switch checked={pbrEnabled} onChange={setPbrEnabled} />
-                    </div>
+                    <div className="flex items-center justify-between"><span className="text-sm text-white">纹理</span><Switch checked={textureEnabled} onChange={setTextureEnabled} /></div>
+                    <div className="flex items-center justify-between"><span className="text-sm text-white">PBR</span><Switch checked={pbrEnabled} onChange={setPbrEnabled} /></div>
                 </div>
 
                 <div className="mb-4">
@@ -257,7 +237,7 @@ export default function Model3DPage() {
 
             <div className="absolute right-6 top-6 w-80 rounded-xl border border-white/10 bg-black/40 p-4 backdrop-blur-lg">
                 <h3 className="mb-2 text-sm font-semibold text-white">内容信息</h3>
-                {currentResult && (
+                {currentResult ? (
                     <div className="space-y-1 text-xs text-white/80">
                         <div>时间：{new Date(currentResult.createdAt).toLocaleString()}</div>
                         {currentResult.results[0] && (
@@ -268,23 +248,23 @@ export default function Model3DPage() {
                             </>
                         )}
                     </div>
-                )}
+                ) : <div className="text-xs text-white/60">暂无模型信息</div>}
             </div>
 
-            <div className="absolute right-6 top-32 bottom-6 w-80 rounded-xl border border-white/10 bg-black/40 p-4 backdrop-blur-lg overflow-y-auto">
+            <div className="absolute bottom-6 right-6 top-32 w-80 overflow-y-auto rounded-xl border border-white/10 bg-black/40 p-4 backdrop-blur-lg">
                 <div className="mb-2 flex items-center justify-between">
                     <h3 className="text-sm font-semibold text-white">资产</h3>
                     <Button size="small" onClick={() => { setHistoryOpen(true); handleLoadHistory(); }}>查看历史</Button>
                 </div>
-                {currentResult?.results[0] && (
+                {currentResult?.results[0] ? (
                     <div className="rounded border border-white/20 p-2">
                         <div className="mb-1 text-xs text-white">当前模型</div>
                         <Button size="small" onClick={() => { if (currentResult.results[0].url) window.open(currentResult.results[0].url); }}>下载</Button>
                     </div>
-                )}
+                ) : <div className="text-xs text-white/60">生成完成后会显示模型文件</div>}
             </div>
 
-            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2 rounded-full border border-white/10 bg-black/40 px-4 py-2 backdrop-blur-lg">
+            <div className="absolute bottom-6 left-1/2 flex -translate-x-1/2 gap-2 rounded-full border border-white/10 bg-black/40 px-4 py-2 backdrop-blur-lg">
                 <Button type={viewMode === "default" ? "primary" : "default"} onClick={() => setViewMode("default")} size="small">贴图</Button>
                 <Button type={viewMode === "white" ? "primary" : "default"} onClick={() => setViewMode("white")} size="small">白模</Button>
                 <Button type={viewMode === "wireframe" ? "primary" : "default"} onClick={() => setViewMode("wireframe")} size="small">线框</Button>
@@ -295,7 +275,10 @@ export default function Model3DPage() {
                     <div key={h.id} className="mb-4 rounded border p-3">
                         <div className="font-semibold">{h.title}</div>
                         <div className="text-xs text-gray-500">{new Date(h.createdAt).toLocaleString()}</div>
-                        <Button size="small" className="mt-2" onClick={() => { if (h.media[0]) window.open(h.media[0].url); }}>下载</Button>
+                        <div className="mt-2 flex gap-2">
+                            <Button size="small" onClick={() => { if (h.media[0]) window.open(h.media[0].url); }}>下载</Button>
+                            <Button size="small" danger onClick={() => token && deleteGenerationHistory(token, h.id).then(handleLoadHistory)}>删除</Button>
+                        </div>
                     </div>
                 ))}
             </Drawer>
