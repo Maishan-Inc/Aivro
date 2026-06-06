@@ -55,3 +55,8 @@ func parseQuery(r *http.Request) model.Query {
 		PageSize: pageSize,
 	}
 }
+
+func BindJSON(r *http.Request, v any) error {
+	defer r.Body.Close()
+	return json.NewDecoder(r.Body).Decode(v)
+}

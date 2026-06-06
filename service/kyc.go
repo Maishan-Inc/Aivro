@@ -25,6 +25,11 @@ type KYCRewardDescription struct {
 	WorkflowCreateCredits int `json:"workflowCreateCredits"`
 }
 
+// GetKYCStatus 获取用户 KYC 状态（供前端使用）
+func GetKYCStatus(userID string) (map[string]any, error) {
+	return KYCStatusForUser(userID)
+}
+
 func KYCStatusForUser(userID string) (map[string]any, error) {
 	settings, err := repository.GetSettings()
 	if err != nil {
