@@ -140,14 +140,14 @@ type KYCSetting struct {
 
 // CloudStorageSetting 云存储配置。Cloudflare R2 通过 S3-compatible endpoint 访问。
 type CloudStorageSetting struct {
-	Enabled            bool   `json:"enabled"`
-	Provider           string `json:"provider"`
-	Endpoint           string `json:"endpoint"`
-	Region             string `json:"region"`
-	AccessKeyID        string `json:"accessKeyId"`
-	SecretAccessKey    string `json:"secretAccessKey"`
-	Bucket             string `json:"bucket"`
-	PublicBaseURL      string `json:"publicBaseUrl"`
+	Enabled             bool   `json:"enabled"`
+	Provider            string `json:"provider"`
+	Endpoint            string `json:"endpoint"`
+	Region              string `json:"region"`
+	AccessKeyID         string `json:"accessKeyId"`
+	SecretAccessKey     string `json:"secretAccessKey"`
+	Bucket              string `json:"bucket"`
+	PublicBaseURL       string `json:"publicBaseUrl"`
 	ImagePathTemplate   string `json:"imagePathTemplate"`
 	VideoPathTemplate   string `json:"videoPathTemplate"`
 	Model3DPathTemplate string `json:"model3dPathTemplate"`
@@ -155,7 +155,7 @@ type CloudStorageSetting struct {
 	VideoExpireDays     int    `json:"videoExpireDays"`
 	Model3DExpireDays   int    `json:"model3dExpireDays"`
 	AutoCleanupEnabled  *bool  `json:"autoCleanupEnabled"`
-	PathStyleEndpoint  *bool  `json:"pathStyleEndpoint"`
+	PathStyleEndpoint   *bool  `json:"pathStyleEndpoint"`
 }
 
 // PromptSyncSetting 提示词定时同步配置。
@@ -230,10 +230,11 @@ type DatabaseUpdateLog struct {
 }
 
 type DatabaseStatus struct {
-	Updated     bool                `json:"updated"`
-	SourceFiles []string            `json:"sourceFiles"`
-	Missing     []string            `json:"missing"`
-	Logs        []DatabaseUpdateLog `json:"logs"`
+	Updated        bool                `json:"updated"`
+	SourceFiles    []string            `json:"sourceFiles"`
+	Missing        []string            `json:"missing"`
+	MissingColumns []string            `json:"missingColumns"`
+	Logs           []DatabaseUpdateLog `json:"logs"`
 }
 
 // Settings 系统公开和私有配置。

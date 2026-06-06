@@ -366,6 +366,7 @@ export type AdminDatabaseStatus = {
     updated: boolean;
     sourceFiles: string[];
     missing: string[];
+    missingColumns: string[];
     logs: AdminDatabaseUpdateLog[];
 };
 

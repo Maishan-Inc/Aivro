@@ -86,6 +86,20 @@ export default function AdminDatabasePage() {
                                 </div>
                             </div>
                         ) : null}
+                        {status?.missingColumns?.length ? (
+                            <div>
+                                <Typography.Text strong type="danger">
+                                    缺失字段
+                                </Typography.Text>
+                                <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 8 }}>
+                                    {status.missingColumns.map((item) => (
+                                        <Tag color="error" key={item}>
+                                            {item}
+                                        </Tag>
+                                    ))}
+                                </div>
+                            </div>
+                        ) : null}
                     </Flex>
                 </Card>
 

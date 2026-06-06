@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/basketikun/aivro/model"
 )
@@ -29,7 +30,31 @@ func FailError(w http.ResponseWriter, err error) {
 		Fail(w, safe.SafeMessage())
 		return
 	}
+	if msg := databaseErrorMessage(err); msg != "" {
+		Fail(w, msg)
+		return
+	}
 	Fail(w, "操作失败")
+}
+
+func databaseErrorMessage(err error) string {
+	if err == nil {
+		return ""
+	}
+	text := strings.ToLower(err.Error())
+	if strings.Contains(text, "no such table") || strings.Contains(text, "doesn't exist") || strings.Contains(text, "does not exist") && strings.Contains(text, "relation") {
+		return "数据库表不存在，请在后台数据库页面执行更新"
+	}
+	if strings.Contains(text, "no such column") || strings.Contains(text, "unknown column") || strings.Contains(text, "column") && strings.Contains(text, "does not exist") {
+		return "数据库字段不存在，请在后台数据库页面执行更新"
+	}
+	if strings.Contains(text, "readonly") || strings.Contains(text, "read-only") || strings.Contains(text, "permission denied") || strings.Contains(text, "access denied") {
+		return "数据库写入失败，请检查数据库连接和权限"
+	}
+	if strings.Contains(text, "duplicate") || strings.Contains(text, "unique constraint") || strings.Contains(text, "duplicate key") {
+		return "数据已存在，请检查唯一字段"
+	}
+	return ""
 }
 
 func writeJSON(w http.ResponseWriter, value any) {

@@ -98,13 +98,20 @@ func DatabaseStatus() (model.DatabaseStatus, error) {
 			missing = append(missing, item.name)
 		}
 	}
+	missingColumns := make([]string, 0)
+	for _, item := range databaseMigrationColumnItems() {
+		if !db.Migrator().HasColumn(item.value, item.column) {
+			missingColumns = append(missingColumns, item.name)
+		}
+	}
 	logs := []model.DatabaseUpdateLog{}
 	_ = db.Order("created_at desc").Limit(30).Find(&logs).Error
 	return model.DatabaseStatus{
-		Updated:     len(missing) == 0,
-		SourceFiles: databaseMigrationSources,
-		Missing:     missing,
-		Logs:        logs,
+		Updated:        len(missing) == 0 && len(missingColumns) == 0,
+		SourceFiles:    databaseMigrationSources,
+		Missing:        missing,
+		MissingColumns: missingColumns,
+		Logs:           logs,
 	}, nil
 }
 
@@ -184,6 +191,35 @@ func databaseMigrationModelItems() []struct {
 		{"model.KYCVerification", &model.KYCVerification{}},
 		{"model.DatabaseUpdateLog", &model.DatabaseUpdateLog{}},
 	}
+}
+
+func databaseMigrationColumnItems() []struct {
+	name   string
+	value  any
+	column string
+} {
+	return []struct {
+		name   string
+		value  any
+		column string
+	}{
+		{"users.auth_provider", &model.User{}, "auth_provider"},
+		{"users.google_id", &model.User{}, "google_id"},
+		{"users.github_id", &model.User{}, "github_id"},
+		{"users.metamask_address", &model.User{}, "metamask_address"},
+		{"users.workflow_create_credits", &model.User{}, "workflow_create_credits"},
+		{"settings.value", &model.Setting{}, "value"},
+		{"plans.enabled", &model.Plan{}, "enabled"},
+		{"plans.workflow_create_credits", &model.Plan{}, "workflow_create_credits"},
+	}
+}
+
+func EnsureDefaultPlans() error {
+	db, err := DB()
+	if err != nil {
+		return err
+	}
+	return ensureDefaultPlans(db)
 }
 
 func ensureDefaultPlans(db *gorm.DB) error {

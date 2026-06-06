@@ -96,7 +96,7 @@ func New() *gin.Engine {
 	v1.POST("/workflow-shares/:token/revoke", func(c *gin.Context) {
 		handler.RevokeWorkflowShare(c.Writer, c.Request, c.Param("token"))
 	})
-	v1.GET("/plans", gin.WrapF(handler.Plans))
+	api.GET("/v1/plans", gin.WrapF(handler.Plans))
 	v1.POST("/checkout/stripe", gin.WrapF(handler.StripeCheckout))
 	v1.POST("/kyc/session", gin.WrapF(handler.KYCSession))
 	v1.GET("/kyc/status", gin.WrapF(handler.KYCStatus))

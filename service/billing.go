@@ -25,11 +25,26 @@ func ListPlans(admin bool) ([]model.Plan, error) {
 		return nil, err
 	}
 	items := []model.Plan{}
-	tx := db.Order("sort asc, created_at asc")
-	if !admin {
-		tx = tx.Where("enabled = ?", true)
+	query := func() error {
+		tx := db.Order("sort asc, created_at asc")
+		if !admin {
+			tx = tx.Where("enabled = ?", true)
+		}
+		return tx.Find(&items).Error
 	}
-	return items, tx.Find(&items).Error
+	if err := query(); err != nil {
+		return nil, err
+	}
+	if len(items) == 0 {
+		if err := repository.EnsureDefaultPlans(); err != nil {
+			return nil, err
+		}
+		items = []model.Plan{}
+		if err := query(); err != nil {
+			return nil, err
+		}
+	}
+	return items, nil
 }
 
 func SavePlan(input model.Plan) (model.Plan, error) {

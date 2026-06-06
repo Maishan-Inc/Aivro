@@ -276,7 +276,11 @@ export default function AdminSettingsPage() {
                 public: JSON.stringify(data.public, null, 2),
                 private: JSON.stringify(data.private, null, 2),
             });
-            setAuthProviderStats(await fetchAuthProviderStats(token));
+            try {
+                setAuthProviderStats(await fetchAuthProviderStats(token));
+            } catch {
+                setAuthProviderStats({});
+            }
         } catch (error) {
             message.error(error instanceof Error ? error.message : "读取设置失败");
         } finally {
