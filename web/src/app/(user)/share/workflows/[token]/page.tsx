@@ -6,12 +6,14 @@ import { App, Avatar, Button, Input, Modal, Radio, Spin, Tag } from "antd";
 import { Copy, Lock } from "lucide-react";
 
 import { copyWorkflowShare, fetchWorkflowShare, verifyWorkflowShare, type WorkflowSharePreview } from "@/services/api/workflows";
+import { useLocalizedPath } from "@/hooks/use-localized-path";
 import { useUserStore } from "@/stores/use-user-store";
 import { CanvasNodeType } from "@/app/(user)/canvas/types";
 
 export default function WorkflowSharePage() {
     const params = useParams<{ token: string }>();
     const router = useRouter();
+    const localizedPath = useLocalizedPath();
     const { message, modal } = App.useApp();
     const token = useUserStore((state) => state.token);
     const isReady = useUserStore((state) => state.isReady);
@@ -24,7 +26,7 @@ export default function WorkflowSharePage() {
     useEffect(() => {
         if (!isReady) return;
         if (!token) {
-            router.replace(`/login?redirect=/share/workflows/${params.token}`);
+            router.replace(localizedPath(`/login?redirect=/share/workflows/${params.token}`));
             return;
         }
         setIsLoading(true);
@@ -75,7 +77,7 @@ export default function WorkflowSharePage() {
                 try {
                     const workflow = await copyWorkflowShare(token, params.token, { mode: selectedMode, password, shareAccessToken: accessToken });
                     await hydrateUser();
-                    router.push(`/canvas/${workflow.id}`);
+                    router.push(localizedPath(`/canvas/${workflow.id}`));
                 } catch (error) {
                     const text = error instanceof Error ? error.message : "复制失败";
                     if (text.includes("暂无工作流创建次数")) {
@@ -84,8 +86,8 @@ export default function WorkflowSharePage() {
                             content: "当前账号暂无工作流创建次数，请完成 KYC 认证或购买套餐获取更多创建次数。",
                             okText: "去购买套餐",
                             cancelText: "去完成 KYC 认证",
-                            onOk: () => router.push("/pricing"),
-                            onCancel: () => router.push("/pricing?kyc=1"),
+                            onOk: () => router.push(localizedPath("/pricing")),
+                            onCancel: () => router.push(localizedPath("/pricing")),
                         });
                     } else {
                         message.error(text);

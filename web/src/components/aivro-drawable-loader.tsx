@@ -14,8 +14,9 @@ export function AivroDrawableLoader({ className, compact = false }: AivroDrawabl
     const titleId = useId();
 
     useEffect(() => {
-        let animation: { cancel?: () => void; pause?: () => void } | undefined;
+        let animation: { cancel?: () => void; pause?: () => void; revert?: () => void } | undefined;
         let disposed = false;
+        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
         void (async () => {
             const { animate, svg, stagger } = await import("animejs");
@@ -33,6 +34,7 @@ export function AivroDrawableLoader({ className, compact = false }: AivroDrawabl
 
         return () => {
             disposed = true;
+            animation?.revert?.();
             animation?.cancel?.();
             animation?.pause?.();
         };

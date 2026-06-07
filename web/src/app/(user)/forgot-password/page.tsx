@@ -8,6 +8,7 @@ import { useState } from "react";
 
 import { useAuthLoadingOverlay } from "@/hooks/use-auth-loading-overlay";
 import { useI18n } from "@/hooks/use-i18n";
+import { useLocalizedPath } from "@/hooks/use-localized-path";
 import { useTurnstileChallenge } from "@/hooks/use-turnstile-challenge";
 import { resetPassword, sendEmailCode } from "@/services/api/auth";
 import { useConfigStore } from "@/stores/use-config-store";
@@ -22,6 +23,7 @@ type ForgotPasswordValues = {
 export default function ForgotPasswordPage() {
     const { message } = App.useApp();
     const { locale } = useI18n();
+    const localizedPath = useLocalizedPath();
     const router = useRouter();
     const [form] = Form.useForm<ForgotPasswordValues>();
     const [sendingCode, setSendingCode] = useState(false);
@@ -67,7 +69,7 @@ export default function ForgotPasswordPage() {
             const turnstileToken = await verifyTurnstile();
             await runWithOverlay("正在重置密码", () => resetPassword({ email: values.email, code: values.code, password: values.password, turnstileToken }));
             message.success("密码已重置");
-            router.replace("/login");
+            router.replace(localizedPath("/login"));
         } catch (error) {
             message.error(error instanceof Error ? error.message : "重置失败");
         } finally {
@@ -106,7 +108,7 @@ export default function ForgotPasswordPage() {
                         <Button block type="primary" htmlType="submit" loading={submitting} disabled={!publicSettings}>
                             {submitting ? (locale === "en-US" ? "Processing" : "处理中") : locale === "en-US" ? "Reset password" : "重置密码"}
                         </Button>
-                        <Link className="block text-center text-sm text-stone-500 underline-offset-4 hover:underline dark:text-stone-400" href="/login">
+                        <Link className="block text-center text-sm text-stone-500 underline-offset-4 hover:underline dark:text-stone-400" href={localizedPath("/login")}>
                             {locale === "en-US" ? "Back to sign in" : "返回登录"}
                         </Link>
                     </Space>

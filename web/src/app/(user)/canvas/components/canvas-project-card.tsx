@@ -5,10 +5,12 @@ import { useRouter } from "next/navigation";
 import { Button, Input, Tag } from "antd";
 
 import type { CloudWorkflow } from "@/services/api/workflows";
+import { useLocalizedPath } from "@/hooks/use-localized-path";
 import { useCanvasUiStore } from "../stores/use-canvas-ui-store";
 
 export function CanvasProjectCard({ project, onRename, onDelete }: { project: CloudWorkflow; onRename: (project: CloudWorkflow, title: string) => void | Promise<void>; onDelete: (id: string) => void }) {
     const router = useRouter();
+    const localizedPath = useLocalizedPath();
     const selectedIds = useCanvasUiStore((state) => state.selectedProjectIds);
     const editingId = useCanvasUiStore((state) => state.editingProjectId);
     const editingTitle = useCanvasUiStore((state) => state.editingProjectTitle);
@@ -18,7 +20,7 @@ export function CanvasProjectCard({ project, onRename, onDelete }: { project: Cl
     const toggleSelected = useCanvasUiStore((state) => state.toggleSelectedProjectId);
     const editing = editingId === project.id;
     const selected = selectedIds.includes(project.id);
-    const open = () => router.push(`/canvas/${project.id}`);
+    const open = () => router.push(localizedPath(`/canvas/${project.id}`));
     const saveTitle = () => {
         void onRename(project, editingTitle);
         stopEditing();

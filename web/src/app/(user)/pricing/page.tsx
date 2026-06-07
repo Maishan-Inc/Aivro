@@ -1,47 +1,34 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { App, Button, Card, Tag } from "antd";
-import { BadgeCheck, ShieldCheck } from "lucide-react";
+import { type ReactNode, useEffect, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { App, Button, Tag } from "antd";
+import { BadgeCheck, Sparkles } from "lucide-react";
 
-import { createKycSession, createStripeCheckout, fetchKycStatus, fetchPlans, type Plan } from "@/services/api/billing";
+import { createStripeCheckout, fetchPlans, type Plan } from "@/services/api/billing";
 import { useI18n } from "@/hooks/use-i18n";
+import { localeFromPath, withLocalePath } from "@/i18n/routing";
 import { useUserStore } from "@/stores/use-user-store";
 
 export default function PricingPage() {
-    return (
-        <Suspense fallback={<main className="min-h-screen bg-[#f6f1e8] dark:bg-stone-950" />}>
-            <PricingContent />
-        </Suspense>
-    );
-}
-
-function PricingContent() {
     const router = useRouter();
-    const search = useSearchParams();
+    const pathname = usePathname();
     const { message } = App.useApp();
     const { locale } = useI18n();
     const token = useUserStore((state) => state.token);
     const isReady = useUserStore((state) => state.isReady);
     const [plans, setPlans] = useState<Plan[]>([]);
-    const [kyc, setKyc] = useState<{ enabled: boolean; status: string; rewards: { credits: number; workflowCreateCredits: number } } | null>(null);
     const [loadingPlanId, setLoadingPlanId] = useState("");
-    const focusKyc = search.get("kyc") === "1";
 
     useEffect(() => {
         fetchPlans().then(setPlans).catch(() => message.error("读取套餐失败"));
     }, [message]);
 
-    useEffect(() => {
-        if (!token) return;
-        fetchKycStatus(token).then(setKyc).catch(() => undefined);
-    }, [token]);
-
     const buy = async (plan: Plan) => {
         if (!isReady) return;
         if (!token) {
-            router.push("/login?redirect=/pricing");
+            const activeLocale = localeFromPath(pathname) || locale;
+            router.push(withLocalePath(`/login?redirect=${encodeURIComponent(withLocalePath("/pricing", activeLocale))}`, activeLocale));
             return;
         }
         setLoadingPlanId(plan.id);
@@ -55,65 +42,49 @@ function PricingContent() {
         }
     };
 
-    const startKyc = async () => {
-        if (!token) {
-            router.push("/login?redirect=/pricing?kyc=1");
-            return;
-        }
-        try {
-            const result = await createKycSession(token);
-            window.location.href = result.url;
-        } catch (error) {
-            message.error(error instanceof Error ? error.message : "创建 KYC 认证失败");
-        }
-    };
-
     return (
-        <main className="min-h-screen bg-background px-6 py-10 text-stone-950 dark:text-stone-100">
-            <div className="mx-auto max-w-6xl">
-                <section className={`mb-8 rounded-xl border bg-white p-5 shadow-sm dark:bg-stone-900 ${focusKyc ? "ring-2 ring-emerald-500" : ""}`}>
-                    <div className="flex flex-wrap items-center justify-between gap-4">
-                        <div className="flex items-center gap-3">
-                            <ShieldCheck className="size-7 text-emerald-600" />
-                            <div>
-                                <h1 className="text-xl font-semibold">{locale === "en-US" ? "KYC Verification" : "KYC 身份认证"}</h1>
-                                <p className="mt-1 text-sm text-stone-500">{locale === "en-US" ? `After approval, you receive ${kyc?.rewards.credits ?? 0} credits and ${kyc?.rewards.workflowCreateCredits ?? 0} workflow creation quota.` : `认证通过后可获得 ${kyc?.rewards.credits ?? 0} 算力点和 ${kyc?.rewards.workflowCreateCredits ?? 0} 次工作流创建次数。`}</p>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <Tag color={kyc?.status === "approved" ? "success" : kyc?.status === "pending" ? "processing" : "default"}>{kycStatusText(kyc?.status, locale)}</Tag>
-                            <Button type="primary" disabled={!kyc?.enabled || kyc?.status === "approved"} onClick={startKyc}>
-                                {locale === "en-US" ? "Start verification" : "开始认证"}
-                            </Button>
-                        </div>
-                    </div>
-                </section>
-
-                <header className="mb-8">
-                    <p className="text-sm text-stone-500">{locale === "en-US" ? "Plans" : "套餐购买"}</p>
-                    <h2 className="mt-2 text-3xl font-semibold">{locale === "en-US" ? "Get credits and cloud workflow quota" : "获取算力点和云端工作流创建次数"}</h2>
+        <main className="relative min-h-screen overflow-hidden bg-[#050505] px-5 py-12 text-white">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.13)_1px,transparent_0)] [background-size:22px_22px]" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(99,102,241,0.22),transparent_34%),linear-gradient(180deg,rgba(5,5,5,0.08),#050505_72%)]" />
+            <div className="relative mx-auto max-w-7xl">
+                <header className="mb-8 text-center">
+                    <p className="text-sm font-medium text-white/55">{locale === "en-US" ? "Plans" : "套餐购买"}</p>
+                    <h1 className="mt-3 text-3xl font-semibold tracking-tight md:text-4xl">{locale === "en-US" ? "Choose the plan that fits your workflow" : "选择适合你的创作套餐"}</h1>
+                    <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-white/55 md:text-base">{locale === "en-US" ? "Get credits and cloud workflow quota for image, video, canvas, and AI creation." : "获取算力点和云端工作流创建次数，支持图片、视频、画布和 AI 创作。"}</p>
                 </header>
 
-                <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+                <div className="grid justify-center gap-5 sm:grid-cols-2 xl:grid-cols-4">
                     {plans.map((plan) => (
-                        <Card key={plan.id} className="h-full" styles={{ body: { minHeight: 320, display: "flex", flexDirection: "column" } }}>
-                            <div className="mb-4 flex items-center justify-between gap-3">
-                                <h3 className="text-2xl font-semibold">{plan.name}</h3>
-                                {plan.recommended ? <Tag color="gold">{locale === "en-US" ? "Recommended" : "推荐"}</Tag> : null}
+                        <section key={plan.id} className={`group flex min-h-[440px] w-full flex-col rounded-2xl border p-6 shadow-2xl transition duration-300 ${plan.recommended ? "border-indigo-300/45 bg-[linear-gradient(180deg,rgba(89,86,178,0.9),rgba(32,32,43,0.96))] shadow-indigo-950/40" : "border-white/12 bg-[#202020]/95 shadow-black/40 hover:border-white/24"}`}>
+                            <div className="mb-8 flex items-start justify-between gap-3">
+                                <div>
+                                    <h2 className="text-2xl font-semibold tracking-tight text-white">{plan.name}</h2>
+                                    <p className="mt-3 min-h-10 text-sm leading-5 text-white/66">{plan.description || (locale === "en-US" ? "Flexible quota for AI creation." : "适合 AI 创作的灵活额度。")}</p>
+                                </div>
+                                {plan.recommended ? <Tag className="m-0 border-indigo-200/20 bg-white/12 text-white">{locale === "en-US" ? "Recommended" : "推荐"}</Tag> : null}
                             </div>
-                            <p className="text-sm text-stone-500">{plan.description}</p>
-                            <div className="my-6">
-                                <span className="text-3xl font-semibold">{(plan.priceCents / 100).toFixed(2)}</span>
-                                <span className="ml-1 text-sm text-stone-500">{plan.currency}</span>
+
+                            <div className="mb-6">
+                                <div className="flex items-end gap-2">
+                                    <span className="text-4xl font-semibold tracking-tight">{formatPrice(plan)}</span>
+                                    <span className="pb-1 text-xs font-medium text-white/60">{plan.currency}</span>
+                                </div>
+                                <p className="mt-2 text-xs text-white/45">{locale === "en-US" ? "One-time package purchase" : "一次性套餐购买"}</p>
                             </div>
-                            <div className="mb-6 grid gap-2 text-sm">
-                                <span className="inline-flex items-center gap-2"><BadgeCheck className="size-4 text-emerald-600" />{plan.credits} {locale === "en-US" ? "credits" : "算力点"}</span>
-                                <span className="inline-flex items-center gap-2"><BadgeCheck className="size-4 text-emerald-600" />{plan.workflowCreateCredits} {locale === "en-US" ? "workflow creations" : "次工作流创建次数"}</span>
-                            </div>
-                            <Button type={plan.recommended ? "primary" : "default"} block className="mt-auto" loading={loadingPlanId === plan.id} onClick={() => void buy(plan)}>
+
+                            <Button className={`mb-6 h-10 rounded-full border-0 font-medium ${plan.recommended ? "bg-indigo-500 text-white hover:!bg-indigo-400 hover:!text-white" : "bg-white text-neutral-950 hover:!bg-white/90 hover:!text-neutral-950"}`} block loading={loadingPlanId === plan.id} onClick={() => void buy(plan)}>
                                 {locale === "en-US" ? "Buy plan" : "购买套餐"}
                             </Button>
-                        </Card>
+
+                            <div className="grid gap-4 text-sm text-white/82">
+                                <PlanFeature icon={<Sparkles className="size-4" />} text={`${plan.credits} ${locale === "en-US" ? "credits" : "算力点"}`} />
+                                <PlanFeature icon={<BadgeCheck className="size-4" />} text={`${plan.workflowCreateCredits} ${locale === "en-US" ? "workflow creations" : "次工作流创建次数"}`} />
+                                <PlanFeature icon={<BadgeCheck className="size-4" />} text={locale === "en-US" ? "Access to enabled AI models" : "可使用已开放的 AI 模型"} />
+                                <PlanFeature icon={<BadgeCheck className="size-4" />} text={locale === "en-US" ? "Cloud workflow quota included" : "包含云端工作流额度"} />
+                            </div>
+
+                            <p className="mt-auto pt-10 text-xs leading-5 text-white/45">{locale === "en-US" ? "Quota is added after payment is confirmed by Stripe webhook." : "额度会在 Stripe webhook 确认支付后到账。"}</p>
+                        </section>
                     ))}
                 </div>
             </div>
@@ -121,10 +92,16 @@ function PricingContent() {
     );
 }
 
-function kycStatusText(status: string | undefined, locale: string) {
-    const en = locale === "en-US";
-    if (status === "approved") return en ? "Approved" : "已通过";
-    if (status === "pending") return en ? "Pending" : "认证中";
-    if (status === "rejected") return en ? "Rejected" : "未通过";
-    return en ? "Not verified" : "未认证";
+function PlanFeature({ icon, text }: { icon: ReactNode; text: string }) {
+    return (
+        <div className="flex items-center gap-3">
+            <span className="text-white/76">{icon}</span>
+            <span>{text}</span>
+        </div>
+    );
+}
+
+function formatPrice(plan: Plan) {
+    if (plan.priceCents <= 0) return "0";
+    return new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(plan.priceCents / 100);
 }

@@ -348,7 +348,15 @@ func loginRedirect(r *http.Request, redirect string, token string, message strin
 	if strings.TrimSpace(redirect) != "" {
 		values.Set("redirect", redirect)
 	}
-	return service.RequestOrigin(r) + "/login?" + values.Encode()
+	return service.RequestOrigin(r) + localizedLoginPath(redirect) + "?" + values.Encode()
+}
+
+func localizedLoginPath(redirect string) string {
+	path := strings.TrimSpace(redirect)
+	if strings.HasPrefix(path, "/en-US/") || path == "/en-US" {
+		return "/en-US/login"
+	}
+	return "/zh-CN/login"
 }
 
 func AdminDeleteUser(w http.ResponseWriter, r *http.Request, id string) {

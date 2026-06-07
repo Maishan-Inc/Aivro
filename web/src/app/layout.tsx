@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 import { AntdRegistry } from "@ant-design/nextjs-registry";
+import { headers } from "next/headers";
 import { AppProviders } from "@/components/layout/app-providers";
+import type { Locale } from "@/i18n/messages";
+import { isLocale } from "@/i18n/routing";
+import { buildMetadata, seoPages } from "@/lib/seo";
 import "antd/dist/reset.css";
 import "./globals.css";
 import React from "react";
@@ -8,23 +12,26 @@ import React from "react";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export const metadata: Metadata = {
-    title: "Aivro",
-    description: "Aivro - AI 驱动的无限画布创作工具",
-    icons: {
-        icon: "/logo.svg",
-        shortcut: "/logo.svg",
-        apple: "/logo.svg",
-    },
-};
+export async function generateMetadata(): Promise<Metadata> {
+    const locale = await requestLocale();
+    return {
+        ...buildMetadata(seoPages.home, locale),
+        icons: {
+            icon: "/logo.svg",
+            shortcut: "/logo.svg",
+            apple: "/logo.svg",
+        },
+    };
+}
 
-export default function RootLayout({
+export default async function RootLayout({
     children,
 }: Readonly<{
     children: React.ReactNode;
 }>) {
+    const locale = await requestLocale();
     return (
-        <html lang="zh-CN" suppressHydrationWarning className="font-sans">
+        <html lang={locale} suppressHydrationWarning className="font-sans">
             <body
                 className="bg-background text-foreground antialiased"
                 style={{
@@ -37,4 +44,10 @@ export default function RootLayout({
             </body>
         </html>
     );
+}
+
+async function requestLocale(): Promise<Locale> {
+    const headerStore = await headers();
+    const localeHeader = headerStore.get("x-aivro-locale") || "zh-CN";
+    return isLocale(localeHeader) ? localeHeader : "zh-CN";
 }
