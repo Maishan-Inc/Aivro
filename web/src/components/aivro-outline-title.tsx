@@ -49,7 +49,7 @@ export function AivroOutlineTitle({ label = "Aivro", className }: AivroOutlineTi
 
     return (
         <span className={cn("aivro-outline-title", className)} aria-label={label}>
-            <svg viewBox="0 0 620 180" role="img" aria-labelledby={titleId} focusable="false">
+            <svg viewBox="0 0 398 180" role="img" aria-labelledby={titleId} focusable="false">
                 <title id={titleId}>{label}</title>
                 <text className="aivro-outline-title-base" x="28" y="128">
                     {label}

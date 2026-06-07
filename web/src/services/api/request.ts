@@ -72,7 +72,11 @@ async function apiRequest<T>(config: { url: string; method: "GET" | "POST" | "PU
             params: config.params,
             paramsSerializer: { serialize: (params) => serializeApiParams(params as ApiParams).toString() },
             data: config.data,
-            headers: config.headers,
+            headers: {
+                "Cache-Control": "no-cache",
+                Pragma: "no-cache",
+                ...config.headers,
+            },
             validateStatus: () => true,
         });
     } catch {

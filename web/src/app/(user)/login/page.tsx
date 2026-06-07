@@ -204,9 +204,13 @@ function LoginContent() {
     };
 
     return (
-        <main className="aivro-wire-surface flex h-full min-h-0 items-start justify-center overflow-y-auto bg-[#080808] px-5 py-8 text-stone-200">
+        <main className="aivro-wire-surface flex h-full min-h-0 items-center justify-center overflow-y-auto bg-[#080808] px-5 py-8 text-stone-200">
             <AivroReveal className="w-full max-w-[444px]">
                 <Form<LoginFormValues> form={form} layout="vertical" size="large" requiredMark={false} onFinish={submit} className="aivro-auth-form">
+                    <div data-aivro-reveal className="mb-8 flex items-center justify-center gap-3">
+                        <span className="block size-10 bg-stone-100" style={{ mask: "url(/logo.svg) center / contain no-repeat", WebkitMask: "url(/logo.svg) center / contain no-repeat" }} aria-hidden="true" />
+                        <span className="text-4xl font-semibold leading-none tracking-normal text-stone-100">Aivro</span>
+                    </div>
                     <Form.Item className="!mb-11">
                         <Segmented
                             block
@@ -222,7 +226,7 @@ function LoginContent() {
                         />
                     </Form.Item>
                     <AivroReveal key={`${mode}-${registerStep}`}>
-                        <div data-aivro-reveal>
+                        <div data-aivro-reveal className="aivro-auth-fields">
                             {mode === "register" ? <RegisterFields step={registerStep} locale={locale} sendingCode={sendingCode} codeSeconds={codeSeconds} publicReady={Boolean(publicSettings)} onResend={() => void requestRegisterCode(form.getFieldValue("email"), true)} /> : <LoginFields locale={locale} />}
                         </div>
                     </AivroReveal>

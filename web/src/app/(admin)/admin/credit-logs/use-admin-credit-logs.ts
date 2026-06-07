@@ -6,6 +6,7 @@ import { App } from "antd";
 
 import { deleteAdminCreditLog, fetchAdminCreditLogs, saveAdminCreditLog, type AdminCreditLog } from "@/services/api/admin";
 import { useUserStore } from "@/stores/use-user-store";
+import { adminRealtimeQueryOptions } from "../admin-query-options";
 
 const defaultPageSize = 10;
 
@@ -23,12 +24,13 @@ export function useAdminCreditLogs() {
         queryFn: () => fetchAdminCreditLogs(token, { keyword, page, pageSize }),
         enabled: Boolean(token),
         retry: false,
+        ...adminRealtimeQueryOptions,
     });
 
     const saveMutation = useMutation({
         mutationFn: (log: Partial<AdminCreditLog>) => saveAdminCreditLog(token, log),
         onSuccess: async (_, log) => {
-            await queryClient.invalidateQueries({ queryKey: ["admin", "credit-logs"] });
+            await queryClient.invalidateQueries({ queryKey: ["admin"] });
             message.success(log.id ? "日志已保存" : "日志已新增");
         },
         onError: (error) => message.error(error instanceof Error ? error.message : "保存失败"),
@@ -37,7 +39,7 @@ export function useAdminCreditLogs() {
     const deleteMutation = useMutation({
         mutationFn: (id: string) => deleteAdminCreditLog(token, id),
         onSuccess: async () => {
-            await queryClient.invalidateQueries({ queryKey: ["admin", "credit-logs"] });
+            await queryClient.invalidateQueries({ queryKey: ["admin"] });
             message.success("日志已删除");
         },
         onError: (error) => message.error(error instanceof Error ? error.message : "删除失败"),

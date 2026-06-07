@@ -80,7 +80,14 @@ func AdminTestMail(setting model.MailSetting, email string, context MailTemplate
 	if strings.TrimSpace(setting.Password) == "" {
 		setting.Password = normalizeMailSetting(settings.Private.Mail).Password
 	}
-	return sendVerificationMail(setting, email, "register", "123456", context)
+	if err := sendVerificationMail(setting, email, "register", "123456", context); err != nil {
+		var deliveryErr mailDeliveryError
+		if errors.As(err, &deliveryErr) {
+			return safeMessageError{message: "邮件发送失败：" + deliveryErr.DetailMessage()}
+		}
+		return err
+	}
+	return nil
 }
 
 func AdminUpdateDatabase() error {
@@ -488,6 +495,10 @@ func normalizePrivateAuthProvider(provider model.PrivateOAuthProviderSetting, id
 }
 
 func normalizeMailSetting(setting model.MailSetting) model.MailSetting {
+	setting.Host = strings.TrimSpace(setting.Host)
+	setting.Username = strings.TrimSpace(setting.Username)
+	setting.FromEmail = strings.TrimSpace(setting.FromEmail)
+	setting.FromName = strings.TrimSpace(setting.FromName)
 	if setting.Port <= 0 {
 		setting.Port = 587
 	}

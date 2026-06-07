@@ -6,6 +6,7 @@ import { App } from "antd";
 
 import { adjustAdminUserCredits, deleteAdminUser, fetchAdminUsers, saveAdminUser, type AdminUser } from "@/services/api/admin";
 import { useUserStore } from "@/stores/use-user-store";
+import { adminRealtimeQueryOptions } from "../admin-query-options";
 
 const defaultPageSize = 10;
 
@@ -23,12 +24,13 @@ export function useAdminUsers() {
         queryFn: () => fetchAdminUsers(token, { keyword, page, pageSize }),
         enabled: Boolean(token),
         retry: false,
+        ...adminRealtimeQueryOptions,
     });
 
     const saveMutation = useMutation({
         mutationFn: (user: Partial<AdminUser> & { password?: string }) => saveAdminUser(token, user),
         onSuccess: async (_, user) => {
-            await queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+            await queryClient.invalidateQueries({ queryKey: ["admin"] });
             message.success(user.id ? "用户已保存" : "用户已新增");
         },
         onError: (error) => message.error(error instanceof Error ? error.message : "保存失败"),
@@ -37,7 +39,7 @@ export function useAdminUsers() {
     const deleteMutation = useMutation({
         mutationFn: (id: string) => deleteAdminUser(token, id),
         onSuccess: async () => {
-            await queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+            await queryClient.invalidateQueries({ queryKey: ["admin"] });
             message.success("用户已删除");
         },
         onError: (error) => message.error(error instanceof Error ? error.message : "删除失败"),
@@ -46,7 +48,7 @@ export function useAdminUsers() {
     const creditMutation = useMutation({
         mutationFn: ({ id, credits }: { id: string; credits: number }) => adjustAdminUserCredits(token, id, credits),
         onSuccess: async () => {
-            await queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+            await queryClient.invalidateQueries({ queryKey: ["admin"] });
             message.success("算力点已调整");
         },
         onError: (error) => message.error(error instanceof Error ? error.message : "调整失败"),

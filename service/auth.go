@@ -1266,10 +1266,42 @@ func sendVerificationMail(setting model.MailSetting, email string, purpose strin
 	if setting.Username != "" || setting.Password != "" {
 		auth = smtp.PlainAuth("", setting.Username, setting.Password, setting.Host)
 	}
+	var err error
 	if setting.Port == 465 {
-		return sendMailTLS(addr, setting.Host, auth, setting.FromEmail, []string{email}, []byte(message))
+		err = sendMailTLS(addr, setting.Host, auth, setting.FromEmail, []string{email}, []byte(message))
+	} else {
+		err = smtp.SendMail(addr, auth, setting.FromEmail, []string{email}, []byte(message))
 	}
-	return smtp.SendMail(addr, auth, setting.FromEmail, []string{email}, []byte(message))
+	if err != nil {
+		return mailDeliveryError{err: err}
+	}
+	return nil
+}
+
+type mailDeliveryError struct {
+	err error
+}
+
+func (err mailDeliveryError) Error() string {
+	return err.err.Error()
+}
+
+func (err mailDeliveryError) Unwrap() error {
+	return err.err
+}
+
+func (err mailDeliveryError) SafeMessage() string {
+	return "邮件发送失败，请联系管理员检查 SMTP 配置"
+}
+
+func (err mailDeliveryError) DetailMessage() string {
+	message := strings.TrimSpace(err.err.Error())
+	message = strings.ReplaceAll(message, "\r", " ")
+	message = strings.ReplaceAll(message, "\n", " ")
+	if message == "" {
+		return "请检查 SMTP 配置"
+	}
+	return message
 }
 
 func sendMailTLS(addr string, host string, auth smtp.Auth, from string, to []string, msg []byte) error {

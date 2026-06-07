@@ -201,7 +201,12 @@
     .aivro-auth-form .ant-segmented {
         background: #030303;
         border-radius: 8px;
+        height: 58px;
         padding: 3px;
+    }
+
+    .aivro-auth-form .ant-segmented-group {
+        height: 100%;
     }
 
     .aivro-auth-form .ant-segmented-item {
@@ -210,7 +215,18 @@
         font-size: 22px;
         font-weight: 500;
         height: 52px;
-        line-height: 52px;
+        line-height: 1;
+        min-height: 52px;
+    }
+
+    .aivro-auth-form .ant-segmented-item-label {
+        align-items: center;
+        display: flex;
+        height: 52px;
+        justify-content: center;
+        line-height: 1;
+        min-height: 52px;
+        padding: 0;
     }
 
     .aivro-auth-form .ant-segmented-item-selected {
@@ -220,6 +236,30 @@
 
     .aivro-auth-form .ant-form-item {
         margin-bottom: 32px;
+    }
+
+    .aivro-auth-fields {
+        min-height: 218px;
+    }
+
+    @media (max-width: 640px) {
+        .aivro-auth-form .ant-segmented {
+            height: 56px;
+        }
+
+        .aivro-auth-form .ant-segmented-item,
+        .aivro-auth-form .ant-segmented-item-label {
+            height: 50px;
+            min-height: 50px;
+        }
+
+        .aivro-auth-form .ant-segmented-item {
+            font-size: 20px;
+        }
+
+        .aivro-auth-fields {
+            min-height: 210px;
+        }
     }
 
     .aivro-auth-form .ant-form-item-label {

@@ -2,7 +2,7 @@
 
 import { CheckCircleOutlined, CloseCircleOutlined, ReloadOutlined } from "@ant-design/icons";
 import { App, Button, Card, Flex, Space, Table, Tag, Typography } from "antd";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { fetchDatabaseStatus, type AdminDatabaseStatus } from "@/services/api/admin";
 import { useUserStore } from "@/stores/use-user-store";
@@ -13,7 +13,7 @@ export default function AdminDatabasePage() {
     const [status, setStatus] = useState<AdminDatabaseStatus | null>(null);
     const [isLoading, setIsLoading] = useState(false);
 
-    const loadStatus = async () => {
+    const loadStatus = useCallback(async () => {
         if (!token) return;
         setIsLoading(true);
         try {
@@ -23,11 +23,23 @@ export default function AdminDatabasePage() {
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [message, token]);
 
     useEffect(() => {
         void loadStatus();
-    }, [token]);
+    }, [loadStatus]);
+
+    useEffect(() => {
+        const refreshStatus = () => {
+            if (document.visibilityState === "visible") void loadStatus();
+        };
+        window.addEventListener("focus", refreshStatus);
+        document.addEventListener("visibilitychange", refreshStatus);
+        return () => {
+            window.removeEventListener("focus", refreshStatus);
+            document.removeEventListener("visibilitychange", refreshStatus);
+        };
+    }, [loadStatus]);
 
     return (
         <main style={{ padding: 24 }}>

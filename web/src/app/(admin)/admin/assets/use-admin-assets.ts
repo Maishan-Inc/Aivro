@@ -6,6 +6,7 @@ import { App } from "antd";
 
 import { deleteAdminAsset, fetchAdminAssets, saveAdminAsset, type AdminAsset } from "@/services/api/admin";
 import { useUserStore } from "@/stores/use-user-store";
+import { adminRealtimeQueryOptions } from "../admin-query-options";
 
 const defaultPageSize = 10;
 
@@ -25,12 +26,13 @@ export function useAdminAssets() {
         queryFn: () => fetchAdminAssets(token, { keyword, type, tag, page, pageSize }),
         enabled: Boolean(token),
         retry: false,
+        ...adminRealtimeQueryOptions,
     });
 
     const saveMutation = useMutation({
         mutationFn: (asset: Partial<AdminAsset>) => saveAdminAsset(token, asset),
         onSuccess: async (_, asset) => {
-            await queryClient.invalidateQueries({ queryKey: ["admin", "assets"] });
+            await queryClient.invalidateQueries({ queryKey: ["admin"] });
             message.success(asset.id ? "素材已保存" : "素材已新增");
         },
         onError: (error) => {
@@ -41,7 +43,7 @@ export function useAdminAssets() {
     const deleteMutation = useMutation({
         mutationFn: (id: string) => deleteAdminAsset(token, id),
         onSuccess: async () => {
-            await queryClient.invalidateQueries({ queryKey: ["admin", "assets"] });
+            await queryClient.invalidateQueries({ queryKey: ["admin"] });
             message.success("素材已删除");
         },
         onError: (error) => {

@@ -7,6 +7,7 @@ import { App } from "antd";
 import { deleteAdminPrompt, deleteAdminPrompts, fetchAdminPrompts, fetchAdminPromptCategories, saveAdminPrompt, syncAdminPromptCategory, type AdminPromptCategory } from "@/services/api/admin";
 import type { Prompt } from "@/services/api/prompts";
 import { useUserStore } from "@/stores/use-user-store";
+import { adminRealtimeQueryOptions } from "../admin-query-options";
 
 const defaultPageSize = 10;
 
@@ -26,6 +27,7 @@ export function useAdminPrompts() {
         queryFn: () => fetchAdminPromptCategories(token),
         enabled: Boolean(token),
         retry: false,
+        ...adminRealtimeQueryOptions,
     });
 
     const promptsQuery = useQuery({
@@ -33,13 +35,14 @@ export function useAdminPrompts() {
         queryFn: () => fetchAdminPrompts(token, { keyword, category, tag, page, pageSize }),
         enabled: Boolean(token),
         retry: false,
+        ...adminRealtimeQueryOptions,
     });
 
     const syncMutation = useMutation({
         mutationFn: (category: string) => syncAdminPromptCategory(token, category),
         onSuccess: async (categories) => {
             queryClient.setQueryData<AdminPromptCategory[]>(["admin", "prompt-categories", token], categories);
-            await queryClient.invalidateQueries({ queryKey: ["admin", "prompts"] });
+            await queryClient.invalidateQueries({ queryKey: ["admin"] });
             message.success("远程提示词源已同步");
         },
         onError: (error) => {
@@ -50,8 +53,7 @@ export function useAdminPrompts() {
     const saveMutation = useMutation({
         mutationFn: (prompt: Partial<Prompt>) => saveAdminPrompt(token, prompt),
         onSuccess: async (_, prompt) => {
-            await queryClient.invalidateQueries({ queryKey: ["admin", "prompt-categories"] });
-            await queryClient.invalidateQueries({ queryKey: ["admin", "prompts"] });
+            await queryClient.invalidateQueries({ queryKey: ["admin"] });
             message.success(prompt.id ? "提示词已保存" : "提示词已新增");
         },
         onError: (error) => {
@@ -62,8 +64,7 @@ export function useAdminPrompts() {
     const deleteMutation = useMutation({
         mutationFn: (id: string) => deleteAdminPrompt(token, id),
         onSuccess: async () => {
-            await queryClient.invalidateQueries({ queryKey: ["admin", "prompt-categories"] });
-            await queryClient.invalidateQueries({ queryKey: ["admin", "prompts"] });
+            await queryClient.invalidateQueries({ queryKey: ["admin"] });
             message.success("提示词已删除");
         },
         onError: (error) => {
@@ -74,8 +75,7 @@ export function useAdminPrompts() {
     const batchDeleteMutation = useMutation({
         mutationFn: (ids: string[]) => deleteAdminPrompts(token, ids),
         onSuccess: async () => {
-            await queryClient.invalidateQueries({ queryKey: ["admin", "prompt-categories"] });
-            await queryClient.invalidateQueries({ queryKey: ["admin", "prompts"] });
+            await queryClient.invalidateQueries({ queryKey: ["admin"] });
             message.success("提示词已批量删除");
         },
         onError: (error) => {

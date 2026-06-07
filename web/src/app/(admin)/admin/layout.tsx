@@ -30,6 +30,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     const token = useUserStore((state) => state.token);
     const user = useUserStore((state) => state.user);
     const isReady = useUserStore((state) => state.isReady);
+    const hydrateUser = useUserStore((state) => state.hydrateUser);
     const logout = useUserStore((state) => state.clearSession);
     const locale = useLocaleStore((state) => state.locale);
     const setLocale = useLocaleStore((state) => state.setLocale);
@@ -47,6 +48,24 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
             router.replace("/");
         }
     }, [isReady, router, token, user?.role]);
+
+    useEffect(() => {
+        if (!isReady || !token) return;
+        void hydrateUser();
+    }, [hydrateUser, isReady, pathname, token]);
+
+    useEffect(() => {
+        if (!token) return;
+        const refreshUser = () => {
+            if (document.visibilityState === "visible") void hydrateUser();
+        };
+        window.addEventListener("focus", refreshUser);
+        document.addEventListener("visibilitychange", refreshUser);
+        return () => {
+            window.removeEventListener("focus", refreshUser);
+            document.removeEventListener("visibilitychange", refreshUser);
+        };
+    }, [hydrateUser, token]);
 
     if (!isReady || !token || user?.role !== "admin") {
         return (

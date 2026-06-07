@@ -316,7 +316,7 @@ export default function AdminSettingsPage() {
         scheduleAutoSave();
     }, [editingAuthProvider, editingMailTemplate, scheduleAutoSave]);
 
-    const loadSettings = async () => {
+    const loadSettings = useCallback(async () => {
         if (!token) return;
         settingsLoadedRef.current = false;
         setIsLoading(true);
@@ -342,11 +342,24 @@ export default function AdminSettingsPage() {
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [form, message, token]);
 
     useEffect(() => {
         void loadSettings();
-    }, [token]);
+    }, [loadSettings]);
+
+    useEffect(() => {
+        const refreshSettings = () => {
+            if (document.visibilityState !== "visible" || autoSaveTimerRef.current || isSaving || editingAuthProvider || editingMailTemplate || isChannelDrawerOpen || isModelSelectorOpen) return;
+            void loadSettings();
+        };
+        window.addEventListener("focus", refreshSettings);
+        document.addEventListener("visibilitychange", refreshSettings);
+        return () => {
+            window.removeEventListener("focus", refreshSettings);
+            document.removeEventListener("visibilitychange", refreshSettings);
+        };
+    }, [editingAuthProvider, editingMailTemplate, isChannelDrawerOpen, isModelSelectorOpen, isSaving, loadSettings]);
 
     useEffect(() => {
         return () => {
@@ -2041,6 +2054,10 @@ function mergeSavedSecrets(currentSettings: AdminSettings, saved: AdminSettings)
             turnstile: {
                 ...saved.private.turnstile,
                 secretKey: currentSettings.private.turnstile.secretKey || saved.private.turnstile.secretKey,
+            },
+            mail: {
+                ...saved.private.mail,
+                password: currentSettings.private.mail.password || saved.private.mail.password,
             },
             cloudStorage: { ...saved.private.cloudStorage, secretAccessKey: currentSettings.private.cloudStorage.secretAccessKey || saved.private.cloudStorage.secretAccessKey },
             stripe: {

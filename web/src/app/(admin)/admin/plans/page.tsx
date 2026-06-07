@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { App, Button, Card, Col, Form, Input, InputNumber, Row, Switch, Tag } from "antd";
 
 import { fetchAdminPlans, saveAdminPlan } from "@/services/api/admin";
@@ -13,18 +13,30 @@ export default function AdminPlansPage() {
     const [plans, setPlans] = useState<Plan[]>([]);
     const [savingId, setSavingId] = useState("");
 
-    const load = async () => {
+    const load = useCallback(async () => {
         if (!token) return;
         try {
             setPlans(await fetchAdminPlans(token));
         } catch (error) {
             message.error(error instanceof Error ? error.message : "读取套餐失败");
         }
-    };
+    }, [message, token]);
 
     useEffect(() => {
         void load();
-    }, [token]);
+    }, [load]);
+
+    useEffect(() => {
+        const refreshPlans = () => {
+            if (document.visibilityState === "visible") void load();
+        };
+        window.addEventListener("focus", refreshPlans);
+        document.addEventListener("visibilitychange", refreshPlans);
+        return () => {
+            window.removeEventListener("focus", refreshPlans);
+            document.removeEventListener("visibilitychange", refreshPlans);
+        };
+    }, [load]);
 
     const save = async (plan: Plan, values: Partial<Plan>) => {
         if (!token) return;
