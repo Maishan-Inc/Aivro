@@ -41,7 +41,7 @@ type User struct {
 	GithubID              string          `json:"githubId" gorm:"index"`
 	GoogleID              string          `json:"googleId" gorm:"index"`
 	LinuxDoID             string          `json:"linuxDoId" gorm:"index"`
-	MetaMaskAddress       string          `json:"metamaskAddress" gorm:"index"`
+	MetaMaskAddress       string          `json:"metamaskAddress" gorm:"column:metamask_address;index"`
 	WechatID              string          `json:"wechatId"`
 	AuthProvider          string          `json:"authProvider"`
 	EmailVerified         bool            `json:"emailVerified"`

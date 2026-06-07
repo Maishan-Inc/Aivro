@@ -5,7 +5,6 @@ import { App, Button, Form, Input, Segmented, Space } from "antd";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 
-import { AivroOutlineTitle } from "@/components/aivro-outline-title";
 import { AivroReveal } from "@/components/aivro-reveal";
 import { useAuthLoadingOverlay } from "@/hooks/use-auth-loading-overlay";
 import { useI18n } from "@/hooks/use-i18n";
@@ -66,7 +65,7 @@ function LoginContent() {
     const [firstCodeSent, setFirstCodeSent] = useState(false);
     const [metaMaskAvailable, setMetaMaskAvailable] = useState(true);
     const redirect = safeRedirect(searchParams.get("redirect") || localizedPath("/"));
-    const thirdPartyProviders = ([authSettings?.google, authSettings?.github, authSettings?.linuxDo, ...(authSettings?.customProviders || [])] as Array<AdminPublicAuthProvider | undefined>).filter((item): item is AdminPublicAuthProvider => item?.enabled === true);
+    const thirdPartyProviders = ([authSettings?.google, authSettings?.github, authSettings?.linuxDo, ...(authSettings?.customProviders || [])] as Array<AdminPublicAuthProvider | undefined>).filter((item): item is AdminPublicAuthProvider => item?.enabled === true && item.id !== "metamask");
 
     useEffect(() => {
         const token = searchParams.get("token");
@@ -205,16 +204,18 @@ function LoginContent() {
     };
 
     return (
-        <main className="aivro-wire-surface flex h-full min-h-0 items-center justify-center overflow-y-auto bg-background px-6 py-10">
-            <AivroReveal className="w-full max-w-[420px]">
-                <div data-aivro-reveal className="mb-7 text-center">
-                    <span className="mx-auto mb-4 block size-12 bg-stone-950 dark:bg-stone-100" style={{ mask: "url(/logo.svg) center / contain no-repeat", WebkitMask: "url(/logo.svg) center / contain no-repeat" }} aria-label="Aivro" />
-                    <AivroOutlineTitle label="Aivro" className="mx-auto mb-2 max-w-52" />
-                    <h1 className="text-3xl font-semibold tracking-normal text-stone-950 dark:text-stone-100">{mode === "register" ? (locale === "en-US" ? "Create account" : "创建账号") : locale === "en-US" ? "Account sign in" : "账号登录"}</h1>
-                    <p className="mt-3 text-base leading-7 text-stone-500 dark:text-stone-400">{mode === "register" ? (locale === "en-US" ? "Use email verification, then complete your profile." : "使用邮箱验证后，再填写账户信息。") : locale === "en-US" ? "Use email and password or a third-party account." : "支持邮箱密码和第三方登录。"}</p>
+        <main className="aivro-wire-surface flex h-full min-h-0 items-center justify-center overflow-y-auto bg-background px-6 py-8">
+            <AivroReveal className="w-full max-w-[460px]">
+                <div data-aivro-reveal className="mb-6 text-center">
+                    <div className="mb-5 flex items-center justify-center gap-3">
+                        <span className="text-5xl font-semibold leading-none tracking-normal text-stone-950 dark:text-stone-100">Aivro</span>
+                        <span className="block size-11 bg-stone-950 dark:bg-stone-100" style={{ mask: "url(/logo.svg) center / contain no-repeat", WebkitMask: "url(/logo.svg) center / contain no-repeat" }} aria-label="Aivro" />
+                    </div>
+                    <h1 className="text-2xl font-semibold tracking-normal text-stone-950 dark:text-stone-100">{mode === "register" ? (locale === "en-US" ? "Create account" : "创建账号") : locale === "en-US" ? "Account sign in" : "账号登录"}</h1>
+                    <p className="mx-auto mt-3 max-w-[25rem] text-sm leading-6 text-stone-500 dark:text-stone-400">{mode === "register" ? (locale === "en-US" ? "Use email verification, then complete your profile." : "使用邮箱验证后，再填写账户信息。") : locale === "en-US" ? "Use email and password or a third-party account." : "支持邮箱密码和第三方登录。"}</p>
                 </div>
 
-                <Form<LoginFormValues> form={form} layout="vertical" size="large" requiredMark={false} onFinish={submit} className="aivro-wire-card p-5">
+                <Form<LoginFormValues> form={form} layout="vertical" size="large" requiredMark={false} onFinish={submit} className="aivro-wire-card rounded-2xl p-6">
                     <Form.Item>
                         <Segmented
                             block
@@ -351,10 +352,12 @@ function LoginActions({ locale, localizedPath, redirect, authSettings, linuxDoEn
                             </Button>
                         ) : null}
                         {providers.map((provider) =>
-                            provider.id === "linux-do" && linuxDoEnabled ? (
-                                <Button className="h-11 justify-start" key={provider.id} block href={`/api/auth/linux-do/authorize?redirect=${encodeURIComponent(redirect)}`} icon={provider.iconUrl ? <ProviderIcon src={provider.iconUrl} /> : undefined}>
-                                    {locale === "en-US" ? "Sign in with" : "使用"} {provider.name} {locale === "en-US" ? "" : "登录"}
-                                </Button>
+                            provider.id === "linux-do" ? (
+                                linuxDoEnabled ? (
+                                    <Button className="h-11 justify-start" key={provider.id} block href={`/api/auth/linux-do/authorize?redirect=${encodeURIComponent(redirect)}`} icon={provider.iconUrl ? <ProviderIcon src={provider.iconUrl} /> : undefined}>
+                                        {locale === "en-US" ? "Sign in with" : "使用"} {provider.name} {locale === "en-US" ? "" : "登录"}
+                                    </Button>
+                                ) : null
                             ) : (
                                 <Button className="h-11 justify-start" key={provider.id} block href={`/api/auth/oauth/${encodeURIComponent(provider.id)}/authorize?redirect=${encodeURIComponent(redirect)}`} icon={provider.iconUrl ? <ProviderIcon src={provider.iconUrl} /> : undefined}>
                                     {locale === "en-US" ? "Sign in with" : "使用"} {provider.name} {locale === "en-US" ? "" : "登录"}

@@ -1,10 +1,10 @@
 "use client";
 
-import { CheckCircleOutlined, DeleteOutlined, EditOutlined, FormatPainterOutlined, LoadingOutlined, MailOutlined, PlusOutlined, ReloadOutlined, SaveOutlined } from "@ant-design/icons";
+import { CheckCircleOutlined, DeleteOutlined, EditOutlined, FormatPainterOutlined, LoadingOutlined, MailOutlined, PlusOutlined, ReloadOutlined } from "@ant-design/icons";
 import { json } from "@codemirror/lang-json";
 import { App, Button, Card, Checkbox, Col, Drawer, Flex, Form, Input, InputNumber, Modal, Row, Segmented, Select, Space, Switch, Table, Tabs, Tag, Typography } from "antd";
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EditorView } from "@uiw/react-codemirror";
 
 import { fetchAdminSettings, fetchAuthProviderStats, fetchChannelModels, saveAdminSettings, testChannelModel, testCloudStorage, testMailSettings, type AdminCloudStorageSettings, type AdminModelChannel, type AdminModelCost, type AdminPrivateAuthProvider, type AdminPublicAuthProvider, type AdminSettings } from "@/services/api/admin";
@@ -241,6 +241,7 @@ export default function AdminSettingsPage() {
     const [isFetchingChannelModels, setIsFetchingChannelModels] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+    const [saveHint, setSaveHint] = useState("自动保存");
     const [isTestingCloudStorage, setIsTestingCloudStorage] = useState(false);
     const [isSendingTestMail, setIsSendingTestMail] = useState(false);
     const [mailTestEmail, setMailTestEmail] = useState("");
@@ -262,9 +263,62 @@ export default function AdminSettingsPage() {
         return modelSelectGroups[modelSelectTab].filter((model) => model.toLowerCase().includes(keyword));
     }, [modelSelectGroups, modelSelectKeyword, modelSelectTab]);
     const activeSelectedCount = activeModelSelectModels.filter((model) => modelSelectSelected.includes(model)).length;
+    const jsonTextRef = useRef(jsonText);
+    const autoSaveTimerRef = useRef<number | null>(null);
+    const settingsLoadedRef = useRef(false);
+    const authProviderSnapshotRef = useRef<AdminSettings | null>(null);
+
+    useEffect(() => {
+        jsonTextRef.current = jsonText;
+    }, [jsonText]);
+
+    const saveSettings = useCallback(async (silent = false) => {
+        if (!token) return;
+        const values = await collectSettings(form, editorMode, jsonTextRef.current, message);
+        if (!values) {
+            return;
+        }
+        setIsSaving(true);
+        setSaveHint("自动保存中");
+        try {
+            const saved = normalizeSettings(await saveAdminSettings(token, values));
+            const merged = mergeSavedSecrets(values, saved);
+            form.setFieldsValue(merged);
+            setChannels(merged.private.channels);
+            setModelCosts(merged.public.modelChannel.modelCosts);
+            rememberKnownModels(merged);
+            setJsonText({
+                public: JSON.stringify(merged.public, null, 2),
+                private: JSON.stringify(merged.private, null, 2),
+            });
+            setSaveHint("已自动保存");
+            if (!silent) message.success("已保存");
+        } catch (error) {
+            setSaveHint("自动保存失败");
+            message.error(error instanceof Error ? error.message : "保存失败");
+        } finally {
+            setIsSaving(false);
+        }
+    }, [editorMode, form, message, token]);
+
+    const scheduleAutoSave = useCallback(() => {
+        if (!settingsLoadedRef.current || !token) return;
+        setSaveHint("有修改待保存");
+        if (autoSaveTimerRef.current) window.clearTimeout(autoSaveTimerRef.current);
+        autoSaveTimerRef.current = window.setTimeout(() => {
+            autoSaveTimerRef.current = null;
+            void saveSettings(true);
+        }, 900);
+    }, [saveSettings, token]);
+
+    const handleFormValuesChange = useCallback(() => {
+        if (editingAuthProvider || editingMailTemplate) return;
+        scheduleAutoSave();
+    }, [editingAuthProvider, editingMailTemplate, scheduleAutoSave]);
 
     const loadSettings = async () => {
         if (!token) return;
+        settingsLoadedRef.current = false;
         setIsLoading(true);
         try {
             const data = normalizeSettings(await fetchAdminSettings(token));
@@ -281,6 +335,8 @@ export default function AdminSettingsPage() {
             } catch {
                 setAuthProviderStats({});
             }
+            settingsLoadedRef.current = true;
+            setSaveHint("自动保存");
         } catch (error) {
             message.error(error instanceof Error ? error.message : "读取设置失败");
         } finally {
@@ -292,34 +348,14 @@ export default function AdminSettingsPage() {
         void loadSettings();
     }, [token]);
 
+    useEffect(() => {
+        return () => {
+            if (autoSaveTimerRef.current) window.clearTimeout(autoSaveTimerRef.current);
+        };
+    }, []);
+
     const changeTab = (nextTab: SettingsTabKey) => {
         setActiveTab(nextTab);
-    };
-
-    const saveSettings = async () => {
-        if (!token) return;
-        const values = await collectSettings(form, editorMode, jsonText, message);
-        if (!values) {
-            return;
-        }
-        setIsSaving(true);
-        try {
-            const saved = normalizeSettings(await saveAdminSettings(token, values));
-            const merged = mergeSavedSecrets(values, saved);
-            form.setFieldsValue(merged);
-            setChannels(merged.private.channels);
-            setModelCosts(merged.public.modelChannel.modelCosts);
-            rememberKnownModels(merged);
-            setJsonText({
-                public: JSON.stringify(merged.public, null, 2),
-                private: JSON.stringify(merged.private, null, 2),
-            });
-            message.success("已保存");
-        } catch (error) {
-            message.error(error instanceof Error ? error.message : "保存失败");
-        } finally {
-            setIsSaving(false);
-        }
     };
 
     const sendTestMail = async () => {
@@ -344,8 +380,20 @@ export default function AdminSettingsPage() {
     const addCustomAuthProvider = () => {
         const current = (form.getFieldValue(["private", "auth", "customProviders"]) || []) as AdminPrivateAuthProvider[];
         const nextProvider = emptyPrivateProvider(`custom-${current.length + 1}`, `自定义登录 ${current.length + 1}`);
-        form.setFieldValue(["private", "auth", "customProviders"], [...current, nextProvider]);
-        setEditingAuthProvider({ type: "custom", index: current.length });
+        openAuthProviderEditor({ type: "custom", index: current.length }, () => {
+            form.setFieldValue(["private", "auth", "customProviders"], [...current, nextProvider]);
+        });
+    };
+
+    const openAuthProviderEditor = (state: AuthProviderEditorState, beforeOpen?: () => void) => {
+        authProviderSnapshotRef.current = normalizeSettings(form.getFieldsValue(true) as AdminSettings);
+        beforeOpen?.();
+        setEditingAuthProvider(state);
+    };
+
+    const closeAuthProviderEditor = () => {
+        setEditingAuthProvider(null);
+        authProviderSnapshotRef.current = null;
     };
 
     const testCurrentCloudStorage = async () => {
@@ -595,11 +643,11 @@ export default function AdminSettingsPage() {
                             ]}
                         />
                         <Space>
+                            <Typography.Text type={saveHint.includes("失败") ? "danger" : "secondary"}>
+                                {isSaving ? <LoadingOutlined /> : saveHint === "已自动保存" ? <CheckCircleOutlined /> : null} {saveHint}
+                            </Typography.Text>
                             <Button icon={<ReloadOutlined />} loading={isLoading} onClick={() => void loadSettings()}>
                                 刷新
-                            </Button>
-                            <Button type="primary" icon={<SaveOutlined />} loading={isSaving} onClick={() => void saveSettings()}>
-                                保存设置
                             </Button>
                         </Space>
                     </Flex>
@@ -639,7 +687,7 @@ export default function AdminSettingsPage() {
 
                     {activeTab === "public" ? (
                         activeMode === "visual" ? (
-                            <Form form={form} layout="vertical" initialValues={emptySettings} requiredMark={false}>
+                            <Form form={form} layout="vertical" initialValues={emptySettings} requiredMark={false} onValuesChange={handleFormValuesChange}>
                                 <Row gutter={16}>
                                     <Col span={24}>
                                         <Form.Item name={["public", "modelChannel", "availableModels"]} label="系统可用模型(请先在私有配置里配置渠道)" extra="可选项来自已启用渠道中选择的模型，最终开放哪些模型由这里勾选决定">
@@ -736,7 +784,10 @@ export default function AdminSettingsPage() {
                                                             className="!w-full"
                                                             value={item.credits}
                                                             addonAfter="点"
-                                                            onChange={(value) => setModelCost(form, setModelCosts, item.model, Number(value) || 0)}
+                                                            onChange={(value) => {
+                                                                setModelCost(form, setModelCosts, item.model, Number(value) || 0);
+                                                                scheduleAutoSave();
+                                                            }}
                                                         />
                                                     ),
                                                 },
@@ -753,13 +804,16 @@ export default function AdminSettingsPage() {
                                     extensions={[json(), jsonEditorTheme]}
                                     basicSetup={{ foldGutter: true, lineNumbers: true, highlightActiveLine: true, highlightActiveLineGutter: true }}
                                     theme="none"
-                                    onChange={(value) => setJsonText((current) => ({ ...current, public: value }))}
+                                    onChange={(value) => {
+                                        setJsonText((current) => ({ ...current, public: value }));
+                                        scheduleAutoSave();
+                                    }}
                                     style={{ fontSize: 13 }}
                                 />
                             </div>
                         )
                     ) : activeTab === "pages" ? (
-                        <Form form={form} layout="vertical" initialValues={emptySettings} requiredMark={false}>
+                        <Form form={form} layout="vertical" initialValues={emptySettings} requiredMark={false} onValuesChange={handleFormValuesChange}>
                             <Row gutter={[16, 16]}>
                                 <Col xs={24} lg={12}>
                                     <Card size="small" title="隐私政策">
@@ -816,7 +870,7 @@ export default function AdminSettingsPage() {
                             </Row>
                         </Form>
                     ) : activeTab === "cloudStorage" ? (
-                        <Form form={form} layout="vertical" initialValues={emptySettings} requiredMark={false}>
+                        <Form form={form} layout="vertical" initialValues={emptySettings} requiredMark={false} onValuesChange={handleFormValuesChange}>
                             <Card
                                 size="small"
                                 title={t("cloud.tab")}
@@ -906,7 +960,7 @@ export default function AdminSettingsPage() {
                             </Card>
                         </Form>
                     ) : activeTab === "billingKyc" ? (
-                        <Form form={form} layout="vertical" initialValues={emptySettings} requiredMark={false}>
+                        <Form form={form} layout="vertical" initialValues={emptySettings} requiredMark={false} onValuesChange={handleFormValuesChange}>
                             <Row gutter={[16, 16]}>
                                 <Col xs={24} lg={12}>
                                     <Card size="small" title="Stripe 私有配置">
@@ -988,7 +1042,7 @@ export default function AdminSettingsPage() {
                             </Row>
                         </Form>
                     ) : activeTab === "mail" ? (
-                        <Form form={form} layout="vertical" initialValues={emptySettings} requiredMark={false}>
+                        <Form form={form} layout="vertical" initialValues={emptySettings} requiredMark={false} onValuesChange={handleFormValuesChange}>
                             <Row gutter={[16, 16]}>
                                 <Col xs={24} lg={12}>
                                     <Card size="small" title="SMTP 验证码配置">
@@ -1058,14 +1112,14 @@ export default function AdminSettingsPage() {
                             </Row>
                         </Form>
                     ) : activeTab === "thirdParty" ? (
-                        <Form form={form} layout="vertical" initialValues={emptySettings} requiredMark={false}>
+                        <Form form={form} layout="vertical" initialValues={emptySettings} requiredMark={false} onValuesChange={handleFormValuesChange}>
                             <Row gutter={[16, 16]}>
-                                <AuthProviderSummaryCard form={form} title="Linux.do 登录" iconUrl="/icons/linuxdo.svg" users={authProviderStats["linux-do"] || 0} enabledPath={["public", "auth", "linuxDo", "enabled"]} onEdit={() => setEditingAuthProvider({ type: "oauth", providerKey: "linuxDo" })} />
-                                <AuthProviderSummaryCard form={form} title="Google 登录" iconUrl="/icons/google.svg" users={authProviderStats.google || 0} enabledPath={["public", "auth", "google", "enabled"]} onEdit={() => setEditingAuthProvider({ type: "oauth", providerKey: "google" })} />
-                                <AuthProviderSummaryCard form={form} title="GitHub 登录" iconUrl="/icons/github.svg" users={authProviderStats.github || 0} enabledPath={["public", "auth", "github", "enabled"]} onEdit={() => setEditingAuthProvider({ type: "oauth", providerKey: "github" })} />
-                                <AuthProviderSummaryCard form={form} title="MetaMask 登录" iconUrl="/icons/metamask.svg" users={authProviderStats.metamask || 0} enabledPath={["public", "auth", "metamask", "enabled"]} onEdit={() => setEditingAuthProvider({ type: "metamask" })} />
+                                <AuthProviderSummaryCard form={form} title="Linux.do 登录" iconUrl="/icons/linuxdo.svg" users={authProviderStats["linux-do"] || 0} publicEnabledPath={["public", "auth", "linuxDo", "enabled"]} privateEnabledPath={["private", "auth", "linuxDo", "enabled"]} onEdit={() => openAuthProviderEditor({ type: "oauth", providerKey: "linuxDo" })} />
+                                <AuthProviderSummaryCard form={form} title="Google 登录" iconUrl="/icons/google.svg" users={authProviderStats.google || 0} publicEnabledPath={["public", "auth", "google", "enabled"]} privateEnabledPath={["private", "auth", "google", "enabled"]} onEdit={() => openAuthProviderEditor({ type: "oauth", providerKey: "google" })} />
+                                <AuthProviderSummaryCard form={form} title="GitHub 登录" iconUrl="/icons/github.svg" users={authProviderStats.github || 0} publicEnabledPath={["public", "auth", "github", "enabled"]} privateEnabledPath={["private", "auth", "github", "enabled"]} onEdit={() => openAuthProviderEditor({ type: "oauth", providerKey: "github" })} />
+                                <AuthProviderSummaryCard form={form} title="MetaMask 登录" iconUrl="/icons/metamask.svg" users={authProviderStats.metamask || 0} publicEnabledPath={["public", "auth", "metamask", "enabled"]} privateEnabledPath={["private", "auth", "metamask", "enabled"]} onEdit={() => openAuthProviderEditor({ type: "metamask" })} />
                                 {customAuthProviders.map((provider: AdminPrivateAuthProvider, index: number) => (
-                                    <AuthProviderSummaryCard key={`${provider.id}-${index}`} form={form} title={provider.name || `自定义登录 ${index + 1}`} iconUrl={provider.iconUrl} users={authProviderStats[provider.id] || 0} enabledPath={["private", "auth", "customProviders", index, "enabled"]} onEdit={() => setEditingAuthProvider({ type: "custom", index })} />
+                                    <AuthProviderSummaryCard key={`${provider.id}-${index}`} form={form} title={provider.name || `自定义登录 ${index + 1}`} iconUrl={provider.iconUrl} users={authProviderStats[provider.id] || 0} publicEnabledPath={["private", "auth", "customProviders", index, "enabled"]} onEdit={() => openAuthProviderEditor({ type: "custom", index })} />
                                 ))}
                                 <Col xs={24} md={12} xl={8}>
                                     <Button block type="dashed" icon={<PlusOutlined />} style={{ height: 128 }} onClick={addCustomAuthProvider}>
@@ -1073,10 +1127,10 @@ export default function AdminSettingsPage() {
                                     </Button>
                                 </Col>
                             </Row>
-                            <OAuthProviderEditorModal form={form} state={editingAuthProvider} onClose={() => setEditingAuthProvider(null)} />
+                            <OAuthProviderEditorModal form={form} state={editingAuthProvider} snapshot={authProviderSnapshotRef.current} onClose={closeAuthProviderEditor} onSave={scheduleAutoSave} />
                         </Form>
                     ) : activeMode === "visual" ? (
-                        <Form form={form} layout="vertical" initialValues={emptySettings} requiredMark={false}>
+                        <Form form={form} layout="vertical" initialValues={emptySettings} requiredMark={false} onValuesChange={handleFormValuesChange}>
                             <Flex vertical gap={12}>
                                 <Card size="small" title="提示词定时同步">
                                     <Row gutter={16} align="middle">
@@ -1224,13 +1278,16 @@ export default function AdminSettingsPage() {
                                 extensions={[json(), jsonEditorTheme]}
                                 basicSetup={{ foldGutter: true, lineNumbers: true, highlightActiveLine: true, highlightActiveLineGutter: true }}
                                 theme="none"
-                                onChange={(value) => setJsonText((current) => ({ ...current, private: value }))}
+                                onChange={(value) => {
+                                    setJsonText((current) => ({ ...current, private: value }));
+                                    scheduleAutoSave();
+                                }}
                                 style={{ fontSize: 13 }}
                             />
                         </div>
                     )}
                 </Card>
-                <MailTemplateEditorModal form={form} name={editingMailTemplate} onClose={() => setEditingMailTemplate(null)} />
+                <MailTemplateEditorModal form={form} name={editingMailTemplate} onClose={() => setEditingMailTemplate(null)} onSave={scheduleAutoSave} />
                 <Drawer
                     title={editingChannelIndex === null ? "新增渠道" : "编辑渠道"}
                     open={isChannelDrawerOpen}
@@ -1312,7 +1369,7 @@ export default function AdminSettingsPage() {
                         <Space>
                             <Button onClick={closeChannelModelSelector}>取消</Button>
                             <Button type="primary" onClick={confirmChannelModelSelector}>
-                                确定
+                                保存
                             </Button>
                         </Space>
                     }
@@ -1470,7 +1527,7 @@ function MailTemplateBlock({ form, name, title, onEdit }: { form: any; name: Mai
     );
 }
 
-function MailTemplateEditorModal({ form, name, onClose }: { form: any; name: MailTemplateKey | null; onClose: () => void }) {
+function MailTemplateEditorModal({ form, name, onClose, onSave }: { form: any; name: MailTemplateKey | null; onClose: () => void; onSave: () => void }) {
     const activeName = name || "register";
     const title = mailTemplateTitles[activeName];
     const expireMinutes = Form.useWatch(["private", "mail", "codeExpireMin"], form) || 10;
@@ -1485,10 +1542,29 @@ function MailTemplateEditorModal({ form, name, onClose }: { form: any; name: Mai
     const setTemplateField = (field: "subject" | "body", value: string) => {
         if (field === "subject") setSubject(value);
         else setBody(value);
-        form.setFieldValue(["private", "mail", "templates", activeName, field], value);
+    };
+    const saveTemplate = () => {
+        form.setFieldValue(["private", "mail", "templates", activeName, "subject"], subject);
+        form.setFieldValue(["private", "mail", "templates", activeName, "body"], body);
+        onClose();
+        onSave();
     };
     return (
-        <Modal title={title} open={!!name} width={1120} onCancel={onClose} footer={<Button type="primary" onClick={onClose}>完成</Button>} destroyOnHidden>
+        <Modal
+            title={title}
+            open={!!name}
+            width={1120}
+            onCancel={onClose}
+            footer={
+                <Space>
+                    <Button onClick={onClose}>取消</Button>
+                    <Button type="primary" onClick={saveTemplate}>
+                        保存
+                    </Button>
+                </Space>
+            }
+            destroyOnHidden
+        >
             <Row gutter={16}>
                 <Col xs={24} lg={12}>
                     <Flex vertical gap={12}>
@@ -1520,8 +1596,10 @@ const mailTemplateTitles: Record<MailTemplateKey, string> = {
 
 const mailTemplateVariables = ["{{code}}", "{{email}}", "{{expireMinutes}}", "{{siteName}}", "{{ip}}", "{{country}}", "{{region}}"];
 
-function AuthProviderSummaryCard({ form, title, iconUrl, users, enabledPath, onEdit }: { form: any; title: string; iconUrl?: string; users: number; enabledPath: (string | number)[]; onEdit: () => void }) {
-    const enabled = Form.useWatch(enabledPath, form);
+function AuthProviderSummaryCard({ form, title, iconUrl, users, publicEnabledPath, privateEnabledPath, onEdit }: { form: any; title: string; iconUrl?: string; users: number; publicEnabledPath: (string | number)[]; privateEnabledPath?: (string | number)[]; onEdit: () => void }) {
+    const publicEnabled = Form.useWatch(publicEnabledPath, form);
+    const privateEnabled = Form.useWatch(privateEnabledPath || publicEnabledPath, form);
+    const ready = publicEnabled && privateEnabled;
     return (
         <Col xs={24} md={12} xl={8}>
             <Card
@@ -1535,27 +1613,55 @@ function AuthProviderSummaryCard({ form, title, iconUrl, users, enabledPath, onE
             >
                 <Flex vertical gap={12}>
                     <Space>
-                        <Tag color={enabled ? "success" : "default"}>{enabled ? "已开启" : "未开启"}</Tag>
+                        <Tag color={ready ? "success" : "default"}>{ready ? "已开启" : "未开启"}</Tag>
+                        <Tag color={publicEnabled ? "processing" : "default"}>前台{publicEnabled ? "显示" : "隐藏"}</Tag>
+                        {privateEnabledPath ? <Tag color={privateEnabled ? "processing" : "default"}>服务端{privateEnabled ? "启用" : "未启用"}</Tag> : null}
                         <Typography.Text type="secondary">使用人数：{users}</Typography.Text>
                     </Space>
-                    <Typography.Text type="secondary">点击编辑配置显示名称、图片地址和登录参数。</Typography.Text>
+                    <Typography.Text type="secondary">前台显示和服务端启用都打开后，登录页才会展示可用入口。</Typography.Text>
                 </Flex>
             </Card>
         </Col>
     );
 }
 
-function OAuthProviderEditorModal({ form, state, onClose }: { form: any; state: AuthProviderEditorState | null; onClose: () => void }) {
+function OAuthProviderEditorModal({ form, state, snapshot, onClose, onSave }: { form: any; state: AuthProviderEditorState | null; snapshot: AdminSettings | null; onClose: () => void; onSave: () => void }) {
     const title = authProviderEditorTitle(form, state);
+    const cancel = () => {
+        if (snapshot) form.setFieldsValue(snapshot);
+        onClose();
+    };
+    const save = () => {
+        onClose();
+        onSave();
+    };
     const removeCustomProvider = () => {
         if (!state || state.type !== "custom") return;
         const current = [...((form.getFieldValue(["private", "auth", "customProviders"]) || []) as AdminPrivateAuthProvider[])];
         current.splice(state.index, 1);
         form.setFieldValue(["private", "auth", "customProviders"], current);
         onClose();
+        onSave();
     };
     return (
-        <Modal title={title} open={!!state} width={980} onCancel={onClose} footer={<Space>{state?.type === "custom" ? <Button danger onClick={removeCustomProvider}>删除</Button> : null}<Button type="primary" onClick={onClose}>完成</Button></Space>} destroyOnHidden>
+        <Modal
+            title={title}
+            open={!!state}
+            width={980}
+            onCancel={cancel}
+            footer={
+                <Flex justify="space-between" gap={12}>
+                    <div>{state?.type === "custom" ? <Button danger onClick={removeCustomProvider}>删除</Button> : null}</div>
+                    <Space>
+                        <Button onClick={cancel}>取消</Button>
+                        <Button type="primary" onClick={save}>
+                            保存
+                        </Button>
+                    </Space>
+                </Flex>
+            }
+            destroyOnHidden
+        >
             {state?.type === "oauth" ? <OAuthProviderFields providerKey={state.providerKey} /> : null}
             {state?.type === "metamask" ? <MetaMaskProviderFields /> : null}
             {state?.type === "custom" ? <CustomProviderFields index={state.index} /> : null}
@@ -1564,6 +1670,8 @@ function OAuthProviderEditorModal({ form, state, onClose }: { form: any; state: 
 }
 
 function OAuthProviderFields({ providerKey }: { providerKey: "linuxDo" | "google" | "github" }) {
+    const providerId = { linuxDo: "linux-do", google: "google", github: "github" }[providerKey];
+    const callbackPath = `/api/auth/oauth/${providerId}/callback`;
     return (
         <Row gutter={16}>
             <Col xs={24} md={6}>
@@ -1572,7 +1680,7 @@ function OAuthProviderFields({ providerKey }: { providerKey: "linuxDo" | "google
                 </Form.Item>
             </Col>
             <Col xs={24} md={6}>
-                <Form.Item name={["private", "auth", providerKey, "enabled"]} label="启用服务端" valuePropName="checked">
+                <Form.Item name={["private", "auth", providerKey, "enabled"]} label="启用服务端" extra="必须同时开启，否则后端会返回未开启。" valuePropName="checked">
                     <Switch />
                 </Form.Item>
             </Col>
@@ -1615,6 +1723,11 @@ function OAuthProviderFields({ providerKey }: { providerKey: "linuxDo" | "google
                 <Form.Item name={["private", "auth", providerKey, "scope"]} label="Scope">
                     <Input />
                 </Form.Item>
+            </Col>
+            <Col span={24}>
+                <Typography.Text type="secondary">
+                    授权回调地址：当前站点域名 + <Typography.Text code>{callbackPath}</Typography.Text>。Google 控制台里的 Authorized redirect URI 必须与浏览器实际访问域名、协议和此路径完全一致。
+                </Typography.Text>
             </Col>
         </Row>
     );

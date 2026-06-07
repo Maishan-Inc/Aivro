@@ -38,7 +38,7 @@ export default function AdminDatabasePage() {
                             <Typography.Title level={4} style={{ margin: 0 }}>
                                 数据库配置
                             </Typography.Title>
-                            <Typography.Text type="secondary">数据库会在服务启动时自动更新；这里仅查看当前结构和启动更新记录。</Typography.Text>
+                            <Typography.Text type="secondary">数据库会在服务启动时自动更新；这里仅查看当前连接数据库的实际结构和启动更新记录。</Typography.Text>
                         </div>
                         <Space>
                             <Button icon={<ReloadOutlined />} loading={isLoading} onClick={() => void loadStatus()}>
@@ -62,7 +62,7 @@ export default function AdminDatabasePage() {
                                     数据库需要更新
                                 </Tag>
                             )}
-                            <Typography.Text type="secondary">当前检查基于 GORM AutoMigrate 模型。</Typography.Text>
+                            <Typography.Text type="secondary">当前检查基于 GORM AutoMigrate 模型；更新记录成功只代表启动时迁移执行完成，是否仍缺字段以当前结构检查为准。</Typography.Text>
                         </Space>
                         <div>
                             <Typography.Text strong>执行来源文件</Typography.Text>

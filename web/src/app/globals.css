@@ -176,16 +176,12 @@
     }
 
     .aivro-wire-surface {
-        background-image:
-            linear-gradient(rgba(120, 113, 108, 0.1) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(120, 113, 108, 0.1) 1px, transparent 1px);
-        background-size: 42px 42px;
+        background-image: radial-gradient(circle, rgba(120, 113, 108, 0.28) 1px, transparent 1.4px);
+        background-size: 18px 18px;
     }
 
     .dark .aivro-wire-surface {
-        background-image:
-            linear-gradient(rgba(214, 211, 209, 0.11) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(214, 211, 209, 0.11) 1px, transparent 1px);
+        background-image: radial-gradient(circle, rgba(214, 211, 209, 0.18) 1px, transparent 1.4px);
     }
 
     .aivro-wire-card {

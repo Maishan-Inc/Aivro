@@ -4,7 +4,7 @@ import { useCallback, useState } from "react";
 
 import { AuthLoadingOverlay } from "@/components/auth-loading-overlay";
 
-export function useAuthLoadingOverlay(minDurationMs = 2400) {
+export function useAuthLoadingOverlay(minDurationMs = 1450) {
     const [state, setState] = useState<{ open: boolean; label: string }>({ open: false, label: "" });
 
     const runWithOverlay = useCallback(

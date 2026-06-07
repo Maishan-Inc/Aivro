@@ -26,8 +26,8 @@ export function AivroDrawableLoader({ className, compact = false }: AivroDrawabl
             animation = animate(drawables, {
                 draw: ["0 0", "0 1", "1 1"],
                 ease: "inOutQuad",
-                duration: 2000,
-                delay: stagger(100),
+                duration: 1200,
+                delay: stagger(60),
                 loop: true,
             });
         })();
@@ -46,7 +46,7 @@ export function AivroDrawableLoader({ className, compact = false }: AivroDrawabl
             viewBox="0 0 304 112"
             role="img"
             aria-labelledby={titleId}
-            className={cn("block text-stone-900 dark:text-stone-100", compact ? "h-8 w-24" : "h-24 w-72", className)}
+            className={cn("mx-auto block shrink-0 text-stone-900 dark:text-stone-100", compact ? "h-8 w-24" : "h-24 w-72", className)}
         >
             <title id={titleId}>Aivro</title>
             <g stroke="currentColor" fill="none" fillRule="evenodd" strokeLinecap="round" strokeLinejoin="round" strokeWidth={6}>
