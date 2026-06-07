@@ -31,7 +31,9 @@ func PublicSettings() (model.PublicSetting, error) {
 
 func AdminSettings() (model.Settings, error) {
 	settings, err := repository.GetSettings()
-	return hidePrivateAPIKeys(normalizeSettings(settings)), err
+	settings = normalizeSettings(settings)
+	syncBuiltinAuthEnabled(&settings)
+	return hidePrivateAPIKeys(settings), err
 }
 
 func SaveSettings(settings model.Settings) (model.Settings, error) {
@@ -40,6 +42,7 @@ func SaveSettings(settings model.Settings) (model.Settings, error) {
 		return model.Settings{}, err
 	}
 	settings = normalizeSettings(settings)
+	syncBuiltinAuthEnabled(&settings)
 	keepPrivateAPIKeys(&settings, normalizeSettings(saved))
 	keepPrivateAuthSecrets(&settings, normalizeSettings(saved))
 	keepCloudStorageSecrets(&settings, normalizeSettings(saved))
@@ -49,6 +52,13 @@ func SaveSettings(settings model.Settings) (model.Settings, error) {
 		RefreshPromptSyncScheduler()
 	}
 	return hidePrivateAPIKeys(result), err
+}
+
+func syncBuiltinAuthEnabled(settings *model.Settings) {
+	settings.Private.Auth.LinuxDo.Enabled = settings.Public.Auth.LinuxDo.Enabled
+	settings.Private.Auth.Google.Enabled = settings.Public.Auth.Google.Enabled
+	settings.Private.Auth.Github.Enabled = settings.Public.Auth.Github.Enabled
+	settings.Private.Auth.MetaMask.Enabled = settings.Public.Auth.MetaMask.Enabled
 }
 
 func AdminChannelModels(index *int, channel model.ModelChannel) ([]string, error) {

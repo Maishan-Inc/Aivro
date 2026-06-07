@@ -1270,7 +1270,7 @@ func sendVerificationMail(setting model.MailSetting, email string, purpose strin
 	if setting.Port == 465 {
 		err = sendMailTLS(addr, setting.Host, auth, setting.FromEmail, []string{email}, []byte(message))
 	} else {
-		err = smtp.SendMail(addr, auth, setting.FromEmail, []string{email}, []byte(message))
+		err = sendMailPlain(addr, setting.Host, auth, setting.FromEmail, []string{email}, []byte(message))
 	}
 	if err != nil {
 		return mailDeliveryError{err: err}
@@ -1304,17 +1304,43 @@ func (err mailDeliveryError) DetailMessage() string {
 	return message
 }
 
-func sendMailTLS(addr string, host string, auth smtp.Auth, from string, to []string, msg []byte) error {
-	conn, err := tls.Dial("tcp", addr, &tls.Config{ServerName: host, MinVersion: tls.VersionTLS12})
+func sendMailPlain(addr string, host string, auth smtp.Auth, from string, to []string, msg []byte) error {
+	conn, err := net.DialTimeout("tcp", addr, 15*time.Second)
 	if err != nil {
 		return err
 	}
 	defer conn.Close()
+	_ = conn.SetDeadline(time.Now().Add(30 * time.Second))
 	client, err := smtp.NewClient(conn, host)
 	if err != nil {
 		return err
 	}
 	defer client.Quit()
+	if ok, _ := client.Extension("STARTTLS"); ok {
+		if err := client.StartTLS(&tls.Config{ServerName: host, MinVersion: tls.VersionTLS12}); err != nil {
+			return err
+		}
+	}
+	return sendMailWithClient(client, auth, from, to, msg)
+}
+
+func sendMailTLS(addr string, host string, auth smtp.Auth, from string, to []string, msg []byte) error {
+	dialer := &net.Dialer{Timeout: 15 * time.Second}
+	conn, err := tls.DialWithDialer(dialer, "tcp", addr, &tls.Config{ServerName: host, MinVersion: tls.VersionTLS12})
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	_ = conn.SetDeadline(time.Now().Add(30 * time.Second))
+	client, err := smtp.NewClient(conn, host)
+	if err != nil {
+		return err
+	}
+	defer client.Quit()
+	return sendMailWithClient(client, auth, from, to, msg)
+}
+
+func sendMailWithClient(client *smtp.Client, auth smtp.Auth, from string, to []string, msg []byte) error {
 	if auth != nil {
 		if err := client.Auth(auth); err != nil {
 			return err
@@ -1452,15 +1478,32 @@ func oauthStateCookie(provider string) string {
 }
 
 func RequestOrigin(r *http.Request) string {
-	host := strings.TrimSpace(r.Header.Get("X-Forwarded-Host"))
+	host := firstForwardedValue(r.Header.Get("X-Forwarded-Host"))
 	if host == "" {
 		host = r.Host
 	}
-	proto := strings.TrimSpace(r.Header.Get("X-Forwarded-Proto"))
+	proto := firstForwardedValue(r.Header.Get("X-Forwarded-Proto"))
+	if proto == "" && strings.EqualFold(strings.TrimSpace(r.Header.Get("X-Forwarded-Ssl")), "on") {
+		proto = "https"
+	}
+	if proto == "" && strings.Contains(strings.ToLower(r.Header.Get("CF-Visitor")), `"scheme":"https"`) {
+		proto = "https"
+	}
+	if proto == "" && r.TLS != nil {
+		proto = "https"
+	}
 	if proto == "" {
 		proto = "http"
 	}
 	return proto + "://" + host
+}
+
+func firstForwardedValue(value string) string {
+	parts := strings.Split(value, ",")
+	if len(parts) == 0 {
+		return ""
+	}
+	return strings.TrimSpace(parts[0])
 }
 
 func firstNonEmpty(values ...string) string {

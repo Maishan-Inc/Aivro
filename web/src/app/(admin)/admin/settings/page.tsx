@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircleOutlined, DeleteOutlined, EditOutlined, FormatPainterOutlined, LoadingOutlined, MailOutlined, PlusOutlined, ReloadOutlined } from "@ant-design/icons";
+import { CheckCircleOutlined, DeleteOutlined, EditOutlined, FormatPainterOutlined, LoadingOutlined, MailOutlined, PlusOutlined, ReloadOutlined, SaveOutlined } from "@ant-design/icons";
 import { json } from "@codemirror/lang-json";
 import { App, Button, Card, Checkbox, Col, Drawer, Flex, Form, Input, InputNumber, Modal, Row, Segmented, Select, Space, Switch, Table, Tabs, Tag, Typography } from "antd";
 import dynamic from "next/dynamic";
@@ -241,13 +241,14 @@ export default function AdminSettingsPage() {
     const [isFetchingChannelModels, setIsFetchingChannelModels] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
-    const [saveHint, setSaveHint] = useState("自动保存");
+    const [saveHint, setSaveHint] = useState("手动保存");
     const [isTestingCloudStorage, setIsTestingCloudStorage] = useState(false);
     const [isSendingTestMail, setIsSendingTestMail] = useState(false);
     const [mailTestEmail, setMailTestEmail] = useState("");
     const [editingMailTemplate, setEditingMailTemplate] = useState<MailTemplateKey | null>(null);
     const [editingAuthProvider, setEditingAuthProvider] = useState<AuthProviderEditorState | null>(null);
     const [authProviderStats, setAuthProviderStats] = useState<Record<string, number>>({});
+    const [currentOrigin, setCurrentOrigin] = useState("");
     const [modelCosts, setModelCosts] = useState<AdminModelCost[]>([]);
     const [knownModels, setKnownModels] = useState<string[]>([]);
     const publicModels = Form.useWatch(["public", "modelChannel", "availableModels"], form) || [];
@@ -264,7 +265,6 @@ export default function AdminSettingsPage() {
     }, [modelSelectGroups, modelSelectKeyword, modelSelectTab]);
     const activeSelectedCount = activeModelSelectModels.filter((model) => modelSelectSelected.includes(model)).length;
     const jsonTextRef = useRef(jsonText);
-    const autoSaveTimerRef = useRef<number | null>(null);
     const settingsLoadedRef = useRef(false);
     const authProviderSnapshotRef = useRef<AdminSettings | null>(null);
 
@@ -272,14 +272,18 @@ export default function AdminSettingsPage() {
         jsonTextRef.current = jsonText;
     }, [jsonText]);
 
-    const saveSettings = useCallback(async (silent = false) => {
+    useEffect(() => {
+        setCurrentOrigin(window.location.origin);
+    }, []);
+
+    const saveSettings = useCallback(async () => {
         if (!token) return;
         const values = await collectSettings(form, editorMode, jsonTextRef.current, message);
         if (!values) {
             return;
         }
         setIsSaving(true);
-        setSaveHint("自动保存中");
+        setSaveHint("保存中");
         try {
             const saved = normalizeSettings(await saveAdminSettings(token, values));
             const merged = mergeSavedSecrets(values, saved);
@@ -291,30 +295,20 @@ export default function AdminSettingsPage() {
                 public: JSON.stringify(merged.public, null, 2),
                 private: JSON.stringify(merged.private, null, 2),
             });
-            setSaveHint("已自动保存");
-            if (!silent) message.success("已保存");
+            setSaveHint("已保存");
+            message.success("已保存");
         } catch (error) {
-            setSaveHint("自动保存失败");
+            setSaveHint("保存失败");
             message.error(error instanceof Error ? error.message : "保存失败");
         } finally {
             setIsSaving(false);
         }
     }, [editorMode, form, message, token]);
 
-    const scheduleAutoSave = useCallback(() => {
-        if (!settingsLoadedRef.current || !token) return;
-        setSaveHint("有修改待保存");
-        if (autoSaveTimerRef.current) window.clearTimeout(autoSaveTimerRef.current);
-        autoSaveTimerRef.current = window.setTimeout(() => {
-            autoSaveTimerRef.current = null;
-            void saveSettings(true);
-        }, 900);
-    }, [saveSettings, token]);
-
     const handleFormValuesChange = useCallback(() => {
         if (editingAuthProvider || editingMailTemplate) return;
-        scheduleAutoSave();
-    }, [editingAuthProvider, editingMailTemplate, scheduleAutoSave]);
+        if (settingsLoadedRef.current) setSaveHint("有修改未保存");
+    }, [editingAuthProvider, editingMailTemplate]);
 
     const loadSettings = useCallback(async () => {
         if (!token) return;
@@ -336,7 +330,7 @@ export default function AdminSettingsPage() {
                 setAuthProviderStats({});
             }
             settingsLoadedRef.current = true;
-            setSaveHint("自动保存");
+            setSaveHint("手动保存");
         } catch (error) {
             message.error(error instanceof Error ? error.message : "读取设置失败");
         } finally {
@@ -350,7 +344,7 @@ export default function AdminSettingsPage() {
 
     useEffect(() => {
         const refreshSettings = () => {
-            if (document.visibilityState !== "visible" || autoSaveTimerRef.current || isSaving || editingAuthProvider || editingMailTemplate || isChannelDrawerOpen || isModelSelectorOpen) return;
+            if (document.visibilityState !== "visible" || saveHint === "有修改未保存" || isSaving || editingAuthProvider || editingMailTemplate || isChannelDrawerOpen || isModelSelectorOpen) return;
             void loadSettings();
         };
         window.addEventListener("focus", refreshSettings);
@@ -359,17 +353,21 @@ export default function AdminSettingsPage() {
             window.removeEventListener("focus", refreshSettings);
             document.removeEventListener("visibilitychange", refreshSettings);
         };
-    }, [editingAuthProvider, editingMailTemplate, isChannelDrawerOpen, isModelSelectorOpen, isSaving, loadSettings]);
-
-    useEffect(() => {
-        return () => {
-            if (autoSaveTimerRef.current) window.clearTimeout(autoSaveTimerRef.current);
-        };
-    }, []);
+    }, [editingAuthProvider, editingMailTemplate, isChannelDrawerOpen, isModelSelectorOpen, isSaving, loadSettings, saveHint]);
 
     const changeTab = (nextTab: SettingsTabKey) => {
         setActiveTab(nextTab);
     };
+
+    const markUnsaved = () => {
+        if (settingsLoadedRef.current) setSaveHint("有修改未保存");
+    };
+
+    const sectionSaveButton = (label = "保存") => (
+        <Button type="primary" size="small" icon={<SaveOutlined />} loading={isSaving} onClick={() => void saveSettings()}>
+            {label}
+        </Button>
+    );
 
     const sendTestMail = async () => {
         if (!token) return;
@@ -442,6 +440,7 @@ export default function AdminSettingsPage() {
         if (tab === "private") setChannels((parsed as AdminSettings["private"]).channels);
         if (tab === "public") setModelCosts((parsed as AdminSettings["public"]).modelChannel.modelCosts);
         rememberKnownModels({ ...normalizeSettings(form.getFieldsValue(true) as AdminSettings), [tab]: parsed });
+        markUnsaved();
         setEditorMode((current) => ({ ...current, [tab]: nextMode }));
     };
 
@@ -657,8 +656,11 @@ export default function AdminSettingsPage() {
                         />
                         <Space>
                             <Typography.Text type={saveHint.includes("失败") ? "danger" : "secondary"}>
-                                {isSaving ? <LoadingOutlined /> : saveHint === "已自动保存" ? <CheckCircleOutlined /> : null} {saveHint}
+                                {isSaving ? <LoadingOutlined /> : saveHint === "已保存" ? <CheckCircleOutlined /> : null} {saveHint}
                             </Typography.Text>
+                            <Button type="primary" icon={<SaveOutlined />} loading={isSaving} onClick={() => void saveSettings()}>
+                                保存当前页
+                            </Button>
                             <Button icon={<ReloadOutlined />} loading={isLoading} onClick={() => void loadSettings()}>
                                 刷新
                             </Button>
@@ -743,7 +745,7 @@ export default function AdminSettingsPage() {
                                         </Form.Item>
                                     </Col>
                                     <Col span={24}>
-                                        <Card size="small" title="页面访问控制">
+                                        <Card size="small" title="页面访问控制" extra={sectionSaveButton()}>
                                             <Typography.Paragraph type="secondary" style={{ marginTop: 0 }}>
                                                 开启后，对应页面需要登录才可以访问；关闭则保持公开访问。
                                             </Typography.Paragraph>
@@ -799,7 +801,7 @@ export default function AdminSettingsPage() {
                                                             addonAfter="点"
                                                             onChange={(value) => {
                                                                 setModelCost(form, setModelCosts, item.model, Number(value) || 0);
-                                                                scheduleAutoSave();
+                                                                markUnsaved();
                                                             }}
                                                         />
                                                     ),
@@ -819,7 +821,7 @@ export default function AdminSettingsPage() {
                                     theme="none"
                                     onChange={(value) => {
                                         setJsonText((current) => ({ ...current, public: value }));
-                                        scheduleAutoSave();
+                                        markUnsaved();
                                     }}
                                     style={{ fontSize: 13 }}
                                 />
@@ -829,7 +831,7 @@ export default function AdminSettingsPage() {
                         <Form form={form} layout="vertical" initialValues={emptySettings} requiredMark={false} onValuesChange={handleFormValuesChange}>
                             <Row gutter={[16, 16]}>
                                 <Col xs={24} lg={12}>
-                                    <Card size="small" title="隐私政策">
+                                    <Card size="small" title="隐私政策" extra={sectionSaveButton()}>
                                         <Form.Item name={["public", "pages", "privacyTitle"]} label="中文标题">
                                             <Input placeholder="隐私政策" />
                                         </Form.Item>
@@ -848,6 +850,7 @@ export default function AdminSettingsPage() {
                                                 form.setFieldValue(["public", "pages", "privacyContent"], defaultPrivacyContent);
                                                 form.setFieldValue(["public", "pages", "privacyTitleEn"], "Privacy Policy");
                                                 form.setFieldValue(["public", "pages", "privacyContentEn"], defaultPrivacyContentEn);
+                                                markUnsaved();
                                             }}
                                         >
                                             恢复默认隐私政策
@@ -855,7 +858,7 @@ export default function AdminSettingsPage() {
                                     </Card>
                                 </Col>
                                 <Col xs={24} lg={12}>
-                                    <Card size="small" title="服务条款">
+                                    <Card size="small" title="服务条款" extra={sectionSaveButton()}>
                                         <Form.Item name={["public", "pages", "termsTitle"]} label="中文标题">
                                             <Input placeholder="服务条款" />
                                         </Form.Item>
@@ -874,6 +877,7 @@ export default function AdminSettingsPage() {
                                                 form.setFieldValue(["public", "pages", "termsContent"], defaultTermsContent);
                                                 form.setFieldValue(["public", "pages", "termsTitleEn"], "Terms of Service");
                                                 form.setFieldValue(["public", "pages", "termsContentEn"], defaultTermsContentEn);
+                                                markUnsaved();
                                             }}
                                         >
                                             恢复默认服务条款
@@ -888,9 +892,12 @@ export default function AdminSettingsPage() {
                                 size="small"
                                 title={t("cloud.tab")}
                                 extra={
-                                    <Button loading={isTestingCloudStorage} onClick={() => void testCurrentCloudStorage()}>
-                                        {t("cloud.test")}
-                                    </Button>
+                                    <Space>
+                                        {sectionSaveButton()}
+                                        <Button loading={isTestingCloudStorage} onClick={() => void testCurrentCloudStorage()}>
+                                            {t("cloud.test")}
+                                        </Button>
+                                    </Space>
                                 }
                             >
                                 <Row gutter={16}>
@@ -976,7 +983,7 @@ export default function AdminSettingsPage() {
                         <Form form={form} layout="vertical" initialValues={emptySettings} requiredMark={false} onValuesChange={handleFormValuesChange}>
                             <Row gutter={[16, 16]}>
                                 <Col xs={24} lg={12}>
-                                    <Card size="small" title="Stripe 私有配置">
+                                    <Card size="small" title="Stripe 私有配置" extra={sectionSaveButton()}>
                                         <Row gutter={16}>
                                             <Col span={24}>
                                                 <Form.Item name={["private", "stripe", "enabled"]} label="启用 Stripe 支付" valuePropName="checked">
@@ -1007,7 +1014,7 @@ export default function AdminSettingsPage() {
                                     </Card>
                                 </Col>
                                 <Col xs={24} lg={12}>
-                                    <Card size="small" title="Didit KYC 配置">
+                                    <Card size="small" title="Didit KYC 配置" extra={sectionSaveButton()}>
                                         <Row gutter={16}>
                                             <Col xs={24} md={12}>
                                                 <Form.Item name={["private", "kyc", "enabled"]} label="启用 KYC" valuePropName="checked">
@@ -1058,7 +1065,7 @@ export default function AdminSettingsPage() {
                         <Form form={form} layout="vertical" initialValues={emptySettings} requiredMark={false} onValuesChange={handleFormValuesChange}>
                             <Row gutter={[16, 16]}>
                                 <Col xs={24} lg={12}>
-                                    <Card size="small" title="SMTP 验证码配置">
+                                    <Card size="small" title="SMTP 验证码配置" extra={sectionSaveButton()}>
                                         <Row gutter={16}>
                                             <Col xs={24} md={8}>
                                                 <Form.Item name={["private", "mail", "enabled"]} label="开启邮件服务" valuePropName="checked">
@@ -1140,12 +1147,12 @@ export default function AdminSettingsPage() {
                                     </Button>
                                 </Col>
                             </Row>
-                            <OAuthProviderEditorModal form={form} state={editingAuthProvider} snapshot={authProviderSnapshotRef.current} onClose={closeAuthProviderEditor} onSave={scheduleAutoSave} />
+                            <OAuthProviderEditorModal form={form} state={editingAuthProvider} snapshot={authProviderSnapshotRef.current} currentOrigin={currentOrigin} onClose={closeAuthProviderEditor} onSave={() => void saveSettings()} />
                         </Form>
                     ) : activeMode === "visual" ? (
                         <Form form={form} layout="vertical" initialValues={emptySettings} requiredMark={false} onValuesChange={handleFormValuesChange}>
                             <Flex vertical gap={12}>
-                                <Card size="small" title="提示词定时同步">
+                                <Card size="small" title="提示词定时同步" extra={sectionSaveButton()}>
                                     <Row gutter={16} align="middle">
                                         <Col xs={24} md={8}>
                                             <Form.Item name={["private", "promptSync", "enabled"]} label="开启定时同步" valuePropName="checked">
@@ -1159,7 +1166,7 @@ export default function AdminSettingsPage() {
                                         </Col>
                                     </Row>
                                 </Card>
-                                <Card size="small" title="AI 队列 / 按模型限流">
+                                <Card size="small" title="AI 队列 / 按模型限流" extra={sectionSaveButton()}>
                                     <Row gutter={16}>
                                         <Col xs={24} md={6}>
                                             <Form.Item name={["private", "aiQueue", "enabled"]} label="启用队列" valuePropName="checked">
@@ -1213,7 +1220,7 @@ export default function AdminSettingsPage() {
                                         )}
                                     </Form.List>
                                 </Card>
-                                <Card size="small" title="Cloudflare Turnstile">
+                                <Card size="small" title="Cloudflare Turnstile" extra={sectionSaveButton()}>
                                     <Row gutter={16}>
                                         <Col xs={24} md={8}>
                                             <Form.Item name={["private", "turnstile", "enabled"]} label="启用人机验证" valuePropName="checked">
@@ -1293,14 +1300,14 @@ export default function AdminSettingsPage() {
                                 theme="none"
                                 onChange={(value) => {
                                     setJsonText((current) => ({ ...current, private: value }));
-                                    scheduleAutoSave();
+                                    markUnsaved();
                                 }}
                                 style={{ fontSize: 13 }}
                             />
                         </div>
                     )}
                 </Card>
-                <MailTemplateEditorModal form={form} name={editingMailTemplate} onClose={() => setEditingMailTemplate(null)} onSave={scheduleAutoSave} />
+                <MailTemplateEditorModal form={form} name={editingMailTemplate} onClose={() => setEditingMailTemplate(null)} onSave={() => void saveSettings()} />
                 <Drawer
                     title={editingChannelIndex === null ? "新增渠道" : "编辑渠道"}
                     open={isChannelDrawerOpen}
@@ -1638,7 +1645,7 @@ function AuthProviderSummaryCard({ form, title, iconUrl, users, publicEnabledPat
     );
 }
 
-function OAuthProviderEditorModal({ form, state, snapshot, onClose, onSave }: { form: any; state: AuthProviderEditorState | null; snapshot: AdminSettings | null; onClose: () => void; onSave: () => void }) {
+function OAuthProviderEditorModal({ form, state, snapshot, currentOrigin, onClose, onSave }: { form: any; state: AuthProviderEditorState | null; snapshot: AdminSettings | null; currentOrigin: string; onClose: () => void; onSave: () => void }) {
     const title = authProviderEditorTitle(form, state);
     const cancel = () => {
         if (snapshot) form.setFieldsValue(snapshot);
@@ -1675,16 +1682,17 @@ function OAuthProviderEditorModal({ form, state, snapshot, onClose, onSave }: { 
             }
             destroyOnHidden
         >
-            {state?.type === "oauth" ? <OAuthProviderFields providerKey={state.providerKey} /> : null}
+            {state?.type === "oauth" ? <OAuthProviderFields providerKey={state.providerKey} currentOrigin={currentOrigin} /> : null}
             {state?.type === "metamask" ? <MetaMaskProviderFields /> : null}
             {state?.type === "custom" ? <CustomProviderFields index={state.index} /> : null}
         </Modal>
     );
 }
 
-function OAuthProviderFields({ providerKey }: { providerKey: "linuxDo" | "google" | "github" }) {
+function OAuthProviderFields({ providerKey, currentOrigin }: { providerKey: "linuxDo" | "google" | "github"; currentOrigin: string }) {
     const providerId = { linuxDo: "linux-do", google: "google", github: "github" }[providerKey];
     const callbackPath = `/api/auth/oauth/${providerId}/callback`;
+    const callbackUrl = currentOrigin ? `${currentOrigin}${callbackPath}` : `当前站点域名${callbackPath}`;
     return (
         <Row gutter={16}>
             <Col xs={24} md={6}>
@@ -1738,9 +1746,13 @@ function OAuthProviderFields({ providerKey }: { providerKey: "linuxDo" | "google
                 </Form.Item>
             </Col>
             <Col span={24}>
-                <Typography.Text type="secondary">
-                    授权回调地址：当前站点域名 + <Typography.Text code>{callbackPath}</Typography.Text>。Google 控制台里的 Authorized redirect URI 必须与浏览器实际访问域名、协议和此路径完全一致。
-                </Typography.Text>
+                <Flex vertical gap={6}>
+                    <Typography.Text type="secondary">授权回调地址必须与浏览器实际访问域名、协议和路径完全一致。</Typography.Text>
+                    <Typography.Text copyable code>
+                        {callbackUrl}
+                    </Typography.Text>
+                    {providerKey === "google" ? <Typography.Text type="secondary">Google 控制台的 Authorized redirect URI 请填写上面这一整行。</Typography.Text> : null}
+                </Flex>
             </Col>
         </Row>
     );
@@ -2046,11 +2058,22 @@ function mergeSavedSecrets(currentSettings: AdminSettings, saved: AdminSettings)
         ...item,
         apiKey: currentSettings.private.channels[index]?.apiKey || item.apiKey,
     }));
+    const auth = {
+        ...saved.private.auth,
+        linuxDo: { ...saved.private.auth.linuxDo, clientSecret: currentSettings.private.auth.linuxDo.clientSecret || saved.private.auth.linuxDo.clientSecret },
+        google: { ...saved.private.auth.google, clientSecret: currentSettings.private.auth.google.clientSecret || saved.private.auth.google.clientSecret },
+        github: { ...saved.private.auth.github, clientSecret: currentSettings.private.auth.github.clientSecret || saved.private.auth.github.clientSecret },
+        customProviders: saved.private.auth.customProviders.map((item, index) => ({
+            ...item,
+            clientSecret: currentSettings.private.auth.customProviders[index]?.clientSecret || item.clientSecret,
+        })),
+    };
     return {
         public: saved.public,
         private: {
             ...saved.private,
             channels,
+            auth,
             turnstile: {
                 ...saved.private.turnstile,
                 secretKey: currentSettings.private.turnstile.secretKey || saved.private.turnstile.secretKey,
