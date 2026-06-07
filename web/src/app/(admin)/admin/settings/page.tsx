@@ -1618,7 +1618,7 @@ function AuthProviderSummaryCard({ form, title, iconUrl, users, publicEnabledPat
                         {privateEnabledPath ? <Tag color={privateEnabled ? "processing" : "default"}>服务端{privateEnabled ? "启用" : "未启用"}</Tag> : null}
                         <Typography.Text type="secondary">使用人数：{users}</Typography.Text>
                     </Space>
-                    <Typography.Text type="secondary">前台显示和服务端启用都打开后，登录页才会展示可用入口。</Typography.Text>
+                    <Typography.Text type="secondary">登录页展示以前台显示为准；保存时会同步内置登录的服务端启用状态。</Typography.Text>
                 </Flex>
             </Card>
         </Col>
@@ -1680,7 +1680,7 @@ function OAuthProviderFields({ providerKey }: { providerKey: "linuxDo" | "google
                 </Form.Item>
             </Col>
             <Col xs={24} md={6}>
-                <Form.Item name={["private", "auth", providerKey, "enabled"]} label="启用服务端" extra="必须同时开启，否则后端会返回未开启。" valuePropName="checked">
+                <Form.Item name={["private", "auth", providerKey, "enabled"]} label="启用服务端" extra="保存内置登录时会跟随前台显示同步，避免前台已开启但服务端仍未开启。" valuePropName="checked">
                     <Switch />
                 </Form.Item>
             </Col>
@@ -2130,6 +2130,10 @@ async function collectSettings(form: any, editorMode: Record<string, EditorMode>
         iconUrl: provider.iconUrl,
         enabled: provider.enabled,
     }));
+    values.private.auth.linuxDo.enabled = values.public.auth.linuxDo.enabled;
+    values.private.auth.google.enabled = values.public.auth.google.enabled;
+    values.private.auth.github.enabled = values.public.auth.github.enabled;
+    values.private.auth.metamask.enabled = values.public.auth.metamask.enabled;
     return normalizeSettings(values);
 }
 

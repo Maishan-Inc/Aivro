@@ -26,30 +26,7 @@ func PublicSettings() (model.PublicSetting, error) {
 	} else {
 		settings.Public.Auth.TurnstileSiteKey = ""
 	}
-	settings.Public = publicSettingsWithAvailableAuth(settings)
 	return settings.Public, nil
-}
-
-func publicSettingsWithAvailableAuth(settings model.Settings) model.PublicSetting {
-	public := settings.Public
-	public.Auth.LinuxDo.Enabled = public.Auth.LinuxDo.Enabled && settings.Private.Auth.LinuxDo.Enabled
-	public.Auth.Google.Enabled = public.Auth.Google.Enabled && settings.Private.Auth.Google.Enabled
-	public.Auth.Github.Enabled = public.Auth.Github.Enabled && settings.Private.Auth.Github.Enabled
-	public.Auth.MetaMask.Enabled = public.Auth.MetaMask.Enabled && settings.Private.Auth.MetaMask.Enabled
-	for i := range public.Auth.CustomProviders {
-		enabled := false
-		if i < len(settings.Private.Auth.CustomProviders) {
-			enabled = settings.Private.Auth.CustomProviders[i].Enabled
-		}
-		for _, privateProvider := range settings.Private.Auth.CustomProviders {
-			if privateProvider.ID == public.Auth.CustomProviders[i].ID {
-				enabled = privateProvider.Enabled
-				break
-			}
-		}
-		public.Auth.CustomProviders[i].Enabled = public.Auth.CustomProviders[i].Enabled && enabled
-	}
-	return public
 }
 
 func AdminSettings() (model.Settings, error) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { LockOutlined, MailOutlined, UserOutlined } from "@ant-design/icons";
+import { EyeInvisibleOutlined, LockOutlined, MailOutlined, UserOutlined } from "@ant-design/icons";
 import { App, Button, Form, Input, Segmented, Space } from "antd";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
@@ -204,19 +204,10 @@ function LoginContent() {
     };
 
     return (
-        <main className="aivro-wire-surface flex h-full min-h-0 items-center justify-center overflow-y-auto bg-background px-6 py-8">
-            <AivroReveal className="w-full max-w-[460px]">
-                <div data-aivro-reveal className="mb-6 text-center">
-                    <div className="mb-5 flex items-center justify-center gap-3">
-                        <span className="text-5xl font-semibold leading-none tracking-normal text-stone-950 dark:text-stone-100">Aivro</span>
-                        <span className="block size-11 bg-stone-950 dark:bg-stone-100" style={{ mask: "url(/logo.svg) center / contain no-repeat", WebkitMask: "url(/logo.svg) center / contain no-repeat" }} aria-label="Aivro" />
-                    </div>
-                    <h1 className="text-2xl font-semibold tracking-normal text-stone-950 dark:text-stone-100">{mode === "register" ? (locale === "en-US" ? "Create account" : "创建账号") : locale === "en-US" ? "Account sign in" : "账号登录"}</h1>
-                    <p className="mx-auto mt-3 max-w-[25rem] text-sm leading-6 text-stone-500 dark:text-stone-400">{mode === "register" ? (locale === "en-US" ? "Use email verification, then complete your profile." : "使用邮箱验证后，再填写账户信息。") : locale === "en-US" ? "Use email and password or a third-party account." : "支持邮箱密码和第三方登录。"}</p>
-                </div>
-
-                <Form<LoginFormValues> form={form} layout="vertical" size="large" requiredMark={false} onFinish={submit} className="aivro-wire-card rounded-2xl p-6">
-                    <Form.Item>
+        <main className="aivro-wire-surface flex h-full min-h-0 items-start justify-center overflow-y-auto bg-[#080808] px-5 py-8 text-stone-200">
+            <AivroReveal className="w-full max-w-[444px]">
+                <Form<LoginFormValues> form={form} layout="vertical" size="large" requiredMark={false} onFinish={submit} className="aivro-auth-form">
+                    <Form.Item className="!mb-11">
                         <Segmented
                             block
                             value={mode}
@@ -236,16 +227,16 @@ function LoginContent() {
                         </div>
                     </AivroReveal>
                     <Space orientation="vertical" size={14} style={{ width: "100%" }}>
-                        <Button block type="primary" htmlType="submit" loading={isLoading || sendingCode} disabled={!publicSettings}>
+                        <Button className="!mt-1 !h-14 !rounded-xl !border-0 !bg-stone-200 !text-lg !font-medium !text-stone-950 hover:!bg-white disabled:!bg-stone-500" block type="primary" htmlType="submit" loading={isLoading || sendingCode} disabled={!publicSettings}>
                             {isLoading || sendingCode ? (locale === "en-US" ? "Processing" : "处理中") : registerButtonText(mode, registerStep, locale)}
                         </Button>
-                        <p className="m-0 text-center text-xs leading-5 text-stone-500 dark:text-stone-400">
+                        <p className="m-0 px-1 text-center text-sm leading-6 text-stone-400">
                             {mode === "register" ? (locale === "en-US" ? "Registering" : "注册") : locale === "en-US" ? "Signing in to" : "登录"} Aivro，{locale === "en-US" ? "means you agree to our" : "即代表你同意我们的"}{" "}
-                            <a href={localizedPath("/privacy")} className="font-medium text-stone-800 underline underline-offset-4 dark:text-stone-200">
+                            <a href={localizedPath("/privacy")} className="font-medium text-stone-200 underline underline-offset-4">
                                 {locale === "en-US" ? "Privacy Policy" : "隐私政策"}
                             </a>{" "}
                             {locale === "en-US" ? "and" : "和"}{" "}
-                            <a href={localizedPath("/terms")} className="font-medium text-stone-800 underline underline-offset-4 dark:text-stone-200">
+                            <a href={localizedPath("/terms")} className="font-medium text-stone-200 underline underline-offset-4">
                                 {locale === "en-US" ? "Terms of Service" : "服务条款"}
                             </a>
                         </p>
@@ -262,11 +253,11 @@ function LoginContent() {
 function LoginFields({ locale }: { locale: string }) {
     return (
         <>
-            <Form.Item name="username" label={<span className="font-medium text-stone-800 dark:text-stone-200">{locale === "en-US" ? "Email" : "邮箱"}</span>} rules={[{ required: true, message: "请输入邮箱" }]}>
+            <Form.Item name="username" label={<span className="font-medium text-stone-200">{locale === "en-US" ? "Email" : "邮箱"}</span>} rules={[{ required: true, message: "请输入邮箱" }]}>
                 <Input prefix={<MailOutlined />} autoComplete="email" />
             </Form.Item>
-            <Form.Item name="password" label={<span className="font-medium text-stone-800 dark:text-stone-200">{locale === "en-US" ? "Password" : "密码"}</span>} rules={[{ required: true, message: "请输入密码" }]}>
-                <Input.Password prefix={<LockOutlined />} autoComplete="current-password" />
+            <Form.Item name="password" label={<span className="font-medium text-stone-200">{locale === "en-US" ? "Password" : "密码"}</span>} rules={[{ required: true, message: "请输入密码" }]}>
+                <Input.Password prefix={<LockOutlined />} iconRender={() => <EyeInvisibleOutlined />} autoComplete="current-password" />
             </Form.Item>
         </>
     );
@@ -276,19 +267,19 @@ function RegisterFields({ step, locale, sendingCode, codeSeconds, publicReady, o
     return (
         <>
             <RegisterSteps active={step} locale={locale} />
-            <div className="mt-5">
+            <div className="mt-8">
                 {step === "credential" ? (
                     <>
-                        <Form.Item name="email" label={<span className="font-medium text-stone-800 dark:text-stone-200">{locale === "en-US" ? "Email" : "邮箱"}</span>} rules={[{ required: true, message: "请输入邮箱" }, { type: "email", message: "邮箱格式不正确" }]}>
+                        <Form.Item name="email" label={<span className="font-medium text-stone-200">{locale === "en-US" ? "Email" : "邮箱"}</span>} rules={[{ required: true, message: "请输入邮箱" }, { type: "email", message: "邮箱格式不正确" }]}>
                             <Input prefix={<MailOutlined />} autoComplete="email" />
                         </Form.Item>
-                        <Form.Item name="password" label={<span className="font-medium text-stone-800 dark:text-stone-200">{locale === "en-US" ? "Password" : "密码"}</span>} rules={[{ required: true, message: "请输入密码" }]}>
-                            <Input.Password prefix={<LockOutlined />} autoComplete="new-password" />
+                        <Form.Item name="password" label={<span className="font-medium text-stone-200">{locale === "en-US" ? "Password" : "密码"}</span>} rules={[{ required: true, message: "请输入密码" }]}>
+                            <Input.Password prefix={<LockOutlined />} iconRender={() => <EyeInvisibleOutlined />} autoComplete="new-password" />
                         </Form.Item>
                     </>
                 ) : null}
                 {step === "code" ? (
-                    <Form.Item label={<span className="font-medium text-stone-800 dark:text-stone-200">{locale === "en-US" ? "Email code" : "邮箱验证码"}</span>}>
+                    <Form.Item label={<span className="font-medium text-stone-200">{locale === "en-US" ? "Email code" : "邮箱验证码"}</span>}>
                         <Space.Compact style={{ width: "100%" }}>
                             <Form.Item name="code" noStyle rules={[{ required: true, message: "请输入验证码" }]}>
                                 <Input autoComplete="one-time-code" />
@@ -304,7 +295,7 @@ function RegisterFields({ step, locale, sendingCode, codeSeconds, publicReady, o
                         <Form.Item name="accountType" initialValue="personal">
                             <Segmented block options={[{ label: locale === "en-US" ? "Personal" : "个人", value: "personal" }, { label: locale === "en-US" ? "Company" : "公司", value: "company" }]} />
                         </Form.Item>
-                        <Form.Item name="displayName" label={<span className="font-medium text-stone-800 dark:text-stone-200">{locale === "en-US" ? "Name" : "名称"}</span>} rules={[{ required: true, message: "请输入名称" }]}>
+                        <Form.Item name="displayName" label={<span className="font-medium text-stone-200">{locale === "en-US" ? "Name" : "名称"}</span>} rules={[{ required: true, message: "请输入名称" }]}>
                             <Input prefix={<UserOutlined />} autoComplete="name" />
                         </Form.Item>
                     </>
@@ -322,9 +313,9 @@ function RegisterSteps({ active, locale }: { active: RegisterStep; locale: strin
     ];
     const activeIndex = steps.findIndex((item) => item.key === active);
     return (
-        <div className="grid grid-cols-3 overflow-hidden rounded-lg border border-stone-200 text-center text-xs font-medium dark:border-stone-800">
+        <div className="grid grid-cols-3 overflow-hidden rounded-xl border border-stone-700 text-center text-xs font-medium">
             {steps.map((step, index) => (
-                <div key={step.key} className={`py-2 ${index <= activeIndex ? "bg-stone-950 text-white dark:bg-stone-100 dark:text-stone-950" : "bg-background text-stone-500"}`}>
+                <div key={step.key} className={`py-2 ${index <= activeIndex ? "bg-stone-200 text-stone-950" : "bg-transparent text-stone-400"}`}>
                     {step.label}
                 </div>
             ))}
@@ -339,12 +330,7 @@ function LoginActions({ locale, localizedPath, redirect, authSettings, linuxDoEn
                 {locale === "en-US" ? "Forgot password" : "找回密码"}
             </Button>
             {authSettings?.metamask?.enabled || providers.length ? (
-                <div className="mt-5 border-t border-stone-200 pt-5 dark:border-stone-800">
-                    <div className="mb-4 flex items-center gap-3 text-xs text-stone-400">
-                        <span className="h-px flex-1 bg-stone-200 dark:bg-stone-800" />
-                        <span>{locale === "en-US" ? "Third-party sign in" : "第三方登录"}</span>
-                        <span className="h-px flex-1 bg-stone-200 dark:bg-stone-800" />
-                    </div>
+                <div className="mt-5">
                     <div className="grid gap-3">
                         {authSettings?.metamask?.enabled ? (
                             <Button className="h-11 justify-start" block disabled={!metaMaskAvailable} title={metaMaskAvailable ? undefined : locale === "en-US" ? "MetaMask is not installed" : "未检测到 MetaMask"} icon={<ProviderIcon src={authSettings.metamask.iconUrl || "/icons/metamask.svg"} />} onClick={() => void onMetaMask()}>

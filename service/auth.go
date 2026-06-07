@@ -329,7 +329,7 @@ func OAuthAuthorizeURL(w http.ResponseWriter, r *http.Request, provider string, 
 	}
 	settings = normalizeSettings(settings)
 	publicProvider, privateProvider, ok := oauthProviderSettings(settings, provider)
-	if !ok || !publicProvider.Enabled || !privateProvider.Enabled {
+	if !ok || !publicProvider.Enabled {
 		return "", safeMessageError{message: "第三方登录未开启"}
 	}
 	if strings.TrimSpace(privateProvider.ClientID) == "" || strings.TrimSpace(privateProvider.ClientSecret) == "" || strings.TrimSpace(privateProvider.AuthorizeURL) == "" {
@@ -357,7 +357,7 @@ func LoginWithOAuth(r *http.Request, provider string, code string, state string)
 	}
 	settings = normalizeSettings(settings)
 	publicProvider, privateProvider, ok := oauthProviderSettings(settings, provider)
-	if !ok || !publicProvider.Enabled || !privateProvider.Enabled {
+	if !ok || !publicProvider.Enabled {
 		return model.AuthSession{}, redirect, safeMessageError{message: "第三方登录未开启"}
 	}
 	token, err := oauthAccessToken(r, publicProvider.ID, code, privateProvider)

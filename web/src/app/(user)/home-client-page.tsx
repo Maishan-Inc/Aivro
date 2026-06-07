@@ -47,7 +47,7 @@ export function HomeClientPage() {
                 <div className="pointer-events-none absolute right-[23%] top-[48%] size-20 rounded-full border border-dashed border-stone-200 dark:border-stone-800" />
 
                 <AivroReveal className="relative flex min-h-[620px] flex-col items-center justify-center pt-10 text-center">
-                    <div data-aivro-reveal>
+                    <div data-aivro-reveal className="flex w-full justify-center">
                         <AivroOutlineTitle label={t("app.name")} />
                     </div>
                     <p data-aivro-reveal className="mt-8 max-w-3xl text-balance text-lg leading-8 text-stone-500 dark:text-stone-400">

@@ -143,6 +143,8 @@
     .aivro-outline-title {
         display: block;
         line-height: 0;
+        margin-inline: auto;
+        max-width: 100%;
         width: min(86vw, 42rem);
     }
 
@@ -194,6 +196,90 @@
         border-color: rgba(214, 211, 209, 0.18);
         background: rgba(28, 25, 23, 0.58);
         box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+    }
+
+    .aivro-auth-form .ant-segmented {
+        background: #030303;
+        border-radius: 8px;
+        padding: 3px;
+    }
+
+    .aivro-auth-form .ant-segmented-item {
+        border-radius: 7px;
+        color: rgba(231, 229, 228, 0.7);
+        font-size: 22px;
+        font-weight: 500;
+        height: 52px;
+        line-height: 52px;
+    }
+
+    .aivro-auth-form .ant-segmented-item-selected {
+        background: #222222;
+        color: #e7e5e4;
+    }
+
+    .aivro-auth-form .ant-form-item {
+        margin-bottom: 32px;
+    }
+
+    .aivro-auth-form .ant-form-item-label {
+        padding-bottom: 14px;
+    }
+
+    .aivro-auth-form .ant-form-item-label > label {
+        color: #e7e5e4;
+        font-size: 17px;
+        height: auto;
+    }
+
+    .aivro-auth-form .ant-input-affix-wrapper,
+    .aivro-auth-form .ant-input,
+    .aivro-auth-form .ant-input-password {
+        background: #111111;
+        border-color: rgba(231, 229, 228, 0.28);
+        border-radius: 8px;
+        color: #e7e5e4;
+    }
+
+    .aivro-auth-form .ant-input-affix-wrapper {
+        height: 56px;
+        padding-inline: 16px;
+    }
+
+    .aivro-auth-form .ant-input-affix-wrapper:hover,
+    .aivro-auth-form .ant-input-affix-wrapper-focused {
+        background: #111111;
+        border-color: rgba(231, 229, 228, 0.5);
+        box-shadow: none;
+    }
+
+    .aivro-auth-form .ant-input-prefix,
+    .aivro-auth-form .ant-input-suffix {
+        color: rgba(231, 229, 228, 0.86);
+        font-size: 22px;
+    }
+
+    .aivro-auth-form .ant-input {
+        color: #e7e5e4;
+        font-size: 16px;
+    }
+
+    .aivro-auth-form .ant-btn-link {
+        color: #d6d3d1;
+        font-size: 21px;
+        height: 38px;
+    }
+
+    .aivro-auth-form .ant-btn-default {
+        background: #111111;
+        border-color: rgba(231, 229, 228, 0.28);
+        color: #e7e5e4;
+    }
+
+    .aivro-auth-form .ant-btn-default:hover {
+        background: #171717 !important;
+        border-color: rgba(231, 229, 228, 0.5) !important;
+        color: #ffffff !important;
     }
 
     .aivro-reveal {
