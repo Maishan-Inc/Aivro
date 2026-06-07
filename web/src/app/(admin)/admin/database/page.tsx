@@ -77,6 +77,15 @@ export default function AdminDatabasePage() {
                             <Typography.Text type="secondary">当前检查基于 GORM AutoMigrate 模型；更新记录成功只代表启动时迁移执行完成，是否仍缺字段以当前结构检查为准。</Typography.Text>
                         </Space>
                         <div>
+                            <Typography.Text strong>当前连接</Typography.Text>
+                            <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+                                <Tag color={status?.driver === "postgres" ? "blue" : status?.driver === "sqlite" ? "gold" : "default"}>{status?.driver || "unknown"}</Tag>
+                                <Typography.Text code copyable={Boolean(status?.dsn)}>
+                                    {status?.dsn || "-"}
+                                </Typography.Text>
+                            </div>
+                        </div>
+                        <div>
                             <Typography.Text strong>执行来源文件</Typography.Text>
                             <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 8 }}>
                                 {(status?.sourceFiles || []).map((file) => (

@@ -363,6 +363,8 @@ export type AdminDatabaseUpdateLog = {
 };
 
 export type AdminDatabaseStatus = {
+    driver: string;
+    dsn: string;
     updated: boolean;
     sourceFiles: string[];
     missing: string[];

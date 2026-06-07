@@ -230,6 +230,8 @@ type DatabaseUpdateLog struct {
 }
 
 type DatabaseStatus struct {
+	Driver         string              `json:"driver"`
+	DSN            string              `json:"dsn"`
 	Updated        bool                `json:"updated"`
 	SourceFiles    []string            `json:"sourceFiles"`
 	Missing        []string            `json:"missing"`

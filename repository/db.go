@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"log"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -34,11 +36,15 @@ var (
 
 var databaseMigrationSources = []string{
 	"repository/db.go",
+	"repository/db_indexes.go",
 	"model/user.go",
+	"model/prompt.go",
+	"model/asset.go",
+	"model/cloud_file.go",
+	"model/generation_task.go",
 	"model/workflow.go",
 	"model/billing.go",
 	"model/kyc.go",
-	"model/content.go",
 	"model/generation_history.go",
 	"model/setting.go",
 }
@@ -46,16 +52,21 @@ var databaseMigrationSources = []string{
 // DB 初始化并返回全局数据库连接。
 func DB() (*gorm.DB, error) {
 	dbOnce.Do(func() {
-		driver := strings.ToLower(strings.TrimSpace(config.Cfg.StorageDriver))
-		if driver == "" {
-			driver = "sqlite"
-		}
+		driver := databaseDriver()
 		dsn := config.Cfg.DatabaseDSN
-		if driver == "sqlite" && dsn != ":memory:" {
-			_ = os.MkdirAll(filepath.Dir(dsn), 0755)
+		if driver == "sqlite" {
+			if err := ensureSQLiteDir(dsn); err != nil {
+				dbErr = err
+				return
+			}
 		}
+		log.Printf("database connecting driver=%s dsn=%s", driver, sanitizedDatabaseDSN(driver, dsn))
 		db, dbErr = gorm.Open(dialector(driver, dsn), &gorm.Config{})
 		if dbErr != nil {
+			return
+		}
+		if err := configureDatabase(db, driver); err != nil {
+			dbErr = err
 			return
 		}
 		dbErr = migrateModels(db)
@@ -99,7 +110,7 @@ func DatabaseStatus() (model.DatabaseStatus, error) {
 		}
 	}
 	missingColumns := make([]string, 0)
-	for _, item := range databaseMigrationColumnItems() {
+	for _, item := range databaseMigrationColumnItems(db) {
 		if !db.Migrator().HasColumn(item.value, item.column) {
 			missingColumns = append(missingColumns, item.name)
 		}
@@ -107,6 +118,8 @@ func DatabaseStatus() (model.DatabaseStatus, error) {
 	logs := []model.DatabaseUpdateLog{}
 	_ = db.Order("created_at desc").Limit(30).Find(&logs).Error
 	return model.DatabaseStatus{
+		Driver:         databaseDriver(),
+		DSN:            sanitizedDatabaseDSN(databaseDriver(), config.Cfg.DatabaseDSN),
 		Updated:        len(missing) == 0 && len(missingColumns) == 0,
 		SourceFiles:    databaseMigrationSources,
 		Missing:        missing,
@@ -193,25 +206,34 @@ func databaseMigrationModelItems() []struct {
 	}
 }
 
-func databaseMigrationColumnItems() []struct {
+func databaseMigrationColumnItems(db *gorm.DB) []struct {
 	name   string
 	value  any
 	column string
 } {
-	return []struct {
+	items := make([]struct {
 		name   string
 		value  any
 		column string
-	}{
-		{"users.auth_provider", &model.User{}, "auth_provider"},
-		{"users.google_id", &model.User{}, "google_id"},
-		{"users.github_id", &model.User{}, "github_id"},
-		{"users.metamask_address", &model.User{}, "metamask_address"},
-		{"users.workflow_create_credits", &model.User{}, "workflow_create_credits"},
-		{"settings.value", &model.Setting{}, "value"},
-		{"plans.enabled", &model.Plan{}, "enabled"},
-		{"plans.workflow_create_credits", &model.Plan{}, "workflow_create_credits"},
+	}, 0)
+	for _, modelItem := range databaseMigrationModelItems() {
+		stmt := &gorm.Statement{DB: db}
+		if err := stmt.Parse(modelItem.value); err != nil || stmt.Schema == nil {
+			continue
+		}
+		for _, column := range stmt.Schema.DBNames {
+			items = append(items, struct {
+				name   string
+				value  any
+				column string
+			}{
+				name:   stmt.Schema.Table + "." + column,
+				value:  modelItem.value,
+				column: column,
+			})
+		}
 	}
+	return items
 }
 
 func EnsureDefaultPlans() error {
@@ -253,4 +275,80 @@ func dialector(driver string, dsn string) gorm.Dialector {
 	default:
 		return sqlite.Open(dsn)
 	}
+}
+
+func databaseDriver() string {
+	driver := strings.ToLower(strings.TrimSpace(config.Cfg.StorageDriver))
+	if driver == "postgresql" {
+		return "postgres"
+	}
+	if driver == "" {
+		return "sqlite"
+	}
+	return driver
+}
+
+func ensureSQLiteDir(dsn string) error {
+	path := sqliteFilePath(dsn)
+	if path == "" {
+		return nil
+	}
+	dir := filepath.Dir(path)
+	if dir == "." || dir == "" {
+		return nil
+	}
+	return os.MkdirAll(dir, 0755)
+}
+
+func sqliteFilePath(dsn string) string {
+	value := strings.TrimSpace(dsn)
+	if value == "" || value == ":memory:" || strings.HasPrefix(value, "file::memory:") {
+		return ""
+	}
+	if strings.HasPrefix(value, "file:") {
+		value = strings.TrimPrefix(value, "file:")
+	}
+	if index := strings.Index(value, "?"); index >= 0 {
+		value = value[:index]
+	}
+	if value == "" || value == ":memory:" {
+		return ""
+	}
+	return value
+}
+
+func configureDatabase(db *gorm.DB, driver string) error {
+	if driver == "sqlite" {
+		if err := db.Exec("PRAGMA journal_mode=WAL").Error; err != nil {
+			return err
+		}
+		return db.Exec("PRAGMA busy_timeout=5000").Error
+	}
+	return nil
+}
+
+func sanitizedDatabaseDSN(driver string, dsn string) string {
+	value := strings.TrimSpace(dsn)
+	if value == "" {
+		return ""
+	}
+	if driver == "sqlite" {
+		if path := sqliteFilePath(value); path != "" {
+			return path
+		}
+		return value
+	}
+	if parsed, err := url.Parse(value); err == nil && parsed.User != nil {
+		if username := parsed.User.Username(); username != "" {
+			parsed.User = url.UserPassword(username, "***")
+		}
+		return parsed.String()
+	}
+	if at := strings.LastIndex(value, "@"); at > 0 {
+		prefix := value[:at]
+		if colon := strings.LastIndex(prefix, ":"); colon >= 0 {
+			return prefix[:colon+1] + "***" + value[at:]
+		}
+	}
+	return value
 }

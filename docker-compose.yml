@@ -4,6 +4,9 @@ services:
     container_name: aivro
     env_file:
       - .env
+    environment:
+      STORAGE_DRIVER: ${STORAGE_DRIVER:-postgres}
+      DATABASE_DSN: ${DATABASE_DSN:-postgres://aivro:aivro@db:5432/aivro?sslmode=disable}
     volumes:
       - ./data:/app/data
     ports:
