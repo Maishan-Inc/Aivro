@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowUp, History, ImageIcon, LoaderCircle, MessageSquare, PanelRightClose, Plus, RotateCcw, Sparkles, Trash2, X } from "lucide-react";
 import { App, Button, Modal, Tooltip } from "antd";
-import { motion } from "motion/react";
 
 import { ImageGenerationPending } from "@/components/image-generation-pending";
 import { ModelPicker } from "@/components/model-picker";
@@ -24,7 +23,10 @@ import { CanvasNodeType, type CanvasAssistantImage, type CanvasAssistantMessage,
 
 type AssistantMode = "ask" | "image";
 const PANEL_MOTION_MS = 500;
-const PANEL_MOTION_SECONDS = PANEL_MOTION_MS / 1000;
+type AnimeInstance = {
+    cancel?: () => void;
+    pause?: () => void;
+};
 
 type CanvasAssistantPanelProps = {
     nodes: CanvasNodeData[];
@@ -60,6 +62,9 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, sessions, activeS
     const [removedReferenceIds, setRemovedReferenceIds] = useState<Set<string>>(new Set());
     const [localSessions, setLocalSessions] = useState<CanvasAssistantSession[]>(() => (sessions.length ? sessions : [createSession()]));
     const [localActiveSessionId, setLocalActiveSessionId] = useState<string | null>(activeSessionId);
+    const rootRef = useRef<HTMLDivElement>(null);
+    const asideRef = useRef<HTMLElement>(null);
+    const openedRef = useRef(false);
 
     useEffect(() => {
         if (!sessions.length) return;
@@ -84,6 +89,41 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, sessions, activeS
     useEffect(() => {
         setRemovedReferenceIds(new Set());
     }, [selectedNodeKey]);
+
+    useEffect(() => {
+        const root = rootRef.current;
+        const aside = asideRef.current;
+        if (!root || !aside || resizing) return;
+        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+            if (closing) onCollapse();
+            return;
+        }
+        let rootAnimation: AnimeInstance | undefined;
+        let asideAnimation: AnimeInstance | undefined;
+        if (!openedRef.current) {
+            openedRef.current = true;
+            root.style.width = "0px";
+            root.style.opacity = "0";
+            aside.style.transform = "translateX(48px)";
+        }
+        void import("animejs").then(({ animate }) => {
+            rootAnimation = animate(root, { width: closing ? 0 : width + 1, opacity: closing ? 0 : 1, ease: "outCubic", duration: PANEL_MOTION_MS }) as AnimeInstance;
+            asideAnimation = animate(aside, {
+                translateX: closing ? 28 : 0,
+                ease: "outCubic",
+                duration: PANEL_MOTION_MS,
+                onComplete() {
+                    if (closing) onCollapse();
+                },
+            }) as AnimeInstance;
+        });
+        return () => {
+            rootAnimation?.cancel?.();
+            rootAnimation?.pause?.();
+            asideAnimation?.cancel?.();
+            asideAnimation?.pause?.();
+        };
+    }, [closing, onCollapse, resizing, width]);
 
     const updateSession = (sessionId: string, updater: (session: CanvasAssistantSession) => CanvasAssistantSession) => {
         setLocalSessions((prev) => prev.map((session) => (session.id === sessionId ? updater(session) : session)));
@@ -217,22 +257,17 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, sessions, activeS
     const collapse = () => {
         setClosing(true);
         onCollapseStart();
-        window.setTimeout(onCollapse, PANEL_MOTION_MS);
     };
 
     return (
-        <motion.div
+        <div
+            ref={rootRef}
             className="flex shrink-0"
-            initial={{ width: 0, opacity: 0 }}
-            animate={{ width: closing ? 0 : width + 1, opacity: closing ? 0 : 1 }}
-            transition={{ duration: resizing ? 0 : PANEL_MOTION_SECONDS, ease: [0.22, 1, 0.36, 1] }}
-            style={{ overflow: "clip", pointerEvents: closing ? "none" : undefined }}
+            style={{ width: width + 1, opacity: 1, overflow: "clip", pointerEvents: closing ? "none" : undefined }}
         >
-            <motion.aside
+            <aside
+                ref={asideRef}
                 className="relative flex shrink-0 flex-col border-l"
-                initial={{ x: 48 }}
-                animate={{ x: closing ? 28 : 0 }}
-                transition={{ duration: resizing ? 0 : PANEL_MOTION_SECONDS, ease: [0.22, 1, 0.36, 1] }}
                 style={{ width, background: theme.node.panel, borderColor: theme.node.stroke, color: theme.node.text }}
             >
                 <button type="button" className="absolute inset-y-0 left-0 z-40 w-4 -translate-x-1/2 cursor-col-resize" onMouseDown={startResize} aria-label="调整右侧面板宽度" />
@@ -353,8 +388,8 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, sessions, activeS
                 >
                     <p className="text-sm opacity-60">将删除 {deleteChatIds.length} 条对话记录，此操作不可撤销。</p>
                 </Modal>
-            </motion.aside>
-        </motion.div>
+            </aside>
+        </div>
     );
 }
 

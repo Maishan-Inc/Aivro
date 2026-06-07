@@ -6,6 +6,7 @@ import { App, Button, Modal, Spin, Tag } from "antd";
 import { Plus } from "lucide-react";
 
 import { createWorkflow, deleteWorkflow, fetchWorkflows, updateWorkflow, type CloudWorkflow } from "@/services/api/workflows";
+import { useLocalizedPath } from "@/hooks/use-localized-path";
 import { useUserStore } from "@/stores/use-user-store";
 import { CanvasProjectCard } from "./components/canvas-project-card";
 import { useCanvasStore } from "./stores/use-canvas-store";
@@ -16,6 +17,7 @@ const creditsMessage = "当前账号暂无工作流创建次数，请完成 KYC 
 export default function CanvasPage() {
     const { message, modal } = App.useApp();
     const router = useRouter();
+    const localizedPath = useLocalizedPath();
     const token = useUserStore((state) => state.token);
     const user = useUserStore((state) => state.user);
     const isReady = useUserStore((state) => state.isReady);
@@ -32,7 +34,7 @@ export default function CanvasPage() {
     useEffect(() => {
         if (!isReady) return;
         if (!token) {
-            router.replace("/login?redirect=/canvas");
+            router.replace(localizedPath("/login?redirect=/canvas"));
             return;
         }
         setIsLoading(true);
@@ -48,8 +50,8 @@ export default function CanvasPage() {
             content: creditsMessage,
             okText: "去购买套餐",
             cancelText: "去完成 KYC 认证",
-            onOk: () => router.push("/pricing"),
-            onCancel: () => router.push("/pricing?kyc=1"),
+            onOk: () => router.push(localizedPath("/pricing")),
+            onCancel: () => router.push(localizedPath("/pricing")),
         });
     };
 
@@ -69,7 +71,7 @@ export default function CanvasPage() {
             });
             upsertProject(workflow);
             await hydrateUser();
-            router.push(`/canvas/${workflow.id}`);
+            router.push(localizedPath(`/canvas/${workflow.id}`));
         } catch (error) {
             const text = error instanceof Error ? error.message : "创建工作流失败";
             if (text.includes("暂无工作流创建次数")) showCreditsModal();

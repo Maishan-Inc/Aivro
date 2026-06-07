@@ -11,6 +11,7 @@ import { navigationTools, type NavigationToolSlug } from "@/constant/navigation-
 import { MobileNavDrawer } from "@/components/layout/mobile-nav-drawer";
 import { UserStatusActions } from "@/components/layout/user-status-actions";
 import { localeLabels, type Locale } from "@/i18n/messages";
+import { stripLocalePath, withLocalePath } from "@/i18n/routing";
 import { useI18n } from "@/hooks/use-i18n";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { useUserStore } from "@/stores/use-user-store";
@@ -24,8 +25,14 @@ export function AppTopNav() {
     const user = useUserStore((state) => state.user);
     const isReady = useUserStore((state) => state.isReady);
     const { locale, setLocale, t } = useI18n();
-    const hideHeader = /^\/canvas\/[^/]+/.test(pathname);
-    const slug = pathname.split("/").filter(Boolean)[0];
+    const cleanPathname = stripLocalePath(pathname);
+    const localizedPath = (path: string, targetLocale: Locale = locale) => withLocalePath(path, targetLocale);
+    const switchLocale = (nextLocale: Locale) => {
+        setLocale(nextLocale);
+        window.location.href = withLocalePath(cleanPathname, nextLocale);
+    };
+    const hideHeader = /^\/canvas\/[^/]+/.test(cleanPathname);
+    const slug = cleanPathname.split("/").filter(Boolean)[0];
     const activeToolSlug = navigationTools.some((tool) => tool.slug === slug) ? (slug as NavigationToolSlug) : undefined;
     const languageItems = (Object.keys(localeLabels) as Locale[]).map((item) => ({
         key: item,
@@ -44,7 +51,7 @@ export function AppTopNav() {
                 <header className="sticky top-0 z-20 h-16 shrink-0 border-b border-stone-200 bg-background/90 backdrop-blur-xl dark:border-stone-800">
                     <div className="mx-auto grid h-full max-w-7xl grid-cols-[auto_minmax(0,1fr)_auto] items-stretch gap-5 px-6">
                         <div className="flex min-w-0 items-center">
-                            <Link href="/" className="flex h-full shrink-0 items-center gap-2 text-sm font-semibold leading-none tracking-tight text-stone-950 transition hover:text-stone-600 dark:text-stone-100 dark:hover:text-stone-300">
+                            <Link href={localizedPath("/")} className="flex h-full shrink-0 items-center gap-2 text-sm font-semibold leading-none tracking-tight text-stone-950 transition hover:text-stone-600 dark:text-stone-100 dark:hover:text-stone-300">
                                 <span
                                     className="size-5 shrink-0 bg-current"
                                     style={{
@@ -73,7 +80,7 @@ export function AppTopNav() {
                                 return (
                                     <Link
                                         key={tool.slug}
-                                        href={tool.href || `/${tool.slug}`}
+                                        href={tool.external ? tool.href : localizedPath(tool.href || `/${tool.slug}`)}
                                         target={tool.external ? "_blank" : undefined}
                                         rel={tool.external ? "noreferrer" : undefined}
                                         className={cn(
@@ -97,7 +104,7 @@ export function AppTopNav() {
                                     items: languageItems,
                                     selectable: true,
                                     selectedKeys: [locale],
-                                    onClick: ({ key }) => setLocale(key as Locale),
+                                    onClick: ({ key }) => switchLocale(key as Locale),
                                 }}
                             >
                                 <button
@@ -112,7 +119,7 @@ export function AppTopNav() {
                             </Dropdown>
                             {isReady && user ? (
                                 <>
-                                    <Link href="/pricing" className="hidden h-8 items-center gap-1.5 px-1 text-sm font-medium text-stone-600 transition hover:text-stone-950 sm:inline-flex dark:text-stone-300 dark:hover:text-stone-100">
+                                    <Link href={localizedPath("/pricing")} className="hidden h-8 items-center gap-1.5 px-1 text-sm font-medium text-stone-600 transition hover:text-stone-950 sm:inline-flex dark:text-stone-300 dark:hover:text-stone-100">
                                         <WalletCards className="size-4" />
                                         <span>{locale === "en-US" ? "Plans" : "套餐"}</span>
                                     </Link>
@@ -127,7 +134,7 @@ export function AppTopNav() {
                                         aria-label={nextThemeTitle}
                                         title={nextThemeTitle}
                                     />
-                                    <Link href="/login" className="text-sm font-medium text-stone-600 underline-offset-4 transition hover:text-stone-950 hover:underline dark:text-stone-300 dark:hover:text-stone-100">
+                                    <Link href={localizedPath("/login")} className="text-sm font-medium text-stone-600 underline-offset-4 transition hover:text-stone-950 hover:underline dark:text-stone-300 dark:hover:text-stone-100">
                                         {t("common.login")}
                                     </Link>
                                 </>

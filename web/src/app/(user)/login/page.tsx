@@ -2,14 +2,16 @@
 
 import { LockOutlined, MailOutlined, UserOutlined } from "@ant-design/icons";
 import { App, Button, Form, Input, Segmented, Space } from "antd";
-import { AnimatePresence, motion } from "motion/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 
+import { AivroOutlineTitle } from "@/components/aivro-outline-title";
+import { AivroReveal } from "@/components/aivro-reveal";
 import { useAuthLoadingOverlay } from "@/hooks/use-auth-loading-overlay";
 import { useI18n } from "@/hooks/use-i18n";
+import { useLocalizedPath } from "@/hooks/use-localized-path";
 import { useTurnstileChallenge } from "@/hooks/use-turnstile-challenge";
-import { fetchCurrentUser, sendRegisterEmailCode } from "@/services/api/auth";
+import { fetchCurrentUser, loginWithMetaMask, sendRegisterEmailCode } from "@/services/api/auth";
 import type { AdminPublicAuthProvider } from "@/services/api/admin";
 import { useConfigStore } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
@@ -29,6 +31,8 @@ type EthereumProvider = {
     request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
 };
 
+const metamaskPayloadStorageKey = "aivro-metamask-login-payload-v1";
+
 export default function LoginPage() {
     return (
         <Suspense fallback={null}>
@@ -40,6 +44,7 @@ export default function LoginPage() {
 function LoginContent() {
     const { message } = App.useApp();
     const { locale } = useI18n();
+    const localizedPath = useLocalizedPath();
     const [form] = Form.useForm<LoginFormValues>();
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -59,7 +64,8 @@ function LoginContent() {
     const [sendingCode, setSendingCode] = useState(false);
     const [codeSeconds, setCodeSeconds] = useState(0);
     const [firstCodeSent, setFirstCodeSent] = useState(false);
-    const redirect = safeRedirect(searchParams.get("redirect") || "/");
+    const [metaMaskAvailable, setMetaMaskAvailable] = useState(true);
+    const redirect = safeRedirect(searchParams.get("redirect") || localizedPath("/"));
     const thirdPartyProviders = ([authSettings?.google, authSettings?.github, authSettings?.linuxDo, ...(authSettings?.customProviders || [])] as Array<AdminPublicAuthProvider | undefined>).filter((item): item is AdminPublicAuthProvider => item?.enabled === true);
 
     useEffect(() => {
@@ -70,7 +76,7 @@ function LoginContent() {
         void fetchCurrentUser(token).then((user) => {
             setSession(token, user);
             message.success("登录成功");
-            router.replace(user.profileCompleted ? redirect : `/profile/setup?redirect=${encodeURIComponent(redirect)}`);
+            router.replace(user.profileCompleted ? redirect : localizedPath(`/profile/setup?redirect=${encodeURIComponent(redirect)}`));
             router.refresh();
         });
     }, [message, redirect, router, searchParams, setSession]);
@@ -78,6 +84,10 @@ function LoginContent() {
     useEffect(() => {
         if (!allowRegister && mode === "register") setMode("login");
     }, [allowRegister, mode]);
+
+    useEffect(() => {
+        setMetaMaskAvailable(Boolean((window as unknown as { ethereum?: EthereumProvider }).ethereum));
+    }, []);
 
     useEffect(() => {
         if (codeSeconds <= 0) return;
@@ -112,14 +122,14 @@ function LoginContent() {
                     }),
                 );
                 message.success("注册成功");
-                router.replace(user.profileCompleted ? redirect : `/profile/setup?redirect=${encodeURIComponent(redirect)}`);
+                router.replace(user.profileCompleted ? redirect : localizedPath(`/profile/setup?redirect=${encodeURIComponent(redirect)}`));
                 router.refresh();
                 return;
             }
             const turnstileToken = await verifyTurnstile();
             const user = await runWithOverlay("正在登录", () => login({ username: values.username, password: values.password, turnstileToken }));
             message.success("登录成功");
-            router.replace(user.profileCompleted ? redirect : `/profile/setup?redirect=${encodeURIComponent(redirect)}`);
+            router.replace(user.profileCompleted ? redirect : localizedPath(`/profile/setup?redirect=${encodeURIComponent(redirect)}`));
             router.refresh();
         } catch (error) {
             message.error(error instanceof Error ? error.message : mode === "register" ? "注册失败" : "登录失败");
@@ -176,23 +186,35 @@ function LoginContent() {
             }
             const signMessage = `Aivro MetaMask login\nWallet: ${walletAddress}\nTime: ${Date.now()}`;
             const signature = (await ethereum.request({ method: "personal_sign", params: [signMessage, walletAddress] })) as string;
-            const params = new URLSearchParams({ walletAddress, message: signMessage, signature, redirect });
-            router.push(`/metamask-email?${params.toString()}`);
+            try {
+                const session = await runWithOverlay(locale === "en-US" ? "Signing in" : "正在登录", () => loginWithMetaMask({ walletAddress, message: signMessage, signature, email: "", code: "" }));
+                const user = await fetchCurrentUser(session.token);
+                setSession(session.token, user);
+                message.success(locale === "en-US" ? "Signed in" : "登录成功");
+                router.replace(user.profileCompleted ? redirect : localizedPath(`/profile/setup?redirect=${encodeURIComponent(redirect)}`));
+                router.refresh();
+            } catch (error) {
+                const text = error instanceof Error ? error.message : "";
+                if (!text.includes("验证邮箱") && !text.toLowerCase().includes("email")) throw error;
+                window.sessionStorage.setItem(metamaskPayloadStorageKey, JSON.stringify({ walletAddress, message: signMessage, signature, redirect }));
+                router.push(localizedPath("/metamask-email"));
+            }
         } catch (error) {
             message.error(error instanceof Error ? error.message : "MetaMask 签名失败");
         }
     };
 
     return (
-        <main className="flex h-full min-h-0 items-center justify-center overflow-y-auto bg-background bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] px-6 py-10 [background-size:16px_16px] dark:bg-[radial-gradient(rgba(245,245,244,.16)_1px,transparent_1px)]">
-            <section className="w-full max-w-[420px]">
-                <div className="mb-7 text-center">
+        <main className="aivro-wire-surface flex h-full min-h-0 items-center justify-center overflow-y-auto bg-background px-6 py-10">
+            <AivroReveal className="w-full max-w-[420px]">
+                <div data-aivro-reveal className="mb-7 text-center">
                     <span className="mx-auto mb-4 block size-12 bg-stone-950 dark:bg-stone-100" style={{ mask: "url(/logo.svg) center / contain no-repeat", WebkitMask: "url(/logo.svg) center / contain no-repeat" }} aria-label="Aivro" />
+                    <AivroOutlineTitle label="Aivro" className="mx-auto mb-2 max-w-52" />
                     <h1 className="text-3xl font-semibold tracking-normal text-stone-950 dark:text-stone-100">{mode === "register" ? (locale === "en-US" ? "Create account" : "创建账号") : locale === "en-US" ? "Account sign in" : "账号登录"}</h1>
                     <p className="mt-3 text-base leading-7 text-stone-500 dark:text-stone-400">{mode === "register" ? (locale === "en-US" ? "Use email verification, then complete your profile." : "使用邮箱验证后，再填写账户信息。") : locale === "en-US" ? "Use email and password or a third-party account." : "支持邮箱密码和第三方登录。"}</p>
                 </div>
 
-                <Form<LoginFormValues> form={form} layout="vertical" size="large" requiredMark={false} onFinish={submit}>
+                <Form<LoginFormValues> form={form} layout="vertical" size="large" requiredMark={false} onFinish={submit} className="aivro-wire-card p-5">
                     <Form.Item>
                         <Segmented
                             block
@@ -207,29 +229,29 @@ function LoginContent() {
                             options={allowRegister ? [{ label: locale === "en-US" ? "Sign in" : "登录", value: "login" }, { label: locale === "en-US" ? "Register" : "注册", value: "register" }] : [{ label: locale === "en-US" ? "Sign in" : "登录", value: "login" }]}
                         />
                     </Form.Item>
-                    <AnimatePresence mode="wait">
-                        <motion.div key={`${mode}-${registerStep}`} initial={{ opacity: 0, y: 12, filter: "blur(6px)" }} animate={{ opacity: 1, y: 0, filter: "blur(0px)" }} exit={{ opacity: 0, y: -8, filter: "blur(6px)" }} transition={{ duration: 0.22, ease: "easeOut" }}>
+                    <AivroReveal key={`${mode}-${registerStep}`}>
+                        <div data-aivro-reveal>
                             {mode === "register" ? <RegisterFields step={registerStep} locale={locale} sendingCode={sendingCode} codeSeconds={codeSeconds} publicReady={Boolean(publicSettings)} onResend={() => void requestRegisterCode(form.getFieldValue("email"), true)} /> : <LoginFields locale={locale} />}
-                        </motion.div>
-                    </AnimatePresence>
-                    <Space orientation="vertical" size={12} style={{ width: "100%" }}>
+                        </div>
+                    </AivroReveal>
+                    <Space orientation="vertical" size={14} style={{ width: "100%" }}>
                         <Button block type="primary" htmlType="submit" loading={isLoading || sendingCode} disabled={!publicSettings}>
                             {isLoading || sendingCode ? (locale === "en-US" ? "Processing" : "处理中") : registerButtonText(mode, registerStep, locale)}
                         </Button>
                         <p className="m-0 text-center text-xs leading-5 text-stone-500 dark:text-stone-400">
                             {mode === "register" ? (locale === "en-US" ? "Registering" : "注册") : locale === "en-US" ? "Signing in to" : "登录"} Aivro，{locale === "en-US" ? "means you agree to our" : "即代表你同意我们的"}{" "}
-                            <a href="/privacy" className="font-medium text-stone-800 underline underline-offset-4 dark:text-stone-200">
+                            <a href={localizedPath("/privacy")} className="font-medium text-stone-800 underline underline-offset-4 dark:text-stone-200">
                                 {locale === "en-US" ? "Privacy Policy" : "隐私政策"}
                             </a>{" "}
                             {locale === "en-US" ? "and" : "和"}{" "}
-                            <a href="/terms" className="font-medium text-stone-800 underline underline-offset-4 dark:text-stone-200">
+                            <a href={localizedPath("/terms")} className="font-medium text-stone-800 underline underline-offset-4 dark:text-stone-200">
                                 {locale === "en-US" ? "Terms of Service" : "服务条款"}
                             </a>
                         </p>
-                        {mode === "login" ? <LoginActions locale={locale} redirect={redirect} authSettings={authSettings} linuxDoEnabled={linuxDoEnabled} providers={thirdPartyProviders} onMetaMask={connectMetaMask} /> : null}
+                        {mode === "login" ? <LoginActions locale={locale} localizedPath={localizedPath} redirect={redirect} authSettings={authSettings} linuxDoEnabled={linuxDoEnabled} providers={thirdPartyProviders} metaMaskAvailable={metaMaskAvailable} onMetaMask={connectMetaMask} /> : null}
                     </Space>
                 </Form>
-            </section>
+            </AivroReveal>
             {turnstileChallenge}
             {overlay}
         </main>
@@ -309,30 +331,45 @@ function RegisterSteps({ active, locale }: { active: RegisterStep; locale: strin
     );
 }
 
-function LoginActions({ locale, redirect, authSettings, linuxDoEnabled, providers, onMetaMask }: { locale: string; redirect: string; authSettings?: { metamask?: AdminPublicAuthProvider }; linuxDoEnabled: boolean; providers: AdminPublicAuthProvider[]; onMetaMask: () => void }) {
+function LoginActions({ locale, localizedPath, redirect, authSettings, linuxDoEnabled, providers, metaMaskAvailable, onMetaMask }: { locale: string; localizedPath: (path: string) => string; redirect: string; authSettings?: { metamask?: AdminPublicAuthProvider }; linuxDoEnabled: boolean; providers: AdminPublicAuthProvider[]; metaMaskAvailable: boolean; onMetaMask: () => void }) {
     return (
-        <>
-            <Button block type="link" href="/forgot-password">
+        <div className="w-full">
+            <Button block type="link" href={localizedPath("/forgot-password")}>
                 {locale === "en-US" ? "Forgot password" : "找回密码"}
             </Button>
-            {authSettings?.metamask?.enabled ? (
-                <Button block icon={<img src={authSettings.metamask.iconUrl || "/icons/metamask.svg"} alt="" width={18} height={18} />} onClick={() => void onMetaMask()}>
-                    {locale === "en-US" ? "Sign in with MetaMask" : "使用 MetaMask 登录"}
-                </Button>
+            {authSettings?.metamask?.enabled || providers.length ? (
+                <div className="mt-5 border-t border-stone-200 pt-5 dark:border-stone-800">
+                    <div className="mb-4 flex items-center gap-3 text-xs text-stone-400">
+                        <span className="h-px flex-1 bg-stone-200 dark:bg-stone-800" />
+                        <span>{locale === "en-US" ? "Third-party sign in" : "第三方登录"}</span>
+                        <span className="h-px flex-1 bg-stone-200 dark:bg-stone-800" />
+                    </div>
+                    <div className="grid gap-3">
+                        {authSettings?.metamask?.enabled ? (
+                            <Button className="h-11 justify-start" block disabled={!metaMaskAvailable} title={metaMaskAvailable ? undefined : locale === "en-US" ? "MetaMask is not installed" : "未检测到 MetaMask"} icon={<ProviderIcon src={authSettings.metamask.iconUrl || "/icons/metamask.svg"} />} onClick={() => void onMetaMask()}>
+                                {metaMaskAvailable ? (locale === "en-US" ? "Sign in with MetaMask" : "使用 MetaMask 登录") : locale === "en-US" ? "Install MetaMask to sign in" : "安装 MetaMask 后登录"}
+                            </Button>
+                        ) : null}
+                        {providers.map((provider) =>
+                            provider.id === "linux-do" && linuxDoEnabled ? (
+                                <Button className="h-11 justify-start" key={provider.id} block href={`/api/auth/linux-do/authorize?redirect=${encodeURIComponent(redirect)}`} icon={provider.iconUrl ? <ProviderIcon src={provider.iconUrl} /> : undefined}>
+                                    {locale === "en-US" ? "Sign in with" : "使用"} {provider.name} {locale === "en-US" ? "" : "登录"}
+                                </Button>
+                            ) : (
+                                <Button className="h-11 justify-start" key={provider.id} block href={`/api/auth/oauth/${encodeURIComponent(provider.id)}/authorize?redirect=${encodeURIComponent(redirect)}`} icon={provider.iconUrl ? <ProviderIcon src={provider.iconUrl} /> : undefined}>
+                                    {locale === "en-US" ? "Sign in with" : "使用"} {provider.name} {locale === "en-US" ? "" : "登录"}
+                                </Button>
+                            ),
+                        )}
+                    </div>
+                </div>
             ) : null}
-            {providers.map((provider) =>
-                provider.id === "linux-do" && linuxDoEnabled ? (
-                    <Button key={provider.id} block href={`/api/auth/linux-do/authorize?redirect=${encodeURIComponent(redirect)}`} icon={provider.iconUrl ? <img src={provider.iconUrl} alt="" width={18} height={18} /> : undefined}>
-                        {locale === "en-US" ? "Sign in with" : "使用"} {provider.name} {locale === "en-US" ? "" : "登录"}
-                    </Button>
-                ) : (
-                    <Button key={provider.id} block href={`/api/auth/oauth/${encodeURIComponent(provider.id)}/authorize?redirect=${encodeURIComponent(redirect)}`} icon={provider.iconUrl ? <img src={provider.iconUrl} alt="" width={18} height={18} /> : undefined}>
-                        {locale === "en-US" ? "Sign in with" : "使用"} {provider.name} {locale === "en-US" ? "" : "登录"}
-                    </Button>
-                ),
-            )}
-        </>
+        </div>
     );
+}
+
+function ProviderIcon({ src }: { src: string }) {
+    return <img src={src} alt="" width={20} height={20} className="shrink-0" />;
 }
 
 function registerButtonText(mode: "login" | "register", step: RegisterStep, locale: string) {

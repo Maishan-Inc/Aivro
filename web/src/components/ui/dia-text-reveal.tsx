@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { animate, motion, useInView, useMotionValue, useReducedMotion, useTransform, type HTMLMotionProps } from "motion/react";
+import { useEffect, useRef, useState, type ComponentPropsWithoutRef } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -9,6 +8,11 @@ const DEFAULT_COLORS = ["#c679c4", "#fa3d1d", "#ffb005", "#e1e1fe", "#0358f7"];
 const BAND_HALF = 17;
 const SWEEP_START = -BAND_HALF;
 const SWEEP_END = 100 + BAND_HALF;
+type AnimeInstance = {
+    cancel?: () => void;
+    pause?: () => void;
+    revert?: () => void;
+};
 
 const sweepEase = (t: number) => (t < 0.5 ? 4 * t ** 3 : 1 - (-2 * t + 2) ** 3 / 2);
 
@@ -55,7 +59,7 @@ function measureWidths(el: HTMLElement, texts: string[]) {
 /**
  * Props for {@link DiaTextReveal}.
  */
-export interface DiaTextRevealProps extends Omit<HTMLMotionProps<"span">, "ref" | "children" | "style" | "animate" | "transition" | "color"> {
+export interface DiaTextRevealProps extends Omit<ComponentPropsWithoutRef<"span">, "ref" | "children" | "style" | "color"> {
     /**
      * Text to reveal. Pass multiple strings to rotate when {@link DiaTextRevealProps.repeat} is `true`.
      */
@@ -113,7 +117,6 @@ export interface DiaTextRevealProps extends Omit<HTMLMotionProps<"span">, "ref" 
 export function DiaTextReveal({ text, colors = DEFAULT_COLORS, textColor = "var(--foreground)", duration = 1.5, delay = 0, repeat = false, repeatDelay = 0.5, startOnView = true, once = true, className, fixedWidth = false, ...props }: DiaTextRevealProps) {
     const texts = Array.isArray(text) ? text : [text];
     const isMulti = texts.length > 1;
-    const prefersReducedMotion = useReducedMotion();
 
     const spanRef = useRef<HTMLSpanElement>(null);
     const optsRef = useRef({
@@ -140,15 +143,11 @@ export function DiaTextReveal({ text, colors = DEFAULT_COLORS, textColor = "var(
     const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
     const playRef = useRef<() => void>(null!);
     const stopRef = useRef<(() => void) | null>(null);
+    const observerRef = useRef<IntersectionObserver | null>(null);
 
     const [activeIndex, setActiveIndex] = useState(0);
     const [measuredWidths, setMeasuredWidths] = useState<number[]>([]);
-
-    const sweepPos = useMotionValue(SWEEP_START);
-
-    const backgroundImage = useTransform(sweepPos, (pos) => buildGradient(pos, optsRef.current.colors, optsRef.current.textColor));
-
-    const isInView = useInView(spanRef, { once, amount: 0.1 });
+    const [isInView, setIsInView] = useState(!startOnView);
 
     useEffect(() => {
         const el = spanRef.current;
@@ -158,30 +157,46 @@ export function DiaTextReveal({ text, colors = DEFAULT_COLORS, textColor = "var(
 
     playRef.current = () => {
         const { duration, delay, repeat, repeatDelay, texts } = optsRef.current;
+        const el = spanRef.current;
+        if (!el) return;
 
-        sweepPos.set(SWEEP_START);
+        const state = { pos: SWEEP_START };
+        el.style.backgroundImage = buildGradient(state.pos, optsRef.current.colors, optsRef.current.textColor);
 
-        const controls = animate(sweepPos, SWEEP_END, {
-            duration,
-            delay,
-            ease: sweepEase,
-            onComplete() {
-                if (!repeat) return;
-                timerRef.current = setTimeout(() => {
-                    const next = (indexRef.current + 1) % texts.length;
-                    indexRef.current = next;
-                    setActiveIndex(next);
-                    playRef.current();
-                }, repeatDelay * 1000);
-            },
+        void import("animejs").then(({ animate }) => {
+            const controls = animate(state, {
+                pos: SWEEP_END,
+                duration: duration * 1000,
+                delay: delay * 1000,
+                ease: sweepEase,
+                onUpdate() {
+                    el.style.backgroundImage = buildGradient(state.pos, optsRef.current.colors, optsRef.current.textColor);
+                },
+                onComplete() {
+                    el.style.backgroundImage = buildGradient(SWEEP_END, optsRef.current.colors, optsRef.current.textColor);
+                    if (!repeat) return;
+                    timerRef.current = setTimeout(() => {
+                        const next = (indexRef.current + 1) % texts.length;
+                        indexRef.current = next;
+                        setActiveIndex(next);
+                        playRef.current();
+                    }, repeatDelay * 1000);
+                },
+            }) as AnimeInstance;
+
+            stopRef.current = () => {
+                controls.pause?.();
+                controls.cancel?.();
+                controls.revert?.();
+            };
         });
-
-        stopRef.current = () => controls.stop();
     };
 
     useEffect(() => {
-        if (prefersReducedMotion) {
-            sweepPos.set(SWEEP_END);
+        const el = spanRef.current;
+        if (!el) return;
+        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+            el.style.backgroundImage = buildGradient(SWEEP_END, colors, textColor);
             return;
         }
         if (startOnView && !isInView) return;
@@ -193,14 +208,29 @@ export function DiaTextReveal({ text, colors = DEFAULT_COLORS, textColor = "var(
             stopRef.current?.();
             clearTimeout(timerRef.current);
         };
-    }, [isInView, startOnView, once, prefersReducedMotion, sweepPos]);
+    }, [isInView, startOnView, once, colors, textColor]);
+
+    useEffect(() => {
+        const el = spanRef.current;
+        if (!el || !startOnView) return;
+        observerRef.current = new IntersectionObserver(
+            ([entry]) => {
+                if (!entry.isIntersecting) return;
+                setIsInView(true);
+                if (once) observerRef.current?.disconnect();
+            },
+            { threshold: 0.1 },
+        );
+        observerRef.current.observe(el);
+        return () => observerRef.current?.disconnect();
+    }, [once, startOnView]);
 
     const fixedW = isMulti && fixedWidth && measuredWidths.length > 0 ? Math.max(...measuredWidths) : undefined;
 
     const animatedW = isMulti && !fixedWidth && measuredWidths[activeIndex] != null ? measuredWidths[activeIndex] : undefined;
 
     return (
-        <motion.span
+        <span
             ref={spanRef}
             className={cn("align-bottom leading-[100%] text-inherit", className)}
             style={{
@@ -209,20 +239,20 @@ export function DiaTextReveal({ text, colors = DEFAULT_COLORS, textColor = "var(
                 backgroundClip: "text",
                 WebkitBackgroundClip: "text",
                 backgroundSize: "100% 100%",
-                backgroundImage,
+                backgroundImage: buildGradient(SWEEP_END, colors, textColor),
+                transition: "width 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
                 ...(isMulti && {
                     display: "inline-block",
                     overflow: "hidden",
                     whiteSpace: "nowrap",
                     verticalAlign: "text-center",
                     ...(fixedW != null && { width: fixedW }),
+                    ...(animatedW != null && fixedW == null && { width: animatedW }),
                 }),
             }}
-            animate={animatedW != null ? { width: animatedW } : undefined}
-            transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
             {...props}
         >
             {texts[activeIndex]}
-        </motion.span>
+        </span>
     );
 }

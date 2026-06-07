@@ -9,6 +9,7 @@ import enUS from "antd/locale/en_US";
 import zhCN from "antd/locale/zh_CN";
 
 import { ClientRootInit } from "@/components/layout/client-root-init";
+import { LocalePathSync } from "@/components/layout/locale-path-sync";
 import { RuntimeI18nTranslator } from "@/components/layout/runtime-i18n-translator";
 import { getAntThemeConfig } from "@/lib/app-theme";
 import { useLocaleStore } from "@/stores/use-locale-store";
@@ -36,7 +37,6 @@ export function AppProviders({ children }: { children: ReactNode }) {
 
     useEffect(() => {
         document.documentElement.lang = locale;
-        document.title = "Aivro";
     }, [locale]);
 
     return (
@@ -44,6 +44,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
             <ProConfigProvider dark={dark}>
                 <App>
                     <QueryClientProvider client={queryClient}>
+                        <LocalePathSync />
                         <RuntimeI18nTranslator />
                         <ClientRootInit>{children}</ClientRootInit>
                     </QueryClientProvider>

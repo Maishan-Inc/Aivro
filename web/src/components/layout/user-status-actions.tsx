@@ -8,6 +8,7 @@ import Link from "next/link";
 
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
 import { CreditSymbol } from "@/constant/credits";
+import { useLocalizedPath } from "@/hooks/use-localized-path";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { useUserStore } from "@/stores/use-user-store";
@@ -26,6 +27,7 @@ export function UserStatusActions({ variant = "default", onOpenShortcuts, accoun
     const setTheme = useThemeStore((state) => state.setTheme);
     const user = useUserStore((state) => state.user);
     const logout = useUserStore((state) => state.clearSession);
+    const localizedPath = useLocalizedPath();
     const canvasTheme = canvasThemes[theme];
     const userName = user?.displayName || user?.username || "";
     const credits = user?.credits ?? 0;
@@ -59,7 +61,7 @@ export function UserStatusActions({ variant = "default", onOpenShortcuts, accoun
                 </button>
             ) : null}
             {!user ? (
-                <Link href="/login" className="px-1.5 text-sm font-medium text-stone-600 underline-offset-4 transition hover:text-stone-950 hover:underline dark:text-stone-300 dark:hover:text-stone-100" style={iconStyle}>
+                <Link href={localizedPath("/login")} className="px-1.5 text-sm font-medium text-stone-600 underline-offset-4 transition hover:text-stone-950 hover:underline dark:text-stone-300 dark:hover:text-stone-100" style={iconStyle}>
                     登录
                 </Link>
             ) : null}

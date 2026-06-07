@@ -5,6 +5,7 @@ import Link from "next/link";
 
 import { navigationTools, type NavigationToolSlug } from "@/constant/navigation-tools";
 import { useI18n } from "@/hooks/use-i18n";
+import { withLocalePath } from "@/i18n/routing";
 import { cn } from "@/lib/utils";
 
 type MobileNavDrawerProps = {
@@ -14,7 +15,7 @@ type MobileNavDrawerProps = {
 };
 
 export function MobileNavDrawer({ open, activeToolSlug, onClose }: MobileNavDrawerProps) {
-    const { t } = useI18n();
+    const { locale, t } = useI18n();
 
     return (
         <Drawer title={t("nav.title")} placement="left" size={280} open={open} onClose={onClose} className="md:hidden">
@@ -25,7 +26,7 @@ export function MobileNavDrawer({ open, activeToolSlug, onClose }: MobileNavDraw
                     return (
                         <Link
                             key={tool.slug}
-                            href={tool.href || `/${tool.slug}`}
+                            href={tool.external ? tool.href : withLocalePath(tool.href || `/${tool.slug}`, locale)}
                             target={tool.external ? "_blank" : undefined}
                             rel={tool.external ? "noreferrer" : undefined}
                             onClick={onClose}

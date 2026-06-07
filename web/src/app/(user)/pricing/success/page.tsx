@@ -3,11 +3,13 @@
 import { Button, Card } from "antd";
 import Link from "next/link";
 
+import { useLocalizedPath } from "@/hooks/use-localized-path";
 import { useUserStore } from "@/stores/use-user-store";
 
 export default function PricingSuccessPage() {
     const hydrateUser = useUserStore((state) => state.hydrateUser);
     const user = useUserStore((state) => state.user);
+    const localizedPath = useLocalizedPath();
 
     return (
         <main className="grid min-h-screen place-items-center bg-background px-6">
@@ -19,7 +21,7 @@ export default function PricingSuccessPage() {
                 </div>
                 <div className="mt-6 flex justify-center gap-3">
                     <Button onClick={() => void hydrateUser()}>刷新用户信息</Button>
-                    <Link href="/canvas"><Button type="primary">返回工作流</Button></Link>
+                    <Link href={localizedPath("/canvas")}><Button type="primary">返回工作流</Button></Link>
                 </div>
             </Card>
         </main>

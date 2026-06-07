@@ -7,6 +7,7 @@ import { Suspense, useEffect, useState } from "react";
 
 import { completeProfile } from "@/services/api/auth";
 import { useI18n } from "@/hooks/use-i18n";
+import { useLocalizedPath } from "@/hooks/use-localized-path";
 import { useUserStore } from "@/stores/use-user-store";
 
 type ProfileValues = {
@@ -30,8 +31,9 @@ function ProfileSetupContent() {
     const user = useUserStore((state) => state.user);
     const setSession = useUserStore((state) => state.setSession);
     const { locale } = useI18n();
+    const localizedPath = useLocalizedPath();
     const [saving, setSaving] = useState(false);
-    const redirect = safeRedirect(search.get("redirect") || "/");
+    const redirect = safeRedirect(search.get("redirect") || localizedPath("/"));
 
     useEffect(() => {
         if (user?.profileCompleted) router.replace(redirect);
@@ -39,7 +41,7 @@ function ProfileSetupContent() {
 
     const submit = async (values: ProfileValues) => {
         if (!token || !user) {
-            router.replace(`/login?redirect=${encodeURIComponent(redirect)}`);
+            router.replace(localizedPath(`/login?redirect=${encodeURIComponent(redirect)}`));
             return;
         }
         setSaving(true);

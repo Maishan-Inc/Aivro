@@ -5,6 +5,7 @@ import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 import type { AdminPublicPageAccessSettings } from "@/services/api/admin";
+import { localeFromPath, stripLocalePath, withLocalePath } from "@/i18n/routing";
 import { fetchUserPreference } from "@/services/api/preferences";
 import { useConfigStore } from "@/stores/use-config-store";
 import { useLocaleStore } from "@/stores/use-locale-store";
@@ -24,8 +25,11 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
     const setTheme = useThemeStore((state) => state.setTheme);
     const setLocale = useLocaleStore((state) => state.setLocale);
     const isUserReady = useUserStore((state) => state.isReady);
-    const isLoginPage = pathname === "/login" || pathname === "/admin/login";
-    const isProfileSetupPage = pathname === "/profile/setup";
+    const pathLocale = localeFromPath(pathname);
+    const locale = pathLocale || "zh-CN";
+    const cleanPathname = stripLocalePath(pathname);
+    const isLoginPage = cleanPathname === "/login" || cleanPathname === "/admin/login";
+    const isProfileSetupPage = cleanPathname === "/profile/setup";
 
     useEffect(() => {
         void loadPublicSettings();
@@ -39,21 +43,21 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
         if (!token || !user) return;
         void fetchUserPreference(token).then((preference) => {
             if (preference.theme) setTheme(preference.theme, false);
-            if (preference.locale) setLocale(preference.locale, false);
+            if (preference.locale && !pathLocale) setLocale(preference.locale, false);
             if (preference.config) setConfig(preference.config, false);
         });
-    }, [setConfig, setLocale, setTheme, token, user]);
+    }, [pathLocale, setConfig, setLocale, setTheme, token, user]);
 
     useEffect(() => {
         if (isLoginPage || !publicSettings || isPublicSettingsLoading || !isUserReady || user) return;
-        if (!isLoginRequiredPath(pathname, publicSettings.pageAccess)) return;
-        router.replace(`/login?redirect=${encodeURIComponent(pathname)}`);
-    }, [isLoginPage, isPublicSettingsLoading, isUserReady, pathname, publicSettings, router, user]);
+        if (!isLoginRequiredPath(cleanPathname, publicSettings.pageAccess)) return;
+        router.replace(withLocalePath(`/login?redirect=${encodeURIComponent(pathname)}`, locale));
+    }, [cleanPathname, isLoginPage, isPublicSettingsLoading, isUserReady, locale, pathname, publicSettings, router, user]);
 
     useEffect(() => {
         if (!isUserReady || !user || user.role === "guest" || user.profileCompleted || isProfileSetupPage || isLoginPage) return;
-        router.replace(`/profile/setup?redirect=${encodeURIComponent(pathname)}`);
-    }, [isLoginPage, isProfileSetupPage, isUserReady, pathname, router, user]);
+        router.replace(withLocalePath(`/profile/setup?redirect=${encodeURIComponent(pathname)}`, locale));
+    }, [isLoginPage, isProfileSetupPage, isUserReady, locale, pathname, router, user]);
 
     return <>{children}</>;
 }

@@ -3,6 +3,7 @@
 import { ArrowLeft } from "lucide-react";
 import { Button } from "antd";
 
+import { useLocalizedPath } from "@/hooks/use-localized-path";
 import { useConfigStore } from "@/stores/use-config-store";
 import { useLocaleStore } from "@/stores/use-locale-store";
 
@@ -89,6 +90,7 @@ We may update these terms for feature and compliance reasons. Updated content wi
 export function LegalPage({ type }: { type: "privacy" | "terms" }) {
     const pages = useConfigStore((state) => state.publicSettings?.pages);
     const locale = useLocaleStore((state) => state.locale);
+    const localizedPath = useLocalizedPath();
     const isPrivacy = type === "privacy";
     const title = locale === "en-US" ? (isPrivacy ? pages?.privacyTitleEn || "Privacy Policy" : pages?.termsTitleEn || "Terms of Service") : isPrivacy ? pages?.privacyTitle || "隐私政策" : pages?.termsTitle || "服务条款";
     const fallbackContent = locale === "en-US" ? (isPrivacy ? fallbackPrivacyContentEn : fallbackTermsContentEn) : isPrivacy ? fallbackPrivacyContent : fallbackTermsContent;
@@ -97,7 +99,7 @@ export function LegalPage({ type }: { type: "privacy" | "terms" }) {
     return (
         <main className="h-full overflow-y-auto bg-black px-6 py-10 text-stone-100">
             <section className="mx-auto max-w-3xl">
-                <Button href="/login" icon={<ArrowLeft className="size-4" />} type="text" className="mb-8 !text-stone-300 hover:!bg-white/10 hover:!text-white">
+                <Button href={localizedPath("/login")} icon={<ArrowLeft className="size-4" />} type="text" className="mb-8 !text-stone-300 hover:!bg-white/10 hover:!text-white">
                     {locale === "en-US" ? "Back to sign in" : "返回登录"}
                 </Button>
                 <div className="py-8">
