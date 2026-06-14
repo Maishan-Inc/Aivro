@@ -3,6 +3,7 @@
 - 生图、视频和画布节点生成中的 Aivro anime.js 加载动画统一为首页同款描边字标效果待测。
 - Docker 镜像构建待测：云存储上传对象编译错误已修复，GitHub Actions 的 Go 构建阶段不应再出现 `no new variables on left side of :=`。
 - Docker 镜像仓库名已切换为 `maishanhub/aivro`，CI 推送、docker-compose 和部署文档引用需要按新仓库名验证。
+- `/ads.txt` 根路径待测：前端 Next route 会转发到后端 ads.txt 接口，浏览器访问不应再进入 404 页面。
 - 云存储新增存储策略待测：后台可选择只使用本地存储、只使用 S3/R2、优先 S3/R2 失败后自动切本地；后端按文件记录的 provider 读取和删除。
 - 云存储新增 3D 模型路径模板和保存天数待测；图片、视频、3D 模型临时文件和生成历史默认按各自保存天数写入 `expires_at`。
 - AI 请求和上游响应资源限制待测：AI 请求体、图片 JSON 响应、视频内容和 3D 模型下载超过限制时应返回安全错误，避免无上限读入内存。
