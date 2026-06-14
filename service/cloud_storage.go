@@ -107,7 +107,7 @@ func (storage *CloudStorageService) UploadObject(ctx context.Context, request Cl
 	if err != nil {
 		return CloudObjectResult{}, err
 	}
-	_, err := storage.client.PutObject(ctx, &s3.PutObjectInput{
+	_, err = storage.client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket:      aws.String(storage.setting.Bucket),
 		Key:         aws.String(objectKey),
 		Body:        reader,
