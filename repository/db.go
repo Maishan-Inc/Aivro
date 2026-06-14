@@ -152,6 +152,9 @@ func migrateModels(db *gorm.DB) error {
 	if err != nil {
 		return err
 	}
+	if err := dropLegacyGenerationTaskBlobColumns(db); err != nil {
+		return err
+	}
 	if err := backfillUserProfileFields(db); err != nil {
 		return err
 	}
@@ -159,6 +162,17 @@ func migrateModels(db *gorm.DB) error {
 		return err
 	}
 	return ensureDefaultPlans(db)
+}
+
+func dropLegacyGenerationTaskBlobColumns(db *gorm.DB) error {
+	for _, column := range []string{"request_body", "response_body"} {
+		if db.Migrator().HasColumn(&model.GenerationTask{}, column) {
+			if err := db.Migrator().DropColumn(&model.GenerationTask{}, column); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func backfillUserProfileFields(db *gorm.DB) error {

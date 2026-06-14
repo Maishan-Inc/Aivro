@@ -82,6 +82,10 @@ type adjustUserCreditsRequest struct {
 func Register(w http.ResponseWriter, r *http.Request) {
 	var request registerRequest
 	_ = json.NewDecoder(r.Body).Decode(&request)
+	if err := service.VerifyTurnstile(r, request.TurnstileToken); err != nil {
+		FailError(w, err)
+		return
+	}
 	session, err := service.Register(request.Username, request.Password, request.Email, request.Code, service.RegisterProfileInput{AccountType: request.AccountType, Name: request.DisplayName})
 	if err != nil {
 		FailError(w, err)
@@ -149,6 +153,10 @@ func ResetPassword(w http.ResponseWriter, r *http.Request) {
 func MetaMaskLogin(w http.ResponseWriter, r *http.Request) {
 	var request metamaskLoginRequest
 	_ = json.NewDecoder(r.Body).Decode(&request)
+	if err := service.VerifyTurnstile(r, request.TurnstileToken); err != nil {
+		FailError(w, err)
+		return
+	}
 	session, err := service.LoginWithMetaMask(request.WalletAddress, request.Message, request.Signature, request.Email, request.Code)
 	if err != nil {
 		FailError(w, err)

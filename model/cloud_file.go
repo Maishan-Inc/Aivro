@@ -6,6 +6,7 @@ const (
 	CloudFileTypeImage   CloudFileType = "image"
 	CloudFileTypeVideo   CloudFileType = "video"
 	CloudFileTypeModel3D CloudFileType = "model3d"
+	CloudFileTypeTask    CloudFileType = "task"
 )
 
 type CloudFilePurpose string

@@ -15,20 +15,37 @@ func UploadFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 51<<20)
-	file, header, err := r.FormFile("file")
+	reader, err := r.MultipartReader()
 	if err != nil {
 		Fail(w, "请选择文件")
 		return
 	}
-	defer file.Close()
-	body, err := io.ReadAll(io.LimitReader(file, 50<<20+1))
-	if err != nil {
-		Fail(w, "读取文件失败")
-		return
+	var result service.StoredFileResult
+	found := false
+	for {
+		part, err := reader.NextPart()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			Fail(w, "读取文件失败")
+			return
+		}
+		if part.FormName() != "file" {
+			_ = part.Close()
+			continue
+		}
+		found = true
+		result, err = service.StoreUserFileReader(r.Context(), user, part.FileName(), part, part.Header.Get("Content-Type"), "/files", model.CloudFilePurposeTemp)
+		_ = part.Close()
+		if err != nil {
+			FailError(w, err)
+			return
+		}
+		break
 	}
-	result, err := service.StoreUserFile(r.Context(), user, header.Filename, body, header.Header.Get("Content-Type"), "/files", model.CloudFilePurposeTemp)
-	if err != nil {
-		FailError(w, err)
+	if !found {
+		Fail(w, "请选择文件")
 		return
 	}
 	OK(w, result)

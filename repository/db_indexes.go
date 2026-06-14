@@ -29,6 +29,21 @@ func createOptimizedIndexes(db *gorm.DB) error {
 			table: "generation_tasks",
 			sql:   "CREATE INDEX IF NOT EXISTS idx_generation_tasks_cleanup ON generation_tasks(status, finished_at)",
 		},
+		{
+			name:  "idx_generation_tasks_payload_files",
+			table: "generation_tasks",
+			sql:   "CREATE INDEX IF NOT EXISTS idx_generation_tasks_payload_files ON generation_tasks(request_file_id, response_file_id)",
+		},
+		{
+			name:  "idx_cloud_files_cleanup",
+			table: "cloud_files",
+			sql:   "CREATE INDEX IF NOT EXISTS idx_cloud_files_cleanup ON cloud_files(expires_at, deleted_at, provider, purpose, user_id)",
+		},
+		{
+			name:  "idx_cloud_files_token",
+			table: "cloud_files",
+			sql:   "CREATE INDEX IF NOT EXISTS idx_cloud_files_token ON cloud_files(id, access_token, deleted_at)",
+		},
 	}
 
 	for _, idx := range indexes {

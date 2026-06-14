@@ -17,11 +17,19 @@ function proxyHeaders(request: NextRequest) {
     return headers;
 }
 
-function responseHeaders(response: Response) {
+function responseHeaders(response: Response, path: string[], method: string) {
     const headers = new Headers(response.headers);
     headers.delete("content-length");
     headers.delete("content-encoding");
     headers.delete("transfer-encoding");
+    if (method === "GET" && path.join("/") === "prompts") {
+        headers.set("Cache-Control", "public, s-maxage=300, stale-while-revalidate=600");
+        headers.set("CDN-Cache-Control", "public, s-maxage=300, stale-while-revalidate=600");
+        headers.set("Surrogate-Control", "max-age=300, stale-while-revalidate=600");
+        headers.delete("Pragma");
+        headers.delete("Expires");
+        return headers;
+    }
     headers.set("Cache-Control", "no-store, no-cache, max-age=0, must-revalidate, proxy-revalidate");
     headers.set("CDN-Cache-Control", "no-store");
     headers.set("Surrogate-Control", "no-store");
@@ -49,7 +57,7 @@ async function proxy(request: NextRequest, context: RouteContext) {
         return new Response(response.body, {
             status: response.status,
             statusText: response.statusText,
-            headers: responseHeaders(response),
+            headers: responseHeaders(response, path, request.method),
         });
     } catch (error) {
         console.error("Failed to proxy", target, error);

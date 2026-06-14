@@ -25,8 +25,8 @@ The generation task queue system provides rate limiting and queuing for AI model
 - `queue_position` (indexed): Position in queue for this model (0 = not queued)
 - `started_at` (indexed): When execution started (used for rate limit window)
 - `finished_at` (indexed): When task completed (used for cleanup)
-- `request_body` (BLOB): Original request payload
-- `response_body` (BLOB): AI response payload (images, chat, video metadata)
+- `request_file_id` (indexed): `cloud_files.id` for the queued request payload
+- `response_file_id` (indexed): `cloud_files.id` for the completed AI response payload
 - `credits`: Points charged for this task
 - `error`: Error message if failed
 
@@ -46,6 +46,10 @@ CREATE INDEX idx_generation_tasks_user_queue
 -- Cleanup (removes old completed tasks)
 CREATE INDEX idx_generation_tasks_cleanup 
   ON generation_tasks(status, finished_at);
+
+-- Payload object lookup
+CREATE INDEX idx_generation_tasks_payload_files
+  ON generation_tasks(request_file_id, response_file_id);
 ```
 
 ### State Machine
@@ -57,7 +61,7 @@ Check rate limit for model
   ├─ Within limit → executing (immediate)
   │   ↓
   │  Execute upstream API
-  │   ├─ Success → succeeded (save response)
+  │   ├─ Success → succeeded (save response object)
   │   └─ Failure → failed (refund credits)
   │
   └─ Over limit → queued (deferred)
@@ -290,12 +294,14 @@ type ModelRateLimit struct {
 
 ### Cleanup Strategy
 
-**Automatic cleanup** (runs every second):
+**Automatic cleanup** (runs about every 10 minutes):
 ```sql
-DELETE FROM generation_tasks
+SELECT * FROM generation_tasks
 WHERE status IN ('succeeded', 'failed', 'canceled')
   AND finished_at < NOW() - INTERVAL '24 hours';
 ```
+
+The worker deletes the related `cloud_files` request/response objects first, then deletes the task row.
 
 **Manual cleanup** (if DB grows large):
 ```sql

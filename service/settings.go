@@ -29,6 +29,14 @@ func PublicSettings() (model.PublicSetting, error) {
 	return settings.Public, nil
 }
 
+func AdsTxt() (string, error) {
+	settings, err := repository.GetSettings()
+	if err != nil {
+		return "", err
+	}
+	return normalizePublicAdSenseSetting(settings.Public.AdSense).AdsTxt, nil
+}
+
 func AdminSettings() (model.Settings, error) {
 	settings, err := repository.GetSettings()
 	settings = normalizeSettings(settings)
@@ -159,6 +167,7 @@ func normalizePublicPageAccessSetting(setting model.PublicPageAccessSetting) mod
 
 func normalizePublicAdSenseSetting(setting model.PublicAdSenseSetting) model.PublicAdSenseSetting {
 	setting.Code = strings.TrimSpace(setting.Code)
+	setting.AdsTxt = strings.TrimSpace(setting.AdsTxt)
 	return setting
 }
 

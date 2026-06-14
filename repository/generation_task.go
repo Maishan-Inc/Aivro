@@ -55,6 +55,16 @@ func CountQueuedUserTasks(userID string) (int64, error) {
 	return count, err
 }
 
+func CountQueuedModelTasks(modelName string) (int64, error) {
+	db, err := DB()
+	if err != nil {
+		return 0, err
+	}
+	var count int64
+	err = db.Model(&model.GenerationTask{}).Where("model = ? AND status = ?", modelName, model.GenerationTaskQueued).Count(&count).Error
+	return count, err
+}
+
 func CountDispatchedGenerationTasks(modelName string, since string) (int64, error) {
 	db, err := DB()
 	if err != nil {
@@ -171,4 +181,25 @@ func DeleteOldGenerationTasks(before string) error {
 		return err
 	}
 	return db.Where("status IN ? AND finished_at != ? AND finished_at < ?", []model.GenerationTaskStatus{model.GenerationTaskSucceeded, model.GenerationTaskFailed, model.GenerationTaskCanceled}, "", before).Delete(&model.GenerationTask{}).Error
+}
+
+func ListOldGenerationTasks(before string, limit int) ([]model.GenerationTask, error) {
+	db, err := DB()
+	if err != nil {
+		return nil, err
+	}
+	if limit <= 0 {
+		limit = 100
+	}
+	items := []model.GenerationTask{}
+	err = db.Where("status IN ? AND finished_at != ? AND finished_at < ?", []model.GenerationTaskStatus{model.GenerationTaskSucceeded, model.GenerationTaskFailed, model.GenerationTaskCanceled}, "", before).Order("finished_at asc").Limit(limit).Find(&items).Error
+	return items, err
+}
+
+func DeleteGenerationTask(id string) error {
+	db, err := DB()
+	if err != nil {
+		return err
+	}
+	return db.Delete(&model.GenerationTask{}, "id = ?", id).Error
 }

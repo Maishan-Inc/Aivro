@@ -59,11 +59,13 @@ func databaseErrorMessage(err error) string {
 
 func writeJSON(w http.ResponseWriter, value any) {
 	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Cache-Control", "no-store, no-cache, max-age=0, must-revalidate, proxy-revalidate")
-	w.Header().Set("CDN-Cache-Control", "no-store")
-	w.Header().Set("Surrogate-Control", "no-store")
-	w.Header().Set("Pragma", "no-cache")
-	w.Header().Set("Expires", "0")
+	if w.Header().Get("Cache-Control") == "" {
+		w.Header().Set("Cache-Control", "no-store, no-cache, max-age=0, must-revalidate, proxy-revalidate")
+		w.Header().Set("CDN-Cache-Control", "no-store")
+		w.Header().Set("Surrogate-Control", "no-store")
+		w.Header().Set("Pragma", "no-cache")
+		w.Header().Set("Expires", "0")
+	}
 	_ = json.NewEncoder(w).Encode(value)
 }
 

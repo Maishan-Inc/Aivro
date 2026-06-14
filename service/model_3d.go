@@ -8,6 +8,7 @@ import (
 	"log"
 	"mime"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -252,16 +253,18 @@ func storeRemoteModel3D(ctx context.Context, user model.AuthUser, rawURL string,
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
 		return Model3DGeneratedAsset{}, safeMessageError{message: "下载上游模型失败"}
 	}
-	content, err := io.ReadAll(io.LimitReader(response.Body, 100<<20))
+	tmp, size, err := spoolLimited(response.Body, maxUpstreamModel3DBytes, "上游 3D 模型文件过大")
 	if err != nil {
 		return Model3DGeneratedAsset{}, err
 	}
+	defer os.Remove(tmp.Name())
+	defer tmp.Close()
 	contentType := response.Header.Get("Content-Type")
 	ext := strings.ToLower(filepath.Ext(response.Request.URL.Path))
 	if ext == "" {
 		ext = ".glb"
 	}
-	stored, err := StoreModel3DContentToCloud(ctx, user, "model-"+newID("file")+ext, content, contentType, source)
+	stored, err := StoreModel3DReaderToCloud(ctx, user, "model-"+newID("file")+ext, tmp, size, contentType, source)
 	if err != nil {
 		return Model3DGeneratedAsset{}, err
 	}
@@ -279,14 +282,29 @@ func StoreModel3DContentToCloud(ctx context.Context, user model.AuthUser, filena
 			mediaType = "application/octet-stream"
 		}
 	}
-	contentType, fileType, ext, err := validateUploadContent(filename, body, mediaType)
+	contentType, fileType, ext, err := validateStoredContent(filename, body, mediaType, maxUpstreamModel3DBytes, "3D 模型文件不能超过 100MB")
 	if err != nil {
 		return StoredFileResult{}, err
 	}
 	if fileType != model.CloudFileTypeModel3D {
 		return StoredFileResult{}, safeMessageError{message: "只支持 3D 模型文件"}
 	}
-	result, err := storeObject(ctx, CloudObjectUpload{User: user, FileType: fileType, Purpose: model.CloudFilePurposeTemp, Filename: sanitizeFilename(strings.TrimSuffix(filename, filepath.Ext(filename))) + ext, ContentType: contentType, Source: source, Body: body, ExpiresAt: defaultTempExpiresAt()})
+	result, err := storeObject(ctx, CloudObjectUpload{User: user, FileType: fileType, Purpose: model.CloudFilePurposeTemp, Filename: sanitizeFilename(strings.TrimSuffix(filename, filepath.Ext(filename))) + ext, ContentType: contentType, Source: source, Body: body, ExpiresAt: defaultTempExpiresAt(model.CloudFileTypeModel3D)})
+	if err != nil {
+		return StoredFileResult{}, err
+	}
+	return storedFileResult(result.File, 0, 0), nil
+}
+
+func StoreModel3DReaderToCloud(ctx context.Context, user model.AuthUser, filename string, file *os.File, size int64, contentType string, source string) (StoredFileResult, error) {
+	contentType, fileType, ext, err := validateStoredFile(filename, file, size, contentType, maxUpstreamModel3DBytes, "3D 模型文件不能超过 100MB")
+	if err != nil {
+		return StoredFileResult{}, err
+	}
+	if fileType != model.CloudFileTypeModel3D {
+		return StoredFileResult{}, safeMessageError{message: "只支持 3D 模型文件"}
+	}
+	result, err := storeObject(ctx, CloudObjectUpload{User: user, FileType: fileType, Purpose: model.CloudFilePurposeTemp, Filename: sanitizeFilename(strings.TrimSuffix(filename, filepath.Ext(filename))) + ext, ContentType: contentType, Source: source, Reader: file, Size: size, ExpiresAt: defaultTempExpiresAt(model.CloudFileTypeModel3D)})
 	if err != nil {
 		return StoredFileResult{}, err
 	}

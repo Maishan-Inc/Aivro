@@ -131,6 +131,10 @@ CREATE INDEX idx_generation_tasks_user_queue
 -- 过期任务清理
 CREATE INDEX idx_generation_tasks_cleanup 
   ON generation_tasks(status, finished_at);
+
+-- 请求/响应对象引用
+CREATE INDEX idx_generation_tasks_payload_files
+  ON generation_tasks(request_file_id, response_file_id);
 ```
 
 这些索引在首次启动时自动创建，无需手动干预。
@@ -181,25 +185,14 @@ CREATE INDEX idx_generation_tasks_cleanup
 
 ### 自动清理
 
-系统每秒自动清理超过保留时间的已完成任务：
+系统约每 10 分钟自动清理超过保留时间的已完成任务：
 - 状态为 `succeeded`、`failed`、`canceled`
 - `finished_at` 超过配置的保留小时数（默认 24 小时）
+- 先删除 `request_file_id`、`response_file_id` 对应的 `cloud_files.file_type=task` 对象，再删除任务行
 
 ### 手动清理
 
-如需立即清理：
-
-```sql
--- PostgreSQL/MySQL
-DELETE FROM generation_tasks 
-WHERE status IN ('succeeded', 'failed', 'canceled') 
-  AND finished_at < datetime('now', '-24 hours');
-
--- SQLite
-DELETE FROM generation_tasks 
-WHERE status IN ('succeeded', 'failed', 'canceled') 
-  AND finished_at < datetime('now', '-24 hours');
-```
+如需立即清理，优先通过应用内清理逻辑执行，避免只删除 `generation_tasks` 行导致请求/响应对象文件残留。
 
 ### 数据库维护
 

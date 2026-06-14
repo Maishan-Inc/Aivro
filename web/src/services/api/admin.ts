@@ -241,6 +241,7 @@ export type AdminPublicPageAccessSettings = {
 export type AdminAdSenseSettings = {
     enabled: boolean;
     code: string;
+    adsTxt: string;
     pages: AdminAdSensePageSettings;
 };
 
@@ -324,6 +325,7 @@ export type AdminKycSettings = {
 
 export type AdminCloudStorageSettings = {
     enabled: boolean;
+    storageMode: "local_only" | "s3_only" | "s3_with_local_fallback";
     provider: "r2" | "s3";
     endpoint: string;
     region: string;
@@ -333,8 +335,10 @@ export type AdminCloudStorageSettings = {
     publicBaseUrl: string;
     imagePathTemplate: string;
     videoPathTemplate: string;
+    model3dPathTemplate: string;
     imageExpireDays: number;
     videoExpireDays: number;
+    model3dExpireDays: number;
     autoCleanupEnabled: boolean;
     pathStyleEndpoint: boolean;
 };

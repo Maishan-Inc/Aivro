@@ -10,6 +10,7 @@ import { useUserStore } from "@/stores/use-user-store";
 const defaultAdSense: AdminAdSenseSettings = {
     enabled: false,
     code: "",
+    adsTxt: "",
     pages: {
         home: true,
         pricing: true,
@@ -128,13 +129,21 @@ export default function AdminAdsPage() {
                                     <Switch />
                                 </Form.Item>
                                 <Form.Item name="code" label="脚本代码" extra="从 adsense.google.com 复制完整 script 代码粘贴到这里。">
-                                    <Input.TextArea rows={8} placeholder={`<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5415793876234238"\n     crossorigin="anonymous"></script>`} />
+                                    <Input.TextArea rows={8} placeholder="xxxxx" />
                                 </Form.Item>
                                 <Space wrap>
                                     <Tag color={scriptOk ? "success" : "default"}>{scriptOk ? "脚本地址有效" : "未识别 AdSense 脚本"}</Tag>
                                     {publisherId ? <Tag color="processing">Publisher ID：{publisherId}</Tag> : null}
                                 </Space>
                                 <Alert style={{ marginTop: 16 }} type="info" showIcon title="当前实现加载 Auto Ads 脚本" description="如果你在 AdSense 后台开启自动广告，前台页面加载脚本后会由 Google 自动决定展示位置。" />
+                            </Card>
+                            <Card title="Ads.txt" variant="borderless" style={{ marginTop: 16 }}>
+                                <Form.Item name="adsTxt" label="ads.txt 内容" extra="保存后网站根路径 /ads.txt 会输出这里的内容，用于 Google AdSense 网站审核。">
+                                    <Input.TextArea rows={5} placeholder="google.com, pub-xxxxxxxxxxxxxxxx, DIRECT, f08c47fec0942fa0" />
+                                </Form.Item>
+                                <Typography.Link href="/ads.txt" target="_blank" rel="noreferrer">
+                                    打开 /ads.txt
+                                </Typography.Link>
                             </Card>
                         </Col>
                         <Col xs={24} lg={10}>
@@ -173,6 +182,7 @@ function normalizeAdSense(setting: Partial<AdminAdSenseSettings> = {}): AdminAdS
         ...defaultAdSense,
         enabled: setting.enabled === true,
         code: setting.code || "",
+        adsTxt: setting.adsTxt || "",
         pages,
     };
 }

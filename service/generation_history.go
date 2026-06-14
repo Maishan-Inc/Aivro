@@ -43,7 +43,7 @@ func SaveGenerationHistory(user model.AuthUser, input GenerationHistoryInput) (m
 		status = "成功"
 	}
 	if expiresAt == "" {
-		expiresAt = defaultTempExpiresAt()
+		expiresAt = defaultTempExpiresAt(historyCloudFileType(input.Type))
 	}
 	item := model.GenerationHistory{
 		ID:         newID("history"),
@@ -71,6 +71,16 @@ func SaveGenerationHistory(user model.AuthUser, input GenerationHistoryInput) (m
 		return saved, err
 	}
 	return saved, nil
+}
+
+func historyCloudFileType(historyType model.GenerationHistoryType) model.CloudFileType {
+	if historyType == model.GenerationHistoryTypeVideo {
+		return model.CloudFileTypeVideo
+	}
+	if historyType == model.GenerationHistoryTypeModel3D {
+		return model.CloudFileTypeModel3D
+	}
+	return model.CloudFileTypeImage
 }
 
 func ListGenerationHistories(user model.AuthUser, historyType model.GenerationHistoryType, query model.Query) (model.GenerationHistoryList, error) {

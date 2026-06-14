@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/basketikun/aivro/repository"
 )
@@ -18,6 +19,7 @@ type turnstileResponse struct {
 
 func publicHTTPClient() *http.Client {
 	return &http.Client{
+		Timeout: 2 * time.Minute,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			if len(via) >= 5 {
 				return http.ErrUseLastResponse

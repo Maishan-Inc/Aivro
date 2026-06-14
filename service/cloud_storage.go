@@ -28,7 +28,16 @@ import (
 	"github.com/basketikun/aivro/repository"
 )
 
-const maxUserUploadBytes = 50 << 20
+const (
+	maxUserUploadBytes       = 50 << 20
+	maxUpstreamImageBytes    = 64 << 20
+	maxUpstreamVideoBytes    = 512 << 20
+	maxUpstreamModel3DBytes  = 100 << 20
+	maxAIJSONResponseBytes   = 80 << 20
+	storageModeLocalOnly     = "local_only"
+	storageModeS3Only        = "s3_only"
+	storageModeS3WithFallback = "s3_with_local_fallback"
+)
 
 type CloudObjectUpload struct {
 	User        model.AuthUser
@@ -40,6 +49,8 @@ type CloudObjectUpload struct {
 	ContentType string
 	Source      string
 	Body        []byte
+	Reader      io.ReadSeeker
+	Size        int64
 	ExpiresAt   string
 }
 
@@ -92,10 +103,14 @@ func NewCloudStorageService(setting model.CloudStorageSetting) (*CloudStorageSer
 
 func (storage *CloudStorageService) UploadObject(ctx context.Context, request CloudObjectUpload) (CloudObjectResult, error) {
 	objectKey := storage.ObjectKey(request.FileType, request.User.Username, request.Filename, time.Now())
+	reader, size, err := uploadBody(request)
+	if err != nil {
+		return CloudObjectResult{}, err
+	}
 	_, err := storage.client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket:      aws.String(storage.setting.Bucket),
 		Key:         aws.String(objectKey),
-		Body:        bytes.NewReader(request.Body),
+		Body:        reader,
 		ContentType: aws.String(request.ContentType),
 	})
 	if err != nil {
@@ -115,7 +130,7 @@ func (storage *CloudStorageService) UploadObject(ctx context.Context, request Cl
 		PublicURL:   "",
 		AccessToken: mustRandomToken(24),
 		ContentType: request.ContentType,
-		Size:        int64(len(request.Body)),
+		Size:        size,
 		Source:      request.Source,
 		ExpiresAt:   firstNonEmpty(request.ExpiresAt, cloudExpiresAt(storage.setting, request.FileType)),
 		CreatedAt:   now(),
@@ -142,7 +157,35 @@ func StoreUserFile(ctx context.Context, user model.AuthUser, filename string, bo
 		ContentType: contentType,
 		Source:      source,
 		Body:        body,
-		ExpiresAt:   defaultTempExpiresAt(),
+		ExpiresAt:   defaultTempExpiresAt(fileType),
+	})
+	if err != nil {
+		return StoredFileResult{}, err
+	}
+	return storedFileResult(result.File, 0, 0), nil
+}
+
+func StoreUserFileReader(ctx context.Context, user model.AuthUser, filename string, reader io.Reader, contentType string, source string, purpose model.CloudFilePurpose) (StoredFileResult, error) {
+	tmp, size, err := spoolLimited(reader, maxUserUploadBytes, "文件不能超过 50MB")
+	if err != nil {
+		return StoredFileResult{}, err
+	}
+	defer os.Remove(tmp.Name())
+	defer tmp.Close()
+	contentType, fileType, ext, err := validateStoredFile(filename, tmp, size, contentType, maxUserUploadBytes, "文件不能超过 50MB")
+	if err != nil {
+		return StoredFileResult{}, err
+	}
+	result, err := storeObject(ctx, CloudObjectUpload{
+		User:        user,
+		FileType:    fileType,
+		Purpose:     purpose,
+		Filename:    sanitizeFilename(strings.TrimSuffix(filename, filepath.Ext(filename))) + ext,
+		ContentType: contentType,
+		Source:      source,
+		Reader:      tmp,
+		Size:        size,
+		ExpiresAt:   defaultTempExpiresAt(fileType),
 	})
 	if err != nil {
 		return StoredFileResult{}, err
@@ -155,12 +198,33 @@ func storeObject(ctx context.Context, request CloudObjectUpload) (CloudObjectRes
 	if err != nil {
 		return CloudObjectResult{}, err
 	}
-	if enabled {
+	if !enabled || setting.StorageMode == storageModeLocalOnly {
+		if request.ExpiresAt == "" {
+			request.ExpiresAt = cloudExpiresAt(setting, request.FileType)
+		}
+		return storeLocalObject(request)
+	}
+	if setting.StorageMode == storageModeS3Only || setting.StorageMode == storageModeS3WithFallback {
 		storage, err := NewCloudStorageService(setting)
 		if err != nil {
+			if setting.StorageMode == storageModeS3WithFallback {
+				log.Printf("cloud storage unavailable, fallback to local: %v", err)
+				if request.ExpiresAt == "" {
+					request.ExpiresAt = cloudExpiresAt(setting, request.FileType)
+				}
+				return storeLocalObject(request)
+			}
 			return CloudObjectResult{}, err
 		}
-		return storage.UploadObject(ctx, request)
+		result, err := storage.UploadObject(ctx, request)
+		if err != nil && setting.StorageMode == storageModeS3WithFallback {
+			log.Printf("cloud storage upload failed, fallback to local: %v", err)
+			if request.ExpiresAt == "" {
+				request.ExpiresAt = cloudExpiresAt(setting, request.FileType)
+			}
+			return storeLocalObject(request)
+		}
+		return result, err
 	}
 	return storeLocalObject(request)
 }
@@ -171,7 +235,19 @@ func storeLocalObject(request CloudObjectUpload) (CloudObjectResult, error) {
 	if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
 		return CloudObjectResult{}, err
 	}
-	if err := os.WriteFile(fullPath, request.Body, 0644); err != nil {
+	reader, size, err := uploadBody(request)
+	if err != nil {
+		return CloudObjectResult{}, err
+	}
+	fileWriter, err := os.Create(fullPath)
+	if err != nil {
+		return CloudObjectResult{}, err
+	}
+	if _, err := io.Copy(fileWriter, reader); err != nil {
+		_ = fileWriter.Close()
+		return CloudObjectResult{}, err
+	}
+	if err := fileWriter.Close(); err != nil {
 		return CloudObjectResult{}, err
 	}
 	file := model.CloudFile{
@@ -186,7 +262,7 @@ func storeLocalObject(request CloudObjectUpload) (CloudObjectResult, error) {
 		ObjectKey:   objectKey,
 		AccessToken: mustRandomToken(24),
 		ContentType: request.ContentType,
-		Size:        int64(len(request.Body)),
+		Size:        size,
 		Source:      request.Source,
 		ExpiresAt:   request.ExpiresAt,
 		CreatedAt:   now(),
@@ -301,7 +377,7 @@ func CloudStorageEnabled() (model.CloudStorageSetting, bool, error) {
 		return model.CloudStorageSetting{}, false, err
 	}
 	setting := normalizeCloudStorageSetting(settings.Private.CloudStorage)
-	return setting, setting.Enabled, nil
+	return setting, setting.Enabled || setting.StorageMode == storageModeLocalOnly || setting.StorageMode == storageModeS3Only || setting.StorageMode == storageModeS3WithFallback, nil
 }
 
 func AdminTestCloudStorage(setting model.CloudStorageSetting) (string, error) {
@@ -313,6 +389,9 @@ func AdminTestCloudStorage(setting model.CloudStorageSetting) (string, error) {
 	saved := normalizeCloudStorageSetting(settings.Private.CloudStorage)
 	if strings.TrimSpace(setting.SecretAccessKey) == "" {
 		setting.SecretAccessKey = saved.SecretAccessKey
+	}
+	if setting.StorageMode == storageModeLocalOnly {
+		return "本地存储模式无需测试 S3 连接", nil
 	}
 	storage, err := NewCloudStorageService(setting)
 	if err != nil {
@@ -353,7 +432,7 @@ func StoreImageResponseToCloud(ctx context.Context, user model.AuthUser, body []
 			ContentType: contentType,
 			Source:      source,
 			Body:        content,
-			ExpiresAt:   defaultTempExpiresAt(),
+			ExpiresAt:   defaultTempExpiresAt(model.CloudFileTypeImage),
 		})
 		if err != nil {
 			return nil, err
@@ -387,7 +466,59 @@ func StoreVideoContentToCloud(ctx context.Context, user model.AuthUser, body []b
 		ContentType: mediaType,
 		Source:      source,
 		Body:        body,
-		ExpiresAt:   defaultTempExpiresAt(),
+		ExpiresAt:   defaultTempExpiresAt(model.CloudFileTypeVideo),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(map[string]any{
+		"code": 0,
+		"msg":  "",
+		"data": map[string]any{
+			"url":         result.PublicURL,
+			"storageKey":  "cloud:" + result.File.ID,
+			"bytes":       result.File.Size,
+			"mimeType":    result.File.ContentType,
+			"width":       1280,
+			"height":      720,
+			"cloudFileId": result.File.ID,
+			"expiresAt":   result.File.ExpiresAt,
+		},
+	})
+}
+
+func StoreVideoReaderToCloud(ctx context.Context, user model.AuthUser, reader io.Reader, contentType string, source string) ([]byte, error) {
+	tmp, size, err := spoolLimited(reader, maxUpstreamVideoBytes, "上游视频文件过大")
+	if err != nil {
+		return nil, err
+	}
+	defer os.Remove(tmp.Name())
+	defer tmp.Close()
+	mediaType, _, _ := mime.ParseMediaType(contentType)
+	if mediaType == "" || mediaType == "application/octet-stream" {
+		head := make([]byte, 512)
+		n, err := tmp.Read(head)
+		if err != nil && err != io.EOF {
+			return nil, err
+		}
+		if _, err := tmp.Seek(0, io.SeekStart); err != nil {
+			return nil, err
+		}
+		mediaType = http.DetectContentType(head[:n])
+	}
+	if !strings.HasPrefix(mediaType, "video/") {
+		mediaType = "video/mp4"
+	}
+	result, err := storeObject(ctx, CloudObjectUpload{
+		User:        user,
+		FileType:    model.CloudFileTypeVideo,
+		Purpose:     model.CloudFilePurposeTemp,
+		Filename:    "video-" + newID("file") + mediaExtension(mediaType, ".mp4"),
+		ContentType: mediaType,
+		Source:      source,
+		Reader:      tmp,
+		Size:        size,
+		ExpiresAt:   defaultTempExpiresAt(model.CloudFileTypeVideo),
 	})
 	if err != nil {
 		return nil, err
@@ -447,6 +578,18 @@ func CleanupExpiredCloudFiles() error {
 }
 
 func normalizeCloudStorageSetting(setting model.CloudStorageSetting) model.CloudStorageSetting {
+	setting.StorageMode = strings.TrimSpace(setting.StorageMode)
+	if setting.StorageMode == "" {
+		if setting.Enabled {
+			setting.StorageMode = storageModeS3Only
+		} else {
+			setting.StorageMode = storageModeLocalOnly
+		}
+	}
+	if setting.StorageMode != storageModeLocalOnly && setting.StorageMode != storageModeS3Only && setting.StorageMode != storageModeS3WithFallback {
+		setting.StorageMode = storageModeLocalOnly
+	}
+	setting.Enabled = setting.StorageMode != storageModeLocalOnly
 	setting.Provider = strings.TrimSpace(setting.Provider)
 	if setting.Provider == "" {
 		setting.Provider = "r2"
@@ -497,6 +640,9 @@ func (storage *CloudStorageService) ObjectKey(fileType model.CloudFileType, user
 	if fileType == model.CloudFileTypeModel3D {
 		template = storage.setting.Model3DPathTemplate
 	}
+	if fileType == model.CloudFileTypeTask {
+		template = "{username}/tasks/{yyyy}/{mm}/{dd}/{filename}"
+	}
 	username = sanitizePathPart(username)
 	if username == "" {
 		username = "user"
@@ -532,7 +678,7 @@ func imageItemBytes(ctx context.Context, item map[string]any) ([]byte, string, s
 		if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 			return nil, "", "", errors.New("下载上游图片失败")
 		}
-		content, err := io.ReadAll(io.LimitReader(resp.Body, 64<<20))
+		content, err := readLimited(resp.Body, maxUpstreamImageBytes, "上游图片文件过大")
 		if err != nil {
 			return nil, "", "", err
 		}
@@ -546,7 +692,65 @@ func imageItemBytes(ctx context.Context, item map[string]any) ([]byte, string, s
 	return nil, "", "", nil
 }
 
+func ReadAIProxyResponseBody(reader io.Reader, source string) ([]byte, error) {
+	if strings.HasPrefix(source, "/videos/") && strings.HasSuffix(source, "/content") {
+		return readLimited(reader, maxUpstreamVideoBytes, "上游视频文件过大")
+	}
+	if source == "/images/generations" || source == "/images/edits" {
+		return readLimited(reader, maxAIJSONResponseBytes, "上游图片响应过大")
+	}
+	return readLimited(reader, maxAIJSONResponseBytes, "AI 响应内容过大")
+}
+
+func readLimited(reader io.Reader, maxBytes int64, message string) ([]byte, error) {
+	body, err := io.ReadAll(io.LimitReader(reader, maxBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(body)) > maxBytes {
+		return nil, safeMessageError{message: message}
+	}
+	return body, nil
+}
+
+func spoolLimited(reader io.Reader, maxBytes int64, message string) (*os.File, int64, error) {
+	tmp, err := os.CreateTemp("", "aivro-upload-*")
+	if err != nil {
+		return nil, 0, err
+	}
+	written, err := io.Copy(tmp, io.LimitReader(reader, maxBytes+1))
+	if err != nil {
+		_ = tmp.Close()
+		_ = os.Remove(tmp.Name())
+		return nil, 0, err
+	}
+	if written > maxBytes {
+		_ = tmp.Close()
+		_ = os.Remove(tmp.Name())
+		return nil, 0, safeMessageError{message: message}
+	}
+	if _, err := tmp.Seek(0, io.SeekStart); err != nil {
+		_ = tmp.Close()
+		_ = os.Remove(tmp.Name())
+		return nil, 0, err
+	}
+	return tmp, written, nil
+}
+
+func uploadBody(request CloudObjectUpload) (io.Reader, int64, error) {
+	if request.Reader != nil {
+		if _, err := request.Reader.Seek(0, io.SeekStart); err != nil {
+			return nil, 0, err
+		}
+		return request.Reader, request.Size, nil
+	}
+	return bytes.NewReader(request.Body), int64(len(request.Body)), nil
+}
+
 func cloudExpiresAt(setting model.CloudStorageSetting, fileType model.CloudFileType) string {
+	if fileType == model.CloudFileTypeTask {
+		return taskPayloadExpiresAt()
+	}
 	days := setting.ImageExpireDays
 	if fileType == model.CloudFileTypeVideo {
 		days = setting.VideoExpireDays
@@ -566,11 +770,33 @@ func mediaExtension(contentType string, fallback string) string {
 }
 
 func validateUploadContent(filename string, body []byte, contentType string) (string, model.CloudFileType, string, error) {
+	return validateStoredContent(filename, body, contentType, maxUserUploadBytes, "文件不能超过 50MB")
+}
+
+func validateStoredFile(filename string, file *os.File, size int64, contentType string, maxBytes int, maxMessage string) (string, model.CloudFileType, string, error) {
+	if size == 0 {
+		return "", "", "", safeMessageError{message: "文件不能为空"}
+	}
+	if size > int64(maxBytes) {
+		return "", "", "", safeMessageError{message: maxMessage}
+	}
+	head := make([]byte, 512)
+	n, err := file.Read(head)
+	if err != nil && err != io.EOF {
+		return "", "", "", err
+	}
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return "", "", "", err
+	}
+	return validateStoredContent(filename, head[:n], contentType, maxBytes, maxMessage)
+}
+
+func validateStoredContent(filename string, body []byte, contentType string, maxBytes int, maxMessage string) (string, model.CloudFileType, string, error) {
 	if len(body) == 0 {
 		return "", "", "", safeMessageError{message: "文件不能为空"}
 	}
-	if len(body) > maxUserUploadBytes {
-		return "", "", "", safeMessageError{message: "文件不能超过 50MB"}
+	if len(body) > maxBytes {
+		return "", "", "", safeMessageError{message: maxMessage}
 	}
 	mediaType, _, _ := mime.ParseMediaType(contentType)
 	if mediaType == "" || mediaType == "application/octet-stream" {
@@ -653,8 +879,12 @@ func fileContentURL(id string, accessToken string) string {
 	return "/api/files/" + url.PathEscape(id) + "/content?accessToken=" + url.QueryEscape(accessToken)
 }
 
-func defaultTempExpiresAt() string {
-	return time.Now().Add(7 * 24 * time.Hour).Format(time.RFC3339)
+func defaultTempExpiresAt(fileType model.CloudFileType) string {
+	setting, _, err := CloudStorageEnabled()
+	if err != nil {
+		return time.Now().Add(7 * 24 * time.Hour).Format(time.RFC3339)
+	}
+	return cloudExpiresAt(setting, fileType)
 }
 
 func firstPurpose(purpose model.CloudFilePurpose) model.CloudFilePurpose {
@@ -671,6 +901,9 @@ func localObjectKey(fileType model.CloudFileType, username string, filename stri
 	}
 	if fileType == model.CloudFileTypeModel3D {
 		folder = "models"
+	}
+	if fileType == model.CloudFileTypeTask {
+		folder = "tasks"
 	}
 	username = sanitizePathPart(username)
 	if username == "" {

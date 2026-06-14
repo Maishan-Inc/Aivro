@@ -48,6 +48,7 @@
   "adSense": {
     "enabled": false,
     "code": "",
+    "adsTxt": "",
     "pages": {
       "home": true,
       "pricing": true,
@@ -132,6 +133,7 @@
 | --- | --- | --- |
 | `enabled` | boolean | 是否全站启用 Google AdSense 脚本，默认关闭 |
 | `code` | string | 从 AdSense 后台复制的 script 代码；前端只提取官方 AdSense 脚本地址加载 |
+| `adsTxt` | string | 网站根路径 `/ads.txt` 输出内容，用于 Google AdSense 网站审核 |
 | `pages` | object | 首页、套餐页、生图工作台、视频创作台、工作流、提示词库、我的素材、素材库、隐私政策和服务条款等页面的广告开关 |
 
 该配置位于管理后台“谷歌广告”页面。当前只加载 AdSense Auto Ads 脚本，广告展示位置由 Google AdSense 后台配置决定。
@@ -176,6 +178,7 @@
   },
   "cloudStorage": {
     "enabled": false,
+    "storageMode": "local_only",
     "provider": "r2",
     "endpoint": "",
     "region": "auto",
@@ -185,8 +188,10 @@
     "publicBaseUrl": "",
     "imagePathTemplate": "{username}/images/{yyyy}/{mm}/{dd}/{filename}",
     "videoPathTemplate": "{username}/videos/{yyyy}/{mm}/{dd}/{filename}",
+    "model3dPathTemplate": "{username}/models/{yyyy}/{mm}/{dd}/{filename}",
     "imageExpireDays": 7,
     "videoExpireDays": 7,
+    "model3dExpireDays": 7,
     "autoCleanupEnabled": true,
     "pathStyleEndpoint": true
   },
@@ -240,7 +245,8 @@
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `enabled` | boolean | 是否开启云存储，默认关闭；关闭时图片、视频生成仍使用原本的浏览器本地存储流程 |
+| `enabled` | boolean | 是否开启 S3/R2 云存储，旧字段会由 `storageMode` 同步 |
+| `storageMode` | string | 存储策略：`local_only` 只写服务器本地、`s3_only` 只写 R2/S3、`s3_with_local_fallback` 优先写 R2/S3 失败后写本地 |
 | `provider` | string | 服务商：`r2` 表示 Cloudflare R2，`s3` 表示兼容 S3 |
 | `endpoint` | string | S3 兼容 Endpoint；Cloudflare R2 形如 `https://<accountid>.r2.cloudflarestorage.com` |
 | `region` | string | Region；R2 默认使用 `auto` |
@@ -250,12 +256,14 @@
 | `publicBaseUrl` | string | 自定义域名 / Public Base URL；配置后 `public_url` 使用该基地址拼接对象路径 |
 | `imagePathTemplate` | string | 图片路径模板，默认 `{username}/images/{yyyy}/{mm}/{dd}/{filename}` |
 | `videoPathTemplate` | string | 视频路径模板，默认 `{username}/videos/{yyyy}/{mm}/{dd}/{filename}` |
+| `model3dPathTemplate` | string | 3D 模型路径模板，默认 `{username}/models/{yyyy}/{mm}/{dd}/{filename}` |
 | `imageExpireDays` | number | 图片默认过期天数，默认 7 天 |
 | `videoExpireDays` | number | 视频默认过期天数，默认 7 天 |
+| `model3dExpireDays` | number | 3D 模型默认过期天数，默认 7 天 |
 | `autoCleanupEnabled` | boolean | 是否启用自动清理，默认开启 |
 | `pathStyleEndpoint` | boolean | 是否使用 Path Style Endpoint，R2 默认开启 |
 
-路径模板支持 `{username}`、`{yyyy}`、`{mm}`、`{dd}`、`{filename}`。开启云存储后，后端会把图片和视频生成结果转存到云端，写入 `cloud_files`，并把接口返回内容改为云端 `public_url`；图片和视频过期时间按各自天数分别计算。自动清理只删除已到期且未标记删除的云端对象，删除失败只记录日志。
+路径模板支持 `{username}`、`{yyyy}`、`{mm}`、`{dd}`、`{filename}`。后端会把图片、视频和 3D 模型生成结果转存到当前策略对应的存储，写入 `cloud_files`，并把接口返回内容改为受控访问 `public_url`；图片、视频和 3D 模型过期时间按各自天数分别计算。自动清理只删除已到期且未标记删除的对象，删除失败只记录日志。
 
 `stripe` 字段：
 

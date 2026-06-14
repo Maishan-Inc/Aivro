@@ -19,14 +19,14 @@ type GenerationTask struct {
 	Model          string               `json:"model" gorm:"index"`
 	Path           string               `json:"path" gorm:"index"`
 	ContentType    string               `json:"contentType"`
-	RequestBody    []byte               `json:"-"`
+	RequestFileID  string               `json:"requestFileId" gorm:"index"`
 	Credits        int                  `json:"credits"`
 	RequestCount   int                  `json:"requestCount"`
 	Status         GenerationTaskStatus `json:"status" gorm:"index"`
 	QueuePosition  int                  `json:"queuePosition" gorm:"index"`
 	ResponseStatus int                  `json:"responseStatus"`
 	ResponseHeader string               `json:"responseHeader" gorm:"type:text"`
-	ResponseBody   []byte               `json:"-"`
+	ResponseFileID string               `json:"responseFileId" gorm:"index"`
 	Error          string               `json:"error"`
 	StartedAt      string               `json:"startedAt" gorm:"index"`
 	FinishedAt     string               `json:"finishedAt" gorm:"index"`

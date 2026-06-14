@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { ChevronRight, Image as ImageIcon, RefreshCw, Star, Video } from "lucide-react";
 
+import { AivroDrawableLoader } from "@/components/aivro-drawable-loader";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { formatBytes } from "@/lib/image-utils";
 import { useThemeStore } from "@/stores/use-theme-store";
@@ -337,7 +338,7 @@ const nodeContentRenderers = {
 function LoadingContent({ theme }: Pick<NodeContentRendererProps, "theme">) {
     return (
         <div className="flex h-full w-full flex-col items-center justify-center gap-3" style={{ color: theme.node.activeStroke }}>
-            <div className="size-10 animate-spin rounded-full border-2" style={{ borderColor: theme.node.stroke, borderTopColor: theme.node.activeStroke }} />
+            <AivroDrawableLoader compact className="h-10 w-32" style={{ color: theme.node.activeStroke }} />
             <span className="text-[10px] tracking-[0.2em]">生成中</span>
         </div>
     );

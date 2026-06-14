@@ -32,6 +32,17 @@ func Settings(w http.ResponseWriter, r *http.Request) {
 	OK(w, settings)
 }
 
+func AdsTxt(w http.ResponseWriter, r *http.Request) {
+	content, err := service.AdsTxt()
+	if err != nil {
+		FailError(w, err)
+		return
+	}
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	_, _ = w.Write([]byte(content))
+}
+
 func AdminSettings(w http.ResponseWriter, r *http.Request) {
 	settings, err := service.AdminSettings()
 	if err != nil {

@@ -85,6 +85,7 @@ type PublicPageAccessSetting struct {
 type PublicAdSenseSetting struct {
 	Enabled bool                     `json:"enabled"`
 	Code    string                   `json:"code"`
+	AdsTxt  string                   `json:"adsTxt"`
 	Pages   PublicAdSensePageSetting `json:"pages"`
 }
 
@@ -162,6 +163,7 @@ type KYCSetting struct {
 // CloudStorageSetting 云存储配置。Cloudflare R2 通过 S3-compatible endpoint 访问。
 type CloudStorageSetting struct {
 	Enabled             bool   `json:"enabled"`
+	StorageMode         string `json:"storageMode"`
 	Provider            string `json:"provider"`
 	Endpoint            string `json:"endpoint"`
 	Region              string `json:"region"`

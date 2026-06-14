@@ -12,7 +12,7 @@
 - `mysql`
 - `postgresql`
 
-当前服务启动时会自动执行数据库更新并记录更新日志；重新部署或更新镜像后不需要再到后台手动点击更新。数据库状态页会显示当前实际使用的数据库驱动和脱敏连接地址，便于确认安装后连接的是 PostgreSQL、SQLite 还是 MySQL；除检查模型表是否存在外，也会按当前 `AutoMigrate` 模型检查全部数据库字段是否存在。当前 `AutoMigrate` 自动维护以下表：
+当前服务启动时会自动执行数据库更新并记录更新日志；重新部署或更新镜像后不需要再到后台手动点击更新。数据库状态页会显示当前实际使用的数据库驱动和脱敏连接地址，便于确认安装后连接的是 PostgreSQL、SQLite 还是 MySQL；除检查模型表是否存在外，也会按当前 `AutoMigrate` 模型检查全部数据库字段是否存在。安装更新会主动删除队列表旧的 `request_body`、`response_body` 大字段，并改用 `cloud_files` 对象引用。当前 `AutoMigrate` 自动维护以下表：
 
 - `users`
 - `email_verifications`
@@ -22,6 +22,7 @@
 - `settings`
 - `cloud_files`
 - `generation_histories`
+- `generation_tasks`
 - `user_preferences`
 - `workflows`
 - `workflow_shares`
@@ -228,6 +229,7 @@
 | --- | --- | --- |
 | `enabled` | bool | 是否全站启用 Google AdSense 脚本 |
 | `code` | string | 从 AdSense 后台复制的 script 代码，前端只提取官方脚本地址加载 |
+| `adsTxt` | string | 网站根路径 `/ads.txt` 输出内容，用于 Google AdSense 网站审核 |
 | `pages` | object | 页面级广告开关 |
 
 `adSense.pages` 当前字段：
@@ -311,6 +313,7 @@ OAuth 私有配置字段：
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
 | `enabled` | bool | 是否开启云存储，默认关闭 |
+| `storageMode` | string | 存储策略：`local_only`、`s3_only`、`s3_with_local_fallback` |
 | `provider` | string | 服务商：`r2`、`s3` |
 | `endpoint` | string | S3 兼容 Endpoint，R2 使用账号级 endpoint |
 | `region` | string | Region，R2 默认 `auto` |
@@ -320,8 +323,10 @@ OAuth 私有配置字段：
 | `publicBaseUrl` | string | 自定义域名 / Public Base URL |
 | `imagePathTemplate` | string | 图片路径模板，默认 `{username}/images/{yyyy}/{mm}/{dd}/{filename}` |
 | `videoPathTemplate` | string | 视频路径模板，默认 `{username}/videos/{yyyy}/{mm}/{dd}/{filename}` |
+| `model3dPathTemplate` | string | 3D 模型路径模板，默认 `{username}/models/{yyyy}/{mm}/{dd}/{filename}` |
 | `imageExpireDays` | number | 图片默认过期天数，默认 7 |
 | `videoExpireDays` | number | 视频默认过期天数，默认 7 |
+| `model3dExpireDays` | number | 3D 模型默认过期天数，默认 7 |
 | `autoCleanupEnabled` | bool | 是否启用自动清理 |
 | `pathStyleEndpoint` | bool | 是否使用 Path Style Endpoint |
 
@@ -331,7 +336,7 @@ OAuth 私有配置字段：
 
 ### cloud_files
 
-用户文件表。后端把上传图片、剪贴板图片、参考图、生成图片和生成视频写入统一文件记录；开启云存储时写入 Cloudflare R2 或 S3 兼容存储，未开启云存储时写入服务器本地 `LOCAL_FILE_DIR` 目录。
+用户文件表。后端把上传图片、剪贴板图片、参考图、生成图片、生成视频和 3D 模型写入统一文件记录；存储位置由 `cloudStorage.storageMode` 控制，可只写本地、只写 Cloudflare R2 / S3，或优先写 R2/S3 并在失败时自动写入服务器本地 `LOCAL_FILE_DIR` 目录。
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
@@ -339,7 +344,7 @@ OAuth 私有配置字段：
 | `user_id` | string | 用户 ID |
 | `username` | string | 用户名，用于路径模板中的 `{username}` |
 | `provider` | string | 服务商：`r2`、`s3`、`local` |
-| `file_type` | string | 文件类型：`image`、`video` |
+| `file_type` | string | 文件类型：`image`、`video`、`model3d`、`task` |
 | `purpose` | string | 用途：`temp`、`workflow`、`generation` |
 | `workflow_id` | string | 关联工作流 ID，用于删除工作流时同步删除文件 |
 | `history_id` | string | 关联生成历史 ID，用于删除历史时同步删除文件 |
@@ -350,12 +355,41 @@ OAuth 私有配置字段：
 | `content_type` | string | 文件 MIME 类型 |
 | `size` | number | 文件字节数 |
 | `source` | string | 来源接口，例如 `/images/generations`、`/videos/:id/content` |
-| `expires_at` | string | 到期时间。生成历史和临时文件默认 7 天，工作流文件为空表示跟随工作流长期保留 |
+| `expires_at` | string | 到期时间。生成历史和临时文件按图片、视频、3D 模型各自配置计算，工作流文件为空表示跟随工作流长期保留 |
 | `deleted_at` | string | 对象删除成功后的标记时间，未删除为空 |
 | `created_at` | string | 创建时间 |
 | `updated_at` | string | 更新时间 |
 
-用户上传入口只接受安全白名单内的图片或视频 MIME 类型，单文件最大 5MB。文件内容读取时会校验所属用户或访问 token，不能通过猜测文件 ID 读取其他用户文件。自动清理任务只处理 `expires_at <= now` 且 `deleted_at` 为空的记录；删除对象成功后写入 `deleted_at`，删除失败只记录后端日志，不影响其他请求。
+用户上传入口只接受安全白名单内的图片、视频或 3D 模型 MIME 类型，单文件最大 50MB。队列请求和响应使用内部 `task` 类型对象，不开放给用户直接上传。文件内容读取时会校验所属用户或访问 token，不能通过猜测文件 ID 读取其他用户文件。自动清理任务只处理 `expires_at <= now` 且 `deleted_at` 为空的记录；删除对象成功后写入 `deleted_at`，删除失败只记录后端日志，不影响其他请求。
+
+### generation_tasks
+
+AI 生成队列表。任务表只保存状态和对象引用，原始请求体与响应体保存为 `cloud_files.file_type=task`，避免大 BLOB 长期占用数据库。
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | 主键 |
+| `user_id` | string | 用户 ID |
+| `username` | string | 用户名 |
+| `model` | string | 模型名称 |
+| `path` | string | 后端代理路径，例如 `/images/generations` |
+| `content_type` | string | 原始请求 Content-Type |
+| `request_file_id` | string | 请求体对象 `cloud_files.id` |
+| `credits` | number | 本任务预扣算力点 |
+| `request_count` | number | 本次请求生成数量 |
+| `status` | string | `queued`、`executing`、`succeeded`、`failed`、`canceled` |
+| `queue_position` | number | 排队位置 |
+| `response_status` | number | 上游响应状态码 |
+| `response_header` | text | 上游响应头 JSON |
+| `response_file_id` | string | 响应体对象 `cloud_files.id` |
+| `error` | string | 失败原因 |
+| `started_at` | string | 开始执行时间 |
+| `finished_at` | string | 完成时间 |
+| `canceled_at` | string | 取消时间 |
+| `created_at` | string | 创建时间 |
+| `updated_at` | string | 更新时间 |
+
+队列旧任务清理会先删除 `request_file_id` 和 `response_file_id` 指向的文件对象，再删除任务行。
 
 ### workflows
 

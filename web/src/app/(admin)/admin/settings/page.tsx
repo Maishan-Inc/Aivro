@@ -145,6 +145,7 @@ const emptySettings: AdminSettings = {
         adSense: {
             enabled: false,
             code: "",
+            adsTxt: "",
             pages: {
                 home: true,
                 pricing: true,
@@ -189,6 +190,7 @@ const emptySettings: AdminSettings = {
         },
         cloudStorage: {
             enabled: false,
+            storageMode: "local_only",
             provider: "r2",
             endpoint: "",
             region: "auto",
@@ -198,8 +200,10 @@ const emptySettings: AdminSettings = {
             publicBaseUrl: "",
             imagePathTemplate: "{username}/images/{yyyy}/{mm}/{dd}/{filename}",
             videoPathTemplate: "{username}/videos/{yyyy}/{mm}/{dd}/{filename}",
+            model3dPathTemplate: "{username}/models/{yyyy}/{mm}/{dd}/{filename}",
             imageExpireDays: 7,
             videoExpireDays: 7,
+            model3dExpireDays: 7,
             autoCleanupEnabled: true,
             pathStyleEndpoint: true,
         },
@@ -919,8 +923,14 @@ export default function AdminSettingsPage() {
                             >
                                 <Row gutter={16}>
                                     <Col xs={24} md={8}>
-                                        <Form.Item name={["private", "cloudStorage", "enabled"]} label={t("cloud.enabled")} extra={t("cloud.enabled.extra")} valuePropName="checked">
-                                            <Switch />
+                                        <Form.Item name={["private", "cloudStorage", "storageMode"]} label="存储策略" extra="本地、仅 S3/R2，或优先 S3/R2 失败后自动写入本地。">
+                                            <Select
+                                                options={[
+                                                    { label: "只使用本地存储", value: "local_only" },
+                                                    { label: "只使用 S3/R2", value: "s3_only" },
+                                                    { label: "优先 S3/R2，失败切本地", value: "s3_with_local_fallback" },
+                                                ]}
+                                            />
                                         </Form.Item>
                                     </Col>
                                     <Col xs={24} md={8}>
@@ -973,6 +983,11 @@ export default function AdminSettingsPage() {
                                             <Input />
                                         </Form.Item>
                                     </Col>
+                                    <Col xs={24} md={12}>
+                                        <Form.Item name={["private", "cloudStorage", "model3dPathTemplate"]} label="3D 模型路径模板" extra={t("cloud.videoPathTemplate.extra")}>
+                                            <Input />
+                                        </Form.Item>
+                                    </Col>
                                     <Col xs={24} md={6}>
                                         <Form.Item name={["private", "cloudStorage", "imageExpireDays"]} label={t("cloud.imageExpireDays")} extra={t("cloud.expire.extra")}>
                                             <InputNumber min={1} max={3650} precision={0} addonAfter="天" className="!w-full" />
@@ -980,6 +995,11 @@ export default function AdminSettingsPage() {
                                     </Col>
                                     <Col xs={24} md={6}>
                                         <Form.Item name={["private", "cloudStorage", "videoExpireDays"]} label={t("cloud.videoExpireDays")} extra={t("cloud.expire.extra")}>
+                                            <InputNumber min={1} max={3650} precision={0} addonAfter="天" className="!w-full" />
+                                        </Form.Item>
+                                    </Col>
+                                    <Col xs={24} md={6}>
+                                        <Form.Item name={["private", "cloudStorage", "model3dExpireDays"]} label="3D 模型保存天数" extra={t("cloud.expire.extra")}>
                                             <InputNumber min={1} max={3650} precision={0} addonAfter="天" className="!w-full" />
                                         </Form.Item>
                                     </Col>
@@ -1967,6 +1987,7 @@ function normalizeAdSenseSetting(setting: Partial<AdminSettings["public"]["adSen
         ...emptySettings.public.adSense,
         enabled: setting.enabled === true,
         code: setting.code || "",
+        adsTxt: setting.adsTxt || "",
         pages,
     };
 }
@@ -2035,9 +2056,12 @@ function normalizePrivateSetting(setting: Partial<AdminSettings["private"]> = {}
 }
 
 function normalizeCloudStorageSetting(setting: Partial<AdminCloudStorageSettings> = {}): AdminCloudStorageSettings {
+    const storageMode = setting.storageMode === "s3_only" || setting.storageMode === "s3_with_local_fallback" || setting.storageMode === "local_only" ? setting.storageMode : setting.enabled ? "s3_only" : "local_only";
     return {
         ...emptySettings.private.cloudStorage,
         ...setting,
+        enabled: storageMode !== "local_only",
+        storageMode,
         provider: setting.provider === "s3" ? "s3" : "r2",
         endpoint: setting.endpoint || "",
         region: setting.region || "auto",
@@ -2047,8 +2071,10 @@ function normalizeCloudStorageSetting(setting: Partial<AdminCloudStorageSettings
         publicBaseUrl: setting.publicBaseUrl || "",
         imagePathTemplate: setting.imagePathTemplate || "{username}/images/{yyyy}/{mm}/{dd}/{filename}",
         videoPathTemplate: setting.videoPathTemplate || "{username}/videos/{yyyy}/{mm}/{dd}/{filename}",
+        model3dPathTemplate: setting.model3dPathTemplate || "{username}/models/{yyyy}/{mm}/{dd}/{filename}",
         imageExpireDays: Math.max(1, Number(setting.imageExpireDays) || 7),
         videoExpireDays: Math.max(1, Number(setting.videoExpireDays) || 7),
+        model3dExpireDays: Math.max(1, Number(setting.model3dExpireDays) || 7),
         autoCleanupEnabled: setting.autoCleanupEnabled !== false,
         pathStyleEndpoint: setting.pathStyleEndpoint !== false,
     };

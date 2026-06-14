@@ -170,7 +170,7 @@ func ExecuteAIProxyTask(ctx context.Context, user model.AuthUser, body []byte, c
 		return service.AIProxyResponse{}, service.SafeAIError("AI 接口请求失败")
 	}
 
-	payload, err := io.ReadAll(response.Body)
+	payload, err := service.ReadAIProxyResponseBody(response.Body, path)
 	if err != nil {
 		log.Printf("AI proxy read response failed: path=%s err=%v", path, err)
 		return service.AIProxyResponse{}, err
@@ -260,7 +260,21 @@ func rewriteCloudAIResponse(w http.ResponseWriter, response *http.Response, prox
 	if !isImageResponse && !isVideoContent {
 		return nil, false
 	}
-	body, readErr := io.ReadAll(response.Body)
+	if isVideoContent {
+		rewritten, err := service.StoreVideoReaderToCloud(proxyContext.Request.Context(), proxyContext.User, response.Body, response.Header.Get("Content-Type"), proxyContext.Path)
+		if err != nil {
+			log.Printf("AI video cloud transfer failed: path=%s err=%v", proxyContext.Path, err)
+			if onFailure != nil {
+				onFailure()
+			}
+			Fail(w, "云存储转存失败")
+			return nil, true
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		return rewritten, true
+	}
+	body, readErr := service.ReadAIProxyResponseBody(response.Body, proxyContext.Path)
 	if readErr != nil {
 		log.Printf("AI proxy read cloud response failed: path=%s err=%v", proxyContext.Path, readErr)
 		if onFailure != nil {
@@ -284,18 +298,7 @@ func rewriteCloudAIResponse(w http.ResponseWriter, response *http.Response, prox
 		w.WriteHeader(response.StatusCode)
 		return rewritten, true
 	}
-	rewritten, err := service.StoreVideoContentToCloud(proxyContext.Request.Context(), proxyContext.User, body, response.Header.Get("Content-Type"), proxyContext.Path)
-	if err != nil {
-		log.Printf("AI video cloud transfer failed: path=%s err=%v", proxyContext.Path, err)
-		if onFailure != nil {
-			onFailure()
-		}
-		Fail(w, "云存储转存失败")
-		return nil, true
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	return rewritten, true
+	return nil, false
 }
 
 func writeAIProxyResponse(w http.ResponseWriter, response service.AIProxyResponse) {
