@@ -1,6 +1,6 @@
 services:
   app:
-    image: maishanhub/edge-fast-image-queue:main
+    image: maishanhub/aivro:main
     container_name: aivro
     env_file:
       - .env

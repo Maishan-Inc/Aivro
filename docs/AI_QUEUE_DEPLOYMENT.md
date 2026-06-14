@@ -67,7 +67,7 @@ docker run -d \
   -p 127.0.0.1:3982:3000 \
   -v $(pwd)/data:/app/data \
   --env-file .env \
-  maishanhub/edge-fast-image-queue:main
+  maishanhub/aivro:main
 ```
 
 ## 队列配置
