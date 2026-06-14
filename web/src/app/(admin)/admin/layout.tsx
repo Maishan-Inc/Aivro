@@ -19,6 +19,7 @@ const adminMenus = [
     { key: "/admin/plans", icon: <ShoppingOutlined />, label: "套餐管理" },
     { key: "/admin/prompts", icon: <FileTextOutlined />, label: "提示词管理" },
     { key: "/admin/assets", icon: <PictureOutlined />, label: "素材库" },
+    { key: "/admin/ads", icon: <GlobalOutlined />, label: "谷歌广告" },
     { key: "/admin/database", icon: <DatabaseOutlined />, label: "数据库配置" },
     { key: "/admin/settings", icon: <SettingOutlined />, label: "系统设置" },
 ];
@@ -35,7 +36,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     const locale = useLocaleStore((state) => state.locale);
     const setLocale = useLocaleStore((state) => state.setLocale);
     const activeKey = adminMenus.find((item) => pathname.startsWith(item.key))?.key || "";
-    const pageTitle = pathname.startsWith("/admin/settings") ? "系统设置" : pathname.startsWith("/admin/database") ? "数据库配置" : pathname.startsWith("/admin/assets") ? "素材库管理" : pathname.startsWith("/admin/prompts") ? "提示词管理" : pathname.startsWith("/admin/plans") ? "套餐管理" : pathname.startsWith("/admin/credit-logs") ? "算力点日志" : "用户管理";
+    const pageTitle = pathname.startsWith("/admin/settings") ? "系统设置" : pathname.startsWith("/admin/database") ? "数据库配置" : pathname.startsWith("/admin/ads") ? "谷歌广告" : pathname.startsWith("/admin/assets") ? "素材库管理" : pathname.startsWith("/admin/prompts") ? "提示词管理" : pathname.startsWith("/admin/plans") ? "套餐管理" : pathname.startsWith("/admin/credit-logs") ? "算力点日志" : "用户管理";
     const languageItems = (Object.keys(localeLabels) as Locale[]).map((item) => ({ key: item, label: localeLabels[item] }));
 
     useEffect(() => {

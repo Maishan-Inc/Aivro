@@ -156,6 +156,7 @@
 | `auth` | object | 公开登录配置 |
 | `pages` | object | 隐私政策、服务条款等公开页面内容 |
 | `pageAccess` | object | 页面访问控制公开配置 |
+| `adSense` | object | Google AdSense 广告公开配置 |
 
 `modelChannel` 当前字段：
 
@@ -220,6 +221,30 @@
 | `videoLoginRequired` | bool | 视频创作台页面是否需要登录访问 |
 | `promptsLoginRequired` | bool | 提示词库页面是否需要登录访问 |
 | `assetsLoginRequired` | bool | 我的素材页面是否需要登录访问 |
+
+`adSense` 当前字段：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `enabled` | bool | 是否全站启用 Google AdSense 脚本 |
+| `code` | string | 从 AdSense 后台复制的 script 代码，前端只提取官方脚本地址加载 |
+| `pages` | object | 页面级广告开关 |
+
+`adSense.pages` 当前字段：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `home` | bool | 首页是否加载广告脚本 |
+| `pricing` | bool | 套餐页是否加载广告脚本 |
+| `image` | bool | 生图工作台是否加载广告脚本 |
+| `video` | bool | 视频创作台是否加载广告脚本 |
+| `model3d` | bool | 3D 模型页是否加载广告脚本 |
+| `canvas` | bool | 工作流页面是否加载广告脚本 |
+| `prompts` | bool | 提示词库是否加载广告脚本 |
+| `assets` | bool | 我的素材是否加载广告脚本 |
+| `assetLibrary` | bool | 素材库是否加载广告脚本 |
+| `privacy` | bool | 隐私政策页是否加载广告脚本 |
+| `terms` | bool | 服务条款页是否加载广告脚本 |
 
 `private.value` 当前字段：
 

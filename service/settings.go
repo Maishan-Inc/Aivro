@@ -149,10 +149,16 @@ func normalizePublicSetting(setting model.PublicSetting) model.PublicSetting {
 	}
 	setting.Pages = normalizePublicPagesSetting(setting.Pages)
 	setting.PageAccess = normalizePublicPageAccessSetting(setting.PageAccess)
+	setting.AdSense = normalizePublicAdSenseSetting(setting.AdSense)
 	return setting
 }
 
 func normalizePublicPageAccessSetting(setting model.PublicPageAccessSetting) model.PublicPageAccessSetting {
+	return setting
+}
+
+func normalizePublicAdSenseSetting(setting model.PublicAdSenseSetting) model.PublicAdSenseSetting {
+	setting.Code = strings.TrimSpace(setting.Code)
 	return setting
 }
 

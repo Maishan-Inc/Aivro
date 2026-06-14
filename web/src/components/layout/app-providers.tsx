@@ -9,6 +9,7 @@ import enUS from "antd/locale/en_US";
 import zhCN from "antd/locale/zh_CN";
 
 import { ClientRootInit } from "@/components/layout/client-root-init";
+import { GoogleAdSenseScript } from "@/components/layout/google-adsense-script";
 import { LocalePathSync } from "@/components/layout/locale-path-sync";
 import { RuntimeI18nTranslator } from "@/components/layout/runtime-i18n-translator";
 import { getAntThemeConfig } from "@/lib/app-theme";
@@ -46,6 +47,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
                     <QueryClientProvider client={queryClient}>
                         <LocalePathSync />
                         <RuntimeI18nTranslator />
+                        <GoogleAdSenseScript />
                         <ClientRootInit>{children}</ClientRootInit>
                     </QueryClientProvider>
                 </App>

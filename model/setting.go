@@ -60,6 +60,7 @@ type PublicSetting struct {
 	Auth         PublicAuthSetting         `json:"auth"`
 	Pages        PublicPagesSetting        `json:"pages"`
 	PageAccess   PublicPageAccessSetting   `json:"pageAccess"`
+	AdSense      PublicAdSenseSetting      `json:"adSense"`
 }
 
 type PublicPagesSetting struct {
@@ -79,6 +80,26 @@ type PublicPageAccessSetting struct {
 	VideoLoginRequired   bool `json:"videoLoginRequired"`
 	PromptsLoginRequired bool `json:"promptsLoginRequired"`
 	AssetsLoginRequired  bool `json:"assetsLoginRequired"`
+}
+
+type PublicAdSenseSetting struct {
+	Enabled bool                     `json:"enabled"`
+	Code    string                   `json:"code"`
+	Pages   PublicAdSensePageSetting `json:"pages"`
+}
+
+type PublicAdSensePageSetting struct {
+	Home         bool `json:"home"`
+	Pricing      bool `json:"pricing"`
+	Image        bool `json:"image"`
+	Video        bool `json:"video"`
+	Model3D      bool `json:"model3d"`
+	Canvas       bool `json:"canvas"`
+	Prompts      bool `json:"prompts"`
+	Assets       bool `json:"assets"`
+	AssetLibrary bool `json:"assetLibrary"`
+	Privacy      bool `json:"privacy"`
+	Terms        bool `json:"terms"`
 }
 
 type PublicAuthSetting struct {

@@ -44,6 +44,23 @@
     "videoLoginRequired": false,
     "promptsLoginRequired": false,
     "assetsLoginRequired": false
+  },
+  "adSense": {
+    "enabled": false,
+    "code": "",
+    "pages": {
+      "home": true,
+      "pricing": true,
+      "image": true,
+      "video": true,
+      "model3d": true,
+      "canvas": true,
+      "prompts": true,
+      "assets": true,
+      "assetLibrary": true,
+      "privacy": true,
+      "terms": true
+    }
   }
 }
 ```
@@ -54,6 +71,7 @@
 | `auth` | object | 认证相关公开配置 |
 | `pages` | object | 前台公开页面内容配置 |
 | `pageAccess` | object | 页面访问控制公开配置 |
+| `adSense` | object | Google AdSense 广告公开配置 |
 
 `modelChannel` 字段：
 
@@ -107,6 +125,16 @@
 | `assetsLoginRequired` | boolean | 我的素材页面是否需要登录访问，默认关闭 |
 
 这些开关位于管理后台系统设置的公开配置中；开启后，未登录用户访问对应页面会跳转到登录页，关闭时保持公开访问。
+
+`adSense` 字段：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `enabled` | boolean | 是否全站启用 Google AdSense 脚本，默认关闭 |
+| `code` | string | 从 AdSense 后台复制的 script 代码；前端只提取官方 AdSense 脚本地址加载 |
+| `pages` | object | 首页、套餐页、生图工作台、视频创作台、工作流、提示词库、我的素材、素材库、隐私政策和服务条款等页面的广告开关 |
+
+该配置位于管理后台“谷歌广告”页面。当前只加载 AdSense Auto Ads 脚本，广告展示位置由 Google AdSense 后台配置决定。
 
 ## private.value
 

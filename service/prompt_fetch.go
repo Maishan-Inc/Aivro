@@ -27,12 +27,18 @@ var gptImage2CaseFiles = []string{"README.md", "cases/ad-creative.md", "cases/ch
 
 type gptImage2Data struct {
 	Records []struct {
-		Title    string `json:"title"`
-		TweetURL string `json:"tweet_url"`
-		ImageDir string `json:"image_dir"`
-		Category string `json:"category"`
-		AddedAt  string `json:"added_at"`
+		Title      string `json:"title"`
+		TweetURL   string `json:"tweet_url"`
+		ImageDir   string `json:"image_dir"`
+		Category   string `json:"category"`
+		CaseAnchor string `json:"case_anchor"`
+		AddedAt    string `json:"added_at"`
 	} `json:"records"`
+}
+
+type gptImage2Case struct {
+	Prompt string
+	Cover  string
 }
 
 type davidWuGptImage2Prompt struct {
@@ -100,7 +106,7 @@ func fetchText(baseURL, file string) (string, error) {
 }
 
 func buildGptImage2Prompts() ([]model.Prompt, error) {
-	cases := map[string]string{}
+	cases := map[string]gptImage2Case{}
 	raw, err := fetchText(gptImage2RawBase, "data/ingested_tweets.json")
 	if err != nil {
 		return nil, err
@@ -118,21 +124,74 @@ func buildGptImage2Prompts() ([]model.Prompt, error) {
 	}
 	items := []model.Prompt{}
 	for _, item := range data.Records {
-		prompt := cases[item.TweetURL]
-		if prompt == "" {
+		parsed := findGptImage2Case(cases, item.TweetURL, item.CaseAnchor, item.Title)
+		if parsed.Prompt == "" {
 			continue
 		}
-		image := gptImage2RawBase + "/" + item.ImageDir + "/output.jpg"
-		items = append(items, model.Prompt{ID: "gpt-image-2-prompts-" + leftPad(len(items)+1), Title: item.Title, CoverURL: image, Prompt: prompt, Tags: tagsFromCategory(item.Category), CreatedAt: item.AddedAt, UpdatedAt: item.AddedAt, Preview: markdownPreview([]string{image})})
+		image := gptImage2ImageURL(item.ImageDir)
+		if image == "" {
+			image = parsed.Cover
+		}
+		items = append(items, model.Prompt{ID: "gpt-image-2-prompts-" + leftPad(len(items)+1), Title: item.Title, CoverURL: image, Prompt: parsed.Prompt, Tags: tagsFromCategory(item.Category), CreatedAt: item.AddedAt, UpdatedAt: item.AddedAt, Preview: markdownPreview([]string{image})})
 	}
 	return items, nil
 }
 
-func collectGptImage2Cases(cases map[string]string, markdown string) {
-	re := regexp.MustCompile("(?s)### Case \\d+: \\[[^\\]]+\\]\\(([^)]+)\\).*?\\*\\*Prompt:\\*\\*\\s*\\r?\\n\\s*```[\\w-]*\\r?\\n(.*?)\\r?\\n```")
-	for _, match := range re.FindAllStringSubmatch(markdown, -1) {
-		cases[match[1]] = strings.TrimSpace(match[2])
+func collectGptImage2Cases(cases map[string]gptImage2Case, markdown string) {
+	for _, block := range splitBeforeHeading(markdown, "### Case ") {
+		prompt := strings.TrimSpace(firstMatch(block, "(?s)\\*\\*Prompt:?\\*\\*\\s*:?\\s*\\r?\\n\\s*```[\\w-]*\\r?\\n(.*?)\\r?\\n```"))
+		if prompt == "" {
+			continue
+		}
+		title := gptImage2CaseTitle(block)
+		images := extractMarkdownImages(gptImage2RawBase, block)
+		parsed := gptImage2Case{Prompt: prompt}
+		if len(images) > 0 {
+			parsed.Cover = images[0]
+		}
+		for _, key := range []string{gptImage2TweetURL(block), gptImage2Anchor(title), title} {
+			key = strings.TrimSpace(strings.TrimPrefix(key, "#"))
+			if key != "" {
+				cases[key] = parsed
+			}
+		}
 	}
+}
+
+func findGptImage2Case(cases map[string]gptImage2Case, tweetURL, anchor, title string) gptImage2Case {
+	for _, key := range []string{tweetURL, anchor, strings.TrimPrefix(anchor, "#"), title, gptImage2Anchor(title)} {
+		if item, ok := cases[strings.TrimSpace(key)]; ok {
+			return item
+		}
+	}
+	return gptImage2Case{}
+}
+
+func gptImage2CaseTitle(block string) string {
+	heading := strings.TrimSpace(firstMatch(block, `(?m)^###\s+Case\s+\d+:\s+(.+)$`))
+	heading = regexp.MustCompile(`\s+\(by\s+.+\)$`).ReplaceAllString(heading, "")
+	if match := regexp.MustCompile(`\[([^\]]+)]\([^)]+\)`).FindStringSubmatch(heading); len(match) > 1 {
+		return strings.TrimSpace(match[1])
+	}
+	return strings.TrimSpace(heading)
+}
+
+func gptImage2TweetURL(block string) string {
+	return firstMatch(block, `https://x\.com/[^)\s]+/status/\d+`)
+}
+
+func gptImage2Anchor(title string) string {
+	title = strings.ToLower(strings.TrimSpace(title))
+	title = regexp.MustCompile(`[^a-z0-9]+`).ReplaceAllString(title, "-")
+	return strings.Trim(title, "-")
+}
+
+func gptImage2ImageURL(imageDir string) string {
+	imageDir = strings.Trim(strings.TrimSpace(imageDir), "/")
+	if imageDir == "" {
+		return ""
+	}
+	return gptImage2RawBase + "/" + imageDir + "/output.jpg"
 }
 
 func buildAwesomeGptImagePrompts() ([]model.Prompt, error) {

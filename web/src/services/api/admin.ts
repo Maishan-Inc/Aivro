@@ -216,6 +216,7 @@ export type AdminPublicSettings = {
     };
     pages: AdminPublicPagesSettings;
     pageAccess: AdminPublicPageAccessSettings;
+    adSense: AdminAdSenseSettings;
 };
 
 export type AdminPublicPagesSettings = {
@@ -235,6 +236,26 @@ export type AdminPublicPageAccessSettings = {
     videoLoginRequired: boolean;
     promptsLoginRequired: boolean;
     assetsLoginRequired: boolean;
+};
+
+export type AdminAdSenseSettings = {
+    enabled: boolean;
+    code: string;
+    pages: AdminAdSensePageSettings;
+};
+
+export type AdminAdSensePageSettings = {
+    home: boolean;
+    pricing: boolean;
+    image: boolean;
+    video: boolean;
+    model3d: boolean;
+    canvas: boolean;
+    prompts: boolean;
+    assets: boolean;
+    assetLibrary: boolean;
+    privacy: boolean;
+    terms: boolean;
 };
 
 export type AdminPublicAuthProvider = {

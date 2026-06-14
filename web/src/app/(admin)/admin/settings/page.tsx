@@ -142,6 +142,23 @@ const emptySettings: AdminSettings = {
             promptsLoginRequired: false,
             assetsLoginRequired: false,
         },
+        adSense: {
+            enabled: false,
+            code: "",
+            pages: {
+                home: true,
+                pricing: true,
+                image: true,
+                video: true,
+                model3d: true,
+                canvas: true,
+                prompts: true,
+                assets: true,
+                assetLibrary: true,
+                privacy: true,
+                terms: true,
+            },
+        },
     },
     private: {
         channels: [],
@@ -1911,6 +1928,7 @@ function normalizePublicSetting(setting: Partial<AdminSettings["public"]> = {}):
         },
         pages: normalizePublicPagesSetting(setting.pages),
         pageAccess: normalizePublicPageAccessSetting(setting.pageAccess),
+        adSense: normalizeAdSenseSetting(setting.adSense),
     };
 }
 
@@ -1934,6 +1952,22 @@ function normalizePublicPagesSetting(setting: Partial<AdminSettings["public"]["p
         termsContent: setting.termsContent || defaultTermsContent,
         termsTitleEn: setting.termsTitleEn || "Terms of Service",
         termsContentEn: setting.termsContentEn || defaultTermsContentEn,
+    };
+}
+
+function normalizeAdSenseSetting(setting: Partial<AdminSettings["public"]["adSense"]> = {}): AdminSettings["public"]["adSense"] {
+    const pages = {
+        ...emptySettings.public.adSense.pages,
+        ...(setting.pages || {}),
+    };
+    if (!setting.enabled && !setting.code && !Object.values(pages).some(Boolean)) {
+        Object.assign(pages, emptySettings.public.adSense.pages);
+    }
+    return {
+        ...emptySettings.public.adSense,
+        enabled: setting.enabled === true,
+        code: setting.code || "",
+        pages,
     };
 }
 
