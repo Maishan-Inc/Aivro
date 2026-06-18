@@ -199,6 +199,9 @@
 | `name` | string | 前台按钮显示名称 |
 | `iconUrl` | string | 前台按钮图标地址 |
 | `enabled` | bool | 是否在前台开启 |
+| `siteName` | string | MetaMask 签名网站名称，仅 `metamask` 使用 |
+| `siteUrl` | string | MetaMask 签名网站 URL，仅 `metamask` 使用 |
+| `signatureLogoUrl` | string | MetaMask 签名 Logo URL，仅 `metamask` 使用 |
 
 `pages` 当前字段：
 
@@ -293,6 +296,15 @@ OAuth 私有配置字段：
 | `userInfoUrl` | string | OAuth 用户信息地址 |
 | `scope` | string | OAuth scope |
 | `enabled` | bool | 服务端是否启用 |
+
+MetaMask 私有配置字段：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `enabled` | bool | 服务端是否启用 |
+| `siteName` | string | 写入钱包签名消息的网站名称 |
+| `siteUrl` | string | 写入钱包签名消息的网站 URL |
+| `signatureLogoUrl` | string | 写入钱包签名消息的 Logo URL |
 
 `mail` 当前字段：
 

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { App } from "antd";
 
-import { adjustAdminUserCredits, deleteAdminUser, fetchAdminUsers, saveAdminUser, type AdminUser } from "@/services/api/admin";
+import { adjustAdminUserCredits, adjustAdminUserWorkflowCreateCredits, deleteAdminUser, fetchAdminUsers, saveAdminUser, type AdminUser } from "@/services/api/admin";
 import { useUserStore } from "@/stores/use-user-store";
 import { adminRealtimeQueryOptions } from "../admin-query-options";
 
@@ -54,6 +54,15 @@ export function useAdminUsers() {
         onError: (error) => message.error(error instanceof Error ? error.message : "调整失败"),
     });
 
+    const workflowCreateCreditMutation = useMutation({
+        mutationFn: ({ id, workflowCreateCredits }: { id: string; workflowCreateCredits: number }) => adjustAdminUserWorkflowCreateCredits(token, id, workflowCreateCredits),
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({ queryKey: ["admin"] });
+            message.success("工作流创建次数已调整");
+        },
+        onError: (error) => message.error(error instanceof Error ? error.message : "调整失败"),
+    });
+
     useEffect(() => {
         if (query.isError) {
             const errorMessage = query.error instanceof Error ? query.error.message : "读取用户失败";
@@ -78,7 +87,7 @@ export function useAdminUsers() {
         page,
         pageSize,
         total: data?.total || 0,
-        isLoading: query.isFetching || saveMutation.isPending || deleteMutation.isPending || creditMutation.isPending,
+        isLoading: query.isFetching || saveMutation.isPending || deleteMutation.isPending || creditMutation.isPending || workflowCreateCreditMutation.isPending,
         searchUsers: (value = keyword) => updateFilters({ keyword: value }),
         changePage: (value: number) => updateFilters({ page: value }),
         changePageSize: (value: number) => updateFilters({ pageSize: value }),
@@ -86,6 +95,7 @@ export function useAdminUsers() {
         refreshUsers: () => query.refetch(),
         saveUser: (user: Partial<AdminUser> & { password?: string }) => saveMutation.mutateAsync(user),
         adjustCredits: (id: string, credits: number) => creditMutation.mutateAsync({ id, credits }),
+        adjustWorkflowCreateCredits: (id: string, workflowCreateCredits: number) => workflowCreateCreditMutation.mutateAsync({ id, workflowCreateCredits }),
         deleteUser: (id: string) => deleteMutation.mutateAsync(id),
     };
 }

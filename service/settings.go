@@ -21,6 +21,8 @@ func PublicSettings() (model.PublicSetting, error) {
 		return model.PublicSetting{}, err
 	}
 	settings = normalizeSettings(settings)
+	settings.Public.Auth.CustomProviders = publicCustomAuthProviders(settings.Private.Auth.CustomProviders)
+	syncMetaMaskSignatureSetting(&settings)
 	if settings.Private.Turnstile.Enabled && strings.TrimSpace(settings.Private.Turnstile.SiteKey) != "" && strings.TrimSpace(settings.Private.Turnstile.SecretKey) != "" {
 		settings.Public.Auth.TurnstileSiteKey = settings.Private.Turnstile.SiteKey
 	} else {
@@ -67,6 +69,30 @@ func syncBuiltinAuthEnabled(settings *model.Settings) {
 	settings.Private.Auth.Google.Enabled = settings.Public.Auth.Google.Enabled
 	settings.Private.Auth.Github.Enabled = settings.Public.Auth.Github.Enabled
 	settings.Private.Auth.MetaMask.Enabled = settings.Public.Auth.MetaMask.Enabled
+	syncMetaMaskSignatureSetting(settings)
+	settings.Public.Auth.CustomProviders = publicCustomAuthProviders(settings.Private.Auth.CustomProviders)
+}
+
+func syncMetaMaskSignatureSetting(settings *model.Settings) {
+	settings.Private.Auth.MetaMask.SiteName = strings.TrimSpace(firstNonEmpty(settings.Private.Auth.MetaMask.SiteName, settings.Public.Auth.MetaMask.SiteName, settings.Public.Auth.MetaMask.Name, "Aivro"))
+	settings.Private.Auth.MetaMask.SiteURL = strings.TrimSpace(firstNonEmpty(settings.Private.Auth.MetaMask.SiteURL, settings.Public.Auth.MetaMask.SiteURL))
+	settings.Private.Auth.MetaMask.SignatureLogoURL = strings.TrimSpace(firstNonEmpty(settings.Private.Auth.MetaMask.SignatureLogoURL, settings.Public.Auth.MetaMask.SignatureLogoURL, settings.Public.Auth.MetaMask.IconURL))
+	settings.Public.Auth.MetaMask.SiteName = settings.Private.Auth.MetaMask.SiteName
+	settings.Public.Auth.MetaMask.SiteURL = settings.Private.Auth.MetaMask.SiteURL
+	settings.Public.Auth.MetaMask.SignatureLogoURL = settings.Private.Auth.MetaMask.SignatureLogoURL
+}
+
+func publicCustomAuthProviders(providers []model.PrivateOAuthProviderSetting) []model.PublicOAuthProviderSetting {
+	result := make([]model.PublicOAuthProviderSetting, 0, len(providers))
+	for _, provider := range providers {
+		result = append(result, model.PublicOAuthProviderSetting{
+			ID:      provider.ID,
+			Name:    provider.Name,
+			IconURL: provider.IconURL,
+			Enabled: provider.Enabled,
+		})
+	}
+	return result
 }
 
 func AdminChannelModels(index *int, channel model.ModelChannel) ([]string, error) {
@@ -152,8 +178,17 @@ func normalizePublicSetting(setting model.PublicSetting) model.PublicSetting {
 	setting.Auth.Google = normalizePublicAuthProvider(setting.Auth.Google, "google", "Google", "/icons/google.svg")
 	setting.Auth.Github = normalizePublicAuthProvider(setting.Auth.Github, "github", "GitHub", "/icons/github.svg")
 	setting.Auth.MetaMask = normalizePublicAuthProvider(setting.Auth.MetaMask, "metamask", "MetaMask", "/icons/metamask.svg")
+	if setting.Auth.MetaMask.SiteName == "" {
+		setting.Auth.MetaMask.SiteName = firstNonEmpty(setting.Auth.MetaMask.Name, "Aivro")
+	}
+	if setting.Auth.MetaMask.SignatureLogoURL == "" {
+		setting.Auth.MetaMask.SignatureLogoURL = setting.Auth.MetaMask.IconURL
+	}
 	if setting.Auth.CustomProviders == nil {
 		setting.Auth.CustomProviders = []model.PublicOAuthProviderSetting{{ID: "o2", Name: "O2", Enabled: false}}
+	}
+	for i := range setting.Auth.CustomProviders {
+		setting.Auth.CustomProviders[i] = normalizePublicAuthProvider(setting.Auth.CustomProviders[i], setting.Auth.CustomProviders[i].ID, setting.Auth.CustomProviders[i].Name, setting.Auth.CustomProviders[i].IconURL)
 	}
 	setting.Pages = normalizePublicPagesSetting(setting.Pages)
 	setting.PageAccess = normalizePublicPageAccessSetting(setting.PageAccess)
@@ -488,6 +523,12 @@ func normalizePrivateAuthSetting(setting model.PrivateAuthSetting) model.Private
 	setting.LinuxDo = normalizePrivateAuthProvider(setting.LinuxDo, "linux-do", "Linux.do", config.Cfg.LinuxDoAuthorizeURL, config.Cfg.LinuxDoTokenURL, config.Cfg.LinuxDoUserInfoURL, "read")
 	setting.Google = normalizePrivateAuthProvider(setting.Google, "google", "Google", "https://accounts.google.com/o/oauth2/v2/auth", "https://oauth2.googleapis.com/token", "https://www.googleapis.com/oauth2/v3/userinfo", "openid email profile")
 	setting.Github = normalizePrivateAuthProvider(setting.Github, "github", "GitHub", "https://github.com/login/oauth/authorize", "https://github.com/login/oauth/access_token", "https://api.github.com/user", "read:user user:email")
+	if setting.MetaMask.SiteName == "" {
+		setting.MetaMask.SiteName = "Aivro"
+	}
+	if setting.MetaMask.SignatureLogoURL == "" {
+		setting.MetaMask.SignatureLogoURL = "/icons/metamask.svg"
+	}
 	if setting.CustomProviders == nil {
 		setting.CustomProviders = []model.PrivateOAuthProviderSetting{normalizePrivateAuthProvider(model.PrivateOAuthProviderSetting{}, "o2", "O2", "", "", "", "openid email profile")}
 	}

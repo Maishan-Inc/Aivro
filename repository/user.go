@@ -251,6 +251,21 @@ func GetUserByMetaMaskAddress(address string) (model.User, bool, error) {
 	return findUser(db, "metamask_address = ?", address)
 }
 
+func GetUserByAuthProviderOAuthID(provider string, id string) (model.User, bool, error) {
+	db, err := DB()
+	if err != nil {
+		return model.User{}, false, err
+	}
+	id = escapeLike(id)
+	return findUser(db, "auth_provider = ? AND (extra LIKE ? ESCAPE '\\' OR extra LIKE ? ESCAPE '\\')", provider, `%"ID":"`+id+`"%`, `%"id":"`+id+`"%`)
+}
+
+func escapeLike(value string) string {
+	value = strings.ReplaceAll(value, `\`, `\\`)
+	value = strings.ReplaceAll(value, `%`, `\%`)
+	return strings.ReplaceAll(value, `_`, `\_`)
+}
+
 func SaveEmailVerification(item model.EmailVerification) (model.EmailVerification, error) {
 	db, err := DB()
 	if err != nil {

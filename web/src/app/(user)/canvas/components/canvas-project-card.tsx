@@ -1,16 +1,20 @@
 "use client";
 
-import { Check, Pencil, Trash2, X } from "lucide-react";
+import type { ReactNode } from "react";
+import { CalendarDays, Check, Clock3, GitBranch, MessageSquare, Network, Pencil, Trash2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button, Input, Tag } from "antd";
 
 import type { CloudWorkflow } from "@/services/api/workflows";
 import { useLocalizedPath } from "@/hooks/use-localized-path";
+import { canvasThemes, type CanvasTheme } from "@/lib/canvas-theme";
+import { useThemeStore } from "@/stores/use-theme-store";
 import { useCanvasUiStore } from "../stores/use-canvas-ui-store";
 
 export function CanvasProjectCard({ project, onRename, onDelete }: { project: CloudWorkflow; onRename: (project: CloudWorkflow, title: string) => void | Promise<void>; onDelete: (id: string) => void }) {
     const router = useRouter();
     const localizedPath = useLocalizedPath();
+    const theme = canvasThemes[useThemeStore((state) => state.theme)];
     const selectedIds = useCanvasUiStore((state) => state.selectedProjectIds);
     const editingId = useCanvasUiStore((state) => state.editingProjectId);
     const editingTitle = useCanvasUiStore((state) => state.editingProjectTitle);
@@ -25,18 +29,26 @@ export function CanvasProjectCard({ project, onRename, onDelete }: { project: Cl
         void onRename(project, editingTitle);
         stopEditing();
     };
+    const createdAt = formatProjectTime(project.createdAt);
+    const updatedAt = formatProjectTime(project.updatedAt);
+    const syncLabel = project.sourceSyncMode === "linked" ? "跟随分享更新" : project.sourceSyncMode === "detached" ? "独立副本" : "自建";
 
     return (
-        <article className="group flex min-h-44 cursor-pointer flex-col justify-between rounded-2xl bg-[#f1eee8] p-5 transition hover:bg-[#ebe6dc] dark:bg-white/5 dark:hover:bg-white/10" onClick={() => !editing && open()}>
+        <article className="group flex min-h-[286px] cursor-pointer flex-col rounded-lg border p-4 shadow-sm transition hover:-translate-y-0.5 hover:opacity-95" style={{ background: theme.node.panel, borderColor: theme.node.stroke, color: theme.node.text }} onClick={() => !editing && open()}>
+            <div className="mb-4 h-24 overflow-hidden rounded-md border p-3" style={{ background: theme.node.fill, borderColor: theme.node.stroke }}>
+                <div className="grid h-full grid-cols-3 gap-2">
+                    {project.nodes.slice(0, 6).map((node, index) => (
+                        <div key={node.id || index} className="flex min-w-0 items-center justify-center rounded border px-2 text-[10px]" style={{ background: theme.toolbar.panel, borderColor: theme.node.stroke, color: theme.node.muted }}>
+                            <span className="truncate">{String(node.type || "node")}</span>
+                        </div>
+                    ))}
+                    {!project.nodes.length ? (
+                        <div className="col-span-3 flex h-full items-center justify-center text-xs" style={{ color: theme.node.muted }}>空白工作流</div>
+                    ) : null}
+                </div>
+            </div>
             <div className="flex items-start gap-3">
-                <input
-                    type="checkbox"
-                    checked={selected}
-                    onClick={(event) => event.stopPropagation()}
-                    onChange={(event) => toggleSelected(project.id, event.target.checked)}
-                    className="mt-1 size-4 accent-stone-950 dark:accent-stone-100"
-                    aria-label={`选择 ${project.title}`}
-                />
+                <input type="checkbox" checked={selected} onClick={(event) => event.stopPropagation()} onChange={(event) => toggleSelected(project.id, event.target.checked)} className="mt-1 size-4" style={{ accentColor: theme.node.activeStroke }} aria-label={`选择 ${project.title}`} />
                 {editing ? (
                     <Input className="min-w-0" value={editingTitle} onClick={(event) => event.stopPropagation()} onChange={(event) => setEditingTitle(event.target.value)} onKeyDown={(event) => event.key === "Enter" && saveTitle()} autoFocus />
                 ) : (
@@ -49,17 +61,26 @@ export function CanvasProjectCard({ project, onRename, onDelete }: { project: Cl
                         }}
                     >
                         <div className="flex min-w-0 items-center gap-2">
-                            <h2 className="truncate text-xl font-semibold">{project.title}</h2>
-                            {project.sourceSyncMode === "linked" ? <Tag color="processing">跟随分享更新</Tag> : null}
+                            <h2 className="truncate text-lg font-semibold">{project.title}</h2>
                         </div>
-                        <p className="mt-3 text-sm leading-6 text-stone-600 dark:text-stone-400">
-                            {project.nodes.length} 个节点 · {project.connections.length} 条连线
-                        </p>
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                            <Tag color={project.sourceSyncMode === "linked" ? "processing" : project.sourceSyncMode === "detached" ? "purple" : "default"}>{syncLabel}</Tag>
+                            <Tag>{project.backgroundMode}</Tag>
+                        </div>
                     </button>
                 )}
             </div>
-            <div className="mt-8 flex items-end justify-between gap-3">
-                <p className="text-xs text-stone-500">云端更新于 {new Date(project.updatedAt).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}</p>
+            <div className="mt-4 grid grid-cols-3 gap-2 text-xs" style={{ color: theme.node.muted }}>
+                <ProjectMetric icon={<Network className="size-3.5" />} label="节点" value={project.nodes.length} theme={theme} />
+                <ProjectMetric icon={<GitBranch className="size-3.5" />} label="连线" value={project.connections.length} theme={theme} />
+                <ProjectMetric icon={<MessageSquare className="size-3.5" />} label="会话" value={project.chatSessions.length} theme={theme} />
+            </div>
+            <div className="mt-4 space-y-1.5 text-xs" style={{ color: theme.node.muted }}>
+                <div className="flex items-center gap-1.5"><CalendarDays className="size-3.5" />创建于 {createdAt}</div>
+                <div className="flex items-center gap-1.5"><Clock3 className="size-3.5" />更新于 {updatedAt}</div>
+            </div>
+            <div className="mt-auto flex items-end justify-between gap-3 pt-4">
+                <p className="text-xs" style={{ color: theme.node.muted }}>版本 {project.sourceVersion || 1}</p>
                 <div className="flex items-center gap-1" onClick={(event) => event.stopPropagation()}>
                     {editing ? (
                         <>
@@ -76,4 +97,17 @@ export function CanvasProjectCard({ project, onRename, onDelete }: { project: Cl
             </div>
         </article>
     );
+}
+
+function ProjectMetric({ icon, label, value, theme }: { icon: ReactNode; label: string; value: number; theme: CanvasTheme }) {
+    return (
+        <div className="rounded-md px-2 py-1.5" style={{ background: theme.node.fill }}>
+            <div className="flex items-center gap-1" style={{ color: theme.node.muted }}>{icon}{label}</div>
+            <div className="mt-0.5 font-semibold" style={{ color: theme.node.text }}>{value}</div>
+        </div>
+    );
+}
+
+function formatProjectTime(value: string) {
+    return value ? new Date(value).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : "-";
 }

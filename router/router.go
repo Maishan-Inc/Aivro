@@ -114,6 +114,9 @@ func New() *gin.Engine {
 	admin.POST("/users/:id/credits", func(c *gin.Context) {
 		handler.AdminAdjustUserCredits(c.Writer, c.Request, c.Param("id"))
 	})
+	admin.POST("/users/:id/workflow-create-credits", func(c *gin.Context) {
+		handler.AdminAdjustUserWorkflowCreateCredits(c.Writer, c.Request, c.Param("id"))
+	})
 	admin.DELETE("/users/:id", func(c *gin.Context) {
 		handler.AdminDeleteUser(c.Writer, c.Request, c.Param("id"))
 	})

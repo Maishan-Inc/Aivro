@@ -183,7 +183,7 @@ function LoginContent() {
                 message.error("未获取到钱包地址");
                 return;
             }
-            const signMessage = `Aivro MetaMask login\nWallet: ${walletAddress}\nTime: ${Date.now()}`;
+            const signMessage = buildMetaMaskSignMessage(authSettings?.metamask, walletAddress);
             const signature = (await ethereum.request({ method: "personal_sign", params: [signMessage, walletAddress] })) as string;
             try {
                 const session = await runWithOverlay(locale === "en-US" ? "Signing in" : "正在登录", () => loginWithMetaMask({ walletAddress, message: signMessage, signature, email: "", code: "" }));
@@ -338,7 +338,7 @@ function LoginActions({ locale, localizedPath, redirect, authSettings, linuxDoEn
                     <div className="grid gap-3">
                         {authSettings?.metamask?.enabled ? (
                             <Button className="h-11 justify-start" block disabled={!metaMaskAvailable} title={metaMaskAvailable ? undefined : locale === "en-US" ? "MetaMask is not installed" : "未检测到 MetaMask"} icon={<ProviderIcon src={authSettings.metamask.iconUrl || "/icons/metamask.svg"} />} onClick={() => void onMetaMask()}>
-                                {metaMaskAvailable ? (locale === "en-US" ? "Sign in with MetaMask" : "使用 MetaMask 登录") : locale === "en-US" ? "Install MetaMask to sign in" : "安装 MetaMask 后登录"}
+                                {metaMaskAvailable ? `${locale === "en-US" ? "Sign in with" : "使用"} ${authSettings.metamask.name || "MetaMask"} ${locale === "en-US" ? "" : "登录"}` : locale === "en-US" ? "Install MetaMask to sign in" : "安装 MetaMask 后登录"}
                             </Button>
                         ) : null}
                         {providers.map((provider) =>
@@ -363,6 +363,13 @@ function LoginActions({ locale, localizedPath, redirect, authSettings, linuxDoEn
 
 function ProviderIcon({ src }: { src: string }) {
     return <img src={src} alt="" width={20} height={20} className="shrink-0" />;
+}
+
+function buildMetaMaskSignMessage(provider: AdminPublicAuthProvider | undefined, walletAddress: string) {
+    const siteName = provider?.siteName || provider?.name || "Aivro";
+    const siteUrl = provider?.siteUrl || (typeof window === "undefined" ? "" : window.location.origin);
+    const logoUrl = provider?.signatureLogoUrl || provider?.iconUrl || "/icons/metamask.svg";
+    return `${siteName} MetaMask login\nSite URL: ${siteUrl}\nLogo: ${logoUrl}\nWallet: ${walletAddress}\nTime: ${Date.now()}`;
 }
 
 function registerButtonText(mode: "login" | "register", step: RegisterStep, locale: string) {

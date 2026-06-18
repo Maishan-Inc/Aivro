@@ -1,9 +1,9 @@
 "use client";
 
-import { DatabaseOutlined, FileTextOutlined, GlobalOutlined, HomeOutlined, LogoutOutlined, PictureOutlined, ShoppingOutlined, SettingOutlined, TransactionOutlined, UserOutlined } from "@ant-design/icons";
+import { ApiOutlined, DatabaseOutlined, FileTextOutlined, GlobalOutlined, HomeOutlined, LogoutOutlined, MailOutlined, PictureOutlined, ShoppingOutlined, SettingOutlined, TransactionOutlined, UserOutlined } from "@ant-design/icons";
 import { Button, Dropdown, Flex, Layout, Menu, Typography, theme } from "antd";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { ReactNode } from "react";
 import { useEffect } from "react";
 
@@ -21,6 +21,8 @@ const adminMenus = [
     { key: "/admin/assets", icon: <PictureOutlined />, label: "素材库" },
     { key: "/admin/ads", icon: <GlobalOutlined />, label: "谷歌广告" },
     { key: "/admin/database", icon: <DatabaseOutlined />, label: "数据库配置" },
+    { key: "/admin/settings?tab=model", icon: <ApiOutlined />, label: "模型配置" },
+    { key: "/admin/settings?tab=mail", icon: <MailOutlined />, label: "邮件配置" },
     { key: "/admin/settings", icon: <SettingOutlined />, label: "系统设置" },
 ];
 
@@ -28,6 +30,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     const { token: antToken } = theme.useToken();
     const router = useRouter();
     const pathname = usePathname();
+    const searchParams = useSearchParams();
     const token = useUserStore((state) => state.token);
     const user = useUserStore((state) => state.user);
     const isReady = useUserStore((state) => state.isReady);
@@ -35,8 +38,9 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     const logout = useUserStore((state) => state.clearSession);
     const locale = useLocaleStore((state) => state.locale);
     const setLocale = useLocaleStore((state) => state.setLocale);
-    const activeKey = adminMenus.find((item) => pathname.startsWith(item.key))?.key || "";
-    const pageTitle = pathname.startsWith("/admin/settings") ? "系统设置" : pathname.startsWith("/admin/database") ? "数据库配置" : pathname.startsWith("/admin/ads") ? "谷歌广告" : pathname.startsWith("/admin/assets") ? "素材库管理" : pathname.startsWith("/admin/prompts") ? "提示词管理" : pathname.startsWith("/admin/plans") ? "套餐管理" : pathname.startsWith("/admin/credit-logs") ? "算力点日志" : "用户管理";
+    const settingsTab = pathname.startsWith("/admin/settings") ? searchParams.get("tab") : "";
+    const activeKey = settingsTab === "model" ? "/admin/settings?tab=model" : settingsTab === "mail" ? "/admin/settings?tab=mail" : adminMenus.find((item) => pathname.startsWith(item.key))?.key || "";
+    const pageTitle = settingsTab === "model" ? "模型配置" : settingsTab === "mail" ? "邮件配置" : pathname.startsWith("/admin/settings") ? "系统设置" : pathname.startsWith("/admin/database") ? "数据库配置" : pathname.startsWith("/admin/ads") ? "谷歌广告" : pathname.startsWith("/admin/assets") ? "素材库管理" : pathname.startsWith("/admin/prompts") ? "提示词管理" : pathname.startsWith("/admin/plans") ? "套餐管理" : pathname.startsWith("/admin/credit-logs") ? "算力点日志" : "用户管理";
     const languageItems = (Object.keys(localeLabels) as Locale[]).map((item) => ({ key: item, label: localeLabels[item] }));
 
     useEffect(() => {
@@ -100,8 +104,8 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                     }))}
                 />
                 <Flex vertical gap={8} style={{ position: "absolute", bottom: 0, insetInline: 0, padding: 12, borderTop: `1px solid ${antToken.colorBorder}`, background: antToken.colorBgContainer }}>
-                    <Button block icon={<HomeOutlined />} href="/canvas" target="_blank" rel="noreferrer">
-                        前往工作流
+                    <Button block icon={<HomeOutlined />} href="/" target="_blank" rel="noreferrer">
+                        前往站点首页
                     </Button>
                     <Button block icon={<LogoutOutlined />} onClick={logout}>
                         退出登录

@@ -2,7 +2,7 @@
 
 import { DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from "@ant-design/icons";
 import { ProTable, type ProColumns } from "@ant-design/pro-components";
-import { Avatar, Button, Card, Col, Divider, Flex, Form, Input, InputNumber, Modal, Row, Select, Space, Tag, Tooltip, Typography } from "antd";
+import { Avatar, Button, Card, Col, Flex, Form, Input, InputNumber, Modal, Row, Select, Space, Tag, Tooltip, Typography } from "antd";
 import dayjs from "dayjs";
 import { useEffect, useState } from "react";
 
@@ -32,7 +32,7 @@ const profileCompletedOptions = [
 ];
 
 export default function AdminUsersPage() {
-    const { users, keyword, page, pageSize, total, isLoading, searchUsers, changePage, changePageSize, resetFilters, refreshUsers, saveUser: saveAdminUser, adjustCredits, deleteUser } = useAdminUsers();
+    const { users, keyword, page, pageSize, total, isLoading, searchUsers, changePage, changePageSize, resetFilters, refreshUsers, saveUser: saveAdminUser, adjustCredits, adjustWorkflowCreateCredits, deleteUser } = useAdminUsers();
     const [form] = Form.useForm<UserFormValues>();
     const [keywordText, setKeywordText] = useState(keyword);
     const [editingUser, setEditingUser] = useState<Partial<AdminUser> | null>(null);
@@ -48,13 +48,21 @@ export default function AdminUsersPage() {
         const value = await form.validateFields();
         const userValue = { ...value };
         delete userValue.credits;
+        delete userValue.workflowCreateCredits;
         await saveAdminUser({ ...editingUser, ...userValue, password: value.password || undefined });
         setEditingUser(null);
     };
 
     const saveCredits = async () => {
         if (!editingUser?.id) return;
-        await adjustCredits(editingUser.id, form.getFieldValue("credits") || 0);
+        const saved = await adjustCredits(editingUser.id, form.getFieldValue("credits") || 0);
+        setEditingUser(saved);
+    };
+
+    const saveWorkflowCreateCredits = async () => {
+        if (!editingUser?.id) return;
+        const saved = await adjustWorkflowCreateCredits(editingUser.id, form.getFieldValue("workflowCreateCredits") || 0);
+        setEditingUser(saved);
     };
 
     const columns: ProColumns<AdminUser>[] = [
@@ -105,6 +113,12 @@ export default function AdminUsersPage() {
             dataIndex: "credits",
             width: 100,
             render: (_, item) => <Typography.Text>{item.credits}</Typography.Text>,
+        },
+        {
+            title: "工作流次数",
+            dataIndex: "workflowCreateCredits",
+            width: 120,
+            render: (_, item) => <Typography.Text>{item.workflowCreateCredits}</Typography.Text>,
         },
         {
             title: "登录来源",
@@ -214,102 +228,156 @@ export default function AdminUsersPage() {
                 />
             </Flex>
 
-            <Modal title={editingUser?.id ? "编辑用户" : "新增用户"} open={Boolean(editingUser)} width={680} onCancel={() => setEditingUser(null)} onOk={() => void saveUser()} okText="保存" cancelText="取消" destroyOnHidden>
+            <Modal title={editingUser?.id ? "编辑用户" : "新增用户"} open={Boolean(editingUser)} width={920} onCancel={() => setEditingUser(null)} onOk={() => void saveUser()} okText="保存资料" cancelText="取消" destroyOnHidden>
                 <Form form={form} layout="vertical" requiredMark={false}>
-                    <Typography.Text strong>基础信息</Typography.Text>
-                    <Row gutter={14}>
-                        <Col span={12}>
-                            <Form.Item name="username" label="用户名" rules={[{ required: true, message: "请输入用户名" }]}>
-                                <Input />
-                            </Form.Item>
+                    <Card size="small" style={{ marginBottom: 16 }}>
+                        <Flex align="flex-start" justify="space-between" gap={16}>
+                            <Flex vertical gap={8} style={{ minWidth: 0 }}>
+                                <Space size={8} wrap>
+                                    <Typography.Title level={4} style={{ margin: 0 }}>
+                                        {editingUser?.displayName || editingUser?.username || "新用户"}
+                                    </Typography.Title>
+                                    <Tag color={editingUser?.role === "admin" ? "gold" : "default"}>{editingUser?.role === "admin" ? "管理员" : "普通用户"}</Tag>
+                                    {editingUser?.status ? <Tag color={editingUser.status === "ban" ? "red" : "green"}>{editingUser.status === "ban" ? "禁用" : "正常"}</Tag> : null}
+                                </Space>
+                                <Typography.Text type="secondary" ellipsis>
+                                    {editingUser?.email || editingUser?.username || "填写账号信息后创建用户"}
+                                </Typography.Text>
+                                {editingUser?.id ? (
+                                    <Space size={[6, 6]} wrap>
+                                        <Tag>算力点 {editingUser.credits ?? 0}</Tag>
+                                        <Tag color="blue">工作流次数 {editingUser.workflowCreateCredits ?? 0}</Tag>
+                                        <Tag>{editingUser.authProvider || "password"}</Tag>
+                                    </Space>
+                                ) : null}
+                            </Flex>
+                            <Avatar size={76} src={editingUser?.avatarUrl || undefined} style={{ flex: "0 0 auto" }}>
+                                {(editingUser?.displayName || editingUser?.username || "U").slice(0, 1).toUpperCase()}
+                            </Avatar>
+                        </Flex>
+                    </Card>
+
+                    <Row gutter={[16, 16]}>
+                        <Col xs={24} lg={14}>
+                            <Card size="small" title="账号资料">
+                                <Row gutter={14}>
+                                    <Col xs={24} md={12}>
+                                        <Form.Item name="username" label="用户名" rules={[{ required: true, message: "请输入用户名" }]}>
+                                            <Input />
+                                        </Form.Item>
+                                    </Col>
+                                    <Col xs={24} md={12}>
+                                        <Form.Item name="password" label={editingUser?.id ? "新密码" : "密码"} rules={editingUser?.id ? [] : [{ required: true, message: "请输入密码" }]}>
+                                            <Input.Password autoComplete="new-password" placeholder={editingUser?.id ? "留空则不修改" : ""} />
+                                        </Form.Item>
+                                    </Col>
+                                    <Col xs={24} md={12}>
+                                        <Form.Item name="displayName" label="昵称">
+                                            <Input />
+                                        </Form.Item>
+                                    </Col>
+                                    <Col xs={24} md={12}>
+                                        <Form.Item name="email" label="邮箱">
+                                            <Input />
+                                        </Form.Item>
+                                    </Col>
+                                    <Col xs={24} md={8}>
+                                        <Form.Item name="accountType" label="账户类型">
+                                            <Select options={accountTypeOptions} />
+                                        </Form.Item>
+                                    </Col>
+                                    <Col xs={24} md={8}>
+                                        <Form.Item name="profileCompleted" label="资料状态">
+                                            <Select options={profileCompletedOptions} />
+                                        </Form.Item>
+                                    </Col>
+                                    <Col xs={24} md={8}>
+                                        <Form.Item name="emailVerified" label="邮箱验证">
+                                            <Select
+                                                options={[
+                                                    { label: "已验证", value: true },
+                                                    { label: "未验证", value: false },
+                                                ]}
+                                            />
+                                        </Form.Item>
+                                    </Col>
+                                </Row>
+                            </Card>
                         </Col>
-                        <Col span={12}>
-                            <Form.Item name="password" label={editingUser?.id ? "新密码" : "密码"} rules={editingUser?.id ? [] : [{ required: true, message: "请输入密码" }]}>
-                                <Input.Password autoComplete="new-password" />
-                            </Form.Item>
+                        <Col xs={24} lg={10}>
+                            <Card size="small" title="权限与状态">
+                                <Row gutter={14}>
+                                    <Col xs={24} md={12} lg={24}>
+                                        <Form.Item name="role" label="角色" rules={[{ required: true, message: "请选择角色" }]}>
+                                            <Select options={roleOptions} />
+                                        </Form.Item>
+                                    </Col>
+                                    <Col xs={24} md={12} lg={24}>
+                                        <Form.Item name="status" label="状态" rules={[{ required: true, message: "请选择状态" }]}>
+                                            <Select options={statusOptions} />
+                                        </Form.Item>
+                                    </Col>
+                                </Row>
+                            </Card>
                         </Col>
-                        <Col span={12}>
-                            <Form.Item name="displayName" label="昵称">
-                                <Input />
-                            </Form.Item>
-                        </Col>
-                        <Col span={12}>
-                            <Form.Item name="email" label="邮箱">
-                                <Input />
-                            </Form.Item>
-                        </Col>
-                        <Col span={12}>
-                            <Form.Item name="accountType" label="账户类型">
-                                <Select options={accountTypeOptions} />
-                            </Form.Item>
-                        </Col>
-                        <Col span={12}>
-                            <Form.Item name="profileCompleted" label="资料状态">
-                                <Select options={profileCompletedOptions} />
-                            </Form.Item>
-                        </Col>
-                        <Col span={12}>
-                            <Form.Item name="emailVerified" label="邮箱已验证">
-                                <Select
-                                    options={[
-                                        { label: "已验证", value: true },
-                                        { label: "未验证", value: false },
-                                    ]}
-                                />
-                            </Form.Item>
-                        </Col>
-                        <Col span={12}>
-                            <Form.Item name="authProvider" label="登录来源">
-                                <Input placeholder="password / google / github / linux-do / metamask" />
-                            </Form.Item>
-                        </Col>
-                        <Col span={12}>
-                            <Form.Item name="googleId" label="Google ID">
-                                <Input />
-                            </Form.Item>
-                        </Col>
-                        <Col span={12}>
-                            <Form.Item name="githubId" label="GitHub ID">
-                                <Input />
-                            </Form.Item>
-                        </Col>
-                        <Col span={12}>
-                            <Form.Item name="linuxDoId" label="Linux.do ID">
-                                <Input />
-                            </Form.Item>
-                        </Col>
-                        <Col span={12}>
-                            <Form.Item name="metamaskAddress" label="钱包地址">
-                                <Input />
-                            </Form.Item>
-                        </Col>
-                        <Col span={12}>
-                            <Form.Item name="role" label="角色" rules={[{ required: true, message: "请选择角色" }]}>
-                                <Select options={roleOptions} />
-                            </Form.Item>
-                        </Col>
-                        <Col span={12}>
-                            <Form.Item name="status" label="状态" rules={[{ required: true, message: "请选择状态" }]}>
-                                <Select options={statusOptions} />
-                            </Form.Item>
+                        <Col xs={24}>
+                            <Card size="small" title="第三方登录">
+                                <Row gutter={14}>
+                                    <Col xs={24} md={8}>
+                                        <Form.Item name="authProvider" label="登录来源">
+                                            <Input placeholder="password / google / github / linux-do / metamask" />
+                                        </Form.Item>
+                                    </Col>
+                                    <Col xs={24} md={8}>
+                                        <Form.Item name="googleId" label="Google ID">
+                                            <Input />
+                                        </Form.Item>
+                                    </Col>
+                                    <Col xs={24} md={8}>
+                                        <Form.Item name="githubId" label="GitHub ID">
+                                            <Input />
+                                        </Form.Item>
+                                    </Col>
+                                    <Col xs={24} md={8}>
+                                        <Form.Item name="linuxDoId" label="Linux.do ID">
+                                            <Input />
+                                        </Form.Item>
+                                    </Col>
+                                    <Col xs={24} md={16}>
+                                        <Form.Item name="metamaskAddress" label="钱包地址">
+                                            <Input />
+                                        </Form.Item>
+                                    </Col>
+                                </Row>
+                            </Card>
                         </Col>
                     </Row>
                     {editingUser?.id ? (
                         <>
-                            <Divider style={{ margin: "4px 0 16px" }} />
-                            <Typography.Text strong>算力点调整</Typography.Text>
-                            <Row gutter={14}>
-                                <Col span={12}>
-                                    <Form.Item label="算力点">
+                            <Card size="small" title="额度调整" style={{ marginTop: 16 }}>
+                                <Row gutter={14}>
+                                    <Col xs={24} md={12}>
+                                        <Form.Item label="算力点">
+                                            <Space.Compact style={{ width: "100%" }}>
+                                                <Form.Item name="credits" noStyle>
+                                                    <InputNumber min={0} precision={0} style={{ width: "100%" }} />
+                                                </Form.Item>
+                                                <Button onClick={() => void saveCredits()}>调整</Button>
+                                            </Space.Compact>
+                                        </Form.Item>
+                                    </Col>
+                                    <Col xs={24} md={12}>
+                                        <Form.Item label="工作流创建次数">
                                         <Space.Compact style={{ width: "100%" }}>
-                                            <Form.Item name="credits" noStyle>
+                                            <Form.Item name="workflowCreateCredits" noStyle>
                                                 <InputNumber min={0} precision={0} style={{ width: "100%" }} />
                                             </Form.Item>
-                                            <Button onClick={() => void saveCredits()}>调整</Button>
+                                            <Button onClick={() => void saveWorkflowCreateCredits()}>调整</Button>
                                         </Space.Compact>
-                                    </Form.Item>
-                                </Col>
-                            </Row>
+                                        </Form.Item>
+                                    </Col>
+                                </Row>
+                            </Card>
                         </>
                     ) : null}
                 </Form>

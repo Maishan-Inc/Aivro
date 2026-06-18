@@ -115,10 +115,13 @@ type PublicAuthSetting struct {
 }
 
 type PublicOAuthProviderSetting struct {
-	ID      string `json:"id"`
-	Name    string `json:"name"`
-	IconURL string `json:"iconUrl"`
-	Enabled bool   `json:"enabled"`
+	ID               string `json:"id"`
+	Name             string `json:"name"`
+	IconURL          string `json:"iconUrl"`
+	Enabled          bool   `json:"enabled"`
+	SiteName         string `json:"siteName"`
+	SiteURL          string `json:"siteUrl"`
+	SignatureLogoURL string `json:"signatureLogoUrl"`
 }
 
 // PrivateSetting 私有配置。
@@ -209,7 +212,10 @@ type PrivateOAuthProviderSetting struct {
 }
 
 type PrivateMetaMaskAuthSetting struct {
-	Enabled bool `json:"enabled"`
+	Enabled          bool   `json:"enabled"`
+	SiteName         string `json:"siteName"`
+	SiteURL          string `json:"siteUrl"`
+	SignatureLogoURL string `json:"signatureLogoUrl"`
 }
 
 type MailSetting struct {

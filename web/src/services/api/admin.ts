@@ -21,6 +21,7 @@ export type AdminUser = {
     avatarUrl: string;
     role: "user" | "admin";
     credits: number;
+    workflowCreateCredits: number;
     affCode: string;
     affCount: number;
     inviterId: string;
@@ -78,6 +79,10 @@ export async function saveAdminUser(token: string, user: Partial<AdminUser> & { 
 
 export async function adjustAdminUserCredits(token: string, id: string, credits: number) {
     return apiPost<AdminUser>(`/api/admin/users/${encodeURIComponent(id)}/credits`, { credits }, token);
+}
+
+export async function adjustAdminUserWorkflowCreateCredits(token: string, id: string, workflowCreateCredits: number) {
+    return apiPost<AdminUser>(`/api/admin/users/${encodeURIComponent(id)}/workflow-create-credits`, { workflowCreateCredits }, token);
 }
 
 export async function deleteAdminUser(token: string, id: string) {
@@ -264,6 +269,9 @@ export type AdminPublicAuthProvider = {
     name: string;
     iconUrl: string;
     enabled: boolean;
+    siteName?: string;
+    siteUrl?: string;
+    signatureLogoUrl?: string;
 };
 
 export type AdminPrivateSettings = {
@@ -278,7 +286,7 @@ export type AdminPrivateSettings = {
         linuxDo: AdminPrivateAuthProvider;
         google: AdminPrivateAuthProvider;
         github: AdminPrivateAuthProvider;
-        metamask: { enabled: boolean };
+        metamask: AdminMetaMaskAuthSettings;
         customProviders: AdminPrivateAuthProvider[];
     };
     mail: AdminMailSettings;
@@ -350,6 +358,13 @@ export type AdminPrivateAuthProvider = AdminPublicAuthProvider & {
     tokenUrl: string;
     userInfoUrl: string;
     scope: string;
+};
+
+export type AdminMetaMaskAuthSettings = {
+    enabled: boolean;
+    siteName: string;
+    siteUrl: string;
+    signatureLogoUrl: string;
 };
 
 export type AdminMailSettings = {

@@ -79,6 +79,10 @@ type adjustUserCreditsRequest struct {
 	Credits int `json:"credits"`
 }
 
+type adjustUserWorkflowCreateCreditsRequest struct {
+	WorkflowCreateCredits int `json:"workflowCreateCredits"`
+}
+
 func Register(w http.ResponseWriter, r *http.Request) {
 	var request registerRequest
 	_ = json.NewDecoder(r.Body).Decode(&request)
@@ -310,6 +314,17 @@ func AdminAdjustUserCredits(w http.ResponseWriter, r *http.Request, id string) {
 	_ = json.NewDecoder(r.Body).Decode(&request)
 	admin, _ := service.UserFromContext(r.Context())
 	user, err := service.AdjustUserCredits(id, request.Credits, admin)
+	if err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, user)
+}
+
+func AdminAdjustUserWorkflowCreateCredits(w http.ResponseWriter, r *http.Request, id string) {
+	var request adjustUserWorkflowCreateCreditsRequest
+	_ = json.NewDecoder(r.Body).Decode(&request)
+	user, err := service.AdjustUserWorkflowCreateCredits(id, request.WorkflowCreateCredits)
 	if err != nil {
 		FailError(w, err)
 		return

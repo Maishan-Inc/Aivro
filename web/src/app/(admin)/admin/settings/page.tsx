@@ -4,6 +4,7 @@ import { CheckCircleOutlined, DeleteOutlined, EditOutlined, FormatPainterOutline
 import { json } from "@codemirror/lang-json";
 import { App, Button, Card, Checkbox, Col, Drawer, Flex, Form, Input, InputNumber, Modal, Row, Segmented, Select, Space, Switch, Table, Tabs, Tag, Typography } from "antd";
 import dynamic from "next/dynamic";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EditorView } from "@uiw/react-codemirror";
 
@@ -170,7 +171,7 @@ const emptySettings: AdminSettings = {
             linuxDo: emptyPrivateProvider("linux-do", "Linux.do", "/icons/linuxdo.svg"),
             google: emptyPrivateProvider("google", "Google", "/icons/google.svg"),
             github: emptyPrivateProvider("github", "GitHub", "/icons/github.svg"),
-            metamask: { enabled: false },
+            metamask: { enabled: false, siteName: "Aivro", siteUrl: "", signatureLogoUrl: "/icons/metamask.svg" },
             customProviders: [emptyPrivateProvider("o2", "O2")],
         },
         mail: {
@@ -229,7 +230,7 @@ const emptySettings: AdminSettings = {
 };
 const emptyChannel: AdminModelChannel = { protocol: "openai", name: "", baseUrl: "", apiKey: "", models: [], weight: 1, enabled: true, remark: "" };
 
-type SettingsTabKey = "public" | "private" | "mail" | "thirdParty" | "cloudStorage" | "billingKyc" | "pages";
+type SettingsTabKey = "model" | "public" | "private" | "mail" | "thirdParty" | "cloudStorage" | "billingKyc" | "pages";
 type EditorMode = "visual" | "json";
 type ModelSelectTabKey = "new" | "current";
 type MailTemplateKey = "register" | "reset" | "metamask";
@@ -239,8 +240,10 @@ export default function AdminSettingsPage() {
     const token = useUserStore((state) => state.token);
     const { message } = App.useApp();
     const { t } = useI18n();
+    const router = useRouter();
+    const searchParams = useSearchParams();
     const [form] = Form.useForm<AdminSettings>();
-    const [activeTab, setActiveTab] = useState<SettingsTabKey>("public");
+    const [activeTab, setActiveTab] = useState<SettingsTabKey>(normalizeSettingsTab(searchParams.get("tab")));
     const [editorMode, setEditorMode] = useState<Record<string, EditorMode>>({ public: "visual", private: "visual" });
     const [jsonText, setJsonText] = useState<Record<string, string>>({ public: "", private: "" });
     const [channels, setChannels] = useState<AdminModelChannel[]>([]);
@@ -276,7 +279,8 @@ export default function AdminSettingsPage() {
     const customAuthProviders = Form.useWatch(["private", "auth", "customProviders"], form) || [];
     const channelModels = useMemo(() => collectChannelModels(channels), [channels]);
     const channelTableData = useMemo(() => channels.map((channel, index) => ({ ...channel, _index: index, _rowKey: `${index}-${channel.name}-${channel.baseUrl}` })), [channels]);
-    const activeMode = activeTab === "mail" || activeTab === "thirdParty" || activeTab === "cloudStorage" || activeTab === "billingKyc" || activeTab === "pages" ? "visual" : editorMode[activeTab];
+    const standaloneTab = activeTab === "model" || activeTab === "mail";
+    const activeMode = activeTab === "model" || activeTab === "mail" || activeTab === "thirdParty" || activeTab === "cloudStorage" || activeTab === "billingKyc" || activeTab === "pages" ? "visual" : editorMode[activeTab];
     const activeJsonText = jsonText[activeTab] || "";
     const jsonError = activeMode === "json" ? getJsonError(activeJsonText) : "";
     const modelSelectGroups = useMemo(() => buildModelSelectGroups(modelSelectSource, modelSelectExisting), [modelSelectSource, modelSelectExisting]);
@@ -364,6 +368,11 @@ export default function AdminSettingsPage() {
     }, [loadSettings]);
 
     useEffect(() => {
+        const nextTab = normalizeSettingsTab(searchParams.get("tab"));
+        setActiveTab((current) => (current === nextTab ? current : nextTab));
+    }, [searchParams]);
+
+    useEffect(() => {
         const refreshSettings = () => {
             if (document.visibilityState !== "visible" || saveHint === "有修改未保存" || isSaving || editingAuthProvider || editingMailTemplate || isChannelDrawerOpen || isModelSelectorOpen) return;
             void loadSettings();
@@ -378,6 +387,7 @@ export default function AdminSettingsPage() {
 
     const changeTab = (nextTab: SettingsTabKey) => {
         setActiveTab(nextTab);
+        router.replace(nextTab === "public" ? "/admin/settings" : `/admin/settings?tab=${nextTab}`, { scroll: false });
     };
 
     const markUnsaved = () => {
@@ -662,19 +672,25 @@ export default function AdminSettingsPage() {
             <Flex vertical gap={16}>
                 <Card variant="borderless">
                     <Flex justify="space-between" align="center" gap={16} wrap>
-                        <Tabs
-                            activeKey={activeTab}
-                            onChange={(key) => changeTab(key as SettingsTabKey)}
-                            items={[
-                                { key: "public", label: "公开配置（对外暴露）" },
-                                { key: "pages", label: "页面设置" },
-                                { key: "private", label: "私有配置（不会对外暴露）" },
-                                { key: "cloudStorage", label: t("cloud.tab") },
-                                { key: "billingKyc", label: "支付与 KYC" },
-                                { key: "mail", label: "邮件配置" },
-                                { key: "thirdParty", label: "第三方登录" },
-                            ]}
-                        />
+                        {standaloneTab ? (
+                            <Typography.Title level={5} style={{ margin: 0 }}>
+                                {activeTab === "model" ? "模型配置" : "邮件配置"}
+                            </Typography.Title>
+                        ) : (
+                            <Tabs
+                                tabPosition="left"
+                                activeKey={activeTab}
+                                onChange={(key) => changeTab(key as SettingsTabKey)}
+                                items={[
+                                    { key: "public", label: "注册与访问" },
+                                    { key: "pages", label: "页面设置" },
+                                    { key: "private", label: "后台配置" },
+                                    { key: "cloudStorage", label: t("cloud.tab") },
+                                    { key: "billingKyc", label: "支付与 KYC" },
+                                    { key: "thirdParty", label: "第三方登录" },
+                                ]}
+                            />
+                        )}
                         <Space>
                             <Typography.Text type={saveHint.includes("失败") ? "danger" : "secondary"}>
                                 {isSaving ? <LoadingOutlined /> : saveHint === "已保存" ? <CheckCircleOutlined /> : null} {saveHint}
@@ -701,7 +717,7 @@ export default function AdminSettingsPage() {
                                 ]}
                             />
                         ) : (
-                            <Typography.Text type="secondary">{activeTab === "mail" ? "SMTP 验证码和邮件模板" : activeTab === "cloudStorage" ? t("cloud.description") : activeTab === "billingKyc" ? "配置 Stripe 私有密钥和 Didit KYC 奖励" : activeTab === "pages" ? "配置前台隐私政策和服务条款内容" : "OAuth、MetaMask 和自定义登录入口"}</Typography.Text>
+                            <Typography.Text type="secondary">{activeTab === "model" ? "配置模型渠道、开放模型、默认模型和算力点消耗" : activeTab === "mail" ? "SMTP 验证码和邮件模板" : activeTab === "cloudStorage" ? t("cloud.description") : activeTab === "billingKyc" ? "配置 Stripe 私有密钥和 Didit KYC 奖励" : activeTab === "pages" ? "配置前台隐私政策和服务条款内容" : "OAuth、MetaMask 和自定义登录入口"}</Typography.Text>
                         )}
                         {activeMode === "json" ? (
                             <Space>
@@ -721,40 +737,135 @@ export default function AdminSettingsPage() {
                         )}
                     </Flex>
 
-                    {activeTab === "public" ? (
+                    {activeTab === "model" ? (
+                        <Form form={form} layout="vertical" initialValues={emptySettings} requiredMark={false} onValuesChange={handleFormValuesChange}>
+                            <Flex vertical gap={16}>
+                                <Card size="small" title="开放给前台的模型" extra={sectionSaveButton()}>
+                                    <Row gutter={16}>
+                                        <Col span={24}>
+                                            <Form.Item name={["public", "modelChannel", "availableModels"]} label="系统可用模型" extra="可选项来自已启用渠道中选择的模型，最终开放哪些模型由这里勾选决定。">
+                                                <Select mode="multiple" placeholder="请选择系统可用模型" options={channelModels.map((item) => ({ label: item, value: item }))} />
+                                            </Form.Item>
+                                        </Col>
+                                        <Col xs={24} md={6}>
+                                            <Form.Item name={["public", "modelChannel", "defaultModel"]} label="默认模型">
+                                                <Select showSearch allowClear options={publicModels.map((item) => ({ label: item, value: item }))} />
+                                            </Form.Item>
+                                        </Col>
+                                        <Col xs={24} md={6}>
+                                            <Form.Item name={["public", "modelChannel", "defaultImageModel"]} label="默认图片模型">
+                                                <Select showSearch allowClear options={publicModels.map((item) => ({ label: item, value: item }))} />
+                                            </Form.Item>
+                                        </Col>
+                                        <Col xs={24} md={6}>
+                                            <Form.Item name={["public", "modelChannel", "defaultVideoModel"]} label="默认视频模型">
+                                                <Select showSearch allowClear options={publicModels.map((item) => ({ label: item, value: item }))} />
+                                            </Form.Item>
+                                        </Col>
+                                        <Col xs={24} md={6}>
+                                            <Form.Item name={["public", "modelChannel", "defaultTextModel"]} label="默认文本模型">
+                                                <Select showSearch allowClear options={publicModels.map((item) => ({ label: item, value: item }))} />
+                                            </Form.Item>
+                                        </Col>
+                                        <Col span={24}>
+                                            <Form.Item name={["public", "modelChannel", "systemPrompt"]} label="系统提示词">
+                                                <Input.TextArea rows={4} />
+                                            </Form.Item>
+                                        </Col>
+                                    </Row>
+                                </Card>
+                                <Card size="small" title="模型算力点" extra={sectionSaveButton()}>
+                                    <Table
+                                        rowKey="model"
+                                        pagination={false}
+                                        size="small"
+                                        dataSource={publicModels.map((model) => ({ model, credits: modelCostCredits(modelCosts, model) }))}
+                                        columns={[
+                                            { title: "模型", dataIndex: "model" },
+                                            {
+                                                title: "每次调用扣除",
+                                                dataIndex: "credits",
+                                                width: 220,
+                                                render: (_, item) => (
+                                                    <InputNumber
+                                                        min={0}
+                                                        step={1}
+                                                        precision={0}
+                                                        className="!w-full"
+                                                        value={item.credits}
+                                                        addonAfter="点"
+                                                        onChange={(value) => {
+                                                            setModelCost(form, setModelCosts, item.model, Number(value) || 0);
+                                                            markUnsaved();
+                                                        }}
+                                                    />
+                                                ),
+                                            },
+                                        ]}
+                                    />
+                                </Card>
+                                <Card
+                                    size="small"
+                                    title="模型渠道"
+                                    extra={
+                                        <Button type="primary" size="small" icon={<PlusOutlined />} onClick={() => openChannelDrawer(null)}>
+                                            新增渠道
+                                        </Button>
+                                    }
+                                >
+                                    <Table
+                                        rowKey="_rowKey"
+                                        pagination={false}
+                                        dataSource={channelTableData}
+                                        columns={[
+                                            { title: "名称", dataIndex: "name", render: (value) => value || "未命名渠道" },
+                                            { title: "协议", dataIndex: "protocol", width: 96, render: (value) => <Tag>{value || "openai"}</Tag> },
+                                            { title: "状态", dataIndex: "enabled", width: 96, render: (value) => <Tag color={value ? "success" : "default"}>{value ? "已启用" : "已停用"}</Tag> },
+                                            {
+                                                title: "模型",
+                                                dataIndex: "models",
+                                                render: (value: string[]) => (
+                                                    <Typography.Text ellipsis style={{ maxWidth: 360 }}>
+                                                        {modelSummary(value || [])}
+                                                    </Typography.Text>
+                                                ),
+                                            },
+                                            { title: "权重", dataIndex: "weight", width: 88 },
+                                            {
+                                                title: "操作",
+                                                key: "actions",
+                                                width: 220,
+                                                align: "right",
+                                                render: (_, item) => (
+                                                    <Space size={4}>
+                                                        <Button size="small" onClick={() => openTestDialog(item._index)}>
+                                                            测试
+                                                        </Button>
+                                                        <Button size="small" onClick={() => openChannelDrawer(item._index)}>
+                                                            编辑
+                                                        </Button>
+                                                        <Button
+                                                            danger
+                                                            size="small"
+                                                            icon={<DeleteOutlined />}
+                                                            onClick={() => {
+                                                                const nextChannels = [...channels];
+                                                                nextChannels.splice(item._index, 1);
+                                                                void persistChannels(nextChannels);
+                                                            }}
+                                                        />
+                                                    </Space>
+                                                ),
+                                            },
+                                        ]}
+                                    />
+                                </Card>
+                            </Flex>
+                        </Form>
+                    ) : activeTab === "public" ? (
                         activeMode === "visual" ? (
                             <Form form={form} layout="vertical" initialValues={emptySettings} requiredMark={false} onValuesChange={handleFormValuesChange}>
                                 <Row gutter={16}>
-                                    <Col span={24}>
-                                        <Form.Item name={["public", "modelChannel", "availableModels"]} label="系统可用模型(请先在私有配置里配置渠道)" extra="可选项来自已启用渠道中选择的模型，最终开放哪些模型由这里勾选决定">
-                                            <Select mode="multiple" placeholder="请选择系统可用模型" options={channelModels.map((item) => ({ label: item, value: item }))} />
-                                        </Form.Item>
-                                    </Col>
-                                    <Col xs={24} md={6}>
-                                        <Form.Item name={["public", "modelChannel", "defaultModel"]} label="默认模型">
-                                            <Select showSearch allowClear options={publicModels.map((item) => ({ label: item, value: item }))} />
-                                        </Form.Item>
-                                    </Col>
-                                    <Col xs={24} md={6}>
-                                        <Form.Item name={["public", "modelChannel", "defaultImageModel"]} label="默认图片模型">
-                                            <Select showSearch allowClear options={publicModels.map((item) => ({ label: item, value: item }))} />
-                                        </Form.Item>
-                                    </Col>
-                                    <Col xs={24} md={6}>
-                                        <Form.Item name={["public", "modelChannel", "defaultVideoModel"]} label="默认视频模型">
-                                            <Select showSearch allowClear options={publicModels.map((item) => ({ label: item, value: item }))} />
-                                        </Form.Item>
-                                    </Col>
-                                    <Col xs={24} md={6}>
-                                        <Form.Item name={["public", "modelChannel", "defaultTextModel"]} label="默认文本模型">
-                                            <Select showSearch allowClear options={publicModels.map((item) => ({ label: item, value: item }))} />
-                                        </Form.Item>
-                                    </Col>
-                                    <Col span={24}>
-                                        <Form.Item name={["public", "modelChannel", "systemPrompt"]} label="系统提示词">
-                                            <Input.TextArea rows={4} />
-                                        </Form.Item>
-                                    </Col>
                                     <Col xs={24} md={12}>
                                         <Form.Item name={["public", "auth", "allowRegister"]} label="是否允许用户注册" extra="关闭后隐藏注册入口，注册接口也会拒绝新用户创建" valuePropName="checked">
                                             <Switch />
@@ -798,37 +909,6 @@ export default function AdminSettingsPage() {
                                                 </Col>
                                             </Row>
                                         </Card>
-                                    </Col>
-                                    <Col span={24}>
-                                        <Typography.Title level={5}>模型算力点</Typography.Title>
-                                        <Table
-                                            rowKey="model"
-                                            pagination={false}
-                                            size="small"
-                                            dataSource={publicModels.map((model) => ({ model, credits: modelCostCredits(modelCosts, model) }))}
-                                            columns={[
-                                                { title: "模型", dataIndex: "model" },
-                                                {
-                                                    title: "每次调用扣除",
-                                                    dataIndex: "credits",
-                                                    width: 220,
-                                                    render: (_, item) => (
-                                                        <InputNumber
-                                                            min={0}
-                                                            step={1}
-                                                            precision={0}
-                                                            className="!w-full"
-                                                            value={item.credits}
-                                                            addonAfter="点"
-                                                            onChange={(value) => {
-                                                                setModelCost(form, setModelCosts, item.model, Number(value) || 0);
-                                                                markUnsaved();
-                                                            }}
-                                                        />
-                                                    ),
-                                                },
-                                            ]}
-                                        />
                                     </Col>
                                 </Row>
                             </Form>
@@ -1176,7 +1256,7 @@ export default function AdminSettingsPage() {
                                 <AuthProviderSummaryCard form={form} title="GitHub 登录" iconUrl="/icons/github.svg" users={authProviderStats.github || 0} publicEnabledPath={["public", "auth", "github", "enabled"]} privateEnabledPath={["private", "auth", "github", "enabled"]} onEdit={() => openAuthProviderEditor({ type: "oauth", providerKey: "github" })} />
                                 <AuthProviderSummaryCard form={form} title="MetaMask 登录" iconUrl="/icons/metamask.svg" users={authProviderStats.metamask || 0} publicEnabledPath={["public", "auth", "metamask", "enabled"]} privateEnabledPath={["private", "auth", "metamask", "enabled"]} onEdit={() => openAuthProviderEditor({ type: "metamask" })} />
                                 {customAuthProviders.map((provider: AdminPrivateAuthProvider, index: number) => (
-                                    <AuthProviderSummaryCard key={`${provider.id}-${index}`} form={form} title={provider.name || `自定义登录 ${index + 1}`} iconUrl={provider.iconUrl} users={authProviderStats[provider.id] || 0} publicEnabledPath={["private", "auth", "customProviders", index, "enabled"]} onEdit={() => openAuthProviderEditor({ type: "custom", index })} />
+                                    <AuthProviderSummaryCard key={`${provider.id}-${index}`} form={form} title={provider.name || `自定义登录 ${index + 1}`} iconUrl={provider.iconUrl} users={authProviderStats[provider.id] || 0} publicEnabledPath={["public", "auth", "customProviders", index, "enabled"]} privateEnabledPath={["private", "auth", "customProviders", index, "enabled"]} onEdit={() => openAuthProviderEditor({ type: "custom", index })} />
                                 ))}
                                 <Col xs={24} md={12} xl={8}>
                                     <Button block type="dashed" icon={<PlusOutlined />} style={{ height: 128 }} onClick={addCustomAuthProvider}>
@@ -1276,55 +1356,6 @@ export default function AdminSettingsPage() {
                                         </Col>
                                     </Row>
                                 </Card>
-                                <Button type="primary" icon={<PlusOutlined />} onClick={() => openChannelDrawer(null)}>
-                                    新增渠道
-                                </Button>
-                                <Table
-                                    rowKey="_rowKey"
-                                    pagination={false}
-                                    dataSource={channelTableData}
-                                    columns={[
-                                        { title: "名称", dataIndex: "name", render: (value) => value || "未命名渠道" },
-                                        { title: "协议", dataIndex: "protocol", width: 96, render: (value) => <Tag>{value || "openai"}</Tag> },
-                                        { title: "状态", dataIndex: "enabled", width: 96, render: (value) => <Tag color={value ? "success" : "default"}>{value ? "已启用" : "已停用"}</Tag> },
-                                        {
-                                            title: "模型",
-                                            dataIndex: "models",
-                                            render: (value: string[]) => (
-                                                <Typography.Text ellipsis style={{ maxWidth: 360 }}>
-                                                    {modelSummary(value || [])}
-                                                </Typography.Text>
-                                            ),
-                                        },
-                                        { title: "权重", dataIndex: "weight", width: 88 },
-                                        {
-                                            title: "操作",
-                                            key: "actions",
-                                            width: 220,
-                                            align: "right",
-                                            render: (_, item) => (
-                                                <Space size={4}>
-                                                    <Button size="small" onClick={() => openTestDialog(item._index)}>
-                                                        测试
-                                                    </Button>
-                                                    <Button size="small" onClick={() => openChannelDrawer(item._index)}>
-                                                        编辑
-                                                    </Button>
-                                                    <Button
-                                                        danger
-                                                        size="small"
-                                                        icon={<DeleteOutlined />}
-                                                        onClick={() => {
-                                                            const nextChannels = [...channels];
-                                                            nextChannels.splice(item._index, 1);
-                                                            void persistChannels(nextChannels);
-                                                        }}
-                                                    />
-                                                </Space>
-                                            ),
-                                        },
-                                    ]}
-                                />
                             </Flex>
                         </Form>
                     ) : (
@@ -1728,7 +1759,7 @@ function OAuthProviderEditorModal({ form, state, snapshot, currentOrigin, onClos
 
 function OAuthProviderFields({ providerKey, currentOrigin }: { providerKey: "linuxDo" | "google" | "github"; currentOrigin: string }) {
     const providerId = { linuxDo: "linux-do", google: "google", github: "github" }[providerKey];
-    const callbackPath = `/api/auth/oauth/${providerId}/callback`;
+    const callbackPath = providerKey === "linuxDo" ? "/api/auth/linux-do/callback" : `/api/auth/oauth/${providerId}/callback`;
     const callbackUrl = currentOrigin ? `${currentOrigin}${callbackPath}` : `当前站点域名${callbackPath}`;
     return (
         <Row gutter={16}>
@@ -1816,6 +1847,21 @@ function MetaMaskProviderFields() {
             <Col xs={24} md={6}>
                 <Form.Item name={["public", "auth", "metamask", "iconUrl"]} label="图片地址">
                     <Input />
+                </Form.Item>
+            </Col>
+            <Col xs={24} md={8}>
+                <Form.Item name={["private", "auth", "metamask", "siteName"]} label="签名网站名称" extra="会展示在 MetaMask 签名弹窗的第一行。">
+                    <Input placeholder="Aivro" />
+                </Form.Item>
+            </Col>
+            <Col xs={24} md={8}>
+                <Form.Item name={["private", "auth", "metamask", "siteUrl"]} label="签名网站 URL">
+                    <Input placeholder="https://example.com" />
+                </Form.Item>
+            </Col>
+            <Col xs={24} md={8}>
+                <Form.Item name={["private", "auth", "metamask", "signatureLogoUrl"]} label="签名 Logo URL">
+                    <Input placeholder="/logo.svg" />
                 </Form.Item>
             </Col>
             <Col span={24}>
@@ -1912,12 +1958,25 @@ function renderTemplatePreview(template: string, expireMinutes: number) {
         .replaceAll("{{region}}", "Shanghai");
 }
 
+function normalizeSettingsTab(tab: string | null): SettingsTabKey {
+    if (tab === "model" || tab === "private" || tab === "mail" || tab === "thirdParty" || tab === "cloudStorage" || tab === "billingKyc" || tab === "pages") return tab;
+    return "public";
+}
+
 function normalizeSettings(settings: Partial<AdminSettings> = {}): AdminSettings {
     const privateSetting = normalizePrivateSetting(settings.private);
+    const publicSetting = normalizePublicSetting(settings.public);
+    publicSetting.auth.customProviders = privateSetting.auth.customProviders.map((provider) => ({
+        id: provider.id,
+        name: provider.name,
+        iconUrl: provider.iconUrl,
+        enabled: provider.enabled,
+    }));
+    publicSetting.auth.metamask.siteName = privateSetting.auth.metamask.siteName;
+    publicSetting.auth.metamask.siteUrl = privateSetting.auth.metamask.siteUrl;
+    publicSetting.auth.metamask.signatureLogoUrl = privateSetting.auth.metamask.signatureLogoUrl;
     return {
-        public: {
-            ...normalizePublicSetting(settings.public),
-        },
+        public: publicSetting,
         private: privateSetting,
     };
 }
@@ -2027,7 +2086,7 @@ function normalizePrivateSetting(setting: Partial<AdminSettings["private"]> = {}
             linuxDo: normalizePrivateProvider(setting.auth?.linuxDo, "linux-do", "Linux.do", "/icons/linuxdo.svg"),
             google: normalizePrivateProvider(setting.auth?.google, "google", "Google", "/icons/google.svg"),
             github: normalizePrivateProvider(setting.auth?.github, "github", "GitHub", "/icons/github.svg"),
-            metamask: { enabled: setting.auth?.metamask?.enabled === true },
+            metamask: normalizeMetaMaskSetting(setting.auth?.metamask),
             customProviders: (setting.auth?.customProviders?.length ? setting.auth.customProviders : [emptyPrivateProvider("o2", "O2")]).map((item) => normalizePrivateProvider(item, item.id || "o2", item.name || "O2")),
         },
         mail: {
@@ -2081,11 +2140,20 @@ function normalizeCloudStorageSetting(setting: Partial<AdminCloudStorageSettings
 }
 
 function normalizePublicProvider(item: Partial<AdminPublicAuthProvider> = {}, id: string, name: string, iconUrl = ""): AdminPublicAuthProvider {
-    return { id: item.id || id, name: item.name || name, iconUrl: item.iconUrl || iconUrl, enabled: item.enabled === true };
+    return { id: item.id || id, name: item.name || name, iconUrl: item.iconUrl || iconUrl, enabled: item.enabled === true, siteName: item.siteName, siteUrl: item.siteUrl, signatureLogoUrl: item.signatureLogoUrl };
 }
 
 function normalizePrivateProvider(item: Partial<AdminPrivateAuthProvider> = {}, id: string, name: string, iconUrl = ""): AdminPrivateAuthProvider {
     return { ...emptyPrivateProvider(id, name, iconUrl), ...item, id: item.id || id, name: item.name || name, iconUrl: item.iconUrl || iconUrl, enabled: item.enabled === true };
+}
+
+function normalizeMetaMaskSetting(item: Partial<AdminSettings["private"]["auth"]["metamask"]> = {}): AdminSettings["private"]["auth"]["metamask"] {
+    return {
+        enabled: item.enabled === true,
+        siteName: item.siteName || "Aivro",
+        siteUrl: item.siteUrl || "",
+        signatureLogoUrl: item.signatureLogoUrl || "/icons/metamask.svg",
+    };
 }
 
 function normalizeChannel(item: Partial<AdminModelChannel> = {}): AdminModelChannel {
@@ -2234,6 +2302,9 @@ async function collectSettings(form: any, editorMode: Record<string, EditorMode>
     values.private.auth.google.enabled = values.public.auth.google.enabled;
     values.private.auth.github.enabled = values.public.auth.github.enabled;
     values.private.auth.metamask.enabled = values.public.auth.metamask.enabled;
+    values.public.auth.metamask.siteName = values.private.auth.metamask.siteName;
+    values.public.auth.metamask.siteUrl = values.private.auth.metamask.siteUrl;
+    values.public.auth.metamask.signatureLogoUrl = values.private.auth.metamask.signatureLogoUrl;
     return normalizeSettings(values);
 }
 

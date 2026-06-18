@@ -253,7 +253,7 @@ func LinuxDoAuthorizeURL(w http.ResponseWriter, r *http.Request, redirect string
 	values.Set("response_type", "code")
 	values.Set("scope", "read")
 	values.Set("state", newOAuthState(w, r, "linux-do", redirect))
-	return config.Cfg.LinuxDoAuthorizeURL + "?" + values.Encode(), nil
+	return linuxDo.AuthorizeURL + "?" + values.Encode(), nil
 }
 
 func LoginWithLinuxDo(r *http.Request, code string, state string) (model.AuthSession, string, error) {
@@ -274,7 +274,7 @@ func LoginWithLinuxDo(r *http.Request, code string, state string) (model.AuthSes
 	if err != nil {
 		return model.AuthSession{}, redirect, err
 	}
-	profile, err := linuxDoProfile(token)
+	profile, err := linuxDoProfile(token, linuxDo)
 	if err != nil {
 		return model.AuthSession{}, redirect, err
 	}
@@ -438,6 +438,9 @@ func LoginWithMetaMask(walletAddress string, message string, signature string, e
 	walletAddress = strings.ToLower(strings.TrimSpace(walletAddress))
 	if walletAddress == "" || strings.TrimSpace(signature) == "" {
 		return model.AuthSession{}, safeMessageError{message: "缺少钱包签名"}
+	}
+	if !validMetaMaskMessage(settings.Private.Auth.MetaMask, walletAddress, message) {
+		return model.AuthSession{}, safeMessageError{message: "MetaMask 签名内容无效"}
 	}
 	if !validMetaMaskSignature(walletAddress, message, signature) {
 		return model.AuthSession{}, safeMessageError{message: "MetaMask 签名无效"}
@@ -646,6 +649,24 @@ func AdjustUserCredits(id string, credits int, operator model.AuthUser) (model.U
 	return user, err
 }
 
+func AdjustUserWorkflowCreateCredits(id string, credits int) (model.User, error) {
+	user, ok, err := repository.GetUserByID(id)
+	if err != nil || !ok {
+		if err != nil {
+			return user, err
+		}
+		return user, safeMessageError{message: "用户不存在"}
+	}
+	if credits < 0 {
+		credits = 0
+	}
+	user.WorkflowCreateCredits = credits
+	user.UpdatedAt = now()
+	user, err = repository.SaveUser(user)
+	user.Password = ""
+	return user, err
+}
+
 func ConsumeUserCredits(userID string, modelName string, credits int, path string) error {
 	if credits <= 0 {
 		return nil
@@ -802,6 +823,27 @@ func validMetaMaskSignature(walletAddress string, message string, signature stri
 	return strings.EqualFold(crypto.PubkeyToAddress(*pubKey).Hex(), walletAddress)
 }
 
+func validMetaMaskMessage(setting model.PrivateMetaMaskAuthSetting, walletAddress string, message string) bool {
+	message = strings.TrimSpace(message)
+	if message == "" {
+		return false
+	}
+	siteName := strings.TrimSpace(firstNonEmpty(setting.SiteName, "Aivro"))
+	if !strings.Contains(message, siteName+" MetaMask login") {
+		return false
+	}
+	if !strings.Contains(strings.ToLower(message), "wallet: "+strings.ToLower(walletAddress)) {
+		return false
+	}
+	if siteURL := strings.TrimSpace(setting.SiteURL); siteURL != "" && !strings.Contains(message, "Site URL: "+siteURL) {
+		return false
+	}
+	if logoURL := strings.TrimSpace(setting.SignatureLogoURL); logoURL != "" && !strings.Contains(message, "Logo: "+logoURL) {
+		return false
+	}
+	return strings.Contains(message, "Time:")
+}
+
 func now() string {
 	return time.Now().Format(time.RFC3339)
 }
@@ -858,7 +900,7 @@ func linuxDoAccessToken(r *http.Request, code string, setting model.PrivateOAuth
 	values.Set("grant_type", "authorization_code")
 	values.Set("code", code)
 	values.Set("redirect_uri", linuxDoRedirectURI(r))
-	req, _ := http.NewRequest(http.MethodPost, config.Cfg.LinuxDoTokenURL, strings.NewReader(values.Encode()))
+	req, _ := http.NewRequest(http.MethodPost, setting.TokenURL, strings.NewReader(values.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	var payload linuxDoTokenResponse
 	if err := doLinuxDoJSON(req, &payload); err != nil {
@@ -874,8 +916,8 @@ func linuxDoRedirectURI(r *http.Request) string {
 	return RequestOrigin(r) + "/api/auth/linux-do/callback"
 }
 
-func linuxDoProfile(token string) (linuxDoUserResponse, error) {
-	req, _ := http.NewRequest(http.MethodGet, config.Cfg.LinuxDoUserInfoURL, nil)
+func linuxDoProfile(token string, setting model.PrivateOAuthProviderSetting) (linuxDoUserResponse, error) {
+	req, _ := http.NewRequest(http.MethodGet, setting.UserInfoURL, nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	var payload linuxDoUserResponse
 	err := doLinuxDoJSON(req, &payload)
@@ -921,6 +963,7 @@ func linuxDoAvatar(template string) string {
 
 type oauthProfileData struct {
 	ID        string
+	Provider  string
 	Username  string
 	Name      string
 	Email     string
@@ -993,6 +1036,7 @@ func oauthProfile(token string, provider string, setting model.PrivateOAuthProvi
 	}
 	profile := oauthProfileData{
 		ID:        id,
+		Provider:  provider,
 		Username:  firstNonEmpty(anyString(payload["login"]), anyString(payload["username"]), anyString(payload["preferred_username"]), id),
 		Name:      firstNonEmpty(anyString(payload["name"]), anyString(payload["nickname"])),
 		Email:     strings.ToLower(anyString(payload["email"])),
@@ -1048,7 +1092,7 @@ func findOAuthUser(provider string, id string) (model.User, bool, error) {
 	case "github":
 		return repository.GetUserByGithubID(id)
 	default:
-		return model.User{}, false, nil
+		return repository.GetUserByAuthProviderOAuthID(provider, id)
 	}
 }
 
