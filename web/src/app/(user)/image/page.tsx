@@ -478,20 +478,21 @@ export default function ImagePage() {
                             {running ? <Tag className="m-0 px-2 py-1">{locale === "en-US" ? "Waiting" : "等待"} {formatDuration(elapsedMs)}</Tag> : null}
                         </div>
                         {results.length ? (
-                            <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-3">
-                                {results.map((result, index) =>
-                                    result.status === "success" && result.image ? (
-                                        <ResultImageCard key={result.id} image={result.image} index={index} onEdit={addResultToReferences} onDownload={downloadImage} onSaveAsset={saveResultToAssets} />
+                            <div className={`grid gap-4 ${results.length > 1 ? "sm:grid-cols-2 2xl:grid-cols-3" : ""}`}>
+                                {results.map((result, index) => {
+                                    const single = results.length === 1;
+                                    return result.status === "success" && result.image ? (
+                                        <ResultImageCard key={result.id} single={single} image={result.image} index={index} onEdit={addResultToReferences} onDownload={downloadImage} onSaveAsset={saveResultToAssets} />
                                     ) : result.status === "failed" ? (
-                                        <FailedImageCard key={result.id} error={result.error || "生成失败"} />
+                                        <FailedImageCard key={result.id} single={single} error={result.error || "生成失败"} />
                                     ) : result.status === "queued" ? (
-                                        <QueuedImageCard key={result.id} aheadCount={result.aheadCount ?? 0} queuePosition={result.queuePosition ?? 0} onCancel={() => void cancelQueuedResult(result)} />
+                                        <QueuedImageCard key={result.id} single={single} aheadCount={result.aheadCount ?? 0} queuePosition={result.queuePosition ?? 0} onCancel={() => void cancelQueuedResult(result)} />
                                     ) : result.status === "executing" ? (
-                                        <PendingImageCard key={result.id} label="生成中" />
+                                        <PendingImageCard key={result.id} single={single} label="生成中" />
                                     ) : (
-                                        <PendingImageCard key={result.id} />
-                                    ),
-                                )}
+                                        <PendingImageCard key={result.id} single={single} />
+                                    );
+                                })}
                             </div>
                         ) : (
                             <div className="flex min-h-[320px] flex-col items-center justify-center rounded-lg border border-dashed border-stone-300 text-center dark:border-stone-700 lg:min-h-[560px]">
@@ -558,19 +559,21 @@ function GenerationSettings({ config, model, updateConfig, onMissingConfig }: { 
 function ResultImageCard({
     image,
     index,
+    single,
     onEdit,
     onDownload,
     onSaveAsset,
 }: {
     image: GeneratedImage;
     index: number;
+    single?: boolean;
     onEdit: (image: GeneratedImage, index: number) => void;
     onDownload: (image: GeneratedImage, index: number) => void;
     onSaveAsset: (image: GeneratedImage, index: number) => void;
 }) {
     return (
         <div className="overflow-hidden rounded-lg border border-stone-200 bg-background dark:border-stone-800">
-            <Image src={image.dataUrl} alt={`生成结果 ${index + 1}`} className="aspect-square object-cover" />
+            <Image src={image.dataUrl} alt={`生成结果 ${index + 1}`} className={single ? "w-full" : "aspect-square object-cover"} />
             <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-stone-200 px-3 py-2.5 dark:border-stone-800">
                 <div className="flex min-w-0 flex-wrap gap-x-2 gap-y-1 text-xs text-stone-500 dark:text-stone-400">
                     <span>
@@ -595,9 +598,9 @@ function ResultImageCard({
     );
 }
 
-function PendingImageCard({ label = "生成中" }: { label?: string }) {
+function PendingImageCard({ label = "生成中", single }: { label?: string; single?: boolean }) {
     return (
-        <div className="relative aspect-square overflow-hidden rounded-lg border border-dashed border-stone-300 bg-stone-50 dark:border-stone-700 dark:bg-stone-900">
+        <div className={`relative ${single ? "min-h-[280px]" : "aspect-square"} overflow-hidden rounded-lg border border-dashed border-stone-300 bg-stone-50 dark:border-stone-700 dark:bg-stone-900`}>
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-stone-500 dark:text-stone-400">
                 <AivroDrawableLoader className="h-28 w-80 text-stone-900 dark:text-stone-100" />
                 <span className="text-sm">{label}</span>
@@ -606,9 +609,9 @@ function PendingImageCard({ label = "生成中" }: { label?: string }) {
     );
 }
 
-function QueuedImageCard({ aheadCount, queuePosition, onCancel }: { aheadCount: number; queuePosition: number; onCancel: () => void }) {
+function QueuedImageCard({ aheadCount, queuePosition, onCancel, single }: { aheadCount: number; queuePosition: number; onCancel: () => void; single?: boolean }) {
     return (
-        <div className="relative aspect-square overflow-hidden rounded-lg border border-dashed border-blue-300 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/20">
+        <div className={`relative ${single ? "min-h-[280px]" : "aspect-square"} overflow-hidden rounded-lg border border-dashed border-blue-300 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/20`}>
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-5 text-center text-blue-700 dark:text-blue-200">
                 <AivroDrawableLoader className="h-24 w-72 text-blue-700 dark:text-blue-200" />
                 <div className="text-sm font-medium">排队中</div>
@@ -619,10 +622,10 @@ function QueuedImageCard({ aheadCount, queuePosition, onCancel }: { aheadCount: 
     );
 }
 
-function FailedImageCard({ error }: { error: string }) {
+function FailedImageCard({ error, single }: { error: string; single?: boolean }) {
     return (
         <div className="overflow-hidden rounded-lg border border-red-200 bg-red-50 dark:border-red-950 dark:bg-red-950/20">
-            <div className="flex aspect-square flex-col items-center justify-center gap-3 p-5 text-center">
+            <div className={`flex ${single ? "min-h-[200px]" : "aspect-square"} flex-col items-center justify-center gap-3 p-5 text-center`}>
                 <div className="text-sm font-medium text-red-600 dark:text-red-300">生成失败</div>
                 <Typography.Paragraph ellipsis={{ rows: 4 }} className="!mb-0 !text-xs !text-red-500 dark:!text-red-300">
                     {error}
