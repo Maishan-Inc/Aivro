@@ -156,7 +156,8 @@
   ],
   "promptSync": {
     "enabled": true,
-    "cron": "*/5 * * * *"
+    "cron": "*/5 * * * *",
+    "githubRawProxyEnabled": false
   },
   "auth": {
     "linuxDo": {},
@@ -316,6 +317,7 @@ Didit session 只能由后端创建，API Key 不返回前端。Didit approved w
 | --- | --- | --- |
 | `enabled` | boolean | 是否开启定时同步，默认开启 |
 | `cron` | string | Cron 表达式，默认每 5 分钟 |
+| `githubRawProxyEnabled` | boolean | 是否将 GitHub raw 图片通过 `https://gh-proxy.com/` 加速 |
 
 `mail` 字段：
 

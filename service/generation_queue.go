@@ -27,7 +27,14 @@ type AIProxyResponse struct {
 	Body       []byte
 }
 
-type AIProxyExecutor func(ctx context.Context, user model.AuthUser, body []byte, contentType string, modelName string, path string) (AIProxyResponse, error)
+// GenerationTaskResultStream 是任务结果的流式视图，由调用方负责关闭 Content。
+type GenerationTaskResultStream struct {
+	StatusCode int
+	Header     http.Header
+	Content    io.ReadCloser
+}
+
+type AIProxyExecutor func(ctx context.Context, user model.AuthUser, body io.Reader, contentType string, modelName string, path string) (AIProxyResponse, error)
 
 var (
 	queueMu       sync.Mutex
@@ -161,29 +168,24 @@ func ListGenerationTasks(user model.AuthUser) ([]model.GenerationTaskView, error
 	return result, nil
 }
 
-func GetGenerationTaskResult(user model.AuthUser, id string) (AIProxyResponse, error) {
+func GetGenerationTaskResult(user model.AuthUser, id string) (GenerationTaskResultStream, error) {
 	task, ok, err := repository.GetGenerationTask(id)
 	if err != nil {
-		return AIProxyResponse{}, err
+		return GenerationTaskResultStream{}, err
 	}
 	if !ok || task.UserID != user.ID {
-		return AIProxyResponse{}, safeMessageError{message: "任务不存在或无权限访问"}
+		return GenerationTaskResultStream{}, safeMessageError{message: "任务不存在或无权限访问"}
 	}
 	if task.Status != model.GenerationTaskSucceeded || task.ResponseFileID == "" {
-		return AIProxyResponse{}, safeMessageError{message: "任务结果尚未生成"}
+		return GenerationTaskResultStream{}, safeMessageError{message: "任务结果尚未生成"}
 	}
 	header := http.Header{}
 	_ = json.Unmarshal([]byte(task.ResponseHeader), &header)
-	file, content, err := GetFileContent(user, task.ResponseFileID, "")
+	_, content, err := GetFileContent(user, task.ResponseFileID, "")
 	if err != nil {
-		return AIProxyResponse{}, err
+		return GenerationTaskResultStream{}, err
 	}
-	defer content.Close()
-	body, err := readLimited(content, file.Size, "任务结果内容过大")
-	if err != nil {
-		return AIProxyResponse{}, err
-	}
-	return AIProxyResponse{StatusCode: task.ResponseStatus, Header: header, Body: body}, nil
+	return GenerationTaskResultStream{StatusCode: task.ResponseStatus, Header: header, Content: content}, nil
 }
 
 func CancelGenerationTask(user model.AuthUser, id string) error {
@@ -294,11 +296,19 @@ func executeTask(ctx context.Context, user model.AuthUser, task model.Generation
 	if proxyExecutor == nil {
 		return failExecutingTask(task, "AI 执行器未初始化")
 	}
-	requestBody, err := readTaskPayload(user, task.RequestFileID, maxAIRequestBytes, "AI 请求内容过大")
+	if strings.TrimSpace(task.RequestFileID) == "" {
+		return failExecutingTask(task, "AI 请求内容读取失败")
+	}
+	file, content, err := GetFileContent(user, task.RequestFileID, "")
 	if err != nil {
 		return failExecutingTask(task, "AI 请求内容读取失败")
 	}
-	resp, err := proxyExecutor(ctx, user, requestBody, task.ContentType, task.Model, task.Path)
+	if file.FileType != model.CloudFileTypeTask {
+		_ = content.Close()
+		return failExecutingTask(task, "AI 请求内容读取失败")
+	}
+	resp, err := proxyExecutor(ctx, user, content, task.ContentType, task.Model, task.Path)
+	_ = content.Close()
 	now := time.Now().Format(time.RFC3339)
 	if err != nil {
 		return failExecutingTask(task, "AI 接口请求失败")
@@ -485,21 +495,6 @@ func StoreTaskPayload(ctx context.Context, user model.AuthUser, filename string,
 		Body:        body,
 		ExpiresAt:   taskPayloadExpiresAt(),
 	})
-}
-
-func readTaskPayload(user model.AuthUser, fileID string, maxBytes int64, message string) ([]byte, error) {
-	if strings.TrimSpace(fileID) == "" {
-		return nil, safeMessageError{message: "任务请求内容不存在"}
-	}
-	file, content, err := GetFileContent(user, fileID, "")
-	if err != nil {
-		return nil, err
-	}
-	defer content.Close()
-	if file.FileType != model.CloudFileTypeTask {
-		return nil, safeMessageError{message: "任务内容类型不正确"}
-	}
-	return readLimited(content, maxBytes, message)
 }
 
 func deleteTaskPayload(fileID string) error {

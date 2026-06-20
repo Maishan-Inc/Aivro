@@ -279,6 +279,7 @@ export type AdminPrivateSettings = {
     promptSync: {
         enabled: boolean;
         cron: string;
+        githubRawProxyEnabled: boolean;
     };
     aiQueue: AdminAIQueueSettings;
     turnstile: AdminTurnstileSettings;

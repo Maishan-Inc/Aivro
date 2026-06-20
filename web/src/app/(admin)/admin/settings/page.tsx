@@ -164,7 +164,7 @@ const emptySettings: AdminSettings = {
     },
     private: {
         channels: [],
-        promptSync: { enabled: true, cron: "*/5 * * * *" },
+        promptSync: { enabled: true, cron: "*/5 * * * *", githubRawProxyEnabled: false },
         aiQueue: { enabled: true, backend: "database", redisUrl: "", defaultPerMinute: 50, modelPerMinute: [], maxQueuedPerUser: 20, taskRetentionHours: 24 },
         turnstile: { enabled: false, siteKey: "", secretKey: "" },
         auth: {
@@ -674,13 +674,13 @@ export default function AdminSettingsPage() {
                     <Flex justify="space-between" align="center" gap={16} wrap>
                         {standaloneTab ? (
                             <Typography.Title level={5} style={{ margin: 0 }}>
-                                {activeTab === "model" ? "模型配置" : "邮件配置"}
+                                {activeTab === "model" ? "模型配置" : "邮件设置"}
                             </Typography.Title>
                         ) : (
                             <Tabs
-                                tabPosition="left"
                                 activeKey={activeTab}
                                 onChange={(key) => changeTab(key as SettingsTabKey)}
+                                style={{ flex: 1, minWidth: 0 }}
                                 items={[
                                     { key: "public", label: "注册与访问" },
                                     { key: "pages", label: "页面设置" },
@@ -2061,6 +2061,7 @@ function normalizePrivateSetting(setting: Partial<AdminSettings["private"]> = {}
         promptSync: {
             enabled: setting.promptSync?.enabled !== false,
             cron: setting.promptSync?.cron || "*/5 * * * *",
+            githubRawProxyEnabled: setting.promptSync?.githubRawProxyEnabled === true,
         },
         aiQueue: {
             ...emptySettings.private.aiQueue,

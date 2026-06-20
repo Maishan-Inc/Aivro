@@ -22,7 +22,7 @@ const adminMenus = [
     { key: "/admin/ads", icon: <GlobalOutlined />, label: "谷歌广告" },
     { key: "/admin/database", icon: <DatabaseOutlined />, label: "数据库配置" },
     { key: "/admin/settings?tab=model", icon: <ApiOutlined />, label: "模型配置" },
-    { key: "/admin/settings?tab=mail", icon: <MailOutlined />, label: "邮件配置" },
+    { key: "/admin/settings?tab=mail", icon: <MailOutlined />, label: "邮件设置" },
     { key: "/admin/settings", icon: <SettingOutlined />, label: "系统设置" },
 ];
 
@@ -40,7 +40,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     const setLocale = useLocaleStore((state) => state.setLocale);
     const settingsTab = pathname.startsWith("/admin/settings") ? searchParams.get("tab") : "";
     const activeKey = settingsTab === "model" ? "/admin/settings?tab=model" : settingsTab === "mail" ? "/admin/settings?tab=mail" : adminMenus.find((item) => pathname.startsWith(item.key))?.key || "";
-    const pageTitle = settingsTab === "model" ? "模型配置" : settingsTab === "mail" ? "邮件配置" : pathname.startsWith("/admin/settings") ? "系统设置" : pathname.startsWith("/admin/database") ? "数据库配置" : pathname.startsWith("/admin/ads") ? "谷歌广告" : pathname.startsWith("/admin/assets") ? "素材库管理" : pathname.startsWith("/admin/prompts") ? "提示词管理" : pathname.startsWith("/admin/plans") ? "套餐管理" : pathname.startsWith("/admin/credit-logs") ? "算力点日志" : "用户管理";
+    const pageTitle = settingsTab === "model" ? "模型配置" : settingsTab === "mail" ? "邮件设置" : pathname.startsWith("/admin/settings") ? "系统设置" : pathname.startsWith("/admin/database") ? "数据库配置" : pathname.startsWith("/admin/ads") ? "谷歌广告" : pathname.startsWith("/admin/assets") ? "素材库管理" : pathname.startsWith("/admin/prompts") ? "提示词管理" : pathname.startsWith("/admin/plans") ? "套餐管理" : pathname.startsWith("/admin/credit-logs") ? "算力点日志" : "用户管理";
     const languageItems = (Object.keys(localeLabels) as Locale[]).map((item) => ({ key: item, label: localeLabels[item] }));
 
     useEffect(() => {

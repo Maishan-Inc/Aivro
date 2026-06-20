@@ -1,4 +1,4 @@
-import { Box, FileText, ImagePlus, Images, Maximize2, SearchCheck, Video } from "lucide-react";
+import { Box, FileText, ImagePlus, Images, Maximize2, SearchCheck, Sparkles, Video } from "lucide-react";
 
 export const navigationTools = [
     {
@@ -56,6 +56,15 @@ export const navigationTools = [
         href: "https://insigh.aivro.org",
         external: true,
         icon: SearchCheck,
+    },
+    {
+        slug: "free-image",
+        label: "免费生成图片",
+        labelKey: "nav.freeImage",
+        href: "https://edge.aivro.org",
+        external: true,
+        localeAware: true,
+        icon: Sparkles,
     },
 ] as const;
 

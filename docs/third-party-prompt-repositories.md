@@ -8,3 +8,5 @@
 | https://github.com/YouMind-OpenLab/awesome-gpt-image-2 | 已实现同步逻辑 |
 | https://github.com/YouMind-OpenLab/awesome-nano-banana-pro-prompts | 已实现同步逻辑 |
 | https://github.com/davidwuw0811-boop/awesome-gpt-image2-prompts | 已实现同步逻辑 |
+
+仅内置真实图片提示词仓库；仓库导航类项目不作为提示词源同步。

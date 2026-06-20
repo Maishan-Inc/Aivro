@@ -59,6 +59,7 @@ func SaveSettings(settings model.Settings) (model.Settings, error) {
 	keepBillingAndKYCSecrets(&settings, normalizeSettings(saved))
 	result, err := repository.SaveSettings(settings, now())
 	if err == nil {
+		ClearPublicPromptCache()
 		RefreshPromptSyncScheduler()
 	}
 	return hidePrivateAPIKeys(result), err

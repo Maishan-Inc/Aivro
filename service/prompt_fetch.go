@@ -21,6 +21,8 @@ const (
 	youMindGptImage2RawBase      = "https://raw.githubusercontent.com/YouMind-OpenLab/awesome-gpt-image-2/main"
 	youMindNanoBananaProRawBase  = "https://raw.githubusercontent.com/YouMind-OpenLab/awesome-nano-banana-pro-prompts/main"
 	davidWuGptImage2RawBase      = "https://raw.githubusercontent.com/davidwuw0811-boop/awesome-gpt-image2-prompts/main"
+	githubRawURLPrefix           = "https://raw.githubusercontent.com/"
+	githubRawProxyPrefix         = "https://gh-proxy.com/"
 )
 
 var gptImage2CaseFiles = []string{"README.md", "cases/ad-creative.md", "cases/character.md", "cases/comparison.md", "cases/ecommerce.md", "cases/portrait.md", "cases/poster.md", "cases/ui.md"}
@@ -64,6 +66,7 @@ func SyncPromptCategory(category string) ([]model.PromptCategory, error) {
 		if err != nil {
 			return nil, err
 		}
+		items = applyPromptImageProxy(items, promptImageProxyEnabled())
 		if err := repository.ReplacePromptCategory(item, items); err != nil {
 			return nil, err
 		}
@@ -376,6 +379,30 @@ func markdownPreview(images []string) string {
 		}
 	}
 	return strings.Join(lines, "\n\n")
+}
+
+func applyPromptImageProxy(items []model.Prompt, enabled bool) []model.Prompt {
+	for i := range items {
+		items[i].CoverURL = applyGithubRawProxy(items[i].CoverURL, enabled)
+		items[i].Preview = applyGithubRawProxy(items[i].Preview, enabled)
+	}
+	return items
+}
+
+func applyGithubRawProxy(value string, enabled bool) string {
+	value = strings.ReplaceAll(value, githubRawProxyPrefix+githubRawURLPrefix, githubRawURLPrefix)
+	if enabled {
+		value = strings.ReplaceAll(value, githubRawURLPrefix, githubRawProxyPrefix+githubRawURLPrefix)
+	}
+	return value
+}
+
+func promptImageProxyEnabled() bool {
+	settings, err := repository.GetSettings()
+	if err != nil {
+		return false
+	}
+	return normalizePromptSyncSetting(settings.Private.PromptSync).GithubRawProxyEnabled
 }
 
 func extractMarkdownImages(baseURL string, block string) []string {

@@ -1,7 +1,9 @@
 package handler
 
 import (
+	"io"
 	"net/http"
+	"strings"
 
 	"github.com/basketikun/aivro/service"
 )
@@ -45,7 +47,19 @@ func GenerationTaskResult(w http.ResponseWriter, r *http.Request, id string) {
 		FailError(w, err)
 		return
 	}
-	writeAIProxyResponse(w, result)
+	defer result.Content.Close()
+	for key, values := range result.Header {
+		if strings.EqualFold(key, "Content-Length") {
+			continue
+		}
+		for _, value := range values {
+			w.Header().Add(key, value)
+		}
+	}
+	if result.StatusCode > 0 {
+		w.WriteHeader(result.StatusCode)
+	}
+	_, _ = io.Copy(w, result.Content)
 }
 
 func CancelGenerationTask(w http.ResponseWriter, r *http.Request, id string) {

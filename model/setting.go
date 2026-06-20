@@ -186,8 +186,9 @@ type CloudStorageSetting struct {
 
 // PromptSyncSetting 提示词定时同步配置。
 type PromptSyncSetting struct {
-	Enabled *bool  `json:"enabled"`
-	Cron    string `json:"cron"`
+	Enabled               *bool  `json:"enabled"`
+	Cron                  string `json:"cron"`
+	GithubRawProxyEnabled bool   `json:"githubRawProxyEnabled"`
 }
 
 type PrivateAuthSetting struct {

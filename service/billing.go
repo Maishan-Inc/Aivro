@@ -17,6 +17,7 @@ import (
 
 type CheckoutInput struct {
 	PlanID string `json:"planId"`
+	Locale string `json:"locale"`
 }
 
 func ListPlans(admin bool) ([]model.Plan, error) {
@@ -86,15 +87,19 @@ func CreateStripeCheckout(r *http.Request, userID string, input CheckoutInput) (
 	if err := db.Where("id = ? AND enabled = ?", input.PlanID, true).First(&plan).Error; err != nil {
 		return nil, safeMessageError{message: "套餐不存在或已下架"}
 	}
+	resolved := plan.ResolveForLocale(input.Locale)
 	order := model.PlanOrder{
-		ID:          newID("order"),
-		UserID:      userID,
-		PlanID:      plan.ID,
-		Status:      model.PlanOrderStatusPending,
-		AmountCents: plan.PriceCents,
-		Currency:    strings.ToUpper(plan.Currency),
-		CreatedAt:   now(),
-		UpdatedAt:   now(),
+		ID:                    newID("order"),
+		UserID:                userID,
+		PlanID:                plan.ID,
+		Status:                model.PlanOrderStatusPending,
+		Locale:                input.Locale,
+		AmountCents:           resolved.PriceCents,
+		Currency:              strings.ToUpper(resolved.Currency),
+		Credits:               resolved.Credits,
+		WorkflowCreateCredits: resolved.WorkflowCreateCredits,
+		CreatedAt:             now(),
+		UpdatedAt:             now(),
 	}
 	if err := db.Create(&order).Error; err != nil {
 		return nil, err
@@ -110,11 +115,11 @@ func CreateStripeCheckout(r *http.Request, userID string, input CheckoutInput) (
 		LineItems: []*stripe.CheckoutSessionLineItemParams{{
 			Quantity: stripe.Int64(1),
 			PriceData: &stripe.CheckoutSessionLineItemPriceDataParams{
-				Currency:   stripe.String(strings.ToLower(plan.Currency)),
-				UnitAmount: stripe.Int64(int64(plan.PriceCents)),
+				Currency:   stripe.String(strings.ToLower(resolved.Currency)),
+				UnitAmount: stripe.Int64(int64(resolved.PriceCents)),
 				ProductData: &stripe.CheckoutSessionLineItemPriceDataProductDataParams{
-					Name:        stripe.String(plan.Name),
-					Description: stripe.String(plan.Description),
+					Name:        stripe.String(resolved.Name),
+					Description: stripe.String(resolved.Description),
 				},
 			},
 		}},
@@ -181,8 +186,17 @@ func HandleStripeWebhook(r *http.Request) error {
 		if err := tx.Where("id = ?", order.UserID).First(&user).Error; err != nil {
 			return err
 		}
-		user.Credits += plan.Credits
-		user.WorkflowCreateCredits += plan.WorkflowCreateCredits
+		// Grant the entitlements recorded on the order at checkout time so the
+		// user gets exactly what was localized and paid for. Fall back to the
+		// current plan values for legacy orders created before locale recording.
+		creditsDelta := order.Credits
+		workflowDelta := order.WorkflowCreateCredits
+		if creditsDelta == 0 && workflowDelta == 0 {
+			creditsDelta = plan.Credits
+			workflowDelta = plan.WorkflowCreateCredits
+		}
+		user.Credits += creditsDelta
+		user.WorkflowCreateCredits += workflowDelta
 		user.UpdatedAt = now()
 		if err := tx.Save(&user).Error; err != nil {
 			return err
@@ -202,8 +216,8 @@ func HandleStripeWebhook(r *http.Request) error {
 			UserID:                     user.ID,
 			Source:                     model.EntitlementLogPlanPurchase,
 			SourceID:                   order.ID,
-			CreditsDelta:               plan.Credits,
-			WorkflowCreateCreditsDelta: plan.WorkflowCreateCredits,
+			CreditsDelta:               creditsDelta,
+			WorkflowCreateCreditsDelta: workflowDelta,
 			CreditsAfter:               user.Credits,
 			WorkflowCreateCreditsAfter: user.WorkflowCreateCredits,
 			Remark:                     "Stripe 套餐购买",

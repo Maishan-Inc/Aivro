@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { App } from "antd";
 
-import { deleteAdminPrompt, deleteAdminPrompts, fetchAdminPrompts, fetchAdminPromptCategories, saveAdminPrompt, syncAdminPromptCategory, type AdminPromptCategory } from "@/services/api/admin";
+import { deleteAdminPrompt, deleteAdminPrompts, fetchAdminPrompts, fetchAdminPromptCategories, fetchAdminSettings, saveAdminPrompt, saveAdminSettings, syncAdminPromptCategory, type AdminPromptCategory } from "@/services/api/admin";
 import type { Prompt } from "@/services/api/prompts";
 import { useUserStore } from "@/stores/use-user-store";
 import { adminRealtimeQueryOptions } from "../admin-query-options";
@@ -36,6 +36,38 @@ export function useAdminPrompts() {
         enabled: Boolean(token),
         retry: false,
         ...adminRealtimeQueryOptions,
+    });
+
+    const settingsQuery = useQuery({
+        queryKey: ["admin", "settings", "prompt-sync", token],
+        queryFn: () => fetchAdminSettings(token),
+        enabled: Boolean(token),
+        retry: false,
+        ...adminRealtimeQueryOptions,
+    });
+
+    const settingsMutation = useMutation({
+        mutationFn: async (githubRawProxyEnabled: boolean) => {
+            const settings = settingsQuery.data;
+            if (!settings) throw new Error("系统设置未加载");
+            return saveAdminSettings(token, {
+                ...settings,
+                private: {
+                    ...settings.private,
+                    promptSync: {
+                        ...settings.private.promptSync,
+                        githubRawProxyEnabled,
+                    },
+                },
+            });
+        },
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({ queryKey: ["admin"] });
+            message.success("图片加速设置已保存");
+        },
+        onError: (error) => {
+            message.error(error instanceof Error ? error.message : "保存设置失败");
+        },
     });
 
     const syncMutation = useMutation({
@@ -84,12 +116,12 @@ export function useAdminPrompts() {
     });
 
     useEffect(() => {
-        const error = categoriesQuery.error || promptsQuery.error;
+        const error = categoriesQuery.error || promptsQuery.error || settingsQuery.error;
         if (!error) return;
         const errorMessage = error instanceof Error ? error.message : "读取提示词失败";
         message.error(errorMessage);
         if (errorMessage.includes("未登录") || errorMessage.includes("权限不足") || errorMessage.includes("登录状态无效")) clearSession();
-    }, [categoriesQuery.error, clearSession, message, promptsQuery.error]);
+    }, [categoriesQuery.error, clearSession, message, promptsQuery.error, settingsQuery.error]);
 
     const updateFilters = (next: Partial<{ keyword: string; category: string; tag: string[]; page: number; pageSize: number }>) => {
         const queryState = { keyword, category, tag, page, pageSize, ...next };
@@ -113,8 +145,11 @@ export function useAdminPrompts() {
         page,
         pageSize,
         total: data?.total || 0,
+        promptImageProxyEnabled: settingsQuery.data?.private.promptSync.githubRawProxyEnabled === true,
+        isPromptSettingsLoading: settingsQuery.isFetching || settingsMutation.isPending,
         isLoading: categoriesQuery.isFetching || promptsQuery.isFetching || saveMutation.isPending || deleteMutation.isPending || batchDeleteMutation.isPending,
         isSyncing: syncMutation.isPending,
+        savePromptImageProxyEnabled: (value: boolean) => settingsMutation.mutateAsync(value),
         syncCategory: (category: string) => syncMutation.mutateAsync(category),
         searchPrompts: (value = keyword) => updateFilters({ keyword: value }),
         changeCategory: (value: string) => updateFilters({ category: value, tag: [] }),

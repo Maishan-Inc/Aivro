@@ -28,6 +28,7 @@ func ListPrompts(q model.Query) (model.PromptList, error) {
 	if err != nil {
 		return model.PromptList{}, err
 	}
+	items = applyPromptImageProxy(items, promptImageProxyEnabled())
 	tags, err := repository.ListPromptTags(q)
 	if err != nil {
 		return model.PromptList{}, err
@@ -83,6 +84,8 @@ func SavePrompt(item model.Prompt) (model.Prompt, error) {
 		item.Category = category.Category
 	}
 	item.GithubURL = ""
+	item.CoverURL = applyGithubRawProxy(item.CoverURL, promptImageProxyEnabled())
+	item.Preview = applyGithubRawProxy(item.Preview, promptImageProxyEnabled())
 	result, err := repository.SavePrompt(item)
 	if err == nil {
 		ClearPublicPromptCache()

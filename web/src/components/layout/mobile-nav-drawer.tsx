@@ -23,10 +23,11 @@ export function MobileNavDrawer({ open, activeToolSlug, onClose }: MobileNavDraw
                 {navigationTools.map((tool) => {
                     const Icon = tool.icon;
                     const active = tool.slug === activeToolSlug;
+                    const externalHref = "localeAware" in tool && tool.localeAware && locale === "zh-CN" ? `${tool.href}/zh-CN` : tool.href;
                     return (
                         <Link
                             key={tool.slug}
-                            href={tool.external ? tool.href : withLocalePath(tool.href || `/${tool.slug}`, locale)}
+                            href={tool.external ? externalHref : withLocalePath(tool.href || `/${tool.slug}`, locale)}
                             target={tool.external ? "_blank" : undefined}
                             rel={tool.external ? "noreferrer" : undefined}
                             onClick={onClose}

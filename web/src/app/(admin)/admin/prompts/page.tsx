@@ -2,7 +2,7 @@
 
 import { CopyOutlined, DeleteOutlined, EditOutlined, ExportOutlined, EyeOutlined, PlusOutlined, ReloadOutlined, SearchOutlined, SyncOutlined } from "@ant-design/icons";
 import { ProTable, type ProColumns } from "@ant-design/pro-components";
-import { Button, Card, Col, Flex, Form, Image, Input, Modal, Row, Select, Space, Table, Tag, Tooltip, Typography } from "antd";
+import { Button, Card, Col, Flex, Form, Image, Input, Modal, Row, Select, Space, Switch, Table, Tag, Tooltip, Typography } from "antd";
 import { useEffect, useState } from "react";
 
 import { useCopyText } from "@/hooks/use-copy-text";
@@ -20,6 +20,8 @@ export default function AdminPromptsPage() {
         page,
         pageSize,
         total,
+        promptImageProxyEnabled,
+        isPromptSettingsLoading,
         isLoading,
         isSyncing,
         searchPrompts,
@@ -29,6 +31,7 @@ export default function AdminPromptsPage() {
         changePageSize,
         resetFilters,
         refreshPrompts,
+        savePromptImageProxyEnabled,
         syncCategory,
         savePrompt: saveAdminPrompt,
         deletePrompt,
@@ -170,6 +173,15 @@ export default function AdminPromptsPage() {
                             </Col>
                         </Row>
                     </Form>
+                </Card>
+                <Card variant="borderless">
+                    <Flex align="center" justify="space-between" gap={16} wrap>
+                        <Flex vertical gap={4}>
+                            <Typography.Text strong>中国大陆图片加速</Typography.Text>
+                            <Typography.Text type="secondary">开启后，提示词库里的 GitHub raw 图片会通过 https://gh-proxy.com/ 加速访问。</Typography.Text>
+                        </Flex>
+                        <Switch checked={promptImageProxyEnabled} loading={isPromptSettingsLoading} onChange={(checked) => void savePromptImageProxyEnabled(checked)} />
+                    </Flex>
                 </Card>
                 <ProTable<Prompt>
                     rowKey="id"

@@ -141,13 +141,14 @@ func directAIProxyRequest(w http.ResponseWriter, r *http.Request, user model.Aut
 
 // ExecuteAIProxyTask executes an upstream AI POST request and returns the response body.
 // It is registered with service generation queue so synchronous and queued requests share the same path.
-func ExecuteAIProxyTask(ctx context.Context, user model.AuthUser, body []byte, contentType string, modelName string, path string) (service.AIProxyResponse, error) {
+// body is streamed directly to the upstream request to avoid buffering large payloads in memory.
+func ExecuteAIProxyTask(ctx context.Context, user model.AuthUser, body io.Reader, contentType string, modelName string, path string) (service.AIProxyResponse, error) {
 	channel, err := service.SelectModelChannel(modelName)
 	if err != nil {
 		log.Printf("AI proxy select channel failed: model=%s err=%v", modelName, err)
 		return service.AIProxyResponse{}, err
 	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, service.BuildModelChannelURL(channel, path), bytes.NewReader(body))
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, service.BuildModelChannelURL(channel, path), body)
 	if err != nil {
 		log.Printf("AI proxy build request failed: url=%s err=%v", service.BuildModelChannelURL(channel, path), err)
 		return service.AIProxyResponse{}, err
