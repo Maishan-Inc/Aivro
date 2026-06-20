@@ -1601,7 +1601,7 @@ function InfiniteCanvasPage() {
         setIsSharing(true);
         try {
             const result = await shareWorkflow(token, projectId, { passwordEnabled: sharePasswordEnabled, password: sharePassword });
-            setShareUrl(result.shareUrl);
+            setShareUrl(`${window.location.origin}/share/workflows/${result.share.token}`);
             setSharePassword("");
             message.success(result.share.version > 1 ? "分享快照已更新" : "分享链接已生成");
         } catch (error) {
