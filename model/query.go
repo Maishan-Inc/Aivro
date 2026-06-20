@@ -8,6 +8,7 @@ type Query struct {
 	Tags     []string
 	Category string
 	Type     string
+	Locale   string
 	Page     int
 	PageSize int
 }

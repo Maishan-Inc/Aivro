@@ -28,7 +28,7 @@ func ListPrompts(q model.Query) (model.PromptList, error) {
 	if err != nil {
 		return model.PromptList{}, err
 	}
-	items = applyPromptImageProxy(items, promptImageProxyEnabled())
+	items = applyPromptImageProxy(items, false)
 	tags, err := repository.ListPromptTags(q)
 	if err != nil {
 		return model.PromptList{}, err
@@ -50,6 +50,9 @@ func ListPublicPrompts(q model.Query) (model.PromptList, error) {
 	result, err := ListPrompts(q)
 	if err != nil {
 		return model.PromptList{}, err
+	}
+	if q.Locale == "zh-CN" && promptImageProxyEnabled() {
+		result.Items = applyPromptImageProxy(result.Items, true)
 	}
 	publicPromptCache.Lock()
 	publicPromptCache.items[key] = publicPromptCacheItem{Value: result, ExpiresAt: now.Add(publicPromptCacheTTL)}
@@ -84,8 +87,8 @@ func SavePrompt(item model.Prompt) (model.Prompt, error) {
 		item.Category = category.Category
 	}
 	item.GithubURL = ""
-	item.CoverURL = applyGithubRawProxy(item.CoverURL, promptImageProxyEnabled())
-	item.Preview = applyGithubRawProxy(item.Preview, promptImageProxyEnabled())
+	item.CoverURL = applyGithubRawProxy(item.CoverURL, false)
+	item.Preview = applyGithubRawProxy(item.Preview, false)
 	result, err := repository.SavePrompt(item)
 	if err == nil {
 		ClearPublicPromptCache()
@@ -125,5 +128,5 @@ func promptCategoryCodes(items []model.PromptCategory) []string {
 func publicPromptCacheKey(q model.Query) string {
 	tags := append([]string{}, q.Tags...)
 	sort.Strings(tags)
-	return fmt.Sprintf("k=%s|c=%s|t=%s|p=%d|s=%d", q.Keyword, q.Category, strings.Join(tags, ","), q.Page, q.PageSize)
+	return fmt.Sprintf("k=%s|c=%s|t=%s|l=%s|p=%d|s=%d", q.Keyword, q.Category, strings.Join(tags, ","), q.Locale, q.Page, q.PageSize)
 }

@@ -49,7 +49,7 @@ export function AppTopNav() {
         <>
             {!hideHeader ? (
                 <header className="sticky top-0 z-20 h-16 shrink-0 border-b border-stone-200 bg-background/90 backdrop-blur-xl dark:border-stone-800">
-                    <div className="mx-auto grid h-full max-w-7xl grid-cols-[auto_minmax(0,1fr)_auto] items-stretch gap-5 px-6">
+                    <div className="mx-auto grid h-full max-w-screen-2xl grid-cols-[auto_minmax(0,1fr)_auto] items-stretch gap-3 px-4 lg:px-6">
                         <div className="flex min-w-0 items-center">
                             <Link href={localizedPath("/")} className="flex h-full shrink-0 items-center gap-2 text-sm font-semibold leading-none tracking-tight text-stone-950 transition hover:text-stone-600 dark:text-stone-100 dark:hover:text-stone-300">
                                 <span
@@ -73,7 +73,7 @@ export function AppTopNav() {
                             </button>
                         </div>
 
-                        <nav className="hide-scrollbar hidden h-16 min-w-0 items-center justify-center gap-7 overflow-x-auto md:flex">
+                        <nav className="hide-scrollbar hidden h-16 min-w-0 items-center justify-center gap-4 overflow-x-auto md:flex lg:gap-5">
                             {navigationTools.map((tool) => {
                                 const Icon = tool.icon;
                                 const active = tool.slug === activeToolSlug;
@@ -115,7 +115,7 @@ export function AppTopNav() {
                                     title={t("locale.current")}
                                 >
                                     <Languages className="size-4" />
-                                    <span>{localeLabels[locale]}</span>
+                                    <span className="hidden lg:inline">{localeLabels[locale]}</span>
                                 </button>
                             </Dropdown>
                             {isReady && user ? (

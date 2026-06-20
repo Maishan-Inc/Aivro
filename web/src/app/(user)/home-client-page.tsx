@@ -27,7 +27,7 @@ function Highlighter({ action, color, children }: { action: "highlight" | "under
 
 export function HomeClientPage() {
     const { message } = App.useApp();
-    const { t } = useI18n();
+    const { locale, t } = useI18n();
     const localizedPath = useLocalizedPath();
     const [primaryTool] = navigationTools;
     const [promptShowcase, setPromptShowcase] = useState<Prompt[]>([]);
@@ -35,10 +35,10 @@ export function HomeClientPage() {
     const [previewOpen, setPreviewOpen] = useState(false);
 
     useEffect(() => {
-        void fetchPrompts({ pageSize: 12 })
+        void fetchPrompts({ locale, pageSize: 12 })
             .then((data) => setPromptShowcase(data.items))
             .catch((error) => message.error(error instanceof Error ? error.message : t("home.promptError")));
-    }, [message, t]);
+    }, [locale, message, t]);
 
     return (
         <main className="aivro-wire-surface relative h-full overflow-y-auto bg-background text-stone-950 dark:text-stone-100">

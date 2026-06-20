@@ -13,7 +13,7 @@ import { useUserStore } from "@/stores/use-user-store";
 export default function PricingPage() {
     const router = useRouter();
     const pathname = usePathname();
-    const { message } = App.useApp();
+    const { message, modal } = App.useApp();
     const { locale } = useI18n();
     const token = useUserStore((state) => state.token);
     const isReady = useUserStore((state) => state.isReady);
@@ -31,7 +31,13 @@ export default function PricingPage() {
         if (!isReady) return;
         if (!token) {
             const activeLocale = localeFromPath(pathname) || locale;
-            router.push(withLocalePath(`/login?redirect=${encodeURIComponent(withLocalePath("/pricing", activeLocale))}`, activeLocale));
+            modal.confirm({
+                title: en ? "Sign in required" : "需要登录",
+                content: en ? "Please sign in to purchase this plan." : "购买套餐需要先登录，登录后将跳转回套餐页。",
+                okText: en ? "Sign in" : "去登录",
+                cancelText: en ? "Cancel" : "取消",
+                onOk: () => router.push(withLocalePath(`/login?redirect=${encodeURIComponent(withLocalePath("/pricing", activeLocale))}`, activeLocale)),
+            });
             return;
         }
         setLoadingPlanId(plan.id);
@@ -133,9 +139,9 @@ export default function PricingPage() {
 
 function PlanFeature({ icon, text, highlight }: { icon: ReactNode; text: string; highlight?: boolean }) {
     return (
-        <div className="flex items-center gap-3">
-            <span className={`flex size-6 shrink-0 items-center justify-center rounded-full ${highlight ? "bg-indigo-500/20 text-indigo-200" : "bg-white/8 text-white/70"}`}>{icon}</span>
-            <span className={highlight ? "font-medium text-white" : ""}>{text}</span>
+        <div className="flex items-start gap-3">
+            <span className={`mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full ${highlight ? "bg-indigo-500/20 text-indigo-200" : "bg-white/8 text-white/70"}`}>{icon}</span>
+            <span className={`min-w-0 break-words leading-relaxed ${highlight ? "font-medium text-white" : ""}`}>{text}</span>
         </div>
     );
 }

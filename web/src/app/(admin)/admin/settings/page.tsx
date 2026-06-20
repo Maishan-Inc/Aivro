@@ -274,6 +274,7 @@ export default function AdminSettingsPage() {
     const [authProviderStats, setAuthProviderStats] = useState<Record<string, number>>({});
     const [currentOrigin, setCurrentOrigin] = useState("");
     const [modelCosts, setModelCosts] = useState<AdminModelCost[]>([]);
+    const [newCostModel, setNewCostModel] = useState("");
     const [knownModels, setKnownModels] = useState<string[]>([]);
     const publicModels = Form.useWatch(["public", "modelChannel", "availableModels"], form) || [];
     const customAuthProviders = Form.useWatch(["private", "auth", "customProviders"], form) || [];
@@ -779,7 +780,7 @@ export default function AdminSettingsPage() {
                                         rowKey="model"
                                         pagination={false}
                                         size="small"
-                                        dataSource={publicModels.map((model) => ({ model, credits: modelCostCredits(modelCosts, model) }))}
+                                        dataSource={[...publicModels.map((model) => ({ model, credits: modelCostCredits(modelCosts, model) })), ...modelCosts.filter((c) => !publicModels.includes(c.model)).map((c) => ({ model: c.model, credits: c.credits }))]}
                                         columns={[
                                             { title: "模型", dataIndex: "model" },
                                             {
@@ -803,6 +804,32 @@ export default function AdminSettingsPage() {
                                             },
                                         ]}
                                     />
+                                    <Space.Compact style={{ marginTop: 8, width: "100%" }}>
+                                        <Input
+                                            placeholder="输入模型名称以新增算力点配置"
+                                            value={newCostModel}
+                                            onChange={(e) => setNewCostModel(e.target.value)}
+                                            onPressEnter={() => {
+                                                const m = newCostModel.trim();
+                                                if (!m) return;
+                                                setModelCost(form, setModelCosts, m, modelCostCredits(modelCosts, m));
+                                                markUnsaved();
+                                                setNewCostModel("");
+                                            }}
+                                        />
+                                        <Button
+                                            icon={<PlusOutlined />}
+                                            onClick={() => {
+                                                const m = newCostModel.trim();
+                                                if (!m) return;
+                                                setModelCost(form, setModelCosts, m, modelCostCredits(modelCosts, m));
+                                                markUnsaved();
+                                                setNewCostModel("");
+                                            }}
+                                        >
+                                            新增
+                                        </Button>
+                                    </Space.Compact>
                                 </Card>
                                 <Card
                                     size="small"

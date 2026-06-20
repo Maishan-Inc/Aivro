@@ -66,7 +66,7 @@ func SyncPromptCategory(category string) ([]model.PromptCategory, error) {
 		if err != nil {
 			return nil, err
 		}
-		items = applyPromptImageProxy(items, promptImageProxyEnabled())
+		items = applyPromptImageProxy(items, false)
 		if err := repository.ReplacePromptCategory(item, items); err != nil {
 			return nil, err
 		}

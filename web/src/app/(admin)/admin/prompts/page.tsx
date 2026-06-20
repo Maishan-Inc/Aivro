@@ -178,7 +178,7 @@ export default function AdminPromptsPage() {
                     <Flex align="center" justify="space-between" gap={16} wrap>
                         <Flex vertical gap={4}>
                             <Typography.Text strong>中国大陆图片加速</Typography.Text>
-                            <Typography.Text type="secondary">开启后，提示词库里的 GitHub raw 图片会通过 https://gh-proxy.com/ 加速访问。</Typography.Text>
+                            <Typography.Text type="secondary">开启后，仅 /zh-CN 中文页面的 GitHub raw 图片会通过 https://gh-proxy.com/ 加速访问。</Typography.Text>
                         </Flex>
                         <Switch checked={promptImageProxyEnabled} loading={isPromptSettingsLoading} onChange={(checked) => void savePromptImageProxyEnabled(checked)} />
                     </Flex>

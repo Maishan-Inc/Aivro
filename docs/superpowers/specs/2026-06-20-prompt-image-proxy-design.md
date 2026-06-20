@@ -10,12 +10,12 @@
 
 - Store the switch under private prompt sync settings as `githubRawProxyEnabled`.
 - Expose the switch on `/admin/prompts`, near the prompt management controls.
-- When enabled, GitHub raw image URLs are returned and synced as `https://gh-proxy.com/https://raw.githubusercontent.com/...`.
-- When disabled, proxied URLs are normalized back to the original GitHub raw URL.
+- When enabled, GitHub raw image URLs are returned as `https://gh-proxy.com/https://raw.githubusercontent.com/...` only for the `zh-CN` public prompt request.
+- Other locales, admin pages, and stored prompt records stay on the original GitHub raw URL.
 - Apply the conversion only to prompt image fields: `coverUrl` and markdown image URLs in `preview`.
 
 ## Notes
 
 - The URL conversion is idempotent, so repeated syncs do not duplicate the proxy prefix.
-- Existing prompt records are displayed according to the current switch without requiring a one-time migration.
-- Remote sync persists URLs according to the current switch value.
+- Existing prompt records are displayed according to the current switch and locale without requiring a one-time migration.
+- Remote sync persists original raw URLs.
