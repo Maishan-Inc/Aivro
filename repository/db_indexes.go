@@ -44,6 +44,36 @@ func createOptimizedIndexes(db *gorm.DB) error {
 			table: "cloud_files",
 			sql:   "CREATE INDEX IF NOT EXISTS idx_cloud_files_token ON cloud_files(id, access_token, deleted_at)",
 		},
+		{
+			name:  "idx_workflows_owner_slug",
+			table: "workflows",
+			sql:   "CREATE INDEX IF NOT EXISTS idx_workflows_owner_slug ON workflows(user_id, slug, deleted_at)",
+		},
+		{
+			name:  "idx_workflow_share_stars_unique",
+			table: "workflow_share_stars",
+			sql:   "CREATE UNIQUE INDEX IF NOT EXISTS idx_workflow_share_stars_unique ON workflow_share_stars(share_id, user_id)",
+		},
+		{
+			name:  "idx_canvas_assistant_user_workflow",
+			table: "canvas_assistant_sessions",
+			sql:   "CREATE INDEX IF NOT EXISTS idx_canvas_assistant_user_workflow ON canvas_assistant_sessions(user_id, workflow_id, deleted_at, updated_at)",
+		},
+		{
+			name:  "idx_canvas_assistant_cleanup",
+			table: "canvas_assistant_sessions",
+			sql:   "CREATE INDEX IF NOT EXISTS idx_canvas_assistant_cleanup ON canvas_assistant_sessions(expires_at, deleted_at)",
+		},
+		{
+			name:  "idx_workflow_community_public",
+			table: "workflow_community_posts",
+			sql:   "CREATE INDEX IF NOT EXISTS idx_workflow_community_public ON workflow_community_posts(status, deleted_at, locale, updated_at)",
+		},
+		{
+			name:  "idx_workflow_community_owner",
+			table: "workflow_community_posts",
+			sql:   "CREATE INDEX IF NOT EXISTS idx_workflow_community_owner ON workflow_community_posts(user_id, deleted_at, updated_at)",
+		},
 	}
 
 	for _, idx := range indexes {

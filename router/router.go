@@ -37,6 +37,12 @@ func New() *gin.Engine {
 	api.GET("/files/:id/content", middleware.OptionalAuth, func(c *gin.Context) {
 		handler.FileContent(c.Writer, c.Request, c.Param("id"))
 	})
+	api.GET("/workflow-share-paths/:username/:slug", middleware.OptionalAuth, func(c *gin.Context) {
+		handler.WorkflowShareByPath(c.Writer, c.Request, c.Param("username"), c.Param("slug"))
+	})
+	api.POST("/workflow-share-paths/:username/:slug/verify", middleware.OptionalAuth, func(c *gin.Context) {
+		handler.VerifyWorkflowShareByPath(c.Writer, c.Request, c.Param("username"), c.Param("slug"))
+	})
 	v1 := api.Group("/v1", middleware.UserAuth)
 	v1.POST("/files", gin.WrapF(handler.UploadFile))
 	v1.POST("/images/generations", gin.WrapF(handler.AIImagesGenerations))
@@ -73,6 +79,36 @@ func New() *gin.Engine {
 	v1.POST("/profile", gin.WrapF(handler.CompleteProfile))
 	v1.GET("/workflows", gin.WrapF(handler.Workflows))
 	v1.POST("/workflows", gin.WrapF(handler.CreateWorkflow))
+	v1.GET("/workflow-community", gin.WrapF(handler.CommunityWorkflows))
+	v1.GET("/workflow-community/me", gin.WrapF(handler.MyCommunityWorkflows))
+	v1.POST("/workflow-community", gin.WrapF(handler.PublishCommunityWorkflow))
+	v1.GET("/workflow-community/:token", func(c *gin.Context) {
+		handler.CommunityWorkflow(c.Writer, c.Request, c.Param("token"))
+	})
+	v1.POST("/workflow-community/:id/sync", func(c *gin.Context) {
+		handler.SyncCommunityWorkflow(c.Writer, c.Request, c.Param("id"))
+	})
+	v1.DELETE("/workflow-community/:id", func(c *gin.Context) {
+		handler.DeleteCommunityWorkflow(c.Writer, c.Request, c.Param("id"))
+	})
+	v1.GET("/workflows/:id/assistant-sessions", func(c *gin.Context) {
+		handler.CanvasAssistantSessions(c.Writer, c.Request, c.Param("id"))
+	})
+	v1.POST("/workflows/:id/assistant-sessions/message", func(c *gin.Context) {
+		handler.SendCanvasAssistantMessage(c.Writer, c.Request, c.Param("id"))
+	})
+	v1.POST("/workflows/:id/assistant-sessions/batch-delete", func(c *gin.Context) {
+		handler.BatchDeleteCanvasAssistantSessions(c.Writer, c.Request, c.Param("id"))
+	})
+	v1.DELETE("/workflows/:id/assistant-sessions/:sessionId", func(c *gin.Context) {
+		handler.DeleteCanvasAssistantSession(c.Writer, c.Request, c.Param("id"), c.Param("sessionId"))
+	})
+	v1.GET("/workflows/:id/share", func(c *gin.Context) {
+		handler.WorkflowActiveShare(c.Writer, c.Request, c.Param("id"))
+	})
+	v1.POST("/workflows/:id/share", func(c *gin.Context) {
+		handler.ShareWorkflow(c.Writer, c.Request, c.Param("id"))
+	})
 	v1.GET("/workflows/:id", func(c *gin.Context) {
 		handler.Workflow(c.Writer, c.Request, c.Param("id"))
 	})
@@ -82,8 +118,14 @@ func New() *gin.Engine {
 	v1.DELETE("/workflows/:id", func(c *gin.Context) {
 		handler.DeleteWorkflow(c.Writer, c.Request, c.Param("id"))
 	})
-	v1.POST("/workflows/:id/share", func(c *gin.Context) {
-		handler.ShareWorkflow(c.Writer, c.Request, c.Param("id"))
+	v1.POST("/workflows/:id/delete", func(c *gin.Context) {
+		handler.DeleteWorkflow(c.Writer, c.Request, c.Param("id"))
+	})
+	v1.POST("/workflow-share-paths/:username/:slug/copy", func(c *gin.Context) {
+		handler.CopyWorkflowShareByPath(c.Writer, c.Request, c.Param("username"), c.Param("slug"))
+	})
+	v1.POST("/workflow-share-paths/:username/:slug/star", func(c *gin.Context) {
+		handler.ToggleWorkflowShareStar(c.Writer, c.Request, c.Param("username"), c.Param("slug"))
 	})
 	v1.GET("/workflow-shares/:token", func(c *gin.Context) {
 		handler.WorkflowShare(c.Writer, c.Request, c.Param("token"))
@@ -148,6 +190,10 @@ func New() *gin.Engine {
 	admin.POST("/assets", gin.WrapF(handler.AdminSaveAsset))
 	admin.DELETE("/assets/:id", func(c *gin.Context) {
 		handler.AdminDeleteAsset(c.Writer, c.Request, c.Param("id"))
+	})
+	admin.GET("/workflow-community", gin.WrapF(handler.AdminCommunityWorkflows))
+	admin.POST("/workflow-community/:id/ban", func(c *gin.Context) {
+		handler.AdminBanCommunityWorkflow(c.Writer, c.Request, c.Param("id"))
 	})
 
 	router.NoRoute(middleware.NotFoundJSON)

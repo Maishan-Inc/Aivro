@@ -11,10 +11,12 @@ import { CreditSymbol, requestCreditCost } from "@/constant/credits";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { nanoid } from "nanoid";
 import { cn } from "@/lib/utils";
-import { requestEdit, requestGeneration, requestImageQuestion, type ChatCompletionMessage } from "@/services/api/image";
+import { requestEdit, requestGeneration } from "@/services/api/image";
+import { batchDeleteCanvasAssistantSessions, fetchCanvasAssistantSessions, sendCanvasAssistantMessage } from "@/services/api/workflows";
 import { imageToDataUrl, storeGeneratedImage } from "@/services/image-storage";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { useThemeStore } from "@/stores/use-theme-store";
+import { useUserStore } from "@/stores/use-user-store";
 import type { ReferenceImage } from "@/types/image";
 import { DiaTextReveal } from "@/components/ui/dia-text-reveal";
 import { CanvasImageSettingsPopover } from "./canvas-image-settings-popover";
@@ -29,6 +31,7 @@ type AnimeInstance = {
 };
 
 type CanvasAssistantPanelProps = {
+    workflowId: string;
     nodes: CanvasNodeData[];
     selectedNodeIds: Set<string>;
     sessions: CanvasAssistantSession[];
@@ -42,8 +45,9 @@ type CanvasAssistantPanelProps = {
     onCollapse: () => void;
 };
 
-export function CanvasAssistantPanel({ nodes, selectedNodeIds, sessions, activeSessionId, onSelectNodeIds, onSessionsChange, onInsertImage, onInsertText, onPasteImage, onCollapseStart, onCollapse }: CanvasAssistantPanelProps) {
+export function CanvasAssistantPanel({ workflowId, nodes, selectedNodeIds, sessions, activeSessionId, onSelectNodeIds, onSessionsChange, onInsertImage, onInsertText, onPasteImage, onCollapseStart, onCollapse }: CanvasAssistantPanelProps) {
     const { message } = App.useApp();
+    const token = useUserStore((state) => state.token);
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
     const effectiveConfig = useEffectiveConfig();
     const modelCosts = useConfigStore((state) => state.publicSettings?.modelChannel.modelCosts);
@@ -52,7 +56,7 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, sessions, activeS
     const isAiConfigReady = useConfigStore((state) => state.isAiConfigReady);
     const [width, setWidth] = useState(390);
     const [view, setView] = useState<"chat" | "history">("chat");
-    const [mode, setMode] = useState<AssistantMode>("image");
+    const [mode, setMode] = useState<AssistantMode>("ask");
     const [prompt, setPrompt] = useState("");
     const [isRunning, setIsRunning] = useState(false);
     const [checkedChatIds, setCheckedChatIds] = useState<string[]>([]);
@@ -71,6 +75,17 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, sessions, activeS
         setLocalSessions(sessions);
         setLocalActiveSessionId(activeSessionId);
     }, [activeSessionId, sessions]);
+
+    useEffect(() => {
+        if (!token || !workflowId) return;
+        fetchCanvasAssistantSessions(token, workflowId)
+            .then((result) => {
+                const next = result.items.length ? result.items : [createSession()];
+                setLocalSessions(next);
+                setLocalActiveSessionId((current) => (current && next.some((session) => session.id === current) ? current : next[0]?.id || null));
+            })
+            .catch((error) => message.error(error instanceof Error ? error.message : "读取助手历史失败"));
+    }, [message, token, workflowId]);
 
     useEffect(() => {
         onSessionsChange(localSessions, localActiveSessionId);
@@ -168,20 +183,27 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, sessions, activeS
         }
         cleanupImages({ sessions: next });
         setCheckedChatIds((prev) => prev.filter((id) => !ids.includes(id)));
+        if (token) void batchDeleteCanvasAssistantSessions(token, workflowId, ids).catch((error) => message.error(error instanceof Error ? error.message : "删除历史失败"));
     };
 
     const clearSessions = () => {
+        const ids = safeSessions.filter((session) => session.messages.length > 0).map((session) => session.id);
         const session = createSession();
         setLocalSessions([session]);
         setLocalActiveSessionId(session.id);
         setCheckedChatIds([]);
         cleanupImages({ sessions: [session] });
+        if (token && ids.length) void batchDeleteCanvasAssistantSessions(token, workflowId, ids).catch((error) => message.error(error instanceof Error ? error.message : "清空历史失败"));
     };
 
     const sendMessage = async (text: string, nextMode: AssistantMode, history: CanvasAssistantMessage[], savedReferences?: CanvasAssistantReference[]) => {
         const requestConfig = { ...effectiveConfig, model: nextMode === "image" ? effectiveConfig.imageModel || effectiveConfig.model : effectiveConfig.textModel || effectiveConfig.model };
-        if (!isAiConfigReady(requestConfig, requestConfig.model)) {
+        if (nextMode === "image" && !isAiConfigReady(requestConfig, requestConfig.model)) {
             message.warning("管理员尚未配置可用模型");
+            return;
+        }
+        if (nextMode === "ask" && !token) {
+            message.warning("请先登录后使用画布助手");
             return;
         }
 
@@ -214,10 +236,12 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, sessions, activeS
                 return;
             }
 
-            const answer = await requestImageQuestion(requestConfig, await buildChatMessages([...history, userMessage]), (streamed) => {
-                updateMessage(session.id, assistantId, { text: streamed, isLoading: false });
+            const result = await sendCanvasAssistantMessage(token || "", workflowId, { sessionId: session.id, text, messages: history, references: refs });
+            setLocalSessions((prev) => {
+                const next = prev.filter((item) => item.id !== result.session.id && item.id !== session.id);
+                return [result.session, ...next];
             });
-            updateMessage(session.id, assistantId, { text: answer, isLoading: false });
+            setLocalActiveSessionId(result.session.id);
         } catch (error) {
             updateMessage(session.id, assistantId, { text: error instanceof Error ? error.message : "操作失败", isLoading: false });
         } finally {
@@ -274,7 +298,7 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, sessions, activeS
                 <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: theme.node.stroke }}>
                     <div className="flex items-center gap-2 text-sm font-medium">
                         <Sparkles className="size-4" />
-                        {view === "history" ? "历史记录" : "画布助手(未开发)"}
+                        {view === "history" ? "历史记录" : "画布助手"}
                     </div>
                     <div className="flex items-center gap-1">
                         {view === "history" ? (
@@ -423,7 +447,7 @@ function AssistantComposer({
     modelCosts?: { model: string; credits: number }[];
 }) {
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
-    const activeModel = mode === "image" ? config.imageModel || config.model : config.textModel || config.model;
+    const activeModel = mode === "image" ? config.imageModel || config.model : "";
     const credits = requestCreditCost({ modelCosts, model: activeModel, count: mode === "image" ? config.count : 1 });
 
     return (
@@ -463,9 +487,7 @@ function AssistantComposer({
                                 <ModelPicker className="h-8 shrink-0" config={config} value={config.imageModel || config.model} onChange={(model) => onConfigChange("imageModel", model)} onMissingConfig={onMissingConfig} />
                                 <CanvasImageSettingsPopover config={config} placement="topRight" getPopupContainer={() => document.body} buttonClassName="canvas-composer-settings canvas-composer-icon !h-8 !min-w-8 !rounded-full !px-2" onConfigChange={onConfigChange} onMissingConfig={onMissingConfig} />
                             </>
-                        ) : (
-                            <ModelPicker className="h-8 shrink-0" config={config} value={config.textModel || config.model} onChange={(model) => onConfigChange("textModel", model)} onMissingConfig={onMissingConfig} />
-                        )}
+                        ) : null}
                     </div>
                     <Button
                         type="primary"
@@ -475,10 +497,12 @@ function AssistantComposer({
                         aria-label="发送"
                     >
                         <span className="flex items-center gap-1.5">
-                            <span className="inline-flex items-center gap-1 text-xs font-medium tabular-nums">
-                                <CreditSymbol />
-                                {credits.toLocaleString()}
-                            </span>
+                            {mode === "image" ? (
+                                <span className="inline-flex items-center gap-1 text-xs font-medium tabular-nums">
+                                    <CreditSymbol />
+                                    {credits.toLocaleString()}
+                                </span>
+                            ) : null}
                             {isRunning ? <LoaderCircle className="size-4 animate-spin" /> : <ArrowUp className="size-4" />}
                         </span>
                     </Button>
@@ -667,24 +691,6 @@ function buildAssistantReferences(nodes: CanvasNodeData[], selectedNodeIds: Set<
         .filter((node): node is CanvasNodeData => Boolean(node))
         .map(nodeToReference)
         .filter((item): item is CanvasAssistantReference => Boolean(item));
-}
-
-async function buildChatMessages(messages: CanvasAssistantMessage[]): Promise<ChatCompletionMessage[]> {
-    return Promise.all(
-        messages.map(async (message, index) => {
-            if (message.role === "assistant") return { role: "assistant", content: message.text };
-            if (index !== messages.length - 1) return { role: "user", content: message.text };
-            const refs = message.references || [];
-            return {
-                role: "user",
-                content: [
-                    ...refs.flatMap((item) => (item.text ? [{ type: "text" as const, text: item.text }] : [])),
-                    { type: "text", text: message.text },
-                    ...(await Promise.all(refs.filter((item) => item.dataUrl).map(async (item) => ({ type: "image_url" as const, image_url: { url: await imageToDataUrl(item) } })))),
-                ],
-            };
-        }),
-    );
 }
 
 function createSession(): CanvasAssistantSession {

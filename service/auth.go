@@ -58,6 +58,8 @@ type RegisterProfileInput struct {
 	Name        string
 }
 
+var usernameSlugReplacer = strings.NewReplacer("-", "", "_", "", ".", "")
+
 func EnsureDefaultAdmin() error {
 	if strings.TrimSpace(config.Cfg.AdminUsername) == "" || strings.TrimSpace(config.Cfg.AdminPassword) == "" {
 		return nil
@@ -129,11 +131,11 @@ func Register(username string, password string, email string, code string, profi
 		return model.AuthSession{}, safeMessageError{message: "当前未开放注册"}
 	}
 	username = strings.TrimSpace(username)
-	if strings.ContainsAny(username, " \t\r\n") {
-		return model.AuthSession{}, safeMessageError{message: "用户名不能包含空格"}
+	if err := validatePublicUsername(username); err != nil {
+		return model.AuthSession{}, err
 	}
-	if username == "" || password == "" {
-		return model.AuthSession{}, safeMessageError{message: "用户名和密码不能为空"}
+	if password == "" {
+		return model.AuthSession{}, safeMessageError{message: "密码不能为空"}
 	}
 	profile = normalizeRegisterProfile(profile, username)
 	if err := validatePassword(password); err != nil {
@@ -186,7 +188,7 @@ func Register(username string, password string, email string, code string, profi
 	return newSession(user)
 }
 
-func CompleteUserProfile(user model.AuthUser, accountType model.UserAccountType, name string) (model.AuthUser, error) {
+func CompleteUserProfile(user model.AuthUser, username string, accountType model.UserAccountType, name string) (model.AuthUser, error) {
 	saved, ok, err := repository.GetUserByID(user.ID)
 	if err != nil || !ok {
 		if err != nil {
@@ -194,7 +196,23 @@ func CompleteUserProfile(user model.AuthUser, accountType model.UserAccountType,
 		}
 		return model.AuthUser{}, safeMessageError{message: "用户不存在"}
 	}
+	if saved.ProfileCompleted {
+		return model.AuthUser{}, safeMessageError{message: "用户名称暂不支持修改"}
+	}
+	username = strings.TrimSpace(username)
+	if err := validatePublicUsername(username); err != nil {
+		return model.AuthUser{}, err
+	}
+	if username != saved.Username {
+		if _, ok, err := repository.GetUserByUsername(username); err != nil || ok {
+			if err != nil {
+				return model.AuthUser{}, err
+			}
+			return model.AuthUser{}, safeMessageError{message: "用户名称已存在"}
+		}
+	}
 	profile := normalizeRegisterProfile(RegisterProfileInput{AccountType: accountType, Name: name}, saved.Username)
+	saved.Username = username
 	saved.AccountType = profile.AccountType
 	saved.DisplayName = profile.Name
 	saved.ProfileCompleted = true
@@ -882,6 +900,21 @@ func normalizeRegisterProfile(profile RegisterProfileInput, fallbackName string)
 	return profile
 }
 
+func validatePublicUsername(username string) error {
+	if username == "" {
+		return safeMessageError{message: "请填写用户名称"}
+	}
+	if len(username) < 3 || len(username) > 24 {
+		return safeMessageError{message: "用户名称需为 3-24 位小写字母或数字"}
+	}
+	for _, char := range username {
+		if (char < 'a' || char > 'z') && (char < '0' || char > '9') {
+			return safeMessageError{message: "用户名称仅支持小写字母和数字"}
+		}
+	}
+	return nil
+}
+
 type linuxDoTokenResponse struct {
 	AccessToken string `json:"access_token"`
 }
@@ -938,14 +971,11 @@ func doLinuxDoJSON(req *http.Request, payload any) error {
 }
 
 func linuxDoUsername(username string, id string) string {
-	base := strings.TrimSpace(username)
+	base := sanitizeSuggestedUsername(username)
 	if base == "" {
-		base = "linuxdo-" + id
+		base = sanitizeSuggestedUsername("linuxdo" + id)
 	}
-	if _, ok, err := repository.GetUserByUsername(base); err != nil || !ok {
-		return base
-	}
-	return base + "-" + id
+	return uniqueSuggestedUsername(base, id)
 }
 
 func linuxDoAvatar(template string) string {
@@ -1108,14 +1138,48 @@ func applyOAuthID(user *model.User, provider string, id string) {
 }
 
 func oauthUsername(provider string, username string, id string) string {
-	base := strings.TrimSpace(username)
+	base := sanitizeSuggestedUsername(username)
 	if base == "" {
-		base = provider + "-" + id
+		base = sanitizeSuggestedUsername(provider + id)
 	}
-	if _, ok, err := repository.GetUserByUsername(base); err != nil || !ok {
-		return base
+	return uniqueSuggestedUsername(base, id)
+}
+
+func sanitizeSuggestedUsername(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	var builder strings.Builder
+	for _, char := range value {
+		if (char >= 'a' && char <= 'z') || (char >= '0' && char <= '9') {
+			builder.WriteRune(char)
+		}
 	}
-	return base + "-" + id
+	result := usernameSlugReplacer.Replace(builder.String())
+	if len(result) > 24 {
+		result = result[:24]
+	}
+	if len(result) < 3 {
+		return ""
+	}
+	return result
+}
+
+func uniqueSuggestedUsername(base string, id string) string {
+	if base == "" {
+		base = sanitizeSuggestedUsername("user" + id)
+	}
+	candidates := []string{base, sanitizeSuggestedUsername(base + id)}
+	for index := 2; index <= 99; index++ {
+		candidates = append(candidates, sanitizeSuggestedUsername(base+strconv.Itoa(index)))
+	}
+	for _, candidate := range candidates {
+		if candidate == "" {
+			continue
+		}
+		if _, ok, err := repository.GetUserByUsername(candidate); err != nil || !ok {
+			return candidate
+		}
+	}
+	return "user" + strings.ReplaceAll(uuid.NewString(), "-", "")[:20]
 }
 
 func anyString(value any) string {
@@ -1134,11 +1198,7 @@ func anyString(value any) string {
 }
 
 func metamaskUsername(wallet string) string {
-	base := "wallet-" + shortWallet(wallet)
-	if _, ok, err := repository.GetUserByUsername(base); err != nil || !ok {
-		return base
-	}
-	return base + "-" + uuid.NewString()[:6]
+	return uniqueSuggestedUsername(sanitizeSuggestedUsername("wallet"+shortWallet(wallet)), wallet)
 }
 
 func shortWallet(wallet string) string {

@@ -391,10 +391,15 @@ func applyPromptImageProxy(items []model.Prompt, enabled bool) []model.Prompt {
 
 func applyGithubRawProxy(value string, enabled bool) string {
 	value = strings.ReplaceAll(value, githubRawProxyPrefix+githubRawURLPrefix, githubRawURLPrefix)
+	value = normalizeGithubRawURL(value)
 	if enabled {
 		value = strings.ReplaceAll(value, githubRawURLPrefix, githubRawProxyPrefix+githubRawURLPrefix)
 	}
 	return value
+}
+
+func normalizeGithubRawURL(value string) string {
+	return strings.ReplaceAll(value, "https://raw.githubusercontent.com/EvoLinkAI/awesome-gpt-image-2-API-and-Prompts/images/", gptImage2RawBase+"/images/")
 }
 
 func promptImageProxyEnabled() bool {
@@ -424,7 +429,19 @@ func absoluteImage(baseURL, image string) string {
 	if image == "" || strings.HasPrefix(image, "http://") || strings.HasPrefix(image, "https://") {
 		return image
 	}
-	return baseURL + "/" + strings.TrimLeft(strings.TrimPrefix(image, "."), "/")
+	return baseURL + "/" + cleanPromptImagePath(image)
+}
+
+func cleanPromptImagePath(image string) string {
+	image = strings.TrimSpace(image)
+	for {
+		next := strings.TrimPrefix(image, "./")
+		next = strings.TrimPrefix(next, "../")
+		if next == image {
+			return strings.TrimLeft(image, "/")
+		}
+		image = next
+	}
 }
 
 func leftPad(value int) string {

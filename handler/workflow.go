@@ -74,7 +74,9 @@ func DeleteWorkflow(w http.ResponseWriter, r *http.Request, id string) {
 		Fail(w, "未登录或权限不足")
 		return
 	}
-	if err := service.DeleteWorkflow(user.ID, id); err != nil {
+	var input service.DeleteWorkflowInput
+	_ = json.NewDecoder(r.Body).Decode(&input)
+	if err := service.DeleteWorkflowWithInput(user.ID, id, input); err != nil {
 		FailError(w, err)
 		return
 	}
@@ -90,6 +92,20 @@ func ShareWorkflow(w http.ResponseWriter, r *http.Request, id string) {
 	var input service.ShareWorkflowInput
 	_ = json.NewDecoder(r.Body).Decode(&input)
 	result, err := service.ShareWorkflow(r, user.ID, id, input)
+	if err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, result)
+}
+
+func WorkflowActiveShare(w http.ResponseWriter, r *http.Request, id string) {
+	user, ok := service.UserFromContext(r.Context())
+	if !ok {
+		Fail(w, "未登录或权限不足")
+		return
+	}
+	result, err := service.GetWorkflowActiveShare(r, user.ID, id)
 	if err != nil {
 		FailError(w, err)
 		return
@@ -145,6 +161,60 @@ func CopyWorkflowShare(w http.ResponseWriter, r *http.Request, token string) {
 	OK(w, result)
 }
 
+func WorkflowShareByPath(w http.ResponseWriter, r *http.Request, username string, slug string) {
+	user, _ := service.UserFromContext(r.Context())
+	result, err := service.GetWorkflowSharePreviewByPath(username, slug, user.ID, r.URL.Query().Get("shareAccessToken"))
+	if err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, result)
+}
+
+func VerifyWorkflowShareByPath(w http.ResponseWriter, r *http.Request, username string, slug string) {
+	user, _ := service.UserFromContext(r.Context())
+	var input struct {
+		Password string `json:"password"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&input)
+	result, err := service.VerifyWorkflowShareByPath(user.ID, username, slug, input.Password)
+	if err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, result)
+}
+
+func CopyWorkflowShareByPath(w http.ResponseWriter, r *http.Request, username string, slug string) {
+	user, ok := service.UserFromContext(r.Context())
+	if !ok {
+		Fail(w, "未登录或权限不足")
+		return
+	}
+	var input service.CopyWorkflowShareInput
+	_ = json.NewDecoder(r.Body).Decode(&input)
+	result, err := service.CopyWorkflowShareByPath(user.ID, username, slug, input)
+	if err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, result)
+}
+
+func ToggleWorkflowShareStar(w http.ResponseWriter, r *http.Request, username string, slug string) {
+	user, ok := service.UserFromContext(r.Context())
+	if !ok {
+		Fail(w, "未登录或权限不足")
+		return
+	}
+	result, err := service.ToggleWorkflowShareStar(user.ID, username, slug)
+	if err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, result)
+}
+
 func RevokeWorkflowShare(w http.ResponseWriter, r *http.Request, token string) {
 	user, ok := service.UserFromContext(r.Context())
 	if !ok {
@@ -156,6 +226,83 @@ func RevokeWorkflowShare(w http.ResponseWriter, r *http.Request, token string) {
 		return
 	}
 	OK(w, true)
+}
+
+func CommunityWorkflows(w http.ResponseWriter, r *http.Request) {
+	result, err := service.ListCommunityWorkflows(parseQuery(r))
+	if err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, result)
+}
+
+func MyCommunityWorkflows(w http.ResponseWriter, r *http.Request) {
+	user, ok := service.UserFromContext(r.Context())
+	if !ok {
+		Fail(w, "未登录或权限不足")
+		return
+	}
+	result, err := service.ListMyCommunityWorkflows(user.ID, parseQuery(r))
+	if err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, result)
+}
+
+func PublishCommunityWorkflow(w http.ResponseWriter, r *http.Request) {
+	user, ok := service.UserFromContext(r.Context())
+	if !ok {
+		Fail(w, "未登录或权限不足")
+		return
+	}
+	var input service.PublishCommunityWorkflowInput
+	_ = json.NewDecoder(r.Body).Decode(&input)
+	result, err := service.PublishCommunityWorkflow(user.ID, input)
+	if err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, result)
+}
+
+func SyncCommunityWorkflow(w http.ResponseWriter, r *http.Request, id string) {
+	user, ok := service.UserFromContext(r.Context())
+	if !ok {
+		Fail(w, "未登录或权限不足")
+		return
+	}
+	var input service.SyncCommunityWorkflowInput
+	_ = json.NewDecoder(r.Body).Decode(&input)
+	result, err := service.SyncCommunityWorkflow(user.ID, id, input)
+	if err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, result)
+}
+
+func DeleteCommunityWorkflow(w http.ResponseWriter, r *http.Request, id string) {
+	user, ok := service.UserFromContext(r.Context())
+	if !ok {
+		Fail(w, "未登录或权限不足")
+		return
+	}
+	if err := service.DeleteCommunityWorkflow(user.ID, id); err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, true)
+}
+
+func CommunityWorkflow(w http.ResponseWriter, r *http.Request, token string) {
+	result, err := service.GetCommunityWorkflowPreview(token)
+	if err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, result)
 }
 
 func Plans(w http.ResponseWriter, r *http.Request) {

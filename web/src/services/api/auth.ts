@@ -67,6 +67,6 @@ export async function loginWithMetaMask(payload: { walletAddress: string; messag
     return apiPost<AuthSession>("/api/auth/metamask/login", payload);
 }
 
-export async function completeProfile(token: string, payload: { accountType: "personal" | "company"; displayName: string }) {
+export async function completeProfile(token: string, payload: { username: string; accountType: "personal" | "company"; displayName: string }) {
     return apiPost<AuthUser>("/api/v1/profile", payload, token);
 }

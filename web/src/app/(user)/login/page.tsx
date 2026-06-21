@@ -112,7 +112,7 @@ function LoginContent() {
                 const email = values.email || "";
                 const user = await runWithOverlay("正在注册", () =>
                     register({
-                        username: email,
+                        username: values.username || "",
                         password: values.password,
                         email,
                         code: values.code,
@@ -296,6 +296,17 @@ function RegisterFields({ step, locale, sendingCode, codeSeconds, publicReady, o
                 ) : null}
                 {step === "profile" ? (
                     <>
+                        <Form.Item
+                            name="username"
+                            label={<span className="font-medium text-stone-200">{locale === "en-US" ? "Username" : "用户名称"}</span>}
+                            extra={<span className="text-stone-400">{locale === "en-US" ? "Only lowercase letters and numbers. It cannot be changed later." : "仅支持小写字母和数字，当前系统暂不支持修改用户名称。"}</span>}
+                            rules={[
+                                { required: true, message: locale === "en-US" ? "Enter a username" : "请输入用户名称" },
+                                { pattern: /^[a-z0-9]{3,24}$/, message: locale === "en-US" ? "Use 3-24 lowercase letters or numbers" : "请输入 3-24 位小写字母或数字" },
+                            ]}
+                        >
+                            <Input prefix={<UserOutlined />} autoComplete="username" />
+                        </Form.Item>
                         <Form.Item name="accountType" initialValue="personal">
                             <Segmented block options={[{ label: locale === "en-US" ? "Personal" : "个人", value: "personal" }, { label: locale === "en-US" ? "Company" : "公司", value: "company" }]} />
                         </Form.Item>

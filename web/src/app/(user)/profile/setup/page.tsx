@@ -11,6 +11,7 @@ import { useLocalizedPath } from "@/hooks/use-localized-path";
 import { useUserStore } from "@/stores/use-user-store";
 
 type ProfileValues = {
+    username: string;
     accountType: "personal" | "company";
     displayName: string;
 };
@@ -63,9 +64,20 @@ function ProfileSetupContent() {
             <section className="w-full max-w-[420px]">
                 <div className="mb-7 text-center">
                     <h1 className="text-3xl font-semibold tracking-normal text-stone-950 dark:text-stone-100">{locale === "en-US" ? "Complete profile" : "完善账户信息"}</h1>
-                    <p className="mt-3 text-base leading-7 text-stone-500 dark:text-stone-400">{locale === "en-US" ? "Choose account type and enter the display name." : "选择账户类型并填写显示名称。"}</p>
+                <p className="mt-3 text-base leading-7 text-stone-500 dark:text-stone-400">{locale === "en-US" ? "Confirm the username, choose account type, and enter the display name." : "确认用户名称，选择账户类型并填写显示名称。"}</p>
                 </div>
-                <Form<ProfileValues> layout="vertical" size="large" requiredMark={false} initialValues={{ accountType: "personal", displayName: user?.displayName || "" }} onFinish={submit}>
+                <Form<ProfileValues> layout="vertical" size="large" requiredMark={false} initialValues={{ username: user?.username || "", accountType: "personal", displayName: user?.displayName || "" }} onFinish={submit}>
+                    <Form.Item
+                        name="username"
+                        label={locale === "en-US" ? "Username" : "用户名称"}
+                        extra={locale === "en-US" ? "Only lowercase letters and numbers. Usernames cannot be changed yet." : "仅支持小写字母和数字，当前系统暂不支持修改用户名称。"}
+                        rules={[
+                            { required: true, message: locale === "en-US" ? "Enter a username" : "请输入用户名称" },
+                            { pattern: /^[a-z0-9]{3,24}$/, message: locale === "en-US" ? "Use 3-24 lowercase letters or numbers" : "请输入 3-24 位小写字母或数字" },
+                        ]}
+                    >
+                        <Input prefix={<UserOutlined />} autoComplete="username" />
+                    </Form.Item>
                     <Form.Item name="accountType">
                         <Segmented block options={[{ label: locale === "en-US" ? "Personal" : "个人", value: "personal" }, { label: locale === "en-US" ? "Company" : "公司", value: "company" }]} />
                     </Form.Item>

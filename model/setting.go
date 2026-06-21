@@ -129,6 +129,7 @@ type PrivateSetting struct {
 	Channels     []ModelChannel      `json:"channels"`
 	PromptSync   PromptSyncSetting   `json:"promptSync"`
 	AIQueue      AIQueueSetting      `json:"aiQueue"`
+	CanvasAssist CanvasAssistSetting `json:"canvasAssist"`
 	Turnstile    TurnstileSetting    `json:"turnstile"`
 	Auth         PrivateAuthSetting  `json:"auth"`
 	Mail         MailSetting         `json:"mail"`
@@ -189,6 +190,10 @@ type PromptSyncSetting struct {
 	Enabled               *bool  `json:"enabled"`
 	Cron                  string `json:"cron"`
 	GithubRawProxyEnabled bool   `json:"githubRawProxyEnabled"`
+}
+
+type CanvasAssistSetting struct {
+	HistoryRetentionDays int `json:"historyRetentionDays"`
 }
 
 type PrivateAuthSetting struct {

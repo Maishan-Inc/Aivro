@@ -166,6 +166,7 @@ const emptySettings: AdminSettings = {
         channels: [],
         promptSync: { enabled: true, cron: "*/5 * * * *", githubRawProxyEnabled: false },
         aiQueue: { enabled: true, backend: "database", redisUrl: "", defaultPerMinute: 50, modelPerMinute: [], maxQueuedPerUser: 20, taskRetentionHours: 24 },
+        canvasAssist: { historyRetentionDays: 7 },
         turnstile: { enabled: false, siteKey: "", secretKey: "" },
         auth: {
             linuxDo: emptyPrivateProvider("linux-do", "Linux.do", "/icons/linuxdo.svg"),
@@ -1364,6 +1365,15 @@ export default function AdminSettingsPage() {
                                         )}
                                     </Form.List>
                                 </Card>
+                                <Card size="small" title="画布助手" extra={sectionSaveButton()}>
+                                    <Row gutter={16}>
+                                        <Col xs={24} md={8}>
+                                            <Form.Item name={["private", "canvasAssist", "historyRetentionDays"]} label="历史保留天数" extra="画布助手对话会保存到数据库，到期后自动清理。">
+                                                <InputNumber min={1} precision={0} style={{ width: "100%" }} />
+                                            </Form.Item>
+                                        </Col>
+                                    </Row>
+                                </Card>
                                 <Card size="small" title="Cloudflare Turnstile" extra={sectionSaveButton()}>
                                     <Row gutter={16}>
                                         <Col xs={24} md={8}>
@@ -2102,6 +2112,9 @@ function normalizePrivateSetting(setting: Partial<AdminSettings["private"]> = {}
                 .map((item) => ({ model: item.model.trim(), perMinute: Math.max(1, Number(item.perMinute) || 50) })),
             maxQueuedPerUser: Math.max(1, Number(setting.aiQueue?.maxQueuedPerUser) || 20),
             taskRetentionHours: Math.max(1, Number(setting.aiQueue?.taskRetentionHours) || 24),
+        },
+        canvasAssist: {
+            historyRetentionDays: Math.max(1, Number(setting.canvasAssist?.historyRetentionDays) || 7),
         },
         turnstile: {
             ...emptySettings.private.turnstile,

@@ -15,11 +15,11 @@ import { nanoid } from "nanoid";
 import { getDataUrlByteSize, readImageMeta } from "@/lib/image-utils";
 import { canvasThemes, type CanvasBackgroundMode } from "@/lib/canvas-theme";
 import { UserStatusActions } from "@/components/layout/user-status-actions";
-import { useLocalizedPath } from "@/hooks/use-localized-path";
+import { useWorkflowModals, workflowConfirmName } from "@/hooks/use-workflow-modals";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { useUserStore } from "@/stores/use-user-store";
-import { createWorkflow, deleteWorkflow, fetchWorkflow, shareWorkflow, updateWorkflow, type CloudWorkflow } from "@/services/api/workflows";
+import { createWorkflow, deleteWorkflow, fetchWorkflow, fetchWorkflowActiveShare, shareWorkflow, updateWorkflow, type CloudWorkflow } from "@/services/api/workflows";
 import { cropDataUrl } from "../utils/canvas-image-data";
 import { fitNodeSize, nodeSizeFromRatio } from "../utils/canvas-node-size";
 import { App, Button, Dropdown, Input, Modal, Switch } from "antd";
@@ -67,8 +67,6 @@ type PendingConnectionCreate = {
 };
 
 type CanvasHistoryEntry = Pick<CanvasClipboard, "nodes" | "connections"> & {
-    chatSessions: CanvasAssistantSession[];
-    activeChatId: string | null;
     backgroundMode: CanvasBackgroundMode;
     showImageInfo: boolean;
 };
@@ -188,6 +186,7 @@ function ConnectionCreateOption({ theme, icon, title, description, onClick }: { 
 
 function InfiniteCanvasPage() {
     const { message } = App.useApp();
+    const { requestWorkflowName, confirmWorkflowDelete } = useWorkflowModals();
     const params = useParams<{ id: string }>();
     const router = useRouter();
     const projectId = params.id;
@@ -224,6 +223,7 @@ function InfiniteCanvasPage() {
     const addAsset = useAssetStore((state) => state.addAsset);
     const cleanupAssetImages = useAssetStore((state) => state.cleanupImages);
     const token = useUserStore((state) => state.token);
+    const user = useUserStore((state) => state.user);
     const isUserReady = useUserStore((state) => state.isReady);
     const hydrateUser = useUserStore((state) => state.hydrateUser);
     const upsertProject = useCanvasStore((state) => state.upsertProject);
@@ -289,12 +289,10 @@ function InfiniteCanvasPage() {
         (): CanvasHistoryEntry => ({
             nodes: nodesRef.current,
             connections: connectionsRef.current,
-            chatSessions,
-            activeChatId,
             backgroundMode,
             showImageInfo,
         }),
-        [activeChatId, backgroundMode, chatSessions, showImageInfo],
+        [backgroundMode, showImageInfo],
     );
 
     const cleanupCanvasFiles = useCallback(
@@ -320,14 +318,22 @@ function InfiniteCanvasPage() {
                 router.replace("/canvas");
                 return;
             }
+            void fetchWorkflowActiveShare(token, projectId)
+                .then((activeShare) => {
+                    setShareUrl(activeShare.shareUrl || "");
+                    setSharePasswordEnabled(activeShare.share?.passwordEnabled === true);
+                })
+                .catch(() => {
+                    setShareUrl("");
+                    setSharePasswordEnabled(false);
+                });
             setCurrentProject(project);
             upsertProject(project);
             const restoredNodes = await hydrateCanvasImages(resetInterruptedGeneration(project.nodes));
-            const restoredSessions = await hydrateAssistantImages(project.chatSessions || []);
             setNodes(restoredNodes);
             setConnections(project.connections);
-            setChatSessions(restoredSessions);
-            setActiveChatId(project.activeChatId || null);
+            setChatSessions([]);
+            setActiveChatId(null);
             setBackgroundMode(project.backgroundMode);
             setShowImageInfo(project.showImageInfo || false);
             setViewport(project.viewport);
@@ -339,8 +345,6 @@ function InfiniteCanvasPage() {
             lastHistoryRef.current = {
                 nodes: restoredNodes,
                 connections: project.connections,
-                chatSessions: restoredSessions,
-                activeChatId: project.activeChatId || null,
                 backgroundMode: project.backgroundMode,
                 showImageInfo: project.showImageInfo || false,
             };
@@ -354,7 +358,7 @@ function InfiniteCanvasPage() {
         if (!projectLoaded || applyingHistoryRef.current || historyPausedRef.current) return;
         const next = createHistoryEntry();
         const previous = lastHistoryRef.current;
-        if (previous?.nodes === next.nodes && previous.connections === next.connections && previous.chatSessions === next.chatSessions && previous.activeChatId === next.activeChatId && previous.backgroundMode === next.backgroundMode && previous.showImageInfo === next.showImageInfo) return;
+        if (previous?.nodes === next.nodes && previous.connections === next.connections && previous.backgroundMode === next.backgroundMode && previous.showImageInfo === next.showImageInfo) return;
 
         if (historyCommitTimerRef.current) clearTimeout(historyCommitTimerRef.current);
         historyCommitTimerRef.current = setTimeout(() => {
@@ -374,13 +378,13 @@ function InfiniteCanvasPage() {
                 historyCommitTimerRef.current = null;
             }
         };
-    }, [activeChatId, backgroundMode, chatSessions, connections, createHistoryEntry, nodes, projectLoaded, showImageInfo]);
+    }, [backgroundMode, connections, createHistoryEntry, nodes, projectLoaded, showImageInfo]);
 
     useEffect(() => {
         if (!projectLoaded || historyPausedRef.current || !token || !currentProject) return;
         setSaveStatus("saving");
         const timer = setTimeout(() => {
-            updateWorkflow(token, projectId, { title: currentProject.title, nodes, connections, chatSessions, activeChatId, backgroundMode, showImageInfo, viewport: viewportRef.current })
+            updateWorkflow(token, projectId, { title: currentProject.title, nodes, connections, chatSessions: [], activeChatId: null, backgroundMode, showImageInfo, viewport: viewportRef.current })
                 .then((saved) => {
                     setCurrentProject(saved);
                     upsertProject(saved);
@@ -389,7 +393,7 @@ function InfiniteCanvasPage() {
                 .catch(() => setSaveStatus("error"));
         }, 600);
         return () => clearTimeout(timer);
-    }, [activeChatId, backgroundMode, chatSessions, connections, currentProject?.title, nodes, projectId, projectLoaded, showImageInfo, token, upsertProject]);
+    }, [backgroundMode, connections, currentProject?.title, nodes, projectId, projectLoaded, showImageInfo, token, upsertProject]);
 
     useEffect(() => {
         if (!dialogNodeId) setNodeImageSettingsOpen(false);
@@ -400,7 +404,7 @@ function InfiniteCanvasPage() {
         if (viewportSaveTimerRef.current) clearTimeout(viewportSaveTimerRef.current);
         viewportSaveTimerRef.current = setTimeout(() => {
             if (token && currentProject) {
-                void updateWorkflow(token, projectId, { title: currentProject.title, nodes: nodesRef.current, connections: connectionsRef.current, chatSessions, activeChatId, backgroundMode, showImageInfo, viewport: viewportRef.current })
+                void updateWorkflow(token, projectId, { title: currentProject.title, nodes: nodesRef.current, connections: connectionsRef.current, chatSessions: [], activeChatId: null, backgroundMode, showImageInfo, viewport: viewportRef.current })
                     .then((saved) => {
                         setCurrentProject(saved);
                         upsertProject(saved);
@@ -413,7 +417,7 @@ function InfiniteCanvasPage() {
         return () => {
             if (viewportSaveTimerRef.current) clearTimeout(viewportSaveTimerRef.current);
         };
-    }, [activeChatId, backgroundMode, chatSessions, currentProject, projectId, projectLoaded, showImageInfo, token, upsertProject, viewport]);
+    }, [backgroundMode, currentProject, projectId, projectLoaded, showImageInfo, token, upsertProject, viewport]);
 
     useLayoutEffect(() => {
         nodesRef.current = nodes;
@@ -836,8 +840,6 @@ function InfiniteCanvasPage() {
         applyingHistoryRef.current = true;
         setNodes(entry.nodes);
         setConnections(entry.connections);
-        setChatSessions(entry.chatSessions);
-        setActiveChatId(entry.activeChatId);
         setBackgroundMode(entry.backgroundMode);
         setShowImageInfo(entry.showImageInfo);
         setSelectedNodeIds(new Set());
@@ -868,13 +870,14 @@ function InfiniteCanvasPage() {
 
     const createAndOpenProject = useCallback(async () => {
         if (!token) return router.push("/login?redirect=/canvas");
+        const name = await requestWorkflowName({ title: "初始化工作流", username: user?.username, okText: "创建工作流" });
+        if (!name) return;
         try {
             const workflow = await createWorkflow(token, {
-                title: `Aivro ${useCanvasStore.getState().projects.length + 1}`,
+                slug: name,
+                title: name,
                 nodes: [],
                 connections: [],
-                chatSessions: [],
-                activeChatId: null,
                 backgroundMode: "lines",
                 showImageInfo: false,
                 viewport: { x: 0, y: 0, k: 1 },
@@ -885,13 +888,22 @@ function InfiniteCanvasPage() {
         } catch (error) {
             message.error(error instanceof Error ? error.message : "创建工作流失败");
         }
-    }, [hydrateUser, message, router, token, upsertProject]);
+    }, [hydrateUser, message, requestWorkflowName, router, token, upsertProject, user?.username]);
 
     const deleteCurrentProject = useCallback(() => {
-        if (token) void deleteWorkflow(token, projectId);
-        cleanupAssetImages();
-        router.push("/canvas");
-    }, [cleanupAssetImages, projectId, router, token]);
+        if (!token || !currentProject) return;
+        void (async () => {
+            const confirmName = await confirmWorkflowDelete(currentProject);
+            if (!confirmName) return;
+            try {
+                await deleteWorkflow(token, projectId, workflowConfirmName(currentProject));
+                cleanupAssetImages();
+                router.push("/canvas");
+            } catch (error) {
+                message.error(error instanceof Error ? error.message : "删除失败");
+            }
+        })();
+    }, [cleanupAssetImages, confirmWorkflowDelete, currentProject, message, projectId, router, token]);
 
     const handleCanvasMouseDown = useCallback(
         (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -1601,7 +1613,8 @@ function InfiniteCanvasPage() {
         setIsSharing(true);
         try {
             const result = await shareWorkflow(token, projectId, { passwordEnabled: sharePasswordEnabled, password: sharePassword });
-            setShareUrl(`${window.location.origin}/share/workflows/${result.share.token}`);
+            setShareUrl(result.shareUrl);
+            setSharePasswordEnabled(result.share.passwordEnabled);
             setSharePassword("");
             message.success(result.share.version > 1 ? "分享快照已更新" : "分享链接已生成");
         } catch (error) {
@@ -1614,13 +1627,13 @@ function InfiniteCanvasPage() {
     const finishTitleEditing = useCallback(() => {
         const nextTitle = titleDraft.trim();
         if (nextTitle && token && currentProject) {
-            void updateWorkflow(token, projectId, { title: nextTitle, nodes, connections, chatSessions, activeChatId, backgroundMode, showImageInfo, viewport }).then((saved) => {
+            void updateWorkflow(token, projectId, { title: nextTitle, nodes, connections, chatSessions: [], activeChatId: null, backgroundMode, showImageInfo, viewport }).then((saved) => {
                 setCurrentProject(saved);
                 upsertProject(saved);
             });
         }
         setTitleEditing(false);
-    }, [activeChatId, backgroundMode, chatSessions, connections, currentProject, nodes, projectId, showImageInfo, titleDraft, token, upsertProject, viewport]);
+    }, [backgroundMode, connections, currentProject, nodes, projectId, showImageInfo, titleDraft, token, upsertProject, viewport]);
 
     const preventCanvasContextMenu = useCallback((event: ReactMouseEvent) => {
         if ((event.target as HTMLElement).closest("[data-node-id]")) return;
@@ -2381,6 +2394,7 @@ function InfiniteCanvasPage() {
             </section>
             {assistantMounted ? (
                 <CanvasAssistantPanel
+                    workflowId={projectId}
                     nodes={nodes}
                     selectedNodeIds={selectedNodeIds}
                     sessions={chatSessions}
@@ -2555,7 +2569,7 @@ function CanvasTopBar({
             </div>
             {linked ? (
                 <div className="pointer-events-none absolute left-1/2 top-16 z-40 -translate-x-1/2 rounded-lg border px-3 py-2 text-xs shadow-sm backdrop-blur" style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.node.text }}>
-                    该工作流来自分享，并设置为跟随主工作流更新。原作者更新分享后，本工作流可能被覆盖。
+                    该工作流来自分享，并设置为自动更新。原作者更新分享后，本工作流可能被覆盖。
                 </div>
             ) : null}
             <Modal title="快捷键" open={shortcutsOpen} onCancel={() => setShortcutsOpen(false)} footer={null} centered>
@@ -2659,29 +2673,6 @@ async function hydrateCanvasImages(nodes: CanvasNodeData[]) {
             if (!content.startsWith("data:image/")) return node;
             return { ...node, metadata: { ...node.metadata, ...imageMetadata(await uploadImage(content)) } };
         }),
-    );
-}
-
-async function hydrateAssistantImages(sessions: CanvasAssistantSession[]) {
-    const hydrateItem = async <T extends { dataUrl?: string; storageKey?: string }>(item: T) => {
-        if (item.storageKey) return { ...item, dataUrl: await resolveImageUrl(item.storageKey, item.dataUrl) };
-        if (item.dataUrl?.startsWith("data:image/")) {
-            const image = await uploadImage(item.dataUrl);
-            return { ...item, dataUrl: image.url, storageKey: image.storageKey };
-        }
-        return item;
-    };
-    return Promise.all(
-        sessions.map(async (session) => ({
-            ...session,
-            messages: await Promise.all(
-                session.messages.map(async (message) => ({
-                    ...message,
-                    references: await Promise.all((message.references || []).map(hydrateItem)),
-                    images: await Promise.all((message.images || []).map(hydrateItem)),
-                })),
-            ),
-        })),
     );
 }
 

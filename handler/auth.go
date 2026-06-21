@@ -53,6 +53,7 @@ type registerCheckRequest struct {
 }
 
 type completeProfileRequest struct {
+	Username    string                `json:"username"`
 	AccountType model.UserAccountType `json:"accountType"`
 	DisplayName string                `json:"displayName"`
 }
@@ -257,7 +258,7 @@ func CompleteProfile(w http.ResponseWriter, r *http.Request) {
 	}
 	var request completeProfileRequest
 	_ = json.NewDecoder(r.Body).Decode(&request)
-	result, err := service.CompleteUserProfile(user, request.AccountType, request.DisplayName)
+	result, err := service.CompleteUserProfile(user, request.Username, request.AccountType, request.DisplayName)
 	if err != nil {
 		FailError(w, err)
 		return

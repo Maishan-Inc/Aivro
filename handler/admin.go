@@ -72,3 +72,23 @@ func AdminSyncPromptCategories(w http.ResponseWriter, r *http.Request) {
 	log.Printf("sync prompt category done category=%s", request.Category)
 	OK(w, categories)
 }
+
+func AdminCommunityWorkflows(w http.ResponseWriter, r *http.Request) {
+	result, err := service.AdminListCommunityWorkflows(parseQuery(r))
+	if err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, result)
+}
+
+func AdminBanCommunityWorkflow(w http.ResponseWriter, r *http.Request, id string) {
+	var input service.BanCommunityWorkflowInput
+	_ = json.NewDecoder(r.Body).Decode(&input)
+	result, err := service.AdminBanCommunityWorkflow(id, input)
+	if err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, result)
+}

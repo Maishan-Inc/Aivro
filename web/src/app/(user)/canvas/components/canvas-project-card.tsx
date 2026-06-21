@@ -28,7 +28,7 @@ export function CanvasProjectCard({ project, onRename, onDelete }: { project: Cl
     };
     const createdAt = formatProjectTime(project.createdAt);
     const updatedAt = formatProjectTime(project.updatedAt);
-    const syncLabel = project.sourceSyncMode === "linked" ? "跟随分享更新" : project.sourceSyncMode === "detached" ? "独立副本" : "自建";
+    const syncLabel = project.sourceSyncMode === "linked" ? "自动更新" : project.sourceSyncMode === "detached" ? "独立副本" : "自建";
 
     return (
         <article className="group flex min-h-[286px] cursor-pointer flex-col rounded-lg border border-stone-200 bg-card p-4 text-stone-900 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-stone-800 dark:text-stone-100" onClick={() => !editing && open()}>
@@ -61,7 +61,7 @@ export function CanvasProjectCard({ project, onRename, onDelete }: { project: Cl
                             <h2 className="truncate text-lg font-semibold">{project.title}</h2>
                         </div>
                         <div className="mt-2 flex flex-wrap gap-1.5">
-                            <Tag color={project.sourceSyncMode === "linked" ? "processing" : project.sourceSyncMode === "detached" ? "purple" : "default"}>{syncLabel}</Tag>
+                            <Tag color={project.sourceSyncMode === "linked" ? "magenta" : project.sourceSyncMode === "detached" ? "purple" : "default"}>{syncLabel}</Tag>
                             <Tag>{project.backgroundMode}</Tag>
                         </div>
                     </button>

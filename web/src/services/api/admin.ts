@@ -1,6 +1,7 @@
 import { apiDelete, apiGet, apiPost, compactApiParams } from "@/services/api/request";
 import type { Prompt, PromptListResponse } from "@/services/api/prompts";
 import type { Plan } from "@/services/api/billing";
+import type { WorkflowCommunityListResponse, WorkflowCommunityPost } from "@/services/api/workflows";
 
 export type AdminPromptCategory = {
     category: string;
@@ -173,6 +174,14 @@ export async function deleteAdminAsset(token: string, id: string) {
     return apiDelete<boolean>(`/api/admin/assets/${encodeURIComponent(id)}`, token);
 }
 
+export async function fetchAdminCommunityWorkflows(token: string, query: AdminUserQuery & { type?: string } = {}) {
+    return apiGet<WorkflowCommunityListResponse>("/api/admin/workflow-community", compactApiParams(query), token);
+}
+
+export async function banAdminCommunityWorkflow(token: string, id: string, reason: string) {
+    return apiPost<WorkflowCommunityPost>(`/api/admin/workflow-community/${encodeURIComponent(id)}/ban`, { reason }, token);
+}
+
 export async function fetchAdminPlans(token: string) {
     return apiGet<Plan[]>("/api/admin/plans", undefined, token);
 }
@@ -282,6 +291,7 @@ export type AdminPrivateSettings = {
         githubRawProxyEnabled: boolean;
     };
     aiQueue: AdminAIQueueSettings;
+    canvasAssist: AdminCanvasAssistSettings;
     turnstile: AdminTurnstileSettings;
     auth: {
         linuxDo: AdminPrivateAuthProvider;
@@ -310,6 +320,10 @@ export type AdminAIQueueSettings = {
     modelPerMinute: Array<{ model: string; perMinute: number }>;
     maxQueuedPerUser: number;
     taskRetentionHours: number;
+};
+
+export type AdminCanvasAssistSettings = {
+    historyRetentionDays: number;
 };
 
 export type AdminStripeSettings = {

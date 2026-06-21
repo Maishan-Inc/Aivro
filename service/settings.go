@@ -349,6 +349,7 @@ func normalizePrivateSetting(setting model.PrivateSetting) model.PrivateSetting 
 	}
 	setting.PromptSync = normalizePromptSyncSetting(setting.PromptSync)
 	setting.AIQueue = normalizeAIQueueSetting(setting.AIQueue)
+	setting.CanvasAssist = normalizeCanvasAssistSetting(setting.CanvasAssist)
 	setting.Turnstile = normalizeTurnstileSetting(setting.Turnstile)
 	setting.Auth = normalizePrivateAuthSetting(setting.Auth)
 	setting.Mail = normalizeMailSetting(setting.Mail)
@@ -365,6 +366,13 @@ func normalizePrivateSetting(setting model.PrivateSetting) model.PrivateSetting 
 		if setting.Channels[i].Weight <= 0 {
 			setting.Channels[i].Weight = 1
 		}
+	}
+	return setting
+}
+
+func normalizeCanvasAssistSetting(setting model.CanvasAssistSetting) model.CanvasAssistSetting {
+	if setting.HistoryRetentionDays <= 0 {
+		setting.HistoryRetentionDays = 7
 	}
 	return setting
 }
