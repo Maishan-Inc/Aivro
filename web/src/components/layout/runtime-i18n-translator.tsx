@@ -10,7 +10,8 @@ const textTranslations = new WeakMap<Text, string>();
 const attrOriginals = new WeakMap<Element, Map<string, string>>();
 const attrTranslations = new WeakMap<Element, Map<string, string>>();
 const translatableAttrs = ["placeholder", "title", "aria-label", "alt"];
-const skipSelector = "script,style,textarea,input,pre,code,kbd,samp,[contenteditable='true'],[data-i18n-skip]";
+const textSkipSelector = "script,style,textarea,input,pre,code,kbd,samp,[contenteditable='true'],[data-i18n-skip]";
+const attrSkipSelector = "script,style,pre,code,kbd,samp,[data-i18n-skip]";
 const hasChinese = /[\u3400-\u9fff]/;
 const sortedTranslations = Object.entries(runtimeEnglishTranslations).sort((a, b) => b[0].length - a[0].length);
 
@@ -57,7 +58,7 @@ function translateNode(node: Node, locale: string) {
 
 function translateTextNode(node: Text, locale: string) {
     const parent = node.parentElement;
-    if (!parent || parent.closest(skipSelector)) return;
+    if (!parent || parent.closest(textSkipSelector)) return;
     const current = node.nodeValue || "";
     if (locale !== "en-US") {
         if (hasChinese.test(current)) {
@@ -77,7 +78,7 @@ function translateTextNode(node: Text, locale: string) {
 }
 
 function translateElementAttrs(element: Element, locale: string) {
-    if (element.closest(skipSelector)) return;
+    if (element.closest(attrSkipSelector)) return;
     for (const attr of translatableAttrs) {
         const current = element.getAttribute(attr);
         if (!current) continue;
@@ -118,12 +119,21 @@ function translateUIText(value: string) {
         .replace(/(\d+)\s*个素材/g, "$1 assets")
         .replace(/(\d+)\s*个模型/g, "$1 models")
         .replace(/(\d+)\s*个云端工作流/g, "$1 cloud workflows")
+        .replace(/(\d+)\s*次创建/g, "$1 creations")
+        .replace(/(\d+)\s*个会话/g, "$1 sessions")
+        .replace(/(\d+)\s*条记录/g, "$1 records")
         .replace(/(\d+)\s*次工作流创建次数/g, "$1 workflow creations")
+        .replace(/已读取\s*(\d+)\s*张参考图/g, "Loaded $1 reference images")
+        .replace(/已导入\s*(\d+)\s*个素材/g, "Imported $1 assets")
+        .replace(/删除\s*(\d+)\s*个工作流/g, "Delete $1 workflows")
         .replace(/等待\s*(.+)/g, "Waiting $1")
         .replace(/成功\s*(\d+)/g, "Success $1")
         .replace(/失败\s*(\d+)/g, "Failed $1")
         .replace(/共\s*(\d+)/g, "Total $1")
         .replace(/云端更新于\s*(.+)/g, "Cloud updated at $1")
+        .replace(/创建于\s*(.+)/g, "Created at $1")
+        .replace(/更新于\s*(.+)/g, "Updated at $1")
+        .replace(/版本\s*(\d+)/g, "Version $1")
         .replace(/确定删除选中的\s*(\d+)\s*条生成记录吗？/g, "Delete $1 selected history items?")
         .replace(/将删除\s*(\d+)/g, "Will delete $1")
         .replace(/当前列表已选择\s*(\d+)/g, "$1 selected")

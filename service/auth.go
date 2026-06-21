@@ -16,6 +16,7 @@ import (
 	"net"
 	"net/http"
 	"net/smtp"
+	"net/textproto"
 	"net/url"
 	"strconv"
 	"strings"
@@ -1366,15 +1367,11 @@ func sendVerificationMail(setting model.MailSetting, email string, purpose strin
 		body,
 	}, "\r\n")
 	addr := setting.Host + ":" + strconv.Itoa(setting.Port)
-	var auth smtp.Auth
-	if setting.Username != "" || setting.Password != "" {
-		auth = smtp.PlainAuth("", setting.Username, setting.Password, setting.Host)
-	}
 	var err error
 	if setting.Port == 465 {
-		err = sendMailTLS(addr, setting.Host, auth, setting.FromEmail, []string{email}, []byte(message))
+		err = sendMailTLS(addr, setting.Host, setting.Username, setting.Password, setting.FromEmail, []string{email}, []byte(message))
 	} else {
-		err = sendMailPlain(addr, setting.Host, auth, setting.FromEmail, []string{email}, []byte(message))
+		err = sendMailPlain(addr, setting.Host, setting.Username, setting.Password, setting.FromEmail, []string{email}, []byte(message))
 	}
 	if err != nil {
 		return mailDeliveryError{err: err}
@@ -1408,43 +1405,116 @@ func (err mailDeliveryError) DetailMessage() string {
 	return message
 }
 
-func sendMailPlain(addr string, host string, auth smtp.Auth, from string, to []string, msg []byte) error {
+func sendMailPlain(addr string, host string, username string, password string, from string, to []string, msg []byte) error {
+	return sendMailWithAuthFallback(func() (*smtp.Client, error) {
+		return newPlainSMTPClient(addr, host)
+	}, host, username, password, from, to, msg)
+}
+
+func sendMailTLS(addr string, host string, username string, password string, from string, to []string, msg []byte) error {
+	return sendMailWithAuthFallback(func() (*smtp.Client, error) {
+		return newTLSSMTPClient(addr, host)
+	}, host, username, password, from, to, msg)
+}
+
+func newPlainSMTPClient(addr string, host string) (*smtp.Client, error) {
 	conn, err := net.DialTimeout("tcp", addr, 15*time.Second)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	defer conn.Close()
 	_ = conn.SetDeadline(time.Now().Add(30 * time.Second))
 	client, err := smtp.NewClient(conn, host)
 	if err != nil {
-		return err
+		_ = conn.Close()
+		return nil, err
 	}
-	defer client.Quit()
 	if ok, _ := client.Extension("STARTTLS"); ok {
 		if err := client.StartTLS(&tls.Config{ServerName: host, MinVersion: tls.VersionTLS12}); err != nil {
-			return err
+			_ = client.Close()
+			return nil, err
 		}
 	}
-	return sendMailWithClient(client, auth, from, to, msg)
+	return client, nil
 }
 
-func sendMailTLS(addr string, host string, auth smtp.Auth, from string, to []string, msg []byte) error {
+func newTLSSMTPClient(addr string, host string) (*smtp.Client, error) {
 	dialer := &net.Dialer{Timeout: 15 * time.Second}
 	conn, err := tls.DialWithDialer(dialer, "tcp", addr, &tls.Config{ServerName: host, MinVersion: tls.VersionTLS12})
 	if err != nil {
-		return err
+		return nil, err
 	}
-	defer conn.Close()
 	_ = conn.SetDeadline(time.Now().Add(30 * time.Second))
 	client, err := smtp.NewClient(conn, host)
 	if err != nil {
-		return err
+		_ = conn.Close()
+		return nil, err
 	}
-	defer client.Quit()
-	return sendMailWithClient(client, auth, from, to, msg)
+	return client, nil
+}
+
+func sendMailWithAuthFallback(newClient func() (*smtp.Client, error), host string, username string, password string, from string, to []string, msg []byte) error {
+	auths := mailAuthMethods(username, password, host)
+	var lastErr error
+	for i, auth := range auths {
+		client, err := newClient()
+		if err != nil {
+			return err
+		}
+		err = sendMailWithClient(client, auth, from, to, msg)
+		if err == nil {
+			return nil
+		}
+		lastErr = err
+		if i == len(auths)-1 || !isSMTPAuthError(err) {
+			return err
+		}
+	}
+	return lastErr
+}
+
+func mailAuthMethods(username string, password string, host string) []smtp.Auth {
+	if username == "" && password == "" {
+		return []smtp.Auth{nil}
+	}
+	return []smtp.Auth{
+		smtp.PlainAuth("", username, password, host),
+		&loginAuth{username: username, password: password},
+	}
+}
+
+func isSMTPAuthError(err error) bool {
+	var smtpErr *textproto.Error
+	return errors.As(err, &smtpErr) && (smtpErr.Code == 235 || smtpErr.Code == 334 || smtpErr.Code == 454 || smtpErr.Code == 501 || smtpErr.Code == 503 || smtpErr.Code == 504 || smtpErr.Code == 530 || smtpErr.Code == 534 || smtpErr.Code == 535 || smtpErr.Code == 538 || smtpErr.Code == 526 || smtpErr.Code == 550)
+}
+
+type loginAuth struct {
+	username string
+	password string
+	step     int
+}
+
+func (auth *loginAuth) Start(server *smtp.ServerInfo) (string, []byte, error) {
+	auth.step = 0
+	return "LOGIN", nil, nil
+}
+
+func (auth *loginAuth) Next(fromServer []byte, more bool) ([]byte, error) {
+	if !more {
+		return nil, nil
+	}
+	auth.step++
+	prompt := strings.ToLower(string(fromServer))
+	if strings.Contains(prompt, "username") || auth.step == 1 {
+		return []byte(auth.username), nil
+	}
+	if strings.Contains(prompt, "password") || auth.step == 2 {
+		return []byte(auth.password), nil
+	}
+	return nil, fmt.Errorf("unsupported SMTP LOGIN challenge: %s", strings.TrimSpace(string(fromServer)))
 }
 
 func sendMailWithClient(client *smtp.Client, auth smtp.Auth, from string, to []string, msg []byte) error {
+	defer client.Quit()
 	if auth != nil {
 		if err := client.Auth(auth); err != nil {
 			return err
