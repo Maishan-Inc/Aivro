@@ -6,6 +6,7 @@ import type { CanvasAssistantSession, CanvasConnection, CanvasNodeData, Viewport
 export type CanvasProject = {
     id: string;
     userId: string;
+    slug: string;
     title: string;
     createdAt: string;
     updatedAt: string;
