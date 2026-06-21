@@ -1,15 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { App, Avatar, Button, Input, Modal, Radio, Spin, Tag } from "antd";
+import { App, Button, Input, Modal, Radio, Spin, Tag } from "antd";
 import { GitFork, Lock, Star } from "lucide-react";
 
 import { fetchWorkflowShareByPath, forkWorkflowShareByPath, toggleWorkflowShareStar, verifyWorkflowShareByPath, type WorkflowSharePreview } from "@/services/api/workflows";
 import { useLocalizedPath } from "@/hooks/use-localized-path";
 import { useWorkflowModals } from "@/hooks/use-workflow-modals";
 import { useUserStore } from "@/stores/use-user-store";
-import { CanvasNodeType } from "@/app/(user)/canvas/types";
+import { WorkflowReadonlyCanvas } from "@/app/(user)/canvas/components/workflow-readonly-canvas";
 
 export default function WorkflowPathSharePage() {
     const params = useParams<{ username: string; workflowSlug: string }>();
@@ -34,15 +34,6 @@ export default function WorkflowPathSharePage() {
             .catch((error) => message.error(error instanceof Error ? error.message : "读取分享失败"))
             .finally(() => setIsLoading(false));
     }, [accessToken, isReady, message, params.username, params.workflowSlug, token]);
-
-    const nodes = preview?.snapshot?.nodes || [];
-    const bounds = useMemo(() => {
-        if (!nodes.length) return { minX: 0, minY: 0 };
-        return {
-            minX: Math.min(...nodes.map((node) => node.position.x)),
-            minY: Math.min(...nodes.map((node) => node.position.y)),
-        };
-    }, [nodes]);
 
     const verify = async () => {
         try {
@@ -126,8 +117,10 @@ export default function WorkflowPathSharePage() {
                 <section className="w-full max-w-sm rounded-lg border bg-white p-6 shadow-sm dark:bg-stone-950">
                     <Lock className="mb-4 size-8 text-stone-500" />
                     <h1 className="text-xl font-semibold">请输入分享密码</h1>
-                    <Input.Password className="mt-5" value={password} onChange={(event) => setPassword(event.target.value)} onPressEnter={verify} />
-                    <Button type="primary" block className="mt-4" onClick={verify}>进入分享预览</Button>
+                    <div className="mt-6 grid gap-4">
+                        <Input.Password value={password} onChange={(event) => setPassword(event.target.value)} onPressEnter={verify} />
+                        <Button type="primary" block onClick={verify}>进入分享预览</Button>
+                    </div>
                 </section>
             </main>
         );
@@ -145,8 +138,10 @@ export default function WorkflowPathSharePage() {
     }
 
     return (
-        <main className="relative h-screen overflow-hidden bg-[#f7f4ee] text-stone-950 dark:bg-stone-950 dark:text-stone-100">
-            <header className="absolute left-0 right-0 top-0 z-10 flex flex-wrap items-center justify-between gap-3 border-b bg-white/85 px-6 py-4 backdrop-blur dark:bg-stone-950/85">
+        <WorkflowReadonlyCanvas
+            workflow={preview.snapshot}
+            overlay={
+            <header className="absolute left-0 right-0 top-0 z-50 flex flex-wrap items-center justify-between gap-3 border-b bg-white/85 px-6 py-4 backdrop-blur dark:bg-stone-950/85">
                 <div className="flex min-w-0 items-center gap-3">
                     <h1 className="truncate text-xl font-semibold">{preview.title || preview.slug}</h1>
                     <Tag>只读预览</Tag>
@@ -157,30 +152,7 @@ export default function WorkflowPathSharePage() {
                     <Button type="primary" icon={<GitFork className="size-4" />} onClick={() => void forkShare()}>Fork 运行</Button>
                 </div>
             </header>
-            <section className="absolute inset-0 overflow-auto pt-20">
-                <div className="relative min-h-[1200px] min-w-[1600px]">
-                    {nodes.map((node) => (
-                        <div
-                            key={node.id}
-                            className="absolute overflow-hidden rounded-lg border bg-white p-3 shadow-sm dark:bg-stone-900"
-                            style={{ left: node.position.x - bounds.minX + 80, top: node.position.y - bounds.minY + 80, width: node.width, minHeight: Math.min(node.height, 260) }}
-                        >
-                            <div className="mb-2 truncate text-sm font-medium">{node.title}</div>
-                            {node.type === CanvasNodeType.Image && node.metadata?.content ? <img src={node.metadata.content} alt="" className="max-h-48 w-full object-contain" /> : null}
-                            {node.type === CanvasNodeType.Video && node.metadata?.content ? <video src={node.metadata.content} className="max-h-48 w-full" controls /> : null}
-                            {node.type === CanvasNodeType.Text ? <p className="whitespace-pre-wrap text-sm text-stone-600 dark:text-stone-300">{node.metadata?.content || node.metadata?.prompt || ""}</p> : null}
-                        </div>
-                    ))}
-                    {!nodes.length ? <div className="grid h-[50vh] place-items-center text-sm text-stone-500">空白工作流</div> : null}
-                </div>
-            </section>
-            <aside className="absolute bottom-5 right-5 flex items-center gap-3 rounded-lg border bg-white/90 px-4 py-3 shadow-lg backdrop-blur dark:bg-stone-900/90">
-                <Avatar src={preview.owner?.avatarUrl}>{preview.owner?.displayName?.slice(0, 1) || preview.owner?.username?.slice(0, 1)}</Avatar>
-                <div>
-                    <p className="text-sm font-medium">{preview.owner?.displayName || preview.owner?.username || "分享用户"}</p>
-                    <p className="max-w-60 truncate text-xs text-stone-500">/{preview.owner?.username}/{preview.slug || params.workflowSlug}</p>
-                </div>
-            </aside>
-        </main>
+            }
+        />
     );
 }

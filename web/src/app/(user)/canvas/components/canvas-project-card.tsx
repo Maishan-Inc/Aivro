@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { CalendarDays, Check, Clock3, GitBranch, MessageSquare, Network, Pencil, Trash2, X } from "lucide-react";
+import { CalendarDays, Check, Clock3, FileText, GitBranch, MessageSquare, Network, Pencil, Trash2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { Button, Input, Modal, Tag } from "antd";
+import { Button, Dropdown, Input, Modal, Tag } from "antd";
 
 import type { CloudWorkflow } from "@/services/api/workflows";
 import { useLocalizedPath } from "@/hooks/use-localized-path";
@@ -35,20 +35,42 @@ export function CanvasProjectCard({ project, onRename, onDelete }: { project: Cl
 
     return (
         <>
-            <article className={`group relative aspect-[1.18] min-h-[220px] cursor-pointer overflow-hidden rounded-lg border bg-card text-stone-900 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:text-stone-100 ${selected ? "border-stone-400 ring-2 ring-stone-300/70 dark:border-stone-600 dark:ring-stone-700/70" : "border-stone-200 dark:border-stone-800"}`} onClick={() => setDetailOpen(true)}>
-                <WorkflowPreviewBackdrop nodes={project.nodes} connections={project.connections} />
-                <div className="absolute inset-0 bg-gradient-to-b from-black/18 via-transparent to-black/62 dark:from-black/8 dark:to-black/74" />
-                <input type="checkbox" checked={selected} onClick={(event) => event.stopPropagation()} onChange={(event) => toggleSelected(project.id, event.target.checked)} className="absolute left-3 top-3 z-10 size-4 accent-stone-900 dark:accent-stone-100" aria-label={`选择 ${project.title}`} />
-                <div className="absolute right-3 top-3 max-w-[70%] rounded-md border border-white/30 bg-white/80 px-2.5 py-1 text-right text-sm font-semibold shadow-sm backdrop-blur dark:border-white/10 dark:bg-stone-950/72">
-                    <span className="block truncate">{project.title}</span>
-                </div>
-                <div className="absolute inset-x-3 bottom-3 grid grid-cols-4 gap-1.5">
-                    <CardMetric label="节点" value={project.nodes.length} />
-                    <CardMetric label="连线" value={project.connections.length} />
-                    <CardMetric label="会话" value={project.chatSessions.length} />
-                    <CardMetric label="消耗" value="1次" />
-                </div>
-            </article>
+            <Dropdown
+                trigger={["contextMenu"]}
+                menu={{
+                    items: [
+                        { key: "rename", icon: <Pencil className="size-4" />, label: "修改名称" },
+                        { key: "open", icon: <GitBranch className="size-4" />, label: "打开工作流" },
+                        { key: "delete", danger: true, icon: <Trash2 className="size-4" />, label: "删除工作流" },
+                        { type: "divider" },
+                        { key: "info", icon: <FileText className="size-4" />, label: "工作流信息" },
+                    ],
+                    onClick: ({ key }) => {
+                        if (key === "rename") {
+                            setDetailOpen(true);
+                            setEditing(true);
+                        }
+                        if (key === "open") open();
+                        if (key === "delete") onDelete(project.id);
+                        if (key === "info") setDetailOpen(true);
+                    },
+                }}
+            >
+                <article className={`group relative aspect-[1.18] min-h-[220px] cursor-pointer overflow-hidden rounded-lg border bg-card text-stone-900 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:text-stone-100 ${selected ? "border-stone-400 ring-2 ring-stone-300/70 dark:border-stone-600 dark:ring-stone-700/70" : "border-stone-200 dark:border-stone-800"}`} onClick={open}>
+                    <WorkflowPreviewBackdrop nodes={project.nodes} connections={project.connections} />
+                    <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/38 dark:from-black/8 dark:to-black/48" />
+                    <input type="checkbox" checked={selected} onClick={(event) => event.stopPropagation()} onChange={(event) => toggleSelected(project.id, event.target.checked)} className="absolute left-3 top-3 z-10 size-4 accent-stone-900 dark:accent-stone-100" aria-label={`选择 ${project.title}`} />
+                    <div className="absolute right-3 top-3 max-w-[70%] rounded-md border border-white/30 bg-white/80 px-2.5 py-1 text-right text-sm font-semibold shadow-sm backdrop-blur dark:border-white/10 dark:bg-stone-950/72">
+                        <span className="block truncate">{project.title}</span>
+                    </div>
+                    <div className="absolute inset-x-3 bottom-3 grid grid-cols-4 gap-1.5">
+                        <CardMetric label="节点" value={project.nodes.length} />
+                        <CardMetric label="连线" value={project.connections.length} />
+                        <CardMetric label="会话" value={project.chatSessions.length} />
+                        <CardMetric label="消耗" value="1次" />
+                    </div>
+                </article>
+            </Dropdown>
 
             <Modal title="工作流信息" open={detailOpen} centered width={560} onCancel={() => setDetailOpen(false)} footer={null} destroyOnHidden>
                 <div className="space-y-4">
@@ -125,7 +147,12 @@ export function WorkflowPreviewBackdrop({ nodes, connections }: { nodes: CanvasN
                     const from = previewNodes.find((node) => node.id === connection.fromNodeId);
                     const to = previewNodes.find((node) => node.id === connection.toNodeId);
                     if (!from || !to) return null;
-                    return <line key={connection.id || connection.index} x1={from.left + from.width / 2} y1={from.top + from.height / 2} x2={to.left + to.width / 2} y2={to.top + to.height / 2} stroke="currentColor" strokeWidth="0.8" />;
+                    const startX = from.left + from.width;
+                    const startY = from.top + from.height / 2;
+                    const endX = to.left;
+                    const endY = to.top + to.height / 2;
+                    const curvature = Math.max(Math.abs(endX - startX) * 0.5, 8);
+                    return <path key={connection.id || connection.index} d={`M ${startX} ${startY} C ${startX + curvature} ${startY}, ${endX - curvature} ${endY}, ${endX} ${endY}`} stroke="currentColor" strokeWidth="0.8" fill="none" />;
                 })}
             </svg>
             {previewNodes.length ? previewNodes.map((node) => (

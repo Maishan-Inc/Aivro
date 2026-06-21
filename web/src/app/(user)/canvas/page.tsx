@@ -109,7 +109,7 @@ export default function CanvasPage() {
         const matchesFilter = filter === "all" || project.sourceSyncMode === filter;
         return matchesKeyword && matchesFilter;
     });
-    const shareProjects = filteredProjects.filter((project) => project.sourceSyncMode !== "none");
+    const shareProjects = filteredProjects;
 
     const showCreditsModal = () => {
         modal.confirm({
@@ -252,13 +252,10 @@ export default function CanvasPage() {
             </aside>
 
             <section className="order-1 flex min-h-0 flex-col lg:order-2">
-                <header className="border-b border-stone-200 bg-card/80 px-4 py-3 backdrop-blur lg:px-6 dark:border-stone-800">
-                    <div className="flex flex-wrap items-center gap-3">
-                        <div className="min-w-[160px] flex-1">
-                            <h1 className="m-0 text-xl font-semibold">{activeTab === "shares" ? "我的分享" : activeTab === "community" ? "社区工作流" : "我的工作流"}</h1>
-                            <p className="mt-1 text-xs leading-5 text-stone-500 dark:text-stone-400">创建或复制工作流会消耗 1 次创建次数，删除后不会返还。</p>
-                        </div>
-                        <div className="flex flex-1 flex-wrap items-center justify-end gap-2">
+                <header className="overflow-x-auto border-b border-stone-200 bg-card/80 px-4 py-2 backdrop-blur lg:px-6 dark:border-stone-800">
+                    <div className="flex min-w-max items-center gap-2">
+                        {controlBar}
+                        <div className="ml-auto flex items-center gap-2">
                             <HeaderMetric label="剩余创建次数" value={user?.workflowCreateCredits ?? 0} />
                             <HeaderMetric label="工作流" value={projects.length} />
                             <HeaderMetric label="节点" value={workflowStats.nodes} />
@@ -267,7 +264,6 @@ export default function CanvasPage() {
                             <HeaderMetric label="自动更新" value={workflowStats.linked} />
                             <HeaderMetric label="独立副本" value={workflowStats.detached} />
                             <HeaderMetric label="最近更新" value={workflowStats.latest ? formatWorkflowTime(workflowStats.latest) : "-"} wide />
-                            {controlBar}
                         </div>
                     </div>
                 </header>
@@ -382,7 +378,6 @@ function WorkflowSection({
 }) {
     return (
         <>
-            <div className="px-4 pt-3 text-xs text-stone-500 lg:px-6 dark:text-stone-400">当前显示 {projects.length} / {allProjects.length} 个项目</div>
             {isLoading ? (
                 <section className="flex min-h-0 flex-1 items-center justify-center"><Spin /></section>
             ) : projects.length ? (
@@ -433,10 +428,10 @@ function WorkflowControls({
                     { label: "独立副本", value: "detached" },
                 ]}
             />
+            <span className="text-xs text-stone-500 dark:text-stone-400">显示 {projects.length}/{allProjects.length}</span>
             {selectedIds.length ? <Button onClick={() => onDelete(selectedIds)}>删除选中</Button> : null}
             {projects.length ? <Button onClick={() => onDelete(projects.map((project) => project.id))}>删除全部</Button> : null}
             <Button type="primary" icon={<Plus className="size-4" />} loading={isCreating} onClick={onCreate}>新建工作流</Button>
-            <span className="text-xs text-stone-400 dark:text-stone-500">显示 {projects.length}/{allProjects.length}</span>
         </>
     );
 }
