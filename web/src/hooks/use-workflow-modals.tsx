@@ -18,6 +18,7 @@ export function useWorkflowModals() {
             let value = options.defaultValue || "";
             modal.confirm({
                 title: options.title,
+                centered: true,
                 width: 520,
                 content: (
                     <div className="space-y-3 py-2">
@@ -57,6 +58,7 @@ export function useWorkflowModals() {
             let value = "";
             modal.confirm({
                 title: "删除工作流",
+                centered: true,
                 width: 520,
                 content: (
                     <div className="space-y-3 py-2">
@@ -105,6 +107,7 @@ function confirmStep(modal: ReturnType<typeof App.useApp>["modal"], options: { t
     return new Promise<boolean>((resolve) => {
         modal.confirm({
             title: options.title,
+            centered: true,
             content: options.content,
             okText: options.okText,
             okButtonProps: { danger: true },

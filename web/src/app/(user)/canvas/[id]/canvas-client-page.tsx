@@ -77,6 +77,16 @@ const NODE_STATUS_LOADING = "loading" as const;
 const NODE_STATUS_SUCCESS = "success" as const;
 const NODE_STATUS_ERROR = "error" as const;
 
+function normalizeShareUrl(value: string) {
+    if (!value || typeof window === "undefined") return value;
+    try {
+        const url = new URL(value);
+        return `${window.location.origin}${url.pathname}${url.search}${url.hash}`;
+    } catch {
+        return value.replace(/^https?:\/\/localhost(?::\d+)?/i, window.location.origin);
+    }
+}
+
 function createCanvasNode(type: CanvasNodeType, position: Position, metadata?: CanvasNodeMetadata): CanvasNodeData {
     const spec = getNodeSpec(type);
     const id = `${type}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -320,7 +330,7 @@ function InfiniteCanvasPage() {
             }
             void fetchWorkflowActiveShare(token, projectId)
                 .then((activeShare) => {
-                    setShareUrl(activeShare.shareUrl || "");
+                    setShareUrl(normalizeShareUrl(activeShare.shareUrl || ""));
                     setSharePasswordEnabled(activeShare.share?.passwordEnabled === true);
                 })
                 .catch(() => {
@@ -1613,7 +1623,7 @@ function InfiniteCanvasPage() {
         setIsSharing(true);
         try {
             const result = await shareWorkflow(token, projectId, { passwordEnabled: sharePasswordEnabled, password: sharePassword });
-            setShareUrl(result.shareUrl);
+            setShareUrl(normalizeShareUrl(result.shareUrl));
             setSharePasswordEnabled(result.share.passwordEnabled);
             setSharePassword("");
             message.success(result.share.version > 1 ? "分享快照已更新" : "分享链接已生成");
@@ -2125,6 +2135,7 @@ function InfiniteCanvasPage() {
                 <Modal
                     title={shareUrl ? "更新分享" : "分享工作流"}
                     open={shareOpen}
+                    centered
                     okText={shareUrl ? "更新分享" : "生成分享链接"}
                     confirmLoading={isSharing}
                     onOk={() => void submitShare()}

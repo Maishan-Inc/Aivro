@@ -21,7 +21,7 @@ import {
 import { useLocalizedPath } from "@/hooks/use-localized-path";
 import { useWorkflowModals, workflowConfirmName } from "@/hooks/use-workflow-modals";
 import { useUserStore } from "@/stores/use-user-store";
-import { CanvasProjectCard } from "./components/canvas-project-card";
+import { CanvasProjectCard, WorkflowPreviewBackdrop } from "./components/canvas-project-card";
 import { useCanvasStore } from "./stores/use-canvas-store";
 import { useCanvasUiStore } from "./stores/use-canvas-ui-store";
 
@@ -114,6 +114,7 @@ export default function CanvasPage() {
     const showCreditsModal = () => {
         modal.confirm({
             title: "工作流创建次数不足",
+            centered: true,
             content: creditsMessage,
             okText: "去购买套餐",
             cancelText: "去完成 KYC 认证",
@@ -215,55 +216,69 @@ export default function CanvasPage() {
         return <main className="grid h-full place-items-center bg-stone-50 dark:bg-stone-950" />;
     }
 
+    const controlBar = activeTab === "community" ? (
+        <CommunityControls
+            mode={communityMode}
+            setMode={setCommunityMode}
+            keyword={communityKeyword}
+            locale={communityLocale}
+            onKeywordChange={setCommunityKeyword}
+            onLocaleChange={setCommunityLocale}
+            onUpload={openPublish}
+        />
+    ) : (
+        <WorkflowControls
+            projects={activeTab === "shares" ? shareProjects : filteredProjects}
+            allProjects={projects}
+            keyword={keyword}
+            filter={filter}
+            selectedIds={selectedIds}
+            isCreating={isCreating}
+            onKeywordChange={setKeyword}
+            onFilterChange={setFilter}
+            onCreate={createAndEnter}
+            onDelete={deleteProjects}
+        />
+    );
+
     return (
-        <main className="grid h-full min-h-0 grid-cols-1 overflow-hidden bg-stone-50 text-stone-900 lg:grid-cols-[220px_minmax(0,1fr)] dark:bg-stone-950 dark:text-stone-100">
-            <aside className="flex min-h-0 flex-col border-b border-stone-200 bg-card p-4 lg:border-b-0 lg:border-r dark:border-stone-800">
-                <div className="mb-4 flex items-center gap-2 px-2">
-                    <span className="grid size-8 place-items-center rounded-lg bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-950">A</span>
-                    <span className="font-semibold">Aivro</span>
-                </div>
-                <nav className="grid gap-1">
+        <main className="grid h-full min-h-0 grid-rows-[1fr_auto] overflow-hidden bg-stone-50 text-stone-900 lg:grid-cols-[184px_minmax(0,1fr)] lg:grid-rows-1 dark:bg-stone-950 dark:text-stone-100">
+            <aside className="order-2 flex border-t border-stone-200 bg-card p-2 lg:order-1 lg:min-h-0 lg:flex-col lg:border-r lg:border-t-0 lg:p-4 dark:border-stone-800">
+                <nav className="grid flex-1 grid-cols-3 gap-1 lg:flex-none lg:grid-cols-1">
                     <SideButton active={activeTab === "workflows"} icon={<Layers3 className="size-4" />} label="我的工作流" onClick={() => setActiveTab("workflows")} />
                     <SideButton active={activeTab === "shares"} icon={<Link2 className="size-4" />} label="我的分享" onClick={() => setActiveTab("shares")} />
                     <SideButton active={activeTab === "community"} icon={<BookOpen className="size-4" />} label="社区工作流" onClick={() => setActiveTab("community")} />
                 </nav>
             </aside>
 
-            <section className="flex min-h-0 flex-col">
-                <header className="flex flex-wrap items-center justify-between gap-4 border-b border-stone-200 bg-card/80 px-5 py-4 backdrop-blur lg:px-8 dark:border-stone-800">
-                    <div className="min-w-[240px] flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                            <Tag color="blue">云端工作流库</Tag>
-                            <h1 className="m-0 text-2xl font-semibold">Aivro</h1>
+            <section className="order-1 flex min-h-0 flex-col lg:order-2">
+                <header className="border-b border-stone-200 bg-card/80 px-4 py-3 backdrop-blur lg:px-6 dark:border-stone-800">
+                    <div className="flex flex-wrap items-center gap-3">
+                        <div className="min-w-[160px] flex-1">
+                            <h1 className="m-0 text-xl font-semibold">{activeTab === "shares" ? "我的分享" : activeTab === "community" ? "社区工作流" : "我的工作流"}</h1>
+                            <p className="mt-1 text-xs leading-5 text-stone-500 dark:text-stone-400">创建或复制工作流会消耗 1 次创建次数，删除后不会返还。</p>
                         </div>
-                        <p className="mt-2 text-sm leading-6 text-stone-500 dark:text-stone-400">集中管理你的画布项目、分享副本和云端创作上下文。</p>
-                        <p className="mt-1 text-xs text-stone-400 dark:text-stone-500">工作流创建会消耗 1 次创建次数；删除后不会返还次数。</p>
-                    </div>
-                    <div className="flex flex-wrap items-center justify-end gap-3">
-                        <HeaderMetric label="剩余创建次数" value={user?.workflowCreateCredits ?? 0} />
-                        <HeaderMetric label="工作流" value={projects.length} />
-                        <HeaderMetric label="节点" value={workflowStats.nodes} />
-                        <HeaderMetric label="连线" value={workflowStats.connections} />
-                        <HeaderMetric label="会话" value={workflowStats.sessions} />
-                        <HeaderMetric label="自动更新" value={workflowStats.linked} />
-                        <HeaderMetric label="独立副本" value={workflowStats.detached} />
-                        <HeaderMetric label="最近更新" value={workflowStats.latest ? formatWorkflowTime(workflowStats.latest) : "-"} wide />
+                        <div className="flex flex-1 flex-wrap items-center justify-end gap-2">
+                            <HeaderMetric label="剩余创建次数" value={user?.workflowCreateCredits ?? 0} />
+                            <HeaderMetric label="工作流" value={projects.length} />
+                            <HeaderMetric label="节点" value={workflowStats.nodes} />
+                            <HeaderMetric label="连线" value={workflowStats.connections} />
+                            <HeaderMetric label="会话" value={workflowStats.sessions} />
+                            <HeaderMetric label="自动更新" value={workflowStats.linked} />
+                            <HeaderMetric label="独立副本" value={workflowStats.detached} />
+                            <HeaderMetric label="最近更新" value={workflowStats.latest ? formatWorkflowTime(workflowStats.latest) : "-"} wide />
+                            {controlBar}
+                        </div>
                     </div>
                 </header>
 
                 {activeTab === "community" ? (
                     <CommunitySection
                         mode={communityMode}
-                        setMode={setCommunityMode}
                         isLoading={isCommunityLoading}
                         items={communityItems}
                         myItems={myCommunityItems}
                         projects={projects}
-                        keyword={communityKeyword}
-                        locale={communityLocale}
-                        onKeywordChange={setCommunityKeyword}
-                        onLocaleChange={setCommunityLocale}
-                        onUpload={openPublish}
                         onOpen={(item) => router.push(localizedPath(`/canvas/community/${item.token}`))}
                         onSync={async (item) => {
                             if (!token) return;
@@ -283,6 +298,7 @@ export default function CanvasPage() {
                             if (!token) return;
                             Modal.confirm({
                                 title: "删除我的作品？",
+                                centered: true,
                                 content: `删除后「${item.title}」不会继续在社区展示。`,
                                 okText: "删除",
                                 okButtonProps: { danger: true },
@@ -301,13 +317,9 @@ export default function CanvasPage() {
                         projects={activeTab === "shares" ? shareProjects : filteredProjects}
                         allProjects={projects}
                         keyword={keyword}
-                        filter={filter}
-                        selectedIds={selectedIds}
                         isCreating={isCreating}
                         emptyTitle={activeTab === "shares" ? "还没有分享副本" : "还没有云端工作流"}
                         emptyDescription={activeTab === "shares" ? "从分享链接 Fork 的独立副本和自动更新工作流会显示在这里。" : "新建工作流会消耗 1 次创建次数，并保存到你的账号。"}
-                        onKeywordChange={setKeyword}
-                        onFilterChange={setFilter}
                         onCreate={createAndEnter}
                         onRename={renameProject}
                         onDelete={deleteProjects}
@@ -315,7 +327,7 @@ export default function CanvasPage() {
                 )}
             </section>
 
-            <Modal title="上传我的作品" open={publishOpen} onCancel={() => setPublishOpen(false)} onOk={() => void publishCommunity()} okText="上传" cancelText="取消" destroyOnHidden>
+            <Modal title="上传我的作品" open={publishOpen} centered onCancel={() => setPublishOpen(false)} onOk={() => void publishCommunity()} okText="上传" cancelText="取消" destroyOnHidden>
                 <div className="grid gap-4 py-2">
                     <label className="grid gap-2 text-sm">
                         <span className="text-stone-500 dark:text-stone-400">选择我的工作流</span>
@@ -349,13 +361,9 @@ function WorkflowSection({
     projects,
     allProjects,
     keyword,
-    filter,
-    selectedIds,
     isCreating,
     emptyTitle,
     emptyDescription,
-    onKeywordChange,
-    onFilterChange,
     onCreate,
     onRename,
     onDelete,
@@ -364,41 +372,20 @@ function WorkflowSection({
     projects: CloudWorkflow[];
     allProjects: CloudWorkflow[];
     keyword: string;
-    filter: WorkflowFilter;
-    selectedIds: string[];
     isCreating: boolean;
     emptyTitle: string;
     emptyDescription: string;
-    onKeywordChange: (value: string) => void;
-    onFilterChange: (value: WorkflowFilter) => void;
     onCreate: () => void;
     onRename: (project: CloudWorkflow, title: string) => void | Promise<void>;
     onDelete: (ids: string[]) => void;
 }) {
     return (
         <>
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-200 bg-card px-5 py-3 lg:px-8 dark:border-stone-800">
-                <p className="text-sm text-stone-500 dark:text-stone-400">当前显示 {projects.length} / {allProjects.length} 个项目</p>
-                <div className="flex flex-1 flex-wrap items-center justify-end gap-2">
-                    <Input allowClear value={keyword} onChange={(event) => onKeywordChange(event.target.value)} prefix={<Search className="size-4 text-stone-400" />} placeholder="搜索工作流名称" className="max-w-xs" />
-                    <Segmented
-                        value={filter}
-                        onChange={(value) => onFilterChange(value as WorkflowFilter)}
-                        options={[
-                            { label: "全部", value: "all" },
-                            { label: "自动更新", value: "linked" },
-                            { label: "独立副本", value: "detached" },
-                        ]}
-                    />
-                    {selectedIds.length ? <Button onClick={() => onDelete(selectedIds)}>删除选中</Button> : null}
-                    {allProjects.length ? <Button onClick={() => onDelete(allProjects.map((project) => project.id))}>删除全部</Button> : null}
-                    <Button type="primary" icon={<Plus className="size-4" />} loading={isCreating} onClick={onCreate}>新建工作流</Button>
-                </div>
-            </div>
+            <div className="px-4 pt-3 text-xs text-stone-500 lg:px-6 dark:text-stone-400">当前显示 {projects.length} / {allProjects.length} 个项目</div>
             {isLoading ? (
                 <section className="flex min-h-0 flex-1 items-center justify-center"><Spin /></section>
             ) : projects.length ? (
-                <div className="thin-scrollbar min-h-0 flex-1 overflow-auto p-5 lg:p-8">
+                <div className="thin-scrollbar min-h-0 flex-1 overflow-auto p-4 lg:p-6">
                     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                         {projects.map((project) => <CanvasProjectCard key={project.id} project={project} onRename={onRename} onDelete={(id) => onDelete([id])} />)}
                     </div>
@@ -410,33 +397,64 @@ function WorkflowSection({
     );
 }
 
+function WorkflowControls({
+    projects,
+    allProjects,
+    keyword,
+    filter,
+    selectedIds,
+    isCreating,
+    onKeywordChange,
+    onFilterChange,
+    onCreate,
+    onDelete,
+}: {
+    projects: CloudWorkflow[];
+    allProjects: CloudWorkflow[];
+    keyword: string;
+    filter: WorkflowFilter;
+    selectedIds: string[];
+    isCreating: boolean;
+    onKeywordChange: (value: string) => void;
+    onFilterChange: (value: WorkflowFilter) => void;
+    onCreate: () => void;
+    onDelete: (ids: string[]) => void;
+}) {
+    return (
+        <>
+            <Input allowClear value={keyword} onChange={(event) => onKeywordChange(event.target.value)} prefix={<Search className="size-4 text-stone-400" />} placeholder="搜索工作流名称" className="!w-[min(100%,220px)]" />
+            <Segmented
+                value={filter}
+                onChange={(value) => onFilterChange(value as WorkflowFilter)}
+                options={[
+                    { label: "全部", value: "all" },
+                    { label: "自动更新", value: "linked" },
+                    { label: "独立副本", value: "detached" },
+                ]}
+            />
+            {selectedIds.length ? <Button onClick={() => onDelete(selectedIds)}>删除选中</Button> : null}
+            {projects.length ? <Button onClick={() => onDelete(projects.map((project) => project.id))}>删除全部</Button> : null}
+            <Button type="primary" icon={<Plus className="size-4" />} loading={isCreating} onClick={onCreate}>新建工作流</Button>
+            <span className="text-xs text-stone-400 dark:text-stone-500">显示 {projects.length}/{allProjects.length}</span>
+        </>
+    );
+}
+
 function CommunitySection({
     mode,
-    setMode,
     isLoading,
     items,
     myItems,
     projects,
-    keyword,
-    locale,
-    onKeywordChange,
-    onLocaleChange,
-    onUpload,
     onOpen,
     onSync,
     onDelete,
 }: {
     mode: CommunityMode;
-    setMode: (mode: CommunityMode) => void;
     isLoading: boolean;
     items: WorkflowCommunityPost[];
     myItems: WorkflowCommunityPost[];
     projects: CloudWorkflow[];
-    keyword: string;
-    locale: "" | "zh-CN" | "en-US";
-    onKeywordChange: (value: string) => void;
-    onLocaleChange: (value: "" | "zh-CN" | "en-US") => void;
-    onUpload: () => void;
     onOpen: (item: WorkflowCommunityPost) => void;
     onSync: (item: WorkflowCommunityPost) => void;
     onDelete: (item: WorkflowCommunityPost) => void;
@@ -445,23 +463,10 @@ function CommunitySection({
     const projectMap = new Map(projects.map((project) => [project.id, project]));
     return (
         <>
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-200 bg-card px-5 py-3 lg:px-8 dark:border-stone-800">
-                <Segmented value={mode} onChange={(value) => setMode(value as CommunityMode)} options={[{ label: "社区工作流", value: "browse" }, { label: "我的作品", value: "mine" }]} />
-                <div className="flex flex-1 flex-wrap items-center justify-end gap-2">
-                    {mode === "browse" ? (
-                        <>
-                            <Input allowClear value={keyword} onChange={(event) => onKeywordChange(event.target.value)} prefix={<Search className="size-4 text-stone-400" />} placeholder="搜索社区作品" className="max-w-xs" />
-                            <Select value={locale} onChange={onLocaleChange} className="w-32" options={[{ label: "全部语言", value: "" }, { label: "中文", value: "zh-CN" }, { label: "English", value: "en-US" }]} />
-                        </>
-                    ) : null}
-                    <Button icon={<UserRound className="size-4" />} onClick={() => setMode("mine")}>查看我的作品</Button>
-                    <Button type="primary" icon={<UploadCloud className="size-4" />} onClick={onUpload}>上传我的作品</Button>
-                </div>
-            </div>
             {isLoading ? (
                 <section className="flex min-h-0 flex-1 items-center justify-center"><Spin /></section>
             ) : visibleItems.length ? (
-                <div className="thin-scrollbar min-h-0 flex-1 overflow-auto p-5 lg:p-8">
+                <div className="thin-scrollbar min-h-0 flex-1 overflow-auto p-4 lg:p-6">
                     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                         {visibleItems.map((item) => <CommunityCard key={item.id} item={item} source={projectMap.get(item.sourceWorkflowId)} mine={mode === "mine"} onOpen={() => onOpen(item)} onSync={() => onSync(item)} onDelete={() => onDelete(item)} />)}
                     </div>
@@ -473,45 +478,89 @@ function CommunitySection({
     );
 }
 
+function CommunityControls({ mode, setMode, keyword, locale, onKeywordChange, onLocaleChange, onUpload }: { mode: CommunityMode; setMode: (mode: CommunityMode) => void; keyword: string; locale: "" | "zh-CN" | "en-US"; onKeywordChange: (value: string) => void; onLocaleChange: (value: "" | "zh-CN" | "en-US") => void; onUpload: () => void }) {
+    return (
+        <>
+            <Segmented value={mode} onChange={(value) => setMode(value as CommunityMode)} options={[{ label: "社区工作流", value: "browse" }, { label: "我的作品", value: "mine" }]} />
+            {mode === "browse" ? (
+                <>
+                    <Input allowClear value={keyword} onChange={(event) => onKeywordChange(event.target.value)} prefix={<Search className="size-4 text-stone-400" />} placeholder="搜索社区作品" className="!w-[min(100%,220px)]" />
+                    <Select value={locale} onChange={onLocaleChange} className="w-32" options={[{ label: "全部语言", value: "" }, { label: "中文", value: "zh-CN" }, { label: "English", value: "en-US" }]} />
+                </>
+            ) : null}
+            <Button icon={<UserRound className="size-4" />} onClick={() => setMode("mine")}>查看我的作品</Button>
+            <Button type="primary" icon={<UploadCloud className="size-4" />} onClick={onUpload}>上传我的作品</Button>
+        </>
+    );
+}
+
 function CommunityCard({ item, source, mine, onOpen, onSync, onDelete }: { item: WorkflowCommunityPost; source?: CloudWorkflow; mine: boolean; onOpen: () => void; onSync: () => void; onDelete: () => void }) {
     const stale = Boolean(source && source.updatedAt !== item.snapshotWorkflowAt);
     const nodes = item.snapshot?.nodes || [];
+    const connections = item.snapshot?.connections || [];
+    const sessions = item.snapshot?.chatSessions || [];
+    const [detailOpen, setDetailOpen] = useState(false);
     return (
-        <article className="flex min-h-[260px] flex-col rounded-lg border border-stone-200 bg-card p-4 shadow-sm dark:border-stone-800">
-            <div className="mb-4 h-24 overflow-hidden rounded-md border border-stone-200 bg-stone-50 p-3 dark:border-stone-800 dark:bg-stone-900">
-                <div className="grid h-full grid-cols-3 gap-2">
-                    {nodes.slice(0, 6).map((node, index) => <div key={node.id || index} className="flex min-w-0 items-center justify-center rounded border border-stone-200 bg-card px-2 text-[10px] text-stone-500 dark:border-stone-800 dark:text-stone-400"><span className="truncate">{String(node.type || "node")}</span></div>)}
-                    {!nodes.length ? <div className="col-span-3 flex h-full items-center justify-center text-xs text-stone-500 dark:text-stone-400">空白工作流</div> : null}
+        <>
+            <article className="group relative aspect-[1.18] min-h-[220px] cursor-pointer overflow-hidden rounded-lg border border-stone-200 bg-card text-stone-900 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-stone-800 dark:text-stone-100" onClick={() => setDetailOpen(true)}>
+                <WorkflowPreviewBackdrop nodes={nodes} connections={connections} />
+                <div className="absolute inset-0 bg-gradient-to-b from-black/18 via-transparent to-black/62 dark:from-black/8 dark:to-black/74" />
+                <div className="absolute right-3 top-3 flex max-w-[76%] items-center gap-2 rounded-md border border-white/30 bg-white/80 px-2.5 py-1 text-right text-sm font-semibold shadow-sm backdrop-blur dark:border-white/10 dark:bg-stone-950/72">
+                    <span className="truncate">{item.title}</span>
+                    <Tag className="m-0" color={item.status === "banned" ? "red" : item.locale === "en-US" ? "cyan" : "green"}>{item.status === "banned" ? "封禁" : item.locale === "en-US" ? "EN" : "中文"}</Tag>
                 </div>
-            </div>
-            <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                    <h2 className="truncate text-lg font-semibold">{item.title}</h2>
-                    <p className="mt-1 truncate text-xs text-stone-500 dark:text-stone-400">来源：{item.sourceWorkflowTitle}</p>
+                <div className="absolute inset-x-3 bottom-3 grid grid-cols-4 gap-1.5">
+                    <CardMetric label="节点" value={nodes.length} />
+                    <CardMetric label="连线" value={connections.length} />
+                    <CardMetric label="会话" value={sessions.length} />
+                    <CardMetric label="消耗" value="1次" />
                 </div>
-                <Tag color={item.status === "banned" ? "red" : item.locale === "en-US" ? "cyan" : "green"}>{item.status === "banned" ? "已封禁" : item.locale === "en-US" ? "English" : "中文"}</Tag>
-            </div>
-            <div className="mt-3 flex flex-wrap gap-1.5">{(item.tags || []).map((tag) => <Tag key={tag}>{tag}</Tag>)}</div>
-            {mine && item.status === "banned" ? <p className="mt-3 rounded-md bg-red-50 p-2 text-xs leading-5 text-red-600 dark:bg-red-950/30 dark:text-red-300">封禁原因：{item.banReason || "未填写"}。封禁 7 天后会自动从我的作品中删除。</p> : null}
-            {mine && stale && item.status === "active" ? <p className="mt-3 rounded-md bg-amber-50 p-2 text-xs leading-5 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300">我的工作流已有新版本，可手动同步到社区作品。</p> : null}
-            <div className="mt-auto flex items-center justify-between gap-2 pt-4">
-                <span className="text-xs text-stone-500 dark:text-stone-400">更新于 {formatWorkflowTime(item.updatedAt)}</span>
-                <div className="flex gap-2">
-                    {mine && stale && item.status === "active" ? <Button size="small" onClick={onSync}>同步</Button> : null}
-                    {mine ? <Button size="small" danger onClick={onDelete}>删除</Button> : null}
-                    <Button size="small" type="primary" disabled={item.status === "banned"} icon={<Send className="size-3.5" />} onClick={onOpen}>打开</Button>
+            </article>
+            <Modal title="社区工作流信息" open={detailOpen} centered width={560} onCancel={() => setDetailOpen(false)} footer={null} destroyOnHidden>
+                <div className="space-y-4">
+                    <div className="relative aspect-square overflow-hidden rounded-lg border border-stone-200 dark:border-stone-800">
+                        <WorkflowPreviewBackdrop nodes={nodes} connections={connections} />
+                    </div>
+                    <div className="space-y-3">
+                        <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                                <h2 className="truncate text-xl font-semibold">{item.title}</h2>
+                                <p className="mt-1 truncate text-xs text-stone-500 dark:text-stone-400">来源：{item.sourceWorkflowTitle}</p>
+                            </div>
+                            <Tag color={item.status === "banned" ? "red" : item.locale === "en-US" ? "cyan" : "green"}>{item.status === "banned" ? "已封禁" : item.locale === "en-US" ? "English" : "中文"}</Tag>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-xs text-stone-500 sm:grid-cols-4 dark:text-stone-400">
+                            <HeaderMetric label="节点" value={nodes.length} />
+                            <HeaderMetric label="连线" value={connections.length} />
+                            <HeaderMetric label="会话" value={sessions.length} />
+                            <HeaderMetric label="消耗额度" value="1次创建" />
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">{(item.tags || []).map((tag) => <Tag key={tag}>{tag}</Tag>)}</div>
+                        {mine && item.status === "banned" ? <p className="rounded-md bg-red-50 p-2 text-xs leading-5 text-red-600 dark:bg-red-950/30 dark:text-red-300">封禁原因：{item.banReason || "未填写"}。封禁 7 天后会自动从我的作品中删除。</p> : null}
+                        {mine && stale && item.status === "active" ? <p className="rounded-md bg-amber-50 p-2 text-xs leading-5 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300">我的工作流已有新版本，可手动同步到社区作品。</p> : null}
+                        <span className="block text-xs text-stone-500 dark:text-stone-400">更新于 {formatWorkflowTime(item.updatedAt)}</span>
+                    </div>
+                    <div className="flex justify-end gap-2 border-t border-stone-200 pt-4 dark:border-stone-800">
+                        {mine && stale && item.status === "active" ? <Button onClick={onSync}>同步</Button> : null}
+                        {mine ? <Button danger onClick={onDelete}>删除</Button> : null}
+                        <Button type="primary" disabled={item.status === "banned"} icon={<Send className="size-4" />} onClick={onOpen}>打开</Button>
+                    </div>
                 </div>
-            </div>
-        </article>
+            </Modal>
+        </>
     );
 }
 
 function SideButton({ active, icon, label, onClick }: { active: boolean; icon: ReactNode; label: string; onClick: () => void }) {
-    return <button type="button" className={`flex items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition ${active ? "bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-950" : "text-stone-500 hover:bg-stone-100 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-900 dark:hover:text-stone-100"}`} onClick={onClick}>{icon}{label}</button>;
+    return <button type="button" className={`flex min-w-0 flex-col items-center justify-center gap-1 rounded-md border px-2 py-2 text-center text-xs transition lg:flex-row lg:justify-start lg:px-3 lg:text-left lg:text-sm ${active ? "border-stone-300 text-stone-900 dark:border-stone-700 dark:text-stone-100" : "border-transparent text-stone-500 hover:border-stone-200 hover:text-stone-900 dark:text-stone-400 dark:hover:border-stone-800 dark:hover:text-stone-100"}`} onClick={onClick}>{icon}<span className="truncate">{label}</span></button>;
 }
 
 function HeaderMetric({ label, value, wide }: { label: string; value: ReactNode; wide?: boolean }) {
     return <div className={`${wide ? "min-w-28" : "min-w-20"} rounded-md border border-stone-200 bg-stone-50 px-3 py-2 dark:border-stone-800 dark:bg-stone-900`}><div className="text-[11px] text-stone-500 dark:text-stone-400">{label}</div><div className="mt-1 text-sm font-semibold">{value}</div></div>;
+}
+
+function CardMetric({ label, value }: { label: string; value: ReactNode }) {
+    return <div className="min-w-0 rounded-md border border-white/25 bg-white/82 px-2 py-1 text-center text-[11px] shadow-sm backdrop-blur dark:border-white/10 dark:bg-stone-950/72"><div className="truncate text-stone-500 dark:text-stone-400">{label}</div><div className="truncate font-semibold text-stone-900 dark:text-stone-100">{value}</div></div>;
 }
 
 function EmptyState({ title, description, action }: { title: string; description: string; action: ReactNode }) {
@@ -532,6 +581,7 @@ function confirmWorkflowTitle(modal: ReturnType<typeof App.useApp>["modal"], tit
     return new Promise<string>((resolve) => {
         modal.confirm({
             title: "同步社区作品",
+            centered: true,
             content: (
                 <div className="py-2">
                     <p className="mb-3 text-sm text-stone-500">请输入“我的工作流”中的名称确认同步：{title}</p>
