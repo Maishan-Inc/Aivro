@@ -1454,7 +1454,7 @@ func newTLSSMTPClient(addr string, host string) (*smtp.Client, error) {
 
 func sendMailWithAuthFallback(newClient func() (*smtp.Client, error), host string, username string, password string, from string, to []string, msg []byte) error {
 	auths := mailAuthMethods(username, password, host)
-	var lastErr error
+	authErrors := make([]string, 0, len(auths))
 	for i, auth := range auths {
 		client, err := newClient()
 		if err != nil {
@@ -1464,12 +1464,12 @@ func sendMailWithAuthFallback(newClient func() (*smtp.Client, error), host strin
 		if err == nil {
 			return nil
 		}
-		lastErr = err
-		if i == len(auths)-1 || !isSMTPAuthError(err) {
+		authErrors = append(authErrors, mailAuthName(auth)+": "+err.Error())
+		if !isSMTPAuthError(err) {
 			return err
 		}
 	}
-	return lastErr
+	return fmt.Errorf("SMTP authentication failed after trying %s", strings.Join(authErrors, "; "))
 }
 
 func mailAuthMethods(username string, password string, host string) []smtp.Auth {
@@ -1479,6 +1479,17 @@ func mailAuthMethods(username string, password string, host string) []smtp.Auth 
 	return []smtp.Auth{
 		smtp.PlainAuth("", username, password, host),
 		&loginAuth{username: username, password: password},
+	}
+}
+
+func mailAuthName(auth smtp.Auth) string {
+	switch auth.(type) {
+	case nil:
+		return "NOAUTH"
+	case *loginAuth:
+		return "AUTH LOGIN"
+	default:
+		return "AUTH PLAIN"
 	}
 }
 
