@@ -1455,7 +1455,7 @@ func newTLSSMTPClient(addr string, host string) (*smtp.Client, error) {
 func sendMailWithAuthFallback(newClient func() (*smtp.Client, error), host string, username string, password string, from string, to []string, msg []byte) error {
 	auths := mailAuthMethods(username, password, host)
 	authErrors := make([]string, 0, len(auths))
-	for i, auth := range auths {
+	for _, auth := range auths {
 		client, err := newClient()
 		if err != nil {
 			return err
