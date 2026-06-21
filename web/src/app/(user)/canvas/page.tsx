@@ -279,6 +279,7 @@ export default function CanvasPage() {
                         items={communityItems}
                         myItems={myCommunityItems}
                         projects={projects}
+                        onUpload={openPublish}
                         onOpen={(item) => router.push(localizedPath(`/canvas/community/${item.token}`))}
                         onSync={async (item) => {
                             if (!token) return;
@@ -446,6 +447,7 @@ function CommunitySection({
     items,
     myItems,
     projects,
+    onUpload,
     onOpen,
     onSync,
     onDelete,
@@ -455,6 +457,7 @@ function CommunitySection({
     items: WorkflowCommunityPost[];
     myItems: WorkflowCommunityPost[];
     projects: CloudWorkflow[];
+    onUpload: () => void;
     onOpen: (item: WorkflowCommunityPost) => void;
     onSync: (item: WorkflowCommunityPost) => void;
     onDelete: (item: WorkflowCommunityPost) => void;
