@@ -1428,6 +1428,10 @@ func newPlainSMTPClient(addr string, host string) (*smtp.Client, error) {
 		_ = conn.Close()
 		return nil, err
 	}
+	if err := client.Hello("localhost"); err != nil {
+		_ = client.Close()
+		return nil, err
+	}
 	if ok, _ := client.Extension("STARTTLS"); ok {
 		if err := client.StartTLS(&tls.Config{ServerName: host, MinVersion: tls.VersionTLS12}); err != nil {
 			_ = client.Close()
@@ -1449,22 +1453,26 @@ func newTLSSMTPClient(addr string, host string) (*smtp.Client, error) {
 		_ = conn.Close()
 		return nil, err
 	}
+	if err := client.Hello("localhost"); err != nil {
+		_ = client.Close()
+		return nil, err
+	}
 	return client, nil
 }
 
 func sendMailWithAuthFallback(newClient func() (*smtp.Client, error), host string, username string, password string, from string, to []string, msg []byte) error {
-	auths := mailAuthMethods(username, password, host)
-	authErrors := make([]string, 0, len(auths))
-	for _, auth := range auths {
+	methods := mailAuthMethods(username, password)
+	authErrors := make([]string, 0, len(methods))
+	for _, method := range methods {
 		client, err := newClient()
 		if err != nil {
 			return err
 		}
-		err = sendMailWithClient(client, auth, from, to, msg)
+		err = sendMailWithClient(client, method.auth(host, username, password), method, username, password, from, to, msg)
 		if err == nil {
 			return nil
 		}
-		authErrors = append(authErrors, mailAuthName(auth)+": "+err.Error())
+		authErrors = append(authErrors, method.label()+": "+err.Error())
 		if !isSMTPAuthError(err) {
 			return err
 		}
@@ -1472,25 +1480,37 @@ func sendMailWithAuthFallback(newClient func() (*smtp.Client, error), host strin
 	return fmt.Errorf("SMTP authentication failed after trying %s", strings.Join(authErrors, "; "))
 }
 
-func mailAuthMethods(username string, password string, host string) []smtp.Auth {
+type mailAuthMethod string
+
+const (
+	mailAuthNone  mailAuthMethod = "none"
+	mailAuthPlain mailAuthMethod = "plain"
+	mailAuthLogin mailAuthMethod = "login"
+)
+
+func mailAuthMethods(username string, password string) []mailAuthMethod {
 	if username == "" && password == "" {
-		return []smtp.Auth{nil}
+		return []mailAuthMethod{mailAuthNone}
 	}
-	return []smtp.Auth{
-		smtp.PlainAuth("", username, password, host),
-		&loginAuth{username: username, password: password},
-	}
+	return []mailAuthMethod{mailAuthPlain, mailAuthLogin}
 }
 
-func mailAuthName(auth smtp.Auth) string {
-	switch auth.(type) {
-	case nil:
+func (method mailAuthMethod) label() string {
+	switch method {
+	case mailAuthNone:
 		return "NOAUTH"
-	case *loginAuth:
+	case mailAuthLogin:
 		return "AUTH LOGIN"
 	default:
 		return "AUTH PLAIN"
 	}
+}
+
+func (method mailAuthMethod) auth(host string, username string, password string) smtp.Auth {
+	if method == mailAuthPlain {
+		return smtp.PlainAuth("", username, password, host)
+	}
+	return nil
 }
 
 func isSMTPAuthError(err error) bool {
@@ -1498,35 +1518,13 @@ func isSMTPAuthError(err error) bool {
 	return errors.As(err, &smtpErr) && (smtpErr.Code == 235 || smtpErr.Code == 334 || smtpErr.Code == 454 || smtpErr.Code == 501 || smtpErr.Code == 503 || smtpErr.Code == 504 || smtpErr.Code == 530 || smtpErr.Code == 534 || smtpErr.Code == 535 || smtpErr.Code == 538 || smtpErr.Code == 526 || smtpErr.Code == 550)
 }
 
-type loginAuth struct {
-	username string
-	password string
-	step     int
-}
-
-func (auth *loginAuth) Start(server *smtp.ServerInfo) (string, []byte, error) {
-	auth.step = 0
-	return "LOGIN", nil, nil
-}
-
-func (auth *loginAuth) Next(fromServer []byte, more bool) ([]byte, error) {
-	if !more {
-		return nil, nil
-	}
-	auth.step++
-	prompt := strings.ToLower(string(fromServer))
-	if strings.Contains(prompt, "username") || auth.step == 1 {
-		return []byte(auth.username), nil
-	}
-	if strings.Contains(prompt, "password") || auth.step == 2 {
-		return []byte(auth.password), nil
-	}
-	return nil, fmt.Errorf("unsupported SMTP LOGIN challenge: %s", strings.TrimSpace(string(fromServer)))
-}
-
-func sendMailWithClient(client *smtp.Client, auth smtp.Auth, from string, to []string, msg []byte) error {
+func sendMailWithClient(client *smtp.Client, auth smtp.Auth, method mailAuthMethod, username string, password string, from string, to []string, msg []byte) error {
 	defer client.Quit()
-	if auth != nil {
+	if method == mailAuthLogin {
+		if err := sendMailLoginAuth(client, username, password); err != nil {
+			return err
+		}
+	} else if auth != nil {
 		if err := client.Auth(auth); err != nil {
 			return err
 		}
@@ -1548,6 +1546,28 @@ func sendMailWithClient(client *smtp.Client, auth smtp.Auth, from string, to []s
 		return err
 	}
 	return writer.Close()
+}
+
+func sendMailLoginAuth(client *smtp.Client, username string, password string) error {
+	if _, _, err := smtpCommand(client, 334, "AUTH LOGIN"); err != nil {
+		return err
+	}
+	if _, _, err := smtpCommand(client, 334, base64.StdEncoding.EncodeToString([]byte(username))); err != nil {
+		return err
+	}
+	_, _, err := smtpCommand(client, 235, base64.StdEncoding.EncodeToString([]byte(password)))
+	return err
+}
+
+func smtpCommand(client *smtp.Client, expectCode int, format string, args ...any) (int, string, error) {
+	id, err := client.Text.Cmd(format, args...)
+	if err != nil {
+		return 0, "", err
+	}
+	client.Text.StartResponse(id)
+	defer client.Text.EndResponse(id)
+	code, msg, err := client.Text.ReadResponse(expectCode)
+	return code, msg, err
 }
 
 func mimeHeader(value string) string {

@@ -252,10 +252,10 @@ export default function CanvasPage() {
             </aside>
 
             <section className="order-1 flex min-h-0 flex-col lg:order-2">
-                <header className="overflow-x-auto border-b border-stone-200 bg-card/80 px-4 py-2 backdrop-blur lg:px-6 dark:border-stone-800">
-                    <div className="flex min-w-max items-center gap-2">
-                        {controlBar}
-                        <div className="ml-auto flex items-center gap-2">
+                <header className="border-b border-stone-200 bg-card/80 px-4 py-2 backdrop-blur lg:overflow-x-auto lg:px-6 dark:border-stone-800">
+                    <div className="flex min-w-0 flex-wrap items-center gap-2 lg:min-w-max lg:flex-nowrap">
+                        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 lg:flex-none lg:flex-nowrap">{controlBar}</div>
+                        <div className="flex w-full min-w-0 gap-2 overflow-x-auto lg:ml-auto lg:w-auto lg:min-w-max lg:overflow-visible">
                             <HeaderMetric label="剩余创建次数" value={user?.workflowCreateCredits ?? 0} />
                             <HeaderMetric label="工作流" value={projects.length} />
                             <HeaderMetric label="节点" value={workflowStats.nodes} />
@@ -382,7 +382,7 @@ function WorkflowSection({
                 <section className="flex min-h-0 flex-1 items-center justify-center"><Spin /></section>
             ) : projects.length ? (
                 <div className="thin-scrollbar min-h-0 flex-1 overflow-auto p-4 lg:p-6">
-                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                    <div className="grid gap-4 min-[520px]:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                         {projects.map((project) => <CanvasProjectCard key={project.id} project={project} onRename={onRename} onDelete={(id) => onDelete([id])} />)}
                     </div>
                 </div>
@@ -418,7 +418,7 @@ function WorkflowControls({
 }) {
     return (
         <>
-            <Input allowClear value={keyword} onChange={(event) => onKeywordChange(event.target.value)} prefix={<Search className="size-4 text-stone-400" />} placeholder="搜索工作流名称" className="!w-[min(100%,220px)]" />
+            <Input allowClear value={keyword} onChange={(event) => onKeywordChange(event.target.value)} prefix={<Search className="size-4 text-stone-400" />} placeholder="搜索工作流名称" className="!w-full min-[520px]:!w-[220px]" />
             <Segmented
                 value={filter}
                 onChange={(value) => onFilterChange(value as WorkflowFilter)}
@@ -428,10 +428,10 @@ function WorkflowControls({
                     { label: "独立副本", value: "detached" },
                 ]}
             />
-            <span className="text-xs text-stone-500 dark:text-stone-400">显示 {projects.length}/{allProjects.length}</span>
-            {selectedIds.length ? <Button onClick={() => onDelete(selectedIds)}>删除选中</Button> : null}
-            {projects.length ? <Button onClick={() => onDelete(projects.map((project) => project.id))}>删除全部</Button> : null}
-            <Button type="primary" icon={<Plus className="size-4" />} loading={isCreating} onClick={onCreate}>新建工作流</Button>
+            <span className="shrink-0 text-xs text-stone-500 dark:text-stone-400">显示 {projects.length}/{allProjects.length}</span>
+            {selectedIds.length ? <Button className="max-[519px]:flex-1" onClick={() => onDelete(selectedIds)}>删除选中</Button> : null}
+            {projects.length ? <Button className="max-[519px]:flex-1" onClick={() => onDelete(projects.map((project) => project.id))}>删除全部</Button> : null}
+            <Button className="max-[519px]:flex-1" type="primary" icon={<Plus className="size-4" />} loading={isCreating} onClick={onCreate}>新建工作流</Button>
         </>
     );
 }
@@ -465,7 +465,7 @@ function CommunitySection({
                 <section className="flex min-h-0 flex-1 items-center justify-center"><Spin /></section>
             ) : visibleItems.length ? (
                 <div className="thin-scrollbar min-h-0 flex-1 overflow-auto p-4 lg:p-6">
-                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                    <div className="grid gap-4 min-[520px]:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                         {visibleItems.map((item) => <CommunityCard key={item.id} item={item} source={projectMap.get(item.sourceWorkflowId)} mine={mode === "mine"} onOpen={() => onOpen(item)} onSync={() => onSync(item)} onDelete={() => onDelete(item)} />)}
                     </div>
                 </div>
@@ -482,12 +482,12 @@ function CommunityControls({ mode, setMode, keyword, locale, onKeywordChange, on
             <Segmented value={mode} onChange={(value) => setMode(value as CommunityMode)} options={[{ label: "社区工作流", value: "browse" }, { label: "我的作品", value: "mine" }]} />
             {mode === "browse" ? (
                 <>
-                    <Input allowClear value={keyword} onChange={(event) => onKeywordChange(event.target.value)} prefix={<Search className="size-4 text-stone-400" />} placeholder="搜索社区作品" className="!w-[min(100%,220px)]" />
-                    <Select value={locale} onChange={onLocaleChange} className="w-32" options={[{ label: "全部语言", value: "" }, { label: "中文", value: "zh-CN" }, { label: "English", value: "en-US" }]} />
+                    <Input allowClear value={keyword} onChange={(event) => onKeywordChange(event.target.value)} prefix={<Search className="size-4 text-stone-400" />} placeholder="搜索社区作品" className="!w-full min-[520px]:!w-[220px]" />
+                    <Select value={locale} onChange={onLocaleChange} className="w-full min-[520px]:w-32" options={[{ label: "全部语言", value: "" }, { label: "中文", value: "zh-CN" }, { label: "English", value: "en-US" }]} />
                 </>
             ) : null}
-            <Button icon={<UserRound className="size-4" />} onClick={() => setMode("mine")}>查看我的作品</Button>
-            <Button type="primary" icon={<UploadCloud className="size-4" />} onClick={onUpload}>上传我的作品</Button>
+            <Button className="max-[519px]:flex-1" icon={<UserRound className="size-4" />} onClick={() => setMode("mine")}>查看我的作品</Button>
+            <Button className="max-[519px]:flex-1" type="primary" icon={<UploadCloud className="size-4" />} onClick={onUpload}>上传我的作品</Button>
         </>
     );
 }
@@ -500,14 +500,14 @@ function CommunityCard({ item, source, mine, onOpen, onSync, onDelete }: { item:
     const [detailOpen, setDetailOpen] = useState(false);
     return (
         <>
-            <article className="group relative aspect-[1.18] min-h-[220px] cursor-pointer overflow-hidden rounded-lg border border-stone-200 bg-card text-stone-900 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-stone-800 dark:text-stone-100" onClick={() => setDetailOpen(true)}>
+            <article className="group relative aspect-square min-h-[220px] cursor-pointer overflow-hidden rounded-lg border border-stone-200 bg-card text-stone-900 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:aspect-[1.18] dark:border-stone-800 dark:text-stone-100" onClick={() => setDetailOpen(true)}>
                 <WorkflowPreviewBackdrop nodes={nodes} connections={connections} />
                 <div className="absolute inset-0 bg-gradient-to-b from-black/18 via-transparent to-black/62 dark:from-black/8 dark:to-black/74" />
-                <div className="absolute right-3 top-3 flex max-w-[76%] items-center gap-2 rounded-md border border-white/30 bg-white/80 px-2.5 py-1 text-right text-sm font-semibold shadow-sm backdrop-blur dark:border-white/10 dark:bg-stone-950/72">
+                <div className="absolute left-3 right-3 top-3 flex items-center justify-end gap-2 rounded-md border border-white/30 bg-white/80 px-2.5 py-1 text-right text-sm font-semibold shadow-sm backdrop-blur sm:left-auto sm:max-w-[76%] dark:border-white/10 dark:bg-stone-950/72">
                     <span className="truncate">{item.title}</span>
                     <Tag className="m-0" color={item.status === "banned" ? "red" : item.locale === "en-US" ? "cyan" : "green"}>{item.status === "banned" ? "封禁" : item.locale === "en-US" ? "EN" : "中文"}</Tag>
                 </div>
-                <div className="absolute inset-x-3 bottom-3 grid grid-cols-4 gap-1.5">
+                <div className="absolute inset-x-3 bottom-3 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
                     <CardMetric label="节点" value={nodes.length} />
                     <CardMetric label="连线" value={connections.length} />
                     <CardMetric label="会话" value={sessions.length} />
@@ -550,7 +550,7 @@ function CommunityCard({ item, source, mine, onOpen, onSync, onDelete }: { item:
 }
 
 function SideButton({ active, icon, label, onClick }: { active: boolean; icon: ReactNode; label: string; onClick: () => void }) {
-    return <button type="button" className={`flex min-w-0 flex-col items-center justify-center gap-1 rounded-md border px-2 py-2 text-center text-xs transition lg:flex-row lg:justify-start lg:px-3 lg:text-left lg:text-sm ${active ? "border-stone-300 text-stone-900 dark:border-stone-700 dark:text-stone-100" : "border-transparent text-stone-500 hover:border-stone-200 hover:text-stone-900 dark:text-stone-400 dark:hover:border-stone-800 dark:hover:text-stone-100"}`} onClick={onClick}>{icon}<span className="truncate">{label}</span></button>;
+    return <button type="button" className={`flex h-[52px] min-w-0 flex-col items-center justify-center gap-1 rounded-md border px-1.5 py-1.5 text-center text-[11px] transition lg:h-auto lg:flex-row lg:justify-start lg:px-3 lg:py-2 lg:text-left lg:text-sm ${active ? "border-stone-300 text-stone-900 dark:border-stone-700 dark:text-stone-100" : "border-transparent text-stone-500 hover:border-stone-200 hover:text-stone-900 dark:text-stone-400 dark:hover:border-stone-800 dark:hover:text-stone-100"}`} onClick={onClick}>{icon}<span className="w-full truncate leading-4">{label}</span></button>;
 }
 
 function HeaderMetric({ label, value, wide }: { label: string; value: ReactNode; wide?: boolean }) {

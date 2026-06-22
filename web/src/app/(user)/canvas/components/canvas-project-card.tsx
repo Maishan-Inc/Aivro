@@ -56,14 +56,14 @@ export function CanvasProjectCard({ project, onRename, onDelete }: { project: Cl
                     },
                 }}
             >
-                <article className={`group relative aspect-[1.18] min-h-[220px] cursor-pointer overflow-hidden rounded-lg border bg-card text-stone-900 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:text-stone-100 ${selected ? "border-stone-400 ring-2 ring-stone-300/70 dark:border-stone-600 dark:ring-stone-700/70" : "border-stone-200 dark:border-stone-800"}`} onClick={open}>
+                <article className={`group relative aspect-square min-h-[220px] cursor-pointer overflow-hidden rounded-lg border bg-card text-stone-900 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:aspect-[1.18] dark:text-stone-100 ${selected ? "border-stone-400 ring-2 ring-stone-300/70 dark:border-stone-600 dark:ring-stone-700/70" : "border-stone-200 dark:border-stone-800"}`} onClick={open}>
                     <WorkflowPreviewBackdrop nodes={project.nodes} connections={project.connections} />
                     <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/38 dark:from-black/8 dark:to-black/48" />
                     <input type="checkbox" checked={selected} onClick={(event) => event.stopPropagation()} onChange={(event) => toggleSelected(project.id, event.target.checked)} className="absolute left-3 top-3 z-10 size-4 accent-stone-900 dark:accent-stone-100" aria-label={`选择 ${project.title}`} />
-                    <div className="absolute right-3 top-3 max-w-[70%] rounded-md border border-white/30 bg-white/80 px-2.5 py-1 text-right text-sm font-semibold shadow-sm backdrop-blur dark:border-white/10 dark:bg-stone-950/72">
+                    <div className="absolute left-10 right-3 top-3 rounded-md border border-white/30 bg-white/80 px-2.5 py-1 text-right text-sm font-semibold shadow-sm backdrop-blur sm:left-auto sm:max-w-[70%] dark:border-white/10 dark:bg-stone-950/72">
                         <span className="block truncate">{project.title}</span>
                     </div>
-                    <div className="absolute inset-x-3 bottom-3 grid grid-cols-4 gap-1.5">
+                    <div className="absolute inset-x-3 bottom-3 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
                         <CardMetric label="节点" value={project.nodes.length} />
                         <CardMetric label="连线" value={project.connections.length} />
                         <CardMetric label="会话" value={project.chatSessions.length} />
@@ -130,11 +130,13 @@ export function WorkflowPreviewBackdrop({ nodes, connections }: { nodes: CanvasN
         const height = Math.max(1, maxY - minY);
         return items.map((node) => ({
             id: node.id,
-            type: String(node.type || "node"),
             left: 8 + ((node.position.x - minX) / width) * 72,
             top: 10 + ((node.position.y - minY) / height) * 68,
             width: Math.max(12, Math.min(26, (node.width / width) * 76)),
             height: Math.max(10, Math.min(22, (node.height / height) * 72)),
+            title: previewNodeTitle(node),
+            meta: previewNodeMeta(node),
+            accent: previewNodeAccent(node.type),
         }));
     }, [nodes]);
     const previewConnections = useMemo(() => (connections || []).slice(0, 10).map((connection, index) => ({ ...connection, index })), [connections]);
@@ -156,14 +158,51 @@ export function WorkflowPreviewBackdrop({ nodes, connections }: { nodes: CanvasN
                 })}
             </svg>
             {previewNodes.length ? previewNodes.map((node) => (
-                <div key={node.id} className="absolute rounded border border-stone-300 bg-white/85 shadow-sm dark:border-stone-700 dark:bg-stone-900/88" style={{ left: `${node.left}%`, top: `${node.top}%`, width: `${node.width}%`, height: `${node.height}%` }}>
-                    <span className="sr-only">{node.type}</span>
+                <div key={node.id} className="absolute overflow-hidden rounded-md border border-stone-300 bg-white/90 shadow-sm ring-1 ring-white/60 dark:border-stone-700 dark:bg-stone-900/90 dark:ring-white/5" style={{ left: `${node.left}%`, top: `${node.top}%`, width: `${node.width}%`, height: `${node.height}%` }}>
+                    <div className={`h-1 w-full ${node.accent}`} />
+                    <div className="min-w-0 px-1.5 py-1">
+                        <div className="truncate text-[7px] font-semibold leading-3 text-stone-700 dark:text-stone-200">{node.title}</div>
+                        <div className="mt-0.5 truncate text-[6px] leading-2 text-stone-400 dark:text-stone-500">{node.meta}</div>
+                        <div className="mt-1 grid gap-0.5">
+                            <span className="h-0.5 w-4/5 rounded-full bg-stone-200 dark:bg-stone-700" />
+                            <span className="h-0.5 w-1/2 rounded-full bg-stone-200 dark:bg-stone-700" />
+                        </div>
+                    </div>
                 </div>
             )) : (
                 <div className="absolute inset-0 grid place-items-center text-xs text-stone-400">空白工作流</div>
             )}
         </div>
     );
+}
+
+function previewNodeTitle(node: CanvasNodeData) {
+    return stringPreview(node.title || previewNodeTypeLabel(node.type), 18);
+}
+
+function previewNodeMeta(node: CanvasNodeData) {
+    const content = node.metadata?.prompt || (node.type === "text" ? node.metadata?.content : "") || previewNodeTypeLabel(node.type);
+    return stringPreview(content, 24);
+}
+
+function previewNodeTypeLabel(type: CanvasNodeData["type"]) {
+    if (type === "image") return "图片节点";
+    if (type === "text") return "文本节点";
+    if (type === "video") return "视频节点";
+    return "配置节点";
+}
+
+function previewNodeAccent(type: CanvasNodeData["type"]) {
+    if (type === "image") return "bg-cyan-500";
+    if (type === "text") return "bg-emerald-500";
+    if (type === "video") return "bg-rose-500";
+    return "bg-amber-500";
+}
+
+function stringPreview(value: string, maxLength: number) {
+    const text = value.startsWith("data:") ? "" : value.replace(/\s+/g, " ").trim();
+    if (!text) return "节点";
+    return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
 }
 
 function CardMetric({ label, value }: { label: string; value: ReactNode }) {
