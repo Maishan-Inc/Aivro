@@ -2119,11 +2119,11 @@ function normalizeModelCosts(items: Partial<AdminSettings["public"]["modelChanne
 }
 
 function normalizePrivateSetting(setting: Partial<AdminSettings["private"]> = {}): AdminSettings["private"] {
-    const legacyTurnstile = setting.turnstile || {};
-    const captcha = setting.captcha || {};
+    const legacyTurnstile = (setting.turnstile || {}) as Partial<AdminSettings["private"]["turnstile"]>;
+    const captcha = (setting.captcha || {}) as Partial<AdminSettings["private"]["captcha"]>;
     const hasCaptchaSetting = Boolean(setting.captcha);
-    const captchaTurnstile = captcha.turnstile || {};
-    const captchaHCaptcha = captcha.hcaptcha || {};
+    const captchaTurnstile = (captcha.turnstile || {}) as Partial<AdminSettings["private"]["captcha"]["turnstile"]>;
+    const captchaHCaptcha = (captcha.hcaptcha || {}) as Partial<AdminSettings["private"]["captcha"]["hcaptcha"]>;
     const normalizedCaptcha = {
         enabled: hasCaptchaSetting ? captcha.enabled === true : legacyTurnstile.enabled === true,
         provider: captcha.provider === "hcaptcha" ? "hcaptcha" : "turnstile",
