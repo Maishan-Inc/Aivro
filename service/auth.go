@@ -1515,7 +1515,7 @@ func (err mailDeliveryError) DetailMessage() string {
 		return "请检查 SMTP 配置"
 	}
 	if isSMTPAuthFailureMessage(message) {
-		return "SMTP 认证失败：服务器拒绝了当前 SMTP 用户名和密码/授权码。请确认邮箱已开启 SMTP 或客户端授权，SMTP 用户名通常是完整发件邮箱，密码通常应填写邮箱服务商生成的 SMTP 授权码而不是网页登录密码。原始错误：" + message
+		return "SMTP 认证失败：服务器拒绝了当前 SMTP 用户名和密码。请确认：1) 用户名为完整发件邮箱地址且无空格；2) 密码类型正确——QQ/163 等需填 SMTP 授权码（非网页登录密码），阿里企业邮箱等需填邮箱登录密码或客户端专用密码（非授权码）；3) 邮箱已开启 SMTP/客户端授权。原始错误：" + message
 	}
 	return message
 }

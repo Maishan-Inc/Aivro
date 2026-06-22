@@ -619,6 +619,7 @@ func normalizePrivateAuthProvider(provider model.PrivateOAuthProviderSetting, id
 func normalizeMailSetting(setting model.MailSetting) model.MailSetting {
 	setting.Host = strings.TrimSpace(setting.Host)
 	setting.Username = strings.TrimSpace(setting.Username)
+	setting.Password = strings.TrimSpace(setting.Password)
 	setting.FromEmail = strings.TrimSpace(setting.FromEmail)
 	setting.FromName = strings.TrimSpace(setting.FromName)
 	if setting.Port <= 0 {

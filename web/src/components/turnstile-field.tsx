@@ -18,9 +18,10 @@ type TurnstileFieldProps = {
     resetKey: number;
     onVerify: (token: string) => void;
     onError: (message: string) => void;
+    onReady?: () => void;
 };
 
-export function TurnstileField({ siteKey, resetKey, onVerify, onError }: TurnstileFieldProps) {
+export function TurnstileField({ siteKey, resetKey, onVerify, onError, onReady }: TurnstileFieldProps) {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const widgetRef = useRef<string>("");
 
@@ -41,6 +42,7 @@ export function TurnstileField({ siteKey, resetKey, onVerify, onError }: Turnsti
                     "error-callback": () => onError("人机验证加载失败，请重试"),
                 });
                 rendered = true;
+                onReady?.();
             } catch {
                 onError("人机验证渲染失败，请检查 Site Key 和域名配置");
             }
@@ -68,7 +70,7 @@ export function TurnstileField({ siteKey, resetKey, onVerify, onError }: Turnsti
             if (widgetRef.current && window.turnstile) window.turnstile.remove(widgetRef.current);
             widgetRef.current = "";
         };
-    }, [onError, onVerify, resetKey, siteKey]);
+    }, [onError, onVerify, onReady, resetKey, siteKey]);
 
     if (!siteKey) return null;
     return <div ref={containerRef} className="min-h-[65px]" />;

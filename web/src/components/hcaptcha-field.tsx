@@ -18,9 +18,10 @@ type HCaptchaFieldProps = {
     resetKey: number;
     onVerify: (token: string) => void;
     onError: (message: string) => void;
+    onReady?: () => void;
 };
 
-export function HCaptchaField({ siteKey, resetKey, onVerify, onError }: HCaptchaFieldProps) {
+export function HCaptchaField({ siteKey, resetKey, onVerify, onError, onReady }: HCaptchaFieldProps) {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const widgetRef = useRef<string>("");
 
@@ -41,6 +42,7 @@ export function HCaptchaField({ siteKey, resetKey, onVerify, onError }: HCaptcha
                     "error-callback": () => onError("hCaptcha 加载失败，请重试"),
                 });
                 rendered = true;
+                onReady?.();
             } catch {
                 onError("hCaptcha 渲染失败，请检查 Site Key 和域名配置");
             }
@@ -68,7 +70,7 @@ export function HCaptchaField({ siteKey, resetKey, onVerify, onError }: HCaptcha
             if (widgetRef.current && window.hcaptcha) window.hcaptcha.remove(widgetRef.current);
             widgetRef.current = "";
         };
-    }, [onError, onVerify, resetKey, siteKey]);
+    }, [onError, onVerify, onReady, resetKey, siteKey]);
 
     if (!siteKey) return null;
     return <div ref={containerRef} className="min-h-[78px]" />;

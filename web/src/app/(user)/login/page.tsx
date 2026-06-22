@@ -62,7 +62,6 @@ function LoginContent() {
     const [registerStep, setRegisterStep] = useState<RegisterStep>("credential");
     const [sendingCode, setSendingCode] = useState(false);
     const [codeSeconds, setCodeSeconds] = useState(0);
-    const [firstCodeSent, setFirstCodeSent] = useState(false);
     const [metaMaskAvailable, setMetaMaskAvailable] = useState(true);
     const redirect = safeRedirect(searchParams.get("redirect") || localizedPath("/"));
     const thirdPartyProviders = ([authSettings?.google, authSettings?.github, authSettings?.linuxDo, ...(authSettings?.customProviders || [])] as Array<AdminPublicAuthProvider | undefined>).filter((item): item is AdminPublicAuthProvider => item?.enabled === true && item.id !== "metamask");
@@ -102,7 +101,7 @@ function LoginContent() {
             }
             if (mode === "register") {
                 if (registerStep === "credential") {
-                    await startRegisterCode(values, false);
+                    await startRegisterCode(values);
                     return;
                 }
                 if (registerStep === "code") {
@@ -137,7 +136,7 @@ function LoginContent() {
         }
     };
 
-    const startRegisterCode = async (values: LoginFormValues, forceHumanCheck: boolean) => {
+    const startRegisterCode = async (values: LoginFormValues) => {
         if (!allowRegister) {
             message.error("当前未开放注册");
             return;
@@ -146,11 +145,11 @@ function LoginContent() {
             message.warning("请填写邮箱和密码");
             return;
         }
-        const sent = await requestRegisterCode(values.email, forceHumanCheck);
+        const sent = await requestRegisterCode(values.email);
         if (sent) setRegisterStep("code");
     };
 
-    const requestRegisterCode = async (email: string, forceHumanCheck: boolean, checkedCaptchaToken = "") => {
+    const requestRegisterCode = async (email: string) => {
         if (codeSeconds > 0) return false;
         if (!email) {
             message.warning("请先填写邮箱");
@@ -158,9 +157,9 @@ function LoginContent() {
         }
         setSendingCode(true);
         try {
-            const captchaToken = checkedCaptchaToken || (forceHumanCheck || !firstCodeSent ? await verifyCaptcha() : "");
+            // 始终在发送验证码之前完成人机验证，拦截未通过验证的请求。
+            const captchaToken = await verifyCaptcha();
             await sendRegisterEmailCode(email, captchaToken);
-            setFirstCodeSent(true);
             setCodeSeconds(60);
             message.success("验证码已发送");
             return true;
@@ -222,7 +221,6 @@ function LoginContent() {
                             onChange={(value) => {
                                 setMode(value as "login" | "register");
                                 setRegisterStep("credential");
-                                setFirstCodeSent(false);
                                 setCodeSeconds(0);
                                 form.resetFields();
                             }}
@@ -231,7 +229,7 @@ function LoginContent() {
                     </Form.Item>
                     <AivroReveal key={`${mode}-${registerStep}`}>
                         <div data-aivro-reveal className="aivro-auth-fields">
-                            {mode === "register" ? <RegisterFields step={registerStep} locale={locale} sendingCode={sendingCode} codeSeconds={codeSeconds} publicReady={Boolean(publicSettings)} onResend={() => void requestRegisterCode(form.getFieldValue("email"), true)} /> : <LoginFields locale={locale} />}
+                            {mode === "register" ? <RegisterFields step={registerStep} locale={locale} sendingCode={sendingCode} codeSeconds={codeSeconds} publicReady={Boolean(publicSettings)} onResend={() => void requestRegisterCode(form.getFieldValue("email"))} /> : <LoginFields locale={locale} />}
                         </div>
                     </AivroReveal>
                     <Space orientation="vertical" size={14} style={{ width: "100%" }}>

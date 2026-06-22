@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { HCaptchaField } from "@/components/hcaptcha-field";
 import { TurnstileField } from "@/components/turnstile-field";
@@ -48,11 +48,19 @@ export function useCaptchaChallenge(captcha?: AdminPublicCaptchaSettings) {
 }
 
 function CaptchaChallenge({ open, provider, siteKey, resetKey, onVerify, onError }: { open: boolean; provider: "turnstile" | "hcaptcha"; siteKey?: string; resetKey: number; onVerify: (token: string) => void; onError: (message: string) => void }) {
+    const [ready, setReady] = useState(false);
+    const handleReady = useCallback(() => setReady(true), []);
+
+    // 每次打开或重新挑战时先隐藏外框，等控件渲染完成后再和验证码一起显示。
+    useEffect(() => {
+        setReady(false);
+    }, [open, resetKey]);
+
     if (!open || !siteKey) return null;
     return (
         <div className="fixed inset-0 z-[2100] grid place-items-center px-6 pointer-events-none">
-            <div className="pointer-events-auto rounded-2xl border border-dashed border-stone-400 bg-background/95 p-5 shadow-xl dark:border-stone-600">
-                {provider === "hcaptcha" ? <HCaptchaField siteKey={siteKey} resetKey={resetKey} onVerify={onVerify} onError={onError} /> : <TurnstileField siteKey={siteKey} resetKey={resetKey} onVerify={onVerify} onError={onError} />}
+            <div className={`rounded-2xl border border-dashed border-stone-400 bg-background/95 p-5 shadow-xl transition-opacity duration-200 dark:border-stone-600 ${ready ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"}`}>
+                {provider === "hcaptcha" ? <HCaptchaField siteKey={siteKey} resetKey={resetKey} onVerify={onVerify} onError={onError} onReady={handleReady} /> : <TurnstileField siteKey={siteKey} resetKey={resetKey} onVerify={onVerify} onError={onError} onReady={handleReady} />}
             </div>
         </div>
     );
