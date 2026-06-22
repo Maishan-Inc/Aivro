@@ -26,6 +26,7 @@
   "auth": {
     "allowRegister": true,
     "emailVerification": false,
+    "captcha": { "enabled": false, "provider": "turnstile", "siteKey": "" },
     "linuxDo": { "id": "linux-do", "name": "Linux.do", "iconUrl": "/icons/linuxdo.svg", "enabled": false },
     "google": { "id": "google", "name": "Google", "iconUrl": "/icons/google.svg", "enabled": false },
     "github": { "id": "github", "name": "GitHub", "iconUrl": "/icons/github.svg", "enabled": false },
@@ -101,6 +102,7 @@
 | --- | --- | --- |
 | `allowRegister` | boolean | 是否允许用户注册，默认允许；关闭后注册入口隐藏，注册接口拒绝新用户创建 |
 | `emailVerification` | boolean | 是否开启注册邮箱验证码 |
+| `captcha` | object | 人机验证公开配置，包含启用状态、`turnstile` / `hcaptcha` 提供方和前端 Site Key |
 | `linuxDo` / `google` / `github` / `metamask` | object | 内置第三方登录公开配置 |
 | `customProviders` | object[] | 自定义 OAuth 登录公开配置 |
 
@@ -158,6 +160,12 @@
     "enabled": true,
     "cron": "*/5 * * * *",
     "githubRawProxyEnabled": false
+  },
+  "captcha": {
+    "enabled": false,
+    "provider": "turnstile",
+    "turnstile": { "siteKey": "", "secretKey": "" },
+    "hcaptcha": { "siteKey": "", "secretKey": "" }
   },
   "auth": {
     "linuxDo": {},
@@ -221,6 +229,7 @@
 | --- | --- | --- |
 | `channels` | object[] | 模型渠道列表 |
 | `promptSync` | object | GitHub 远程提示词定时同步配置 |
+| `captcha` | object | 人机验证私有配置，支持关闭、Turnstile 和 hCaptcha |
 | `auth` | object | OAuth、MetaMask 和自定义登录私有配置 |
 | `mail` | object | SMTP 验证码与邮件模板配置 |
 | `cloudStorage` | object | Cloudflare R2 / S3 兼容云存储配置 |

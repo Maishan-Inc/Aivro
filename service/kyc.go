@@ -25,32 +25,44 @@ type KYCRewardDescription struct {
 	WorkflowCreateCredits int `json:"workflowCreateCredits"`
 }
 
+type KYCStatusResponse struct {
+	Enabled   bool                 `json:"enabled"`
+	Provider  string               `json:"provider"`
+	Status    string               `json:"status"`
+	Rewarded  bool                 `json:"rewarded"`
+	CreatedAt string               `json:"createdAt"`
+	UpdatedAt string               `json:"updatedAt"`
+	Rewards   KYCRewardDescription `json:"rewards"`
+}
+
 // GetKYCStatus 获取用户 KYC 状态（供前端使用）
-func GetKYCStatus(userID string) (map[string]any, error) {
+func GetKYCStatus(userID string) (KYCStatusResponse, error) {
 	return KYCStatusForUser(userID)
 }
 
-func KYCStatusForUser(userID string) (map[string]any, error) {
+func KYCStatusForUser(userID string) (KYCStatusResponse, error) {
 	settings, err := repository.GetSettings()
 	if err != nil {
-		return nil, err
+		return KYCStatusResponse{}, err
 	}
 	kyc := normalizePrivateSetting(settings.Private).KYC
 	db, err := repository.DB()
 	if err != nil {
-		return nil, err
+		return KYCStatusResponse{}, err
 	}
 	item := model.KYCVerification{}
 	status := "unverified"
 	if err := db.Where("user_id = ?", userID).Order("created_at desc").First(&item).Error; err == nil {
 		status = string(item.Status)
 	}
-	return map[string]any{
-		"enabled":      kyc.Enabled,
-		"provider":     firstNonEmpty(kyc.Provider, "didit"),
-		"status":       status,
-		"verification": item,
-		"rewards":      KYCRewardDescription{Credits: kyc.RewardCredits, WorkflowCreateCredits: kyc.RewardWorkflowCreateCredits},
+	return KYCStatusResponse{
+		Enabled:   kyc.Enabled,
+		Provider:  firstNonEmpty(kyc.Provider, "didit"),
+		Status:    status,
+		Rewarded:  item.Rewarded,
+		CreatedAt: item.CreatedAt,
+		UpdatedAt: item.UpdatedAt,
+		Rewards:   KYCRewardDescription{Credits: kyc.RewardCredits, WorkflowCreateCredits: kyc.RewardWorkflowCreateCredits},
 	}, nil
 }
 
@@ -128,10 +140,10 @@ func HandleDiditWebhook(r *http.Request) error {
 		return err
 	}
 	if strings.TrimSpace(kyc.DiditWebhookSecret) == "" {
-		return safeMessageError{message: "Didit webhook 签名未配置"}
+		return &webhookSignatureError{message: "Didit webhook 签名未配置"}
 	}
 	if !validDiditSignature(r, body, kyc.DiditWebhookSecret) {
-		return safeMessageError{message: "Didit webhook 签名无效"}
+		return &webhookSignatureError{message: "Didit webhook 签名无效"}
 	}
 	var payload map[string]any
 	if err := json.Unmarshal(body, &payload); err != nil {

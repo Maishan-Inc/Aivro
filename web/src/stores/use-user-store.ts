@@ -3,7 +3,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-import { AUTH_TOKEN_KEY, fetchCurrentUser, login, register, type AuthPayload, type AuthUser } from "@/services/api/auth";
+import { AUTH_TOKEN_KEY, COOKIE_SESSION_TOKEN, fetchCurrentUser, login, logout, register, type AuthPayload, type AuthUser } from "@/services/api/auth";
 
 type UserStore = {
     token: string;
@@ -24,22 +24,21 @@ export const useUserStore = create<UserStore>()(
             user: null,
             isReady: false,
             isLoading: false,
-            setSession: (token, user) => set({ token, user, isReady: true }),
-            clearSession: () => set({ token: "", user: null, isReady: true }),
+            setSession: (_token, user) => set({ token: COOKIE_SESSION_TOKEN, user, isReady: true }),
+            clearSession: () => {
+                void logout().catch(() => undefined);
+                set({ token: "", user: null, isReady: true });
+            },
             hydrateUser: async () => {
                 const token = get().token;
-                if (!token) {
-                    set({ user: null, isReady: true });
-                    return;
-                }
                 set({ isLoading: true });
                 try {
-                    const user = await fetchCurrentUser(token);
+                    const user = await fetchCurrentUser(token || undefined);
                     if (user.role === "guest") {
                         set({ token: "", user: null, isReady: true, isLoading: false });
                         return;
                     }
-                    set({ user, isReady: true, isLoading: false });
+                    set({ token: COOKIE_SESSION_TOKEN, user, isReady: true, isLoading: false });
                 } catch {
                     set({ token: "", user: null, isReady: true, isLoading: false });
                 }
@@ -48,7 +47,7 @@ export const useUserStore = create<UserStore>()(
                 set({ isLoading: true });
                 try {
                     const session = await login(payload);
-                    set({ token: session.token, user: session.user, isReady: true, isLoading: false });
+                    set({ token: COOKIE_SESSION_TOKEN, user: session.user, isReady: true, isLoading: false });
                     return session.user;
                 } catch (error) {
                     set({ isLoading: false });
@@ -59,7 +58,7 @@ export const useUserStore = create<UserStore>()(
                 set({ isLoading: true });
                 try {
                     const session = await register(payload);
-                    set({ token: session.token, user: session.user, isReady: true, isLoading: false });
+                    set({ token: COOKIE_SESSION_TOKEN, user: session.user, isReady: true, isLoading: false });
                     return session.user;
                 } catch (error) {
                     set({ isLoading: false });
@@ -69,9 +68,12 @@ export const useUserStore = create<UserStore>()(
         }),
         {
             name: AUTH_TOKEN_KEY,
-            partialize: (state) => ({ token: state.token }),
+            partialize: (state) => ({ token: state.token ? COOKIE_SESSION_TOKEN : "" }),
             onRehydrateStorage: () => (state) => {
-                if (state) state.isReady = false;
+                if (state) {
+                    state.token = state.token ? COOKIE_SESSION_TOKEN : "";
+                    state.isReady = false;
+                }
             },
         },
     ),

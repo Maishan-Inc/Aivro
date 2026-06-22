@@ -23,6 +23,7 @@ export type CanvasImageGenerationType = "generation" | "edit";
 export type CanvasNodeMetadata = {
     content?: string;
     prompt?: string;
+    composerContent?: string;
     status?: CanvasNodeStatus;
     errorDetails?: string;
     fontSize?: number;
@@ -90,6 +91,9 @@ export type CanvasAssistantMessage = {
     isLoading?: boolean;
     references?: CanvasAssistantReference[];
     images?: CanvasAssistantImage[];
+    agentOps?: import("./utils/canvas-agent-ops").CanvasAgentOp[];
+    agentUsage?: { inputTokens: number; outputTokens: number; totalTokens: number; credits: number; estimated?: boolean };
+    agentNeedsClarification?: boolean;
 };
 
 export type CanvasAssistantSession = {

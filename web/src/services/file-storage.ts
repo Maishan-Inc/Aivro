@@ -2,6 +2,7 @@
 
 import axios from "axios";
 
+import { authHeader } from "@/services/api/request";
 import { useUserStore } from "@/stores/use-user-store";
 
 export type UploadedFile = { url: string; storageKey: string; bytes: number; mimeType: string; width?: number; height?: number; cloudFileId?: string; expiresAt?: string };
@@ -48,14 +49,14 @@ async function uploadFile(file: File) {
     if (!token) throw new Error("请先登录后再上传文件");
     const formData = new FormData();
     formData.set("file", file);
-    const response = await axios.post<ApiResponse<UploadedFile>>("/api/v1/files", formData, { headers: { Authorization: `Bearer ${token}` } });
+    const response = await axios.post<ApiResponse<UploadedFile>>("/api/v1/files", formData, { headers: authHeader(token), withCredentials: true });
     if (response.data.code !== 0) throw new Error(response.data.msg || "上传失败");
     return response.data.data;
 }
 
 function authHeaders() {
     const token = useUserStore.getState().token;
-    return token ? { headers: { Authorization: `Bearer ${token}` } } : undefined;
+    return token ? { headers: authHeader(token), credentials: "include" as RequestCredentials } : { credentials: "include" as RequestCredentials };
 }
 
 function readVideoMeta(url: string) {

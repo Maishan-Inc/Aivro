@@ -9,8 +9,8 @@ import { AivroReveal } from "@/components/aivro-reveal";
 import { useAuthLoadingOverlay } from "@/hooks/use-auth-loading-overlay";
 import { useI18n } from "@/hooks/use-i18n";
 import { useLocalizedPath } from "@/hooks/use-localized-path";
-import { useTurnstileChallenge } from "@/hooks/use-turnstile-challenge";
-import { fetchCurrentUser, loginWithMetaMask, sendRegisterEmailCode } from "@/services/api/auth";
+import { useCaptchaChallenge } from "@/hooks/use-captcha-challenge";
+import { COOKIE_SESSION_TOKEN, fetchCurrentUser, fetchMetaMaskChallenge, loginWithMetaMask, sendRegisterEmailCode } from "@/services/api/auth";
 import type { AdminPublicAuthProvider } from "@/services/api/admin";
 import { useConfigStore } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
@@ -54,10 +54,10 @@ function LoginContent() {
     const publicSettings = useConfigStore((state) => state.publicSettings);
     const authSettings = publicSettings?.auth;
     const linuxDoEnabled = authSettings?.linuxDo?.enabled === true;
-    const turnstileSiteKey = authSettings?.turnstileSiteKey || "";
+    const captcha = authSettings?.captcha?.enabled ? authSettings.captcha : authSettings?.turnstileSiteKey ? { enabled: true, provider: "turnstile" as const, siteKey: authSettings.turnstileSiteKey } : undefined;
     const allowRegister = authSettings?.allowRegister !== false;
     const { overlay, runWithOverlay } = useAuthLoadingOverlay();
-    const { verify: verifyTurnstile, challenge: turnstileChallenge } = useTurnstileChallenge(turnstileSiteKey);
+    const { verify: verifyCaptcha, challenge: captchaChallenge } = useCaptchaChallenge(captcha);
     const [mode, setMode] = useState<"login" | "register">("login");
     const [registerStep, setRegisterStep] = useState<RegisterStep>("credential");
     const [sendingCode, setSendingCode] = useState(false);
@@ -68,16 +68,16 @@ function LoginContent() {
     const thirdPartyProviders = ([authSettings?.google, authSettings?.github, authSettings?.linuxDo, ...(authSettings?.customProviders || [])] as Array<AdminPublicAuthProvider | undefined>).filter((item): item is AdminPublicAuthProvider => item?.enabled === true && item.id !== "metamask");
 
     useEffect(() => {
-        const token = searchParams.get("token");
         const error = searchParams.get("error");
         if (error) message.error(error);
-        if (!token) return;
-        void fetchCurrentUser(token).then((user) => {
-            setSession(token, user);
+        if (error) return;
+        void fetchCurrentUser().then((user) => {
+            if (user.role === "guest") return;
+            setSession(COOKIE_SESSION_TOKEN, user);
             message.success("登录成功");
             router.replace(user.profileCompleted ? redirect : localizedPath(`/profile/setup?redirect=${encodeURIComponent(redirect)}`));
             router.refresh();
-        });
+        }).catch(() => undefined);
     }, [message, redirect, router, searchParams, setSession]);
 
     useEffect(() => {
@@ -110,6 +110,7 @@ function LoginContent() {
                     return;
                 }
                 const email = values.email || "";
+                const captchaToken = await verifyCaptcha();
                 const user = await runWithOverlay("正在注册", () =>
                     register({
                         username: values.username || "",
@@ -118,6 +119,7 @@ function LoginContent() {
                         code: values.code,
                         accountType: values.accountType || "personal",
                         displayName: values.displayName,
+                        captchaToken,
                     }),
                 );
                 message.success("注册成功");
@@ -125,8 +127,8 @@ function LoginContent() {
                 router.refresh();
                 return;
             }
-            const turnstileToken = await verifyTurnstile();
-            const user = await runWithOverlay("正在登录", () => login({ username: values.username, password: values.password, turnstileToken }));
+            const captchaToken = await verifyCaptcha();
+            const user = await runWithOverlay("正在登录", () => login({ username: values.username, password: values.password, captchaToken }));
             message.success("登录成功");
             router.replace(user.profileCompleted ? redirect : localizedPath(`/profile/setup?redirect=${encodeURIComponent(redirect)}`));
             router.refresh();
@@ -148,7 +150,7 @@ function LoginContent() {
         if (sent) setRegisterStep("code");
     };
 
-    const requestRegisterCode = async (email: string, forceHumanCheck: boolean, checkedTurnstileToken = "") => {
+    const requestRegisterCode = async (email: string, forceHumanCheck: boolean, checkedCaptchaToken = "") => {
         if (codeSeconds > 0) return false;
         if (!email) {
             message.warning("请先填写邮箱");
@@ -156,8 +158,8 @@ function LoginContent() {
         }
         setSendingCode(true);
         try {
-            const turnstileToken = checkedTurnstileToken || (forceHumanCheck || !firstCodeSent ? await verifyTurnstile() : "");
-            await sendRegisterEmailCode(email, turnstileToken);
+            const captchaToken = checkedCaptchaToken || (forceHumanCheck || !firstCodeSent ? await verifyCaptcha() : "");
+            await sendRegisterEmailCode(email, captchaToken);
             setFirstCodeSent(true);
             setCodeSeconds(60);
             message.success("验证码已发送");
@@ -183,12 +185,14 @@ function LoginContent() {
                 message.error("未获取到钱包地址");
                 return;
             }
-            const signMessage = buildMetaMaskSignMessage(authSettings?.metamask, walletAddress);
+            const challenge = await fetchMetaMaskChallenge(walletAddress);
+            const signMessage = challenge.message;
             const signature = (await ethereum.request({ method: "personal_sign", params: [signMessage, walletAddress] })) as string;
             try {
-                const session = await runWithOverlay(locale === "en-US" ? "Signing in" : "正在登录", () => loginWithMetaMask({ walletAddress, message: signMessage, signature, email: "", code: "" }));
+                const captchaToken = await verifyCaptcha();
+                const session = await runWithOverlay(locale === "en-US" ? "Signing in" : "正在登录", () => loginWithMetaMask({ walletAddress, message: signMessage, signature, email: "", code: "", captchaToken }));
                 const user = await fetchCurrentUser(session.token);
-                setSession(session.token, user);
+                setSession(COOKIE_SESSION_TOKEN, user);
                 message.success(locale === "en-US" ? "Signed in" : "登录成功");
                 router.replace(user.profileCompleted ? redirect : localizedPath(`/profile/setup?redirect=${encodeURIComponent(redirect)}`));
                 router.refresh();
@@ -248,7 +252,7 @@ function LoginContent() {
                     </Space>
                 </Form>
             </AivroReveal>
-            {turnstileChallenge}
+            {captchaChallenge}
             {overlay}
         </main>
     );
@@ -374,13 +378,6 @@ function LoginActions({ locale, localizedPath, redirect, authSettings, linuxDoEn
 
 function ProviderIcon({ src }: { src: string }) {
     return <img src={src} alt="" width={20} height={20} className="shrink-0" />;
-}
-
-function buildMetaMaskSignMessage(provider: AdminPublicAuthProvider | undefined, walletAddress: string) {
-    const siteName = provider?.siteName || provider?.name || "Aivro";
-    const siteUrl = provider?.siteUrl || (typeof window === "undefined" ? "" : window.location.origin);
-    const logoUrl = provider?.signatureLogoUrl || provider?.iconUrl || "/icons/metamask.svg";
-    return `${siteName} MetaMask login\nSite URL: ${siteUrl}\nLogo: ${logoUrl}\nWallet: ${walletAddress}\nTime: ${Date.now()}`;
 }
 
 function registerButtonText(mode: "login" | "register", step: RegisterStep, locale: string) {

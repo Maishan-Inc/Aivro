@@ -160,14 +160,14 @@ func ExecuteAIProxyTask(ctx context.Context, user model.AuthUser, body io.Reader
 
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
-		log.Printf("AI proxy request failed: url=%s err=%v", request.URL.String(), err)
+		log.Printf("AI proxy request failed: path=%s err=%v", request.URL.Path, err)
 		return service.AIProxyResponse{}, err
 	}
 	defer response.Body.Close()
 
 	if response.StatusCode >= http.StatusBadRequest {
 		payload, _ := io.ReadAll(io.LimitReader(response.Body, 4096))
-		log.Printf("AI upstream error: url=%s status=%d body=%s", request.URL.String(), response.StatusCode, strings.TrimSpace(string(payload)))
+		log.Printf("AI upstream error: path=%s status=%d body=%s", request.URL.Path, response.StatusCode, strings.TrimSpace(string(payload)))
 		return service.AIProxyResponse{}, service.SafeAIError("AI 接口请求失败")
 	}
 
@@ -213,7 +213,7 @@ type aiProxyContext struct {
 func copyAIResponse(w http.ResponseWriter, request *http.Request, onFailure func(), proxyContext aiProxyContext) {
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
-		log.Printf("AI proxy request failed: url=%s err=%v", request.URL.String(), err)
+		log.Printf("AI proxy request failed: path=%s err=%v", request.URL.Path, err)
 		if onFailure != nil {
 			onFailure()
 		}
@@ -224,7 +224,7 @@ func copyAIResponse(w http.ResponseWriter, request *http.Request, onFailure func
 
 	if response.StatusCode >= http.StatusBadRequest {
 		payload, _ := io.ReadAll(io.LimitReader(response.Body, 4096))
-		log.Printf("AI upstream error: url=%s status=%d body=%s", request.URL.String(), response.StatusCode, strings.TrimSpace(string(payload)))
+		log.Printf("AI upstream error: path=%s status=%d body=%s", request.URL.Path, response.StatusCode, strings.TrimSpace(string(payload)))
 		if onFailure != nil {
 			onFailure()
 		}

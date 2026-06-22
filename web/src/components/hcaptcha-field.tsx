@@ -4,23 +4,23 @@ import { useEffect, useRef } from "react";
 
 declare global {
     interface Window {
-        turnstile?: {
+        hcaptcha?: {
             render: (container: HTMLElement, options: Record<string, unknown>) => string;
             remove: (widgetId: string) => void;
         };
     }
 }
 
-const turnstileScriptId = "cf-turnstile-script";
+const hCaptchaScriptId = "hcaptcha-script";
 
-type TurnstileFieldProps = {
+type HCaptchaFieldProps = {
     siteKey?: string;
     resetKey: number;
     onVerify: (token: string) => void;
     onError: (message: string) => void;
 };
 
-export function TurnstileField({ siteKey, resetKey, onVerify, onError }: TurnstileFieldProps) {
+export function HCaptchaField({ siteKey, resetKey, onVerify, onError }: HCaptchaFieldProps) {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const widgetRef = useRef<string>("");
 
@@ -32,44 +32,44 @@ export function TurnstileField({ siteKey, resetKey, onVerify, onError }: Turnsti
         let rendered = false;
         let canceled = false;
         const render = () => {
-            if (canceled || !containerRef.current || !window.turnstile || widgetRef.current) return;
+            if (canceled || !containerRef.current || !window.hcaptcha || widgetRef.current) return;
             try {
-                widgetRef.current = window.turnstile.render(containerRef.current, {
+                widgetRef.current = window.hcaptcha.render(containerRef.current, {
                     sitekey: siteKey,
                     callback: onVerify,
                     "expired-callback": () => onError("人机验证已过期，请重试"),
-                    "error-callback": () => onError("人机验证加载失败，请重试"),
+                    "error-callback": () => onError("hCaptcha 加载失败，请重试"),
                 });
                 rendered = true;
             } catch {
-                onError("人机验证渲染失败，请检查 Site Key 和域名配置");
+                onError("hCaptcha 渲染失败，请检查 Site Key 和域名配置");
             }
         };
-        const existing = document.getElementById(turnstileScriptId) as HTMLScriptElement | null;
+        const existing = document.getElementById(hCaptchaScriptId) as HTMLScriptElement | null;
         if (existing) {
-            if (window.turnstile) render();
+            if (window.hcaptcha) render();
             else existing.addEventListener("load", render, { once: true });
         } else {
             const script = document.createElement("script");
-            script.id = turnstileScriptId;
-            script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+            script.id = hCaptchaScriptId;
+            script.src = "https://js.hcaptcha.com/1/api.js?render=explicit";
             script.async = true;
             script.defer = true;
             script.addEventListener("load", render, { once: true });
-            script.addEventListener("error", () => onError("人机验证脚本加载失败，请检查网络或域名配置"), { once: true });
+            script.addEventListener("error", () => onError("hCaptcha 脚本加载失败，请检查网络或域名配置"), { once: true });
             document.head.appendChild(script);
         }
         const timer = window.setTimeout(() => {
-            if (!canceled && !rendered) onError("人机验证加载超时，请重试");
+            if (!canceled && !rendered) onError("hCaptcha 加载超时，请重试");
         }, 10000);
         return () => {
             canceled = true;
             window.clearTimeout(timer);
-            if (widgetRef.current && window.turnstile) window.turnstile.remove(widgetRef.current);
+            if (widgetRef.current && window.hcaptcha) window.hcaptcha.remove(widgetRef.current);
             widgetRef.current = "";
         };
     }, [onError, onVerify, resetKey, siteKey]);
 
     if (!siteKey) return null;
-    return <div ref={containerRef} className="min-h-[65px]" />;
+    return <div ref={containerRef} className="min-h-[78px]" />;
 }

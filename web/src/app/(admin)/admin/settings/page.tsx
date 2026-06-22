@@ -120,6 +120,7 @@ const emptySettings: AdminSettings = {
             allowRegister: true,
             emailVerification: false,
             turnstileSiteKey: "",
+            captcha: { enabled: false, provider: "turnstile", siteKey: "" },
             linuxDo: emptyPublicProvider("linux-do", "Linux.do", "/icons/linuxdo.svg"),
             google: emptyPublicProvider("google", "Google", "/icons/google.svg"),
             github: emptyPublicProvider("github", "GitHub", "/icons/github.svg"),
@@ -167,6 +168,7 @@ const emptySettings: AdminSettings = {
         promptSync: { enabled: true, cron: "*/5 * * * *", githubRawProxyEnabled: false },
         aiQueue: { enabled: true, backend: "database", redisUrl: "", defaultPerMinute: 50, modelPerMinute: [], maxQueuedPerUser: 20, taskRetentionHours: 24 },
         canvasAssist: { historyRetentionDays: 7 },
+        captcha: { enabled: false, provider: "turnstile", turnstile: { siteKey: "", secretKey: "" }, hcaptcha: { siteKey: "", secretKey: "" } },
         turnstile: { enabled: false, siteKey: "", secretKey: "" },
         auth: {
             linuxDo: emptyPrivateProvider("linux-do", "Linux.do", "/icons/linuxdo.svg"),
@@ -278,7 +280,7 @@ export default function AdminSettingsPage() {
     const [newCostModel, setNewCostModel] = useState("");
     const [knownModels, setKnownModels] = useState<string[]>([]);
     const publicModels = Form.useWatch(["public", "modelChannel", "availableModels"], form) || [];
-    const customAuthProviders = Form.useWatch(["private", "auth", "customProviders"], form) || [];
+    const customAuthProviders = Form.useWatch(["private", "auth", "customProviders"], { form, preserve: true }) || [];
     const channelModels = useMemo(() => collectChannelModels(channels), [channels]);
     const channelTableData = useMemo(() => channels.map((channel, index) => ({ ...channel, _index: index, _rowKey: `${index}-${channel.name}-${channel.baseUrl}` })), [channels]);
     const standaloneTab = activeTab === "model" || activeTab === "mail";
@@ -1233,13 +1235,13 @@ export default function AdminSettingsPage() {
                                                 </Form.Item>
                                             </Col>
                                             <Col xs={24} md={12}>
-                                                <Form.Item name={["private", "mail", "username"]} label="SMTP 用户名">
+                                                <Form.Item name={["private", "mail", "username"]} label="SMTP 用户名" extra="多数邮箱要求填写完整发件邮箱地址，并与发件邮箱一致。">
                                                     <Input />
                                                 </Form.Item>
                                             </Col>
                                             <Col xs={24} md={12}>
-                                                <Form.Item name={["private", "mail", "password"]} label="SMTP 密码">
-                                                    <Input.Password placeholder="留空则沿用已保存的密码" />
+                                                <Form.Item name={["private", "mail", "password"]} label="SMTP 密码" extra="多数服务商需要填写 SMTP/客户端授权码，不是网页登录密码；留空测试或保存会沿用已保存密码。">
+                                                    <Input.Password placeholder="填写 SMTP 授权码，留空沿用已保存密码" />
                                                 </Form.Item>
                                             </Col>
                                             <Col xs={24} md={12}>
@@ -1248,7 +1250,7 @@ export default function AdminSettingsPage() {
                                                 </Form.Item>
                                             </Col>
                                             <Col xs={24} md={12}>
-                                                <Form.Item name={["private", "mail", "fromEmail"]} label="发件邮箱">
+                                                <Form.Item name={["private", "mail", "fromEmail"]} label="发件邮箱" extra="建议与 SMTP 用户名一致，否则部分服务商会拒绝发信。">
                                                     <Input placeholder="noreply@example.com" />
                                                 </Form.Item>
                                             </Col>
@@ -1374,22 +1376,39 @@ export default function AdminSettingsPage() {
                                         </Col>
                                     </Row>
                                 </Card>
-                                <Card size="small" title="Cloudflare Turnstile" extra={sectionSaveButton()}>
+                                <Card size="small" title="人机验证" extra={sectionSaveButton()}>
                                     <Row gutter={16}>
                                         <Col xs={24} md={8}>
-                                            <Form.Item name={["private", "turnstile", "enabled"]} label="启用人机验证" valuePropName="checked">
+                                            <Form.Item name={["private", "captcha", "enabled"]} label="启用人机验证" valuePropName="checked">
                                                 <Switch />
                                             </Form.Item>
                                         </Col>
                                         <Col xs={24} md={8}>
-                                            <Form.Item name={["private", "turnstile", "siteKey"]} label="Site Key" extra="启用后会通过公开设置下发给前端。">
-                                                <Input placeholder="0x..." />
+                                            <Form.Item name={["private", "captcha", "provider"]} label="验证服务">
+                                                <Segmented block options={[{ label: "Turnstile", value: "turnstile" }, { label: "hCaptcha", value: "hcaptcha" }]} />
                                             </Form.Item>
                                         </Col>
-                                        <Col xs={24} md={8}>
-                                            <Form.Item name={["private", "turnstile", "secretKey"]} label="Secret Key" extra="后台返回时隐藏；留空保存表示沿用已保存密钥。">
-                                                <Input.Password placeholder="0x..." />
-                                            </Form.Item>
+                                    </Row>
+                                    <Row gutter={16}>
+                                        <Col xs={24} md={12}>
+                                            <Card size="small" title="Cloudflare Turnstile">
+                                                <Form.Item name={["private", "captcha", "turnstile", "siteKey"]} label="Site Key" extra="选择 Turnstile 时会通过公开设置下发给前端。">
+                                                    <Input placeholder="0x..." />
+                                                </Form.Item>
+                                                <Form.Item name={["private", "captcha", "turnstile", "secretKey"]} label="Secret Key" extra="后台返回时隐藏；留空保存表示沿用已保存密钥。">
+                                                    <Input.Password placeholder="0x..." />
+                                                </Form.Item>
+                                            </Card>
+                                        </Col>
+                                        <Col xs={24} md={12}>
+                                            <Card size="small" title="hCaptcha">
+                                                <Form.Item name={["private", "captcha", "hcaptcha", "siteKey"]} label="Site Key" extra="选择 hCaptcha 时会通过公开设置下发给前端。">
+                                                    <Input placeholder="10000000-ffff-ffff-ffff-000000000001" />
+                                                </Form.Item>
+                                                <Form.Item name={["private", "captcha", "hcaptcha", "secretKey"]} label="Secret Key" extra="后台返回时隐藏；留空保存表示沿用已保存密钥。">
+                                                    <Input.Password placeholder="0x..." />
+                                                </Form.Item>
+                                            </Card>
                                         </Col>
                                     </Row>
                                 </Card>
@@ -1722,8 +1741,8 @@ const mailTemplateTitles: Record<MailTemplateKey, string> = {
 const mailTemplateVariables = ["{{code}}", "{{email}}", "{{expireMinutes}}", "{{siteName}}", "{{ip}}", "{{country}}", "{{region}}"];
 
 function AuthProviderSummaryCard({ form, title, iconUrl, users, publicEnabledPath, privateEnabledPath, onEdit }: { form: any; title: string; iconUrl?: string; users: number; publicEnabledPath: (string | number)[]; privateEnabledPath?: (string | number)[]; onEdit: () => void }) {
-    const publicEnabled = Form.useWatch(publicEnabledPath, form);
-    const privateEnabled = Form.useWatch(privateEnabledPath || publicEnabledPath, form);
+    const publicEnabled = Form.useWatch(publicEnabledPath, { form, preserve: true });
+    const privateEnabled = Form.useWatch(privateEnabledPath || publicEnabledPath, { form, preserve: true });
     const ready = publicEnabled && privateEnabled;
     return (
         <Col xs={24} md={12} xl={8}>
@@ -2036,6 +2055,13 @@ function normalizePublicSetting(setting: Partial<AdminSettings["public"]> = {}):
             allowRegister: setting.auth?.allowRegister !== false,
             emailVerification: setting.auth?.emailVerification === true,
             turnstileSiteKey: setting.auth?.turnstileSiteKey || "",
+            captcha: {
+                ...emptySettings.public.auth.captcha,
+                ...(setting.auth?.captcha || {}),
+                provider: setting.auth?.captcha?.provider === "hcaptcha" ? "hcaptcha" : "turnstile",
+                enabled: setting.auth?.captcha?.enabled === true,
+                siteKey: setting.auth?.captcha?.siteKey || setting.auth?.turnstileSiteKey || "",
+            },
             linuxDo: normalizePublicProvider(setting.auth?.linuxDo, "linux-do", "Linux.do", "/icons/linuxdo.svg"),
             google: normalizePublicProvider(setting.auth?.google, "google", "Google", "/icons/google.svg"),
             github: normalizePublicProvider(setting.auth?.github, "github", "GitHub", "/icons/github.svg"),
@@ -2093,6 +2119,23 @@ function normalizeModelCosts(items: Partial<AdminSettings["public"]["modelChanne
 }
 
 function normalizePrivateSetting(setting: Partial<AdminSettings["private"]> = {}): AdminSettings["private"] {
+    const legacyTurnstile = setting.turnstile || {};
+    const captcha = setting.captcha || {};
+    const hasCaptchaSetting = Boolean(setting.captcha);
+    const captchaTurnstile = captcha.turnstile || {};
+    const captchaHCaptcha = captcha.hcaptcha || {};
+    const normalizedCaptcha = {
+        enabled: hasCaptchaSetting ? captcha.enabled === true : legacyTurnstile.enabled === true,
+        provider: captcha.provider === "hcaptcha" ? "hcaptcha" : "turnstile",
+        turnstile: {
+            siteKey: captchaTurnstile.siteKey || legacyTurnstile.siteKey || "",
+            secretKey: captchaTurnstile.secretKey || legacyTurnstile.secretKey || "",
+        },
+        hcaptcha: {
+            siteKey: captchaHCaptcha.siteKey || "",
+            secretKey: captchaHCaptcha.secretKey || "",
+        },
+    } as AdminSettings["private"]["captcha"];
     return {
         channels: (setting.channels || []).map(normalizeChannel),
         promptSync: {
@@ -2116,12 +2159,13 @@ function normalizePrivateSetting(setting: Partial<AdminSettings["private"]> = {}
         canvasAssist: {
             historyRetentionDays: Math.max(1, Number(setting.canvasAssist?.historyRetentionDays) || 7),
         },
+        captcha: normalizedCaptcha,
         turnstile: {
             ...emptySettings.private.turnstile,
-            ...(setting.turnstile || {}),
-            enabled: setting.turnstile?.enabled === true,
-            siteKey: setting.turnstile?.siteKey || "",
-            secretKey: setting.turnstile?.secretKey || "",
+            ...(legacyTurnstile || {}),
+            enabled: normalizedCaptcha.enabled && normalizedCaptcha.provider === "turnstile",
+            siteKey: normalizedCaptcha.turnstile.siteKey,
+            secretKey: normalizedCaptcha.turnstile.secretKey,
         },
         auth: {
             linuxDo: normalizePrivateProvider(setting.auth?.linuxDo, "linux-do", "Linux.do", "/icons/linuxdo.svg"),
@@ -2246,6 +2290,17 @@ function mergeSavedSecrets(currentSettings: AdminSettings, saved: AdminSettings)
             turnstile: {
                 ...saved.private.turnstile,
                 secretKey: currentSettings.private.turnstile.secretKey || saved.private.turnstile.secretKey,
+            },
+            captcha: {
+                ...saved.private.captcha,
+                turnstile: {
+                    ...saved.private.captcha.turnstile,
+                    secretKey: currentSettings.private.captcha.turnstile.secretKey || saved.private.captcha.turnstile.secretKey,
+                },
+                hcaptcha: {
+                    ...saved.private.captcha.hcaptcha,
+                    secretKey: currentSettings.private.captcha.hcaptcha.secretKey || saved.private.captcha.hcaptcha.secretKey,
+                },
             },
             mail: {
                 ...saved.private.mail,

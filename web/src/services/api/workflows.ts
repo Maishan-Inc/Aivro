@@ -1,6 +1,7 @@
 import { apiDelete, apiGet, apiPost, apiPut, compactApiParams } from "@/services/api/request";
 import type { CanvasBackgroundMode } from "@/lib/canvas-theme";
 import type { CanvasAssistantSession, CanvasConnection, CanvasNodeData, ViewportTransform } from "@/app/(user)/canvas/types";
+import type { CanvasAgentOp, CanvasAgentSnapshot } from "@/app/(user)/canvas/utils/canvas-agent-ops";
 
 export type CloudWorkflow = {
     id: string;
@@ -114,12 +115,23 @@ export type CanvasAssistantSendInput = {
     references?: NonNullable<CanvasAssistantSession["messages"][number]["references"]>;
 };
 
+export type CanvasAgentPlanInput = CanvasAssistantSendInput & {
+    snapshot: CanvasAgentSnapshot;
+    preview?: { ops: CanvasAgentOp[]; snapshot: CanvasAgentSnapshot };
+};
+
+export type CanvasAgentUsage = { inputTokens: number; outputTokens: number; totalTokens: number; credits: number; estimated?: boolean };
+
 export async function fetchCanvasAssistantSessions(token: string, workflowId: string) {
     return apiGet<{ items: CanvasAssistantSession[]; total: number }>(`/api/v1/workflows/${encodeURIComponent(workflowId)}/assistant-sessions`, undefined, token);
 }
 
 export async function sendCanvasAssistantMessage(token: string, workflowId: string, input: CanvasAssistantSendInput) {
     return apiPost<{ session: CanvasAssistantSession; message: CanvasAssistantSession["messages"][number] }>(`/api/v1/workflows/${encodeURIComponent(workflowId)}/assistant-sessions/message`, input, token);
+}
+
+export async function planCanvasAgent(token: string, workflowId: string, input: CanvasAgentPlanInput) {
+    return apiPost<{ session: CanvasAssistantSession; message: CanvasAssistantSession["messages"][number]; ops: CanvasAgentOp[]; usage: CanvasAgentUsage }>(`/api/v1/workflows/${encodeURIComponent(workflowId)}/canvas-agent/plan`, input, token);
 }
 
 export async function deleteCanvasAssistantSession(token: string, workflowId: string, sessionId: string) {

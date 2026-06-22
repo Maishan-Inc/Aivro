@@ -5,7 +5,7 @@ import { App, Button, Form, Input, Segmented } from "antd";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 
-import { completeProfile } from "@/services/api/auth";
+import { COOKIE_SESSION_TOKEN, completeProfile } from "@/services/api/auth";
 import { useI18n } from "@/hooks/use-i18n";
 import { useLocalizedPath } from "@/hooks/use-localized-path";
 import { useUserStore } from "@/stores/use-user-store";
@@ -48,7 +48,7 @@ function ProfileSetupContent() {
         setSaving(true);
         try {
             const nextUser = await completeProfile(token, values);
-            setSession(token, nextUser);
+            setSession(token || COOKIE_SESSION_TOKEN, nextUser);
             message.success(locale === "en-US" ? "Profile completed" : "资料已完成");
             router.replace(redirect);
             router.refresh();

@@ -1,11 +1,11 @@
 "use client";
 
-import { Copy, FolderPlus } from "lucide-react";
+import { Copy, FolderPlus, Sparkles } from "lucide-react";
 import { Button, Modal, Space, Tag } from "antd";
 
 import { formatPromptDate, type Prompt } from "@/services/api/prompts";
 
-export function PromptDetailDialog({ prompt, onClose, onCopy, onSaveAsset }: { prompt: Prompt | null; onClose: () => void; onCopy: (prompt: string) => void; onSaveAsset?: (prompt: Prompt) => void }) {
+export function PromptDetailDialog({ prompt, onClose, onCopy, onGenerate, onSaveAsset }: { prompt: Prompt | null; onClose: () => void; onCopy: (prompt: string) => void; onGenerate?: (prompt: string) => void; onSaveAsset?: (prompt: Prompt) => void }) {
     return (
         <>
             <Modal title={prompt?.title} open={Boolean(prompt)} onCancel={onClose} footer={null} width={860}>
@@ -29,6 +29,11 @@ export function PromptDetailDialog({ prompt, onClose, onCopy, onSaveAsset }: { p
                                     创建：{formatPromptDate(prompt.createdAt)} · 更新：{formatPromptDate(prompt.updatedAt)}
                                 </div>
                                 <Space wrap className="mt-5">
+                                    {onGenerate ? (
+                                        <Button type="primary" icon={<Sparkles className="size-4" />} onClick={() => onGenerate(prompt.prompt)}>
+                                            立即生成
+                                        </Button>
+                                    ) : null}
                                     <Button type="primary" icon={<Copy className="size-4" />} onClick={() => onCopy(prompt.prompt)}>
                                         复制提示词
                                     </Button>

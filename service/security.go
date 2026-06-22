@@ -2,19 +2,39 @@ package service
 
 import (
 	"encoding/json"
+	"errors"
 	"net"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
+	"github.com/basketikun/aivro/model"
 	"github.com/basketikun/aivro/repository"
 )
 
 const turnstileVerifyURL = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
+const hCaptchaVerifyURL = "https://api.hcaptcha.com/siteverify"
 
-type turnstileResponse struct {
+type captchaVerifyResponse struct {
 	Success bool `json:"success"`
+}
+
+type webhookSignatureError struct {
+	message string
+}
+
+func (err webhookSignatureError) Error() string {
+	return err.message
+}
+
+func (err webhookSignatureError) SafeMessage() string {
+	return err.message
+}
+
+func IsWebhookSignatureError(err error) bool {
+	var signatureErr *webhookSignatureError
+	return errors.As(err, &signatureErr)
 }
 
 func publicHTTPClient() *http.Client {
@@ -32,30 +52,31 @@ func publicHTTPClient() *http.Client {
 	}
 }
 
-func VerifyTurnstile(r *http.Request, token string) error {
+func VerifyCaptcha(r *http.Request, token string) error {
 	settings, err := repository.GetSettings()
 	if err != nil {
 		return err
 	}
-	turnstile := normalizeTurnstileSetting(settings.Private.Turnstile)
-	if !turnstile.Enabled || turnstile.SiteKey == "" || turnstile.SecretKey == "" {
+	captcha := normalizeCaptchaSetting(settings.Private.Captcha, settings.Private.Turnstile)
+	provider := captchaProviderSetting(captcha)
+	if !captcha.Enabled || provider.SiteKey == "" || provider.SecretKey == "" {
 		return nil
 	}
 	if strings.TrimSpace(token) == "" {
 		return safeMessageError{message: "请先完成人机验证"}
 	}
 	values := url.Values{}
-	values.Set("secret", turnstile.SecretKey)
+	values.Set("secret", provider.SecretKey)
 	values.Set("response", strings.TrimSpace(token))
 	if ip := requestIP(r); ip != "" && ip != "未知" {
 		values.Set("remoteip", ip)
 	}
-	resp, err := http.PostForm(turnstileVerifyURL, values)
+	resp, err := http.PostForm(captchaVerifyURL(captcha.Provider), values)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
-	payload := turnstileResponse{}
+	payload := captchaVerifyResponse{}
 	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
 		return err
 	}
@@ -63,6 +84,13 @@ func VerifyTurnstile(r *http.Request, token string) error {
 		return safeMessageError{message: "人机验证失败，请重试"}
 	}
 	return nil
+}
+
+func captchaVerifyURL(provider model.CaptchaProvider) string {
+	if provider == model.CaptchaProviderHCaptcha {
+		return hCaptchaVerifyURL
+	}
+	return turnstileVerifyURL
 }
 
 func SafeRedirectPath(redirect string) string {

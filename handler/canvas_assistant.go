@@ -7,6 +7,8 @@ import (
 	"github.com/basketikun/aivro/service"
 )
 
+const canvasAssistantRequestMaxBytes = 2 << 20
+
 func CanvasAssistantSessions(w http.ResponseWriter, r *http.Request, workflowID string) {
 	user, ok := service.UserFromContext(r.Context())
 	if !ok {
@@ -28,8 +30,32 @@ func SendCanvasAssistantMessage(w http.ResponseWriter, r *http.Request, workflow
 		return
 	}
 	var input service.CanvasAssistantSendInput
-	_ = json.NewDecoder(r.Body).Decode(&input)
+	r.Body = http.MaxBytesReader(w, r.Body, canvasAssistantRequestMaxBytes)
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		Fail(w, "请求参数无效或过大")
+		return
+	}
 	result, err := service.SendCanvasAssistantMessage(r.Context(), user.ID, workflowID, input)
+	if err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, result)
+}
+
+func PlanCanvasAgent(w http.ResponseWriter, r *http.Request, workflowID string) {
+	user, ok := service.UserFromContext(r.Context())
+	if !ok {
+		Fail(w, "未登录或权限不足")
+		return
+	}
+	var input service.CanvasAgentPlanInput
+	r.Body = http.MaxBytesReader(w, r.Body, canvasAssistantRequestMaxBytes)
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		Fail(w, "请求参数无效或过大")
+		return
+	}
+	result, err := service.PlanCanvasAgent(r.Context(), user.ID, workflowID, input)
 	if err != nil {
 		FailError(w, err)
 		return

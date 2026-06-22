@@ -13,7 +13,7 @@ export function workflowConfirmName(workflow: Pick<CloudWorkflow, "slug" | "titl
 export function useWorkflowModals() {
     const { message, modal } = App.useApp();
 
-    const requestWorkflowName = (options: { title: string; username?: string; okText: string; placeholder?: string; defaultValue?: string }) =>
+    const requestWorkflowName = (options: { title: string; username?: string; okText: string; placeholder?: string; defaultValue?: string; cancelOnLeft?: boolean }) =>
         new Promise<string>((resolve) => {
             let value = options.defaultValue || "";
             modal.confirm({
@@ -37,6 +37,7 @@ export function useWorkflowModals() {
                 ),
                 okText: options.okText,
                 cancelText: "取消",
+                footer: options.cancelOnLeft ? (_, { OkBtn, CancelBtn }) => <div className="flex items-center justify-between gap-2"><CancelBtn /><OkBtn /></div> : undefined,
                 onOk: () => {
                     if (!value) {
                         message.error("请填写工作流名称");

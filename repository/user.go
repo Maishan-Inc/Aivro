@@ -300,6 +300,36 @@ func GetLatestEmailVerification(purpose string, target string) (model.EmailVerif
 	return item, err == nil, err
 }
 
+func SaveMetaMaskChallenge(item model.MetaMaskChallenge) (model.MetaMaskChallenge, error) {
+	db, err := DB()
+	if err != nil {
+		return item, err
+	}
+	return item, db.Save(&item).Error
+}
+
+func GetActiveMetaMaskChallenge(nonce string, currentTime string) (model.MetaMaskChallenge, bool, error) {
+	db, err := DB()
+	if err != nil {
+		return model.MetaMaskChallenge{}, false, err
+	}
+	item := model.MetaMaskChallenge{}
+	err = db.Where("nonce = ? AND used_at = '' AND expires_at > ?", nonce, currentTime).First(&item).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return model.MetaMaskChallenge{}, false, nil
+	}
+	return item, err == nil, err
+}
+
+func ConsumeMetaMaskChallenge(id string, usedAt string) (bool, error) {
+	db, err := DB()
+	if err != nil {
+		return false, err
+	}
+	tx := db.Model(&model.MetaMaskChallenge{}).Where("id = ? AND used_at = '' AND expires_at > ?", id, usedAt).Update("used_at", usedAt)
+	return tx.RowsAffected > 0, tx.Error
+}
+
 // findUser 查询单个用户，并将未命中转换为 ok=false。
 func findUser(db *gorm.DB, query string, args ...any) (model.User, bool, error) {
 	user := model.User{}

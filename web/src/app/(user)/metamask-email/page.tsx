@@ -8,8 +8,8 @@ import { Suspense, useEffect, useState } from "react";
 import { useAuthLoadingOverlay } from "@/hooks/use-auth-loading-overlay";
 import { useI18n } from "@/hooks/use-i18n";
 import { useLocalizedPath } from "@/hooks/use-localized-path";
-import { useTurnstileChallenge } from "@/hooks/use-turnstile-challenge";
-import { fetchCurrentUser, loginWithMetaMask, sendEmailCode } from "@/services/api/auth";
+import { useCaptchaChallenge } from "@/hooks/use-captcha-challenge";
+import { COOKIE_SESSION_TOKEN, fetchCurrentUser, loginWithMetaMask, sendEmailCode } from "@/services/api/auth";
 import { useConfigStore } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
 
@@ -48,12 +48,12 @@ function MetaMaskEmailContent() {
     const [codeSeconds, setCodeSeconds] = useState(0);
     const [payload, setPayload] = useState<MetaMaskLoginPayload | null>(null);
     const publicSettings = useConfigStore((state) => state.publicSettings);
-    const turnstileSiteKey = publicSettings?.auth?.turnstileSiteKey || "";
+    const captcha = publicSettings?.auth?.captcha?.enabled ? publicSettings.auth.captcha : publicSettings?.auth?.turnstileSiteKey ? { enabled: true, provider: "turnstile" as const, siteKey: publicSettings.auth.turnstileSiteKey } : undefined;
     const { overlay, runWithOverlay } = useAuthLoadingOverlay();
-    const { verify: verifyTurnstile, challenge: turnstileChallenge } = useTurnstileChallenge(turnstileSiteKey);
-    const walletAddress = payload?.walletAddress || searchParams.get("walletAddress") || "";
-    const signMessage = payload?.message || searchParams.get("message") || "";
-    const signature = payload?.signature || searchParams.get("signature") || "";
+    const { verify: verifyCaptcha, challenge: captchaChallenge } = useCaptchaChallenge(captcha);
+    const walletAddress = payload?.walletAddress || "";
+    const signMessage = payload?.message || "";
+    const signature = payload?.signature || "";
     const redirect = safeRedirect(payload?.redirect || searchParams.get("redirect") || localizedPath("/"));
 
     useEffect(() => {
@@ -86,8 +86,8 @@ function MetaMaskEmailContent() {
         if (codeSeconds > 0) return;
         setSendingCode(true);
         try {
-            const turnstileToken = await verifyTurnstile();
-            await sendEmailCode(email, "metamask", turnstileToken);
+            const captchaToken = await verifyCaptcha();
+            await sendEmailCode(email, "metamask", captchaToken);
             setCodeSeconds(60);
             message.success(locale === "en-US" ? "Code sent" : "验证码已发送");
         } catch (error) {
@@ -109,10 +109,10 @@ function MetaMaskEmailContent() {
         }
         setSubmitting(true);
         try {
-            const turnstileToken = await verifyTurnstile();
-            const session = await runWithOverlay(locale === "en-US" ? "Completing sign in" : "正在完成登录", () => loginWithMetaMask({ walletAddress, message: signMessage, signature, email: values.email, code: values.code, turnstileToken }));
+            const captchaToken = await verifyCaptcha();
+            const session = await runWithOverlay(locale === "en-US" ? "Completing sign in" : "正在完成登录", () => loginWithMetaMask({ walletAddress, message: signMessage, signature, email: values.email, code: values.code, captchaToken }));
             const user = await fetchCurrentUser(session.token);
-            setSession(session.token, user);
+            setSession(COOKIE_SESSION_TOKEN, user);
             window.sessionStorage.removeItem(metamaskPayloadStorageKey);
             message.success(locale === "en-US" ? "Signed in" : "登录成功");
             router.replace(user.profileCompleted ? redirect : localizedPath(`/profile/setup?redirect=${encodeURIComponent(redirect)}`));
@@ -151,7 +151,7 @@ function MetaMaskEmailContent() {
                     </Button>
                 </Form>
             </section>
-            {turnstileChallenge}
+            {captchaChallenge}
             {overlay}
         </main>
     );

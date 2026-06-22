@@ -1,10 +1,28 @@
 # 待测试
 
+- 画布 Agent 待测：画布助手 Agent 模式通过纯后端 API 调用默认文本模型生成结构化画布操作，不引入 MCP 或本机 Agent；点击“预览修改”后画布进入实时预览，预览不会自动保存或触发生图/视频生成，确认后才写入工作流并执行 `run_generation`，取消预览应恢复原画布，继续输入反馈应基于当前预览重新规划。
+- 画布 Agent 安全与计费待测：后端应只接受白名单画布操作和合法节点字段，拒绝不存在节点、非法连线、外部媒体 URL、过量删除等不安全 ops；Agent 规划接口调用模型前按估算 token 预扣，成功后按模型返回 token usage 多退少补并记录到 `credit_logs`；请求构造失败、上游请求失败或 HTTP 错误应退还预扣，模型已成功返回但 JSON/ops 无效时仍按已消耗 token 计费。
+- 安全修复待测：MetaMask 登录必须先调用服务端 challenge 获取 nonce，签名消息包含服务端 nonce 和过期时间；同一签名成功使用后再次提交应失败，过期 nonce 或钱包地址不匹配也应失败。
+- 安全修复待测：账号密码登录、管理员登录、邮箱验证码、注册验证码、重置密码、MetaMask challenge 和 MetaMask 登录在 Turnstile 关闭时仍有 IP + 账号/邮箱/钱包维度限流；管理员登录连续失败过多后短时间内应拒绝；经 Next `/api` 代理访问时，客户端伪造的 `X-Forwarded-For` / `X-Real-IP` 不应绕过 IP 维度限流。
+- 安全修复待测：OAuth / Linux.do 回调成功后浏览器地址、历史记录和 Referer 不应出现 JWT；登录态通过 HttpOnly Cookie 恢复，前端不再把 JWT 持久化到 localStorage；OAuth 回调同时清理 state cookie 并写入登录 cookie 时，Next `/api` 代理应正确透传多个 `Set-Cookie`。
+- 安全修复待测：Stripe / Didit webhook 签名错误或签名密钥未配置返回 HTTP 400，业务处理失败返回 HTTP 500，成功返回 HTTP 200，普通业务接口仍保持 `{ code, data, msg }`。
+- 安全修复待测：部署配置 `APP_ORIGIN` 后 OAuth 回调、Stripe 支付回跳、KYC 回调和工作流分享链接应使用可信站点地址；未配置时仅允许本机开发 Host 或 `ALLOWED_ORIGINS` 显式 allowlist 推断，生产建议配置 `APP_ORIGIN`。
+- 安全修复待测：`/api/v1/kyc/status` 只返回 enabled、provider、status、rewarded、createdAt、updatedAt、rewards，不再返回 rawPayload；public settings 不应泄露 API key、secret、SMTP 密码、Stripe/Didit 密钥。
+- 安全修复待测：`/api/files/:id/content` 响应包含 `Referrer-Policy: no-referrer` 和 `X-Content-Type-Options: nosniff`；默认临时云文件过期时间缩短到最多 24 小时，Gin 访问日志和 Next 代理错误日志都不应输出 accessToken。
+- 安全修复待测：Next 页面响应包含 CSP、Referrer-Policy、X-Frame-Options 和 X-Content-Type-Options；Cloudflare Turnstile、Ant Design、Google AdSense 和站内 API 请求仍应正常。
+- 数据库安装更新待测：启动 AutoMigrate 应新增 `meta_mask_challenges` 表，用于 MetaMask 服务端 nonce 记录。
+- 用户控制台待测：登录后顶部“套餐”右侧显示“控制台”入口，移动端导航也显示控制台入口；访问 `/console` 应进入用户控制台首页，管理员后台仍只从管理员入口进入，不与用户控制台混用。
+- 用户控制台侧栏待测：控制台首页、我的工作流、我的分享、社区工作流、我的钱包、个人中心在 `/console/*` 内使用新左侧栏；生图工作台、视频创作台、3D 模型工作台、提示词库、我的素材、提示词反推、免费生成图片和套餐只作为跳转入口，进入后不保留控制台侧栏。
+- 控制台工作流同步待测：`/console/workflows`、`/console/shares`、`/console/community` 复用 `/canvas` 工作流库能力，搜索、筛选、新建、删除、上传社区作品、同步社区作品和打开工作流仍应正常。
+- 控制台钱包待测：`/console/wallet` 展示当前算力点余额、工作流创建次数和套餐入口；用户侧扣费明细接口接入前应显示暂无扣费记录。
+- 控制台个人中心待测：`/console/profile` 可修改头像 URL、显示名称和账号类型，保存后顶部头像与用户菜单应更新；KYC 身份验证入口按后台 KYC 配置显示状态并可发起认证。
 - 画布底部工具栏待测：标准桌面宽度下应相对画布页面居中；当宽度不足以完整显示时，仍按原左侧面板外的区域显示并支持横向滚动。
 - `/canvas` 工作流库卡片待测：卡片背景预览新增节点文字、内容摘要和类型色条；手机端工作流/社区卡片改为正方比例，顶部筛选和底部三个导航按钮应自适应不横向撑出。
 - SMTP 测试发送兼容性待测：邮件发送仍按 465 端口使用隐式 TLS、其他端口使用 STARTTLS；当服务器拒绝 `AUTH PLAIN` 或返回 `526 Authentication failure` 时会重新连接并用手动两步 `AUTH LOGIN` 重试，用于兼容部分企业邮箱。
+- SMTP 认证失败提示待测：当 SMTP 服务端仍拒绝 `AUTH PLAIN` / `AUTH LOGIN` 并返回 526 认证失败时，后台测试发送应提示检查 SMTP 用户名、授权码和 SMTP 发信权限，邮件配置表单应说明多数服务商需要 SMTP/客户端授权码而不是网页登录密码。
 - 英文模式运行时翻译增强待测：`/en-US` 下用户端输入框 placeholder、title、aria-label、画布工具栏、工作流弹窗、生成提示和常见后端错误应尽量显示英文，不应因输入框被跳过而残留中文提示。
-- 工作流新建初始化待测：点击新建工作流先弹出名称输入框，工作流名称仅允许小写字母和数字，创建后公开 URL 使用 `域名/用户名称/工作流名称`。
+- 提示词库立即生成待测：提示词详情弹窗中“复制提示词”左侧新增“立即生成”，点击后应跳转到生图工作台并自动填入该提示词，不自动开始生成。
+- 工作流新建初始化待测：点击新建工作流会先检查剩余创建次数；次数不足时直接提示购买套餐或完成 KYC，不再弹出初始化工作流窗口；次数充足时再弹出名称输入框，且取消按钮在左侧，工作流名称仅允许小写字母和数字，创建后公开 URL 使用 `域名/用户名称/工作流名称`。
 - 工作流公开分享页待测：打开 `/{username}/{workflowName}` 时，无密码分享直接展示和画布一致的只读预览，可拖动画布和缩放但不能编辑或运行节点；有密码分享先输入密码，密码输入和进入按钮需要保持间距。
 - 工作流 Star / Fork 待测：登录用户可在公开分享页 Star；需要运行时必须 Fork，Fork 弹窗显示 `用户名称/工作流名称`，可选择独立副本或自动更新，自动更新副本在“我的工作流”卡片显示彩色“自动更新”标签。
 - 工作流删除确认待测：列表页、详情页删除工作流都必须输入工作流名称，再二次确认，最后确认删除后不会返还新建工作流次数。
@@ -37,6 +55,8 @@
 - 数据库安装更新待测：启动 AutoMigrate 应补齐 `generation_tasks.request_file_id`、`generation_tasks.response_file_id`、删除旧的 `request_body` / `response_body` 大字段并创建新增复合索引，数据库状态页不应再报告缺字段。
 - AI 队列调度待测：排队位置改为计数查询，旧任务清理从每秒执行改为约 10 分钟执行一次，排队、完成、取消和结果读取仍应正常。
 - 安全修复待测：开启 Turnstile 后，注册提交和 MetaMask 登录提交也必须完成人机验证。
+- Turnstile 弹窗修复待测：开启并配置 Site Key/Secret Key 后，登录、注册最终提交、注册验证码、找回密码发送验证码和重置密码都会弹出 Cloudflare Turnstile；脚本加载失败、渲染失败、过期或超时时应关闭弹窗并显示明确错误，不应一直卡在处理中。
+- 人机验证配置待测：后台系统设置支持关闭、Turnstile、hCaptcha 三种选择；旧 `turnstile` 配置升级后应自动显示为 Turnstile，新部署默认关闭；选择 hCaptcha 后登录、注册、找回密码和 MetaMask 邮箱验证应弹出 hCaptcha 并通过后提交。
 - 管理后台新增“谷歌广告”页面，可配置 AdSense script 代码、全站开关和页面开关；前台只在启用页面加载官方 AdSense Auto Ads 脚本。
 - 管理后台谷歌广告页面新增 ads.txt 编辑，保存后网站根路径 `/ads.txt` 输出对应纯文本内容，用于 Google AdSense 网站审核。
 - 公开提示词列表接口新增 5 分钟服务端内存缓存和 CDN 缓存响应头，后台保存、删除、批量删除和远程同步提示词后会清空公开缓存。

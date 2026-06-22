@@ -141,3 +141,14 @@ type EmailVerification struct {
 	UsedAt    string `json:"usedAt"`
 	CreatedAt string `json:"createdAt"`
 }
+
+// MetaMaskChallenge 服务端签名挑战。每个 nonce 只能使用一次。
+type MetaMaskChallenge struct {
+	ID            string `json:"id" gorm:"primaryKey"`
+	WalletAddress string `json:"walletAddress" gorm:"index"`
+	Nonce         string `json:"nonce" gorm:"uniqueIndex"`
+	Message       string `json:"message" gorm:"type:text"`
+	ExpiresAt     string `json:"expiresAt" gorm:"index"`
+	UsedAt        string `json:"usedAt" gorm:"index"`
+	CreatedAt     string `json:"createdAt"`
+}

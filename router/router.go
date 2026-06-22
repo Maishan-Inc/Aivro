@@ -1,7 +1,11 @@
 package router
 
 import (
+	"fmt"
 	"net/http"
+	"net/url"
+	"strings"
+	"time"
 
 	"github.com/basketikun/aivro/handler"
 	"github.com/basketikun/aivro/middleware"
@@ -9,7 +13,8 @@ import (
 )
 
 func New() *gin.Engine {
-	router := gin.Default()
+	router := gin.New()
+	router.Use(gin.LoggerWithFormatter(accessLogFormatter), gin.Recovery())
 	router.RedirectTrailingSlash = false
 	_ = router.SetTrustedProxies(nil)
 	router.GET("/ads.txt", gin.WrapF(handler.AdsTxt))
@@ -21,8 +26,10 @@ func New() *gin.Engine {
 	api.POST("/auth/register/check", gin.WrapF(handler.CheckRegisterEmail))
 	api.POST("/auth/register/code", gin.WrapF(handler.SendRegisterEmailCode))
 	api.POST("/auth/login", gin.WrapF(handler.Login))
+	api.POST("/auth/logout", gin.WrapF(handler.Logout))
 	api.POST("/auth/email-code", gin.WrapF(handler.SendEmailCode))
 	api.POST("/auth/reset-password", gin.WrapF(handler.ResetPassword))
+	api.POST("/auth/metamask/challenge", gin.WrapF(handler.MetaMaskChallenge))
 	api.POST("/auth/metamask/login", gin.WrapF(handler.MetaMaskLogin))
 	api.GET("/auth/linux-do/authorize", gin.WrapF(handler.LinuxDoAuthorize))
 	api.GET("/auth/linux-do/callback", gin.WrapF(handler.LinuxDoCallback))
@@ -96,6 +103,9 @@ func New() *gin.Engine {
 	})
 	v1.POST("/workflows/:id/assistant-sessions/message", func(c *gin.Context) {
 		handler.SendCanvasAssistantMessage(c.Writer, c.Request, c.Param("id"))
+	})
+	v1.POST("/workflows/:id/canvas-agent/plan", func(c *gin.Context) {
+		handler.PlanCanvasAgent(c.Writer, c.Request, c.Param("id"))
 	})
 	v1.POST("/workflows/:id/assistant-sessions/batch-delete", func(c *gin.Context) {
 		handler.BatchDeleteCanvasAssistantSessions(c.Writer, c.Request, c.Param("id"))
@@ -199,4 +209,30 @@ func New() *gin.Engine {
 	router.NoRoute(middleware.NotFoundJSON)
 
 	return router
+}
+
+func accessLogFormatter(param gin.LogFormatterParams) string {
+	return fmt.Sprintf("[GIN] %v | %3d | %13v | %15s | %-7s %#v\n",
+		param.TimeStamp.Format(time.RFC3339),
+		param.StatusCode,
+		param.Latency,
+		param.ClientIP,
+		param.Method,
+		redactedRequestPath(param.Path),
+	)
+}
+
+func redactedRequestPath(raw string) string {
+	parsed, err := url.ParseRequestURI(raw)
+	if err != nil {
+		return raw
+	}
+	values := parsed.Query()
+	for key := range values {
+		if strings.EqualFold(key, "accessToken") {
+			values.Set(key, "[redacted]")
+		}
+	}
+	parsed.RawQuery = values.Encode()
+	return parsed.RequestURI()
 }

@@ -107,11 +107,25 @@ type PublicAuthSetting struct {
 	AllowRegister     *bool                        `json:"allowRegister"`
 	EmailVerification *bool                        `json:"emailVerification"`
 	TurnstileSiteKey  string                       `json:"turnstileSiteKey"`
+	Captcha           PublicCaptchaSetting         `json:"captcha"`
 	LinuxDo           PublicOAuthProviderSetting   `json:"linuxDo"`
 	Google            PublicOAuthProviderSetting   `json:"google"`
 	Github            PublicOAuthProviderSetting   `json:"github"`
 	MetaMask          PublicOAuthProviderSetting   `json:"metamask"`
 	CustomProviders   []PublicOAuthProviderSetting `json:"customProviders"`
+}
+
+type CaptchaProvider string
+
+const (
+	CaptchaProviderTurnstile CaptchaProvider = "turnstile"
+	CaptchaProviderHCaptcha  CaptchaProvider = "hcaptcha"
+)
+
+type PublicCaptchaSetting struct {
+	Enabled  bool            `json:"enabled"`
+	Provider CaptchaProvider `json:"provider"`
+	SiteKey  string          `json:"siteKey"`
 }
 
 type PublicOAuthProviderSetting struct {
@@ -130,6 +144,7 @@ type PrivateSetting struct {
 	PromptSync   PromptSyncSetting   `json:"promptSync"`
 	AIQueue      AIQueueSetting      `json:"aiQueue"`
 	CanvasAssist CanvasAssistSetting `json:"canvasAssist"`
+	Captcha      CaptchaSetting      `json:"captcha"`
 	Turnstile    TurnstileSetting    `json:"turnstile"`
 	Auth         PrivateAuthSetting  `json:"auth"`
 	Mail         MailSetting         `json:"mail"`
@@ -140,6 +155,18 @@ type PrivateSetting struct {
 
 type TurnstileSetting struct {
 	Enabled   bool   `json:"enabled"`
+	SiteKey   string `json:"siteKey"`
+	SecretKey string `json:"secretKey"`
+}
+
+type CaptchaSetting struct {
+	Enabled   bool                      `json:"enabled"`
+	Provider  CaptchaProvider           `json:"provider"`
+	Turnstile CaptchaProviderKeySetting `json:"turnstile"`
+	HCaptcha  CaptchaProviderKeySetting `json:"hcaptcha"`
+}
+
+type CaptchaProviderKeySetting struct {
 	SiteKey   string `json:"siteKey"`
 	SecretKey string `json:"secretKey"`
 }

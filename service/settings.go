@@ -23,11 +23,7 @@ func PublicSettings() (model.PublicSetting, error) {
 	settings = normalizeSettings(settings)
 	settings.Public.Auth.CustomProviders = publicCustomAuthProviders(settings.Private.Auth.CustomProviders)
 	syncMetaMaskSignatureSetting(&settings)
-	if settings.Private.Turnstile.Enabled && strings.TrimSpace(settings.Private.Turnstile.SiteKey) != "" && strings.TrimSpace(settings.Private.Turnstile.SecretKey) != "" {
-		settings.Public.Auth.TurnstileSiteKey = settings.Private.Turnstile.SiteKey
-	} else {
-		settings.Public.Auth.TurnstileSiteKey = ""
-	}
+	syncPublicCaptchaSetting(&settings)
 	return settings.Public, nil
 }
 
@@ -81,6 +77,31 @@ func syncMetaMaskSignatureSetting(settings *model.Settings) {
 	settings.Public.Auth.MetaMask.SiteName = settings.Private.Auth.MetaMask.SiteName
 	settings.Public.Auth.MetaMask.SiteURL = settings.Private.Auth.MetaMask.SiteURL
 	settings.Public.Auth.MetaMask.SignatureLogoURL = settings.Private.Auth.MetaMask.SignatureLogoURL
+}
+
+func syncPublicCaptchaSetting(settings *model.Settings) {
+	captcha := normalizeCaptchaSetting(settings.Private.Captcha, settings.Private.Turnstile)
+	settings.Private.Captcha = captcha
+	settings.Public.Auth.TurnstileSiteKey = ""
+	settings.Public.Auth.Captcha = model.PublicCaptchaSetting{Provider: captcha.Provider}
+	if !captcha.Enabled {
+		return
+	}
+	provider := captchaProviderSetting(captcha)
+	if provider.SiteKey == "" || provider.SecretKey == "" {
+		return
+	}
+	settings.Public.Auth.Captcha = model.PublicCaptchaSetting{Enabled: true, Provider: captcha.Provider, SiteKey: provider.SiteKey}
+	if captcha.Provider == model.CaptchaProviderTurnstile {
+		settings.Public.Auth.TurnstileSiteKey = provider.SiteKey
+	}
+}
+
+func captchaProviderSetting(setting model.CaptchaSetting) model.CaptchaProviderKeySetting {
+	if setting.Provider == model.CaptchaProviderHCaptcha {
+		return setting.HCaptcha
+	}
+	return setting.Turnstile
 }
 
 func publicCustomAuthProviders(providers []model.PrivateOAuthProviderSetting) []model.PublicOAuthProviderSetting {
@@ -175,6 +196,7 @@ func normalizePublicSetting(setting model.PublicSetting) model.PublicSetting {
 		setting.Auth.EmailVerification = &enabled
 	}
 	setting.Auth.TurnstileSiteKey = ""
+	setting.Auth.Captcha = model.PublicCaptchaSetting{Provider: model.CaptchaProviderTurnstile}
 	setting.Auth.LinuxDo = normalizePublicAuthProvider(setting.Auth.LinuxDo, "linux-do", "Linux.do", "/icons/linuxdo.svg")
 	setting.Auth.Google = normalizePublicAuthProvider(setting.Auth.Google, "google", "Google", "/icons/google.svg")
 	setting.Auth.Github = normalizePublicAuthProvider(setting.Auth.Github, "github", "GitHub", "/icons/github.svg")
@@ -351,6 +373,7 @@ func normalizePrivateSetting(setting model.PrivateSetting) model.PrivateSetting 
 	setting.AIQueue = normalizeAIQueueSetting(setting.AIQueue)
 	setting.CanvasAssist = normalizeCanvasAssistSetting(setting.CanvasAssist)
 	setting.Turnstile = normalizeTurnstileSetting(setting.Turnstile)
+	setting.Captcha = normalizeCaptchaSetting(setting.Captcha, setting.Turnstile)
 	setting.Auth = normalizePrivateAuthSetting(setting.Auth)
 	setting.Mail = normalizeMailSetting(setting.Mail)
 	setting.CloudStorage = normalizeCloudStorageSetting(setting.CloudStorage)
@@ -417,6 +440,22 @@ func normalizeTurnstileSetting(setting model.TurnstileSetting) model.TurnstileSe
 	return setting
 }
 
+func normalizeCaptchaSetting(setting model.CaptchaSetting, legacyTurnstile model.TurnstileSetting) model.CaptchaSetting {
+	hasCaptchaSetting := setting.Provider != "" || setting.Enabled || setting.Turnstile.SiteKey != "" || setting.Turnstile.SecretKey != "" || setting.HCaptcha.SiteKey != "" || setting.HCaptcha.SecretKey != ""
+	setting.Turnstile.SiteKey = strings.TrimSpace(firstNonEmpty(setting.Turnstile.SiteKey, legacyTurnstile.SiteKey))
+	setting.Turnstile.SecretKey = strings.TrimSpace(firstNonEmpty(setting.Turnstile.SecretKey, legacyTurnstile.SecretKey))
+	setting.HCaptcha.SiteKey = strings.TrimSpace(setting.HCaptcha.SiteKey)
+	setting.HCaptcha.SecretKey = strings.TrimSpace(setting.HCaptcha.SecretKey)
+	if setting.Provider != model.CaptchaProviderHCaptcha {
+		setting.Provider = model.CaptchaProviderTurnstile
+	}
+	if !hasCaptchaSetting && !setting.Enabled && legacyTurnstile.Enabled && setting.Turnstile.SiteKey != "" && setting.Turnstile.SecretKey != "" {
+		setting.Enabled = true
+		setting.Provider = model.CaptchaProviderTurnstile
+	}
+	return setting
+}
+
 func normalizeStripeSetting(setting model.StripeSetting) model.StripeSetting {
 	return setting
 }
@@ -449,6 +488,8 @@ func hidePrivateAPIKeys(settings model.Settings) model.Settings {
 	}
 	settings.Private.Mail.Password = ""
 	settings.Private.Turnstile.SecretKey = ""
+	settings.Private.Captcha.Turnstile.SecretKey = ""
+	settings.Private.Captcha.HCaptcha.SecretKey = ""
 	settings.Private.CloudStorage.SecretAccessKey = ""
 	settings.Private.Stripe.SecretKey = ""
 	settings.Private.Stripe.WebhookSecret = ""
@@ -491,6 +532,12 @@ func keepPrivateAuthSecrets(settings *model.Settings, saved model.Settings) {
 	}
 	if strings.TrimSpace(settings.Private.Turnstile.SecretKey) == "" {
 		settings.Private.Turnstile.SecretKey = saved.Private.Turnstile.SecretKey
+	}
+	if strings.TrimSpace(settings.Private.Captcha.Turnstile.SecretKey) == "" {
+		settings.Private.Captcha.Turnstile.SecretKey = saved.Private.Captcha.Turnstile.SecretKey
+	}
+	if strings.TrimSpace(settings.Private.Captcha.HCaptcha.SecretKey) == "" {
+		settings.Private.Captcha.HCaptcha.SecretKey = saved.Private.Captcha.HCaptcha.SecretKey
 	}
 }
 

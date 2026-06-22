@@ -13,6 +13,7 @@ import (
 type loginRequest struct {
 	Username       string `json:"username"`
 	Password       string `json:"password"`
+	CaptchaToken   string `json:"captchaToken"`
 	TurnstileToken string `json:"turnstileToken"`
 }
 
@@ -23,12 +24,14 @@ type registerRequest struct {
 	Code           string                `json:"code"`
 	AccountType    model.UserAccountType `json:"accountType"`
 	DisplayName    string                `json:"displayName"`
+	CaptchaToken   string                `json:"captchaToken"`
 	TurnstileToken string                `json:"turnstileToken"`
 }
 
 type emailCodeRequest struct {
 	Email          string `json:"email"`
 	Purpose        string `json:"purpose"`
+	CaptchaToken   string `json:"captchaToken"`
 	TurnstileToken string `json:"turnstileToken"`
 }
 
@@ -36,6 +39,7 @@ type resetPasswordRequest struct {
 	Email          string `json:"email"`
 	Code           string `json:"code"`
 	Password       string `json:"password"`
+	CaptchaToken   string `json:"captchaToken"`
 	TurnstileToken string `json:"turnstileToken"`
 }
 
@@ -45,7 +49,12 @@ type metamaskLoginRequest struct {
 	Signature      string `json:"signature"`
 	Email          string `json:"email"`
 	Code           string `json:"code"`
+	CaptchaToken   string `json:"captchaToken"`
 	TurnstileToken string `json:"turnstileToken"`
+}
+
+type metamaskChallengeRequest struct {
+	WalletAddress string `json:"walletAddress"`
 }
 
 type registerCheckRequest struct {
@@ -56,6 +65,7 @@ type completeProfileRequest struct {
 	Username    string                `json:"username"`
 	AccountType model.UserAccountType `json:"accountType"`
 	DisplayName string                `json:"displayName"`
+	AvatarURL   string                `json:"avatarUrl"`
 }
 
 type saveUserRequest struct {
@@ -84,10 +94,17 @@ type adjustUserWorkflowCreateCreditsRequest struct {
 	WorkflowCreateCredits int `json:"workflowCreateCredits"`
 }
 
+func requestCaptchaToken(captchaToken string, turnstileToken string) string {
+	if strings.TrimSpace(captchaToken) != "" {
+		return captchaToken
+	}
+	return turnstileToken
+}
+
 func Register(w http.ResponseWriter, r *http.Request) {
 	var request registerRequest
 	_ = json.NewDecoder(r.Body).Decode(&request)
-	if err := service.VerifyTurnstile(r, request.TurnstileToken); err != nil {
+	if err := service.VerifyCaptcha(r, requestCaptchaToken(request.CaptchaToken, request.TurnstileToken)); err != nil {
 		FailError(w, err)
 		return
 	}
@@ -96,6 +113,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		FailError(w, err)
 		return
 	}
+	service.SetAuthCookie(w, r, session.Token)
 	OK(w, session)
 }
 
@@ -112,7 +130,11 @@ func CheckRegisterEmail(w http.ResponseWriter, r *http.Request) {
 func SendEmailCode(w http.ResponseWriter, r *http.Request) {
 	var request emailCodeRequest
 	_ = json.NewDecoder(r.Body).Decode(&request)
-	if err := service.VerifyTurnstile(r, request.TurnstileToken); err != nil {
+	if err := service.CheckAuthRateLimit(r, "email-code", request.Email); err != nil {
+		FailError(w, err)
+		return
+	}
+	if err := service.VerifyCaptcha(r, requestCaptchaToken(request.CaptchaToken, request.TurnstileToken)); err != nil {
 		FailError(w, err)
 		return
 	}
@@ -126,7 +148,11 @@ func SendEmailCode(w http.ResponseWriter, r *http.Request) {
 func SendRegisterEmailCode(w http.ResponseWriter, r *http.Request) {
 	var request emailCodeRequest
 	_ = json.NewDecoder(r.Body).Decode(&request)
-	if err := service.VerifyTurnstile(r, request.TurnstileToken); err != nil {
+	if err := service.CheckAuthRateLimit(r, "register-code", request.Email); err != nil {
+		FailError(w, err)
+		return
+	}
+	if err := service.VerifyCaptcha(r, requestCaptchaToken(request.CaptchaToken, request.TurnstileToken)); err != nil {
 		FailError(w, err)
 		return
 	}
@@ -144,7 +170,11 @@ func SendRegisterEmailCode(w http.ResponseWriter, r *http.Request) {
 func ResetPassword(w http.ResponseWriter, r *http.Request) {
 	var request resetPasswordRequest
 	_ = json.NewDecoder(r.Body).Decode(&request)
-	if err := service.VerifyTurnstile(r, request.TurnstileToken); err != nil {
+	if err := service.CheckAuthRateLimit(r, "reset-password", request.Email); err != nil {
+		FailError(w, err)
+		return
+	}
+	if err := service.VerifyCaptcha(r, requestCaptchaToken(request.CaptchaToken, request.TurnstileToken)); err != nil {
 		FailError(w, err)
 		return
 	}
@@ -155,10 +185,29 @@ func ResetPassword(w http.ResponseWriter, r *http.Request) {
 	OK(w, true)
 }
 
+func MetaMaskChallenge(w http.ResponseWriter, r *http.Request) {
+	var request metamaskChallengeRequest
+	_ = json.NewDecoder(r.Body).Decode(&request)
+	if err := service.CheckAuthRateLimit(r, "metamask-challenge", request.WalletAddress); err != nil {
+		FailError(w, err)
+		return
+	}
+	result, err := service.CreateMetaMaskChallenge(request.WalletAddress)
+	if err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, result)
+}
+
 func MetaMaskLogin(w http.ResponseWriter, r *http.Request) {
 	var request metamaskLoginRequest
 	_ = json.NewDecoder(r.Body).Decode(&request)
-	if err := service.VerifyTurnstile(r, request.TurnstileToken); err != nil {
+	if err := service.CheckAuthRateLimit(r, "metamask-login", request.WalletAddress); err != nil {
+		FailError(w, err)
+		return
+	}
+	if err := service.VerifyCaptcha(r, requestCaptchaToken(request.CaptchaToken, request.TurnstileToken)); err != nil {
 		FailError(w, err)
 		return
 	}
@@ -167,13 +216,18 @@ func MetaMaskLogin(w http.ResponseWriter, r *http.Request) {
 		FailError(w, err)
 		return
 	}
+	service.SetAuthCookie(w, r, session.Token)
 	OK(w, session)
 }
 
 func Login(w http.ResponseWriter, r *http.Request) {
 	var request loginRequest
 	_ = json.NewDecoder(r.Body).Decode(&request)
-	if err := service.VerifyTurnstile(r, request.TurnstileToken); err != nil {
+	if err := service.CheckAuthRateLimit(r, "login", request.Username); err != nil {
+		FailError(w, err)
+		return
+	}
+	if err := service.VerifyCaptcha(r, requestCaptchaToken(request.CaptchaToken, request.TurnstileToken)); err != nil {
 		FailError(w, err)
 		return
 	}
@@ -182,6 +236,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
 		FailError(w, err)
 		return
 	}
+	service.SetAuthCookie(w, r, session.Token)
 	OK(w, session)
 }
 
@@ -207,39 +262,58 @@ func OAuthCallback(w http.ResponseWriter, r *http.Request, provider string) {
 	session, redirect, err := service.LoginWithOAuth(r, provider, r.URL.Query().Get("code"), r.URL.Query().Get("state"))
 	service.ClearOAuthState(w, r, provider)
 	if err != nil {
-		http.Redirect(w, r, loginRedirect(r, redirect, "", err.Error()), http.StatusFound)
+		http.Redirect(w, r, loginRedirect(r, redirect, err.Error()), http.StatusFound)
 		return
 	}
-	http.Redirect(w, r, loginRedirect(r, redirect, session.Token, ""), http.StatusFound)
+	service.SetAuthCookie(w, r, session.Token)
+	http.Redirect(w, r, cleanRedirectURL(r, redirect), http.StatusFound)
 }
 
 func LinuxDoCallback(w http.ResponseWriter, r *http.Request) {
 	session, redirect, err := service.LoginWithLinuxDo(r, r.URL.Query().Get("code"), r.URL.Query().Get("state"))
 	service.ClearOAuthState(w, r, "linux-do")
 	if err != nil {
-		http.Redirect(w, r, loginRedirect(r, redirect, "", err.Error()), http.StatusFound)
+		http.Redirect(w, r, loginRedirect(r, redirect, err.Error()), http.StatusFound)
 		return
 	}
-	http.Redirect(w, r, loginRedirect(r, redirect, session.Token, ""), http.StatusFound)
+	service.SetAuthCookie(w, r, session.Token)
+	http.Redirect(w, r, cleanRedirectURL(r, redirect), http.StatusFound)
 }
 
 func AdminLogin(w http.ResponseWriter, r *http.Request) {
 	var request loginRequest
 	_ = json.NewDecoder(r.Body).Decode(&request)
-	if err := service.VerifyTurnstile(r, request.TurnstileToken); err != nil {
+	if err := service.CheckAuthRateLimit(r, "admin-login", request.Username); err != nil {
+		FailError(w, err)
+		return
+	}
+	if err := service.CheckAdminLoginBlocked(r, request.Username); err != nil {
+		FailError(w, err)
+		return
+	}
+	if err := service.VerifyCaptcha(r, requestCaptchaToken(request.CaptchaToken, request.TurnstileToken)); err != nil {
 		FailError(w, err)
 		return
 	}
 	session, err := service.Login(request.Username, request.Password)
 	if err != nil {
+		service.RecordAdminLoginFailure(r, request.Username)
 		FailError(w, err)
 		return
 	}
 	if session.User.Role != model.UserRoleAdmin {
+		service.RecordAdminLoginFailure(r, request.Username)
 		Fail(w, "需要管理员权限")
 		return
 	}
+	service.RecordAdminLoginSuccess(r, request.Username)
+	service.SetAuthCookie(w, r, session.Token)
 	OK(w, session)
+}
+
+func Logout(w http.ResponseWriter, r *http.Request) {
+	service.ClearAuthCookie(w, r)
+	OK(w, true)
 }
 
 func CurrentUser(w http.ResponseWriter, r *http.Request) {
@@ -258,7 +332,7 @@ func CompleteProfile(w http.ResponseWriter, r *http.Request) {
 	}
 	var request completeProfileRequest
 	_ = json.NewDecoder(r.Body).Decode(&request)
-	result, err := service.CompleteUserProfile(user, request.Username, request.AccountType, request.DisplayName)
+	result, err := service.CompleteUserProfile(user, request.Username, request.AccountType, request.DisplayName, request.AvatarURL)
 	if err != nil {
 		FailError(w, err)
 		return
@@ -361,11 +435,8 @@ func AdminDeleteCreditLog(w http.ResponseWriter, r *http.Request, id string) {
 	OK(w, true)
 }
 
-func loginRedirect(r *http.Request, redirect string, token string, message string) string {
+func loginRedirect(r *http.Request, redirect string, message string) string {
 	values := url.Values{}
-	if strings.TrimSpace(token) != "" {
-		values.Set("token", token)
-	}
 	if strings.TrimSpace(message) != "" {
 		values.Set("error", message)
 	}
@@ -373,6 +444,10 @@ func loginRedirect(r *http.Request, redirect string, token string, message strin
 		values.Set("redirect", redirect)
 	}
 	return service.RequestOrigin(r) + localizedLoginPath(redirect) + "?" + values.Encode()
+}
+
+func cleanRedirectURL(r *http.Request, redirect string) string {
+	return service.RequestOrigin(r) + service.SafeRedirectPath(redirect)
 }
 
 func localizedLoginPath(redirect string) string {

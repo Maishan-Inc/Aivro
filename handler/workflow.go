@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 
 	"github.com/basketikun/aivro/model"
@@ -352,7 +353,11 @@ func StripeCheckout(w http.ResponseWriter, r *http.Request) {
 
 func StripeWebhook(w http.ResponseWriter, r *http.Request) {
 	if err := service.HandleStripeWebhook(r); err != nil {
-		FailError(w, err)
+		if service.IsWebhookSignatureError(err) {
+			writeWebhookError(w, http.StatusBadRequest, err)
+		} else {
+			writeWebhookError(w, http.StatusInternalServerError, err)
+		}
 		return
 	}
 	OK(w, true)
@@ -388,8 +393,23 @@ func KYCStatus(w http.ResponseWriter, r *http.Request) {
 
 func DiditWebhook(w http.ResponseWriter, r *http.Request) {
 	if err := service.HandleDiditWebhook(r); err != nil {
-		FailError(w, err)
+		if service.IsWebhookSignatureError(err) {
+			writeWebhookError(w, http.StatusBadRequest, err)
+		} else {
+			writeWebhookError(w, http.StatusInternalServerError, err)
+		}
 		return
 	}
 	OK(w, true)
+}
+
+func writeWebhookError(w http.ResponseWriter, status int, err error) {
+	log.Printf("webhook failed: %v", err)
+	msg := "操作失败"
+	if safe, ok := err.(interface{ SafeMessage() string }); ok {
+		msg = safe.SafeMessage()
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(response{Code: 1, Data: nil, Msg: msg})
 }

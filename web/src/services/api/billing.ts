@@ -50,7 +50,7 @@ export async function createStripeCheckout(token: string, planId: string, locale
 }
 
 export async function fetchKycStatus(token: string) {
-    return apiGet<{ enabled: boolean; provider: string; status: string; rewards: { credits: number; workflowCreateCredits: number } }>("/api/v1/kyc/status", undefined, token);
+    return apiGet<{ enabled: boolean; provider: string; status: string; rewarded: boolean; createdAt: string; updatedAt: string; rewards: { credits: number; workflowCreateCredits: number } }>("/api/v1/kyc/status", undefined, token);
 }
 
 export async function createKycSession(token: string) {

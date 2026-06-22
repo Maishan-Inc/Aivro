@@ -4,6 +4,7 @@ import type { AiConfig } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
 import { nanoid } from "nanoid";
 import { dataUrlToFile } from "@/lib/image-utils";
+import { authHeader } from "@/services/api/request";
 import { imageToDataUrl } from "@/services/image-storage";
 import type { ReferenceImage } from "@/types/image";
 
@@ -183,7 +184,7 @@ function aiApiUrl(_config: AiConfig, path: string) {
 function aiHeaders(_config: AiConfig, contentType?: string) {
     const token = useUserStore.getState().token;
     return {
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...authHeader(token),
         ...(contentType ? { "Content-Type": contentType } : {}),
     };
 }
@@ -254,6 +255,7 @@ export async function requestGeneration(config: AiConfig, prompt: string, onQueu
             },
             {
                 headers: aiHeaders(config, "application/json"),
+                withCredentials: true,
             },
         );
         return await unwrapImageResponse(config, response.data, onQueue);
@@ -281,7 +283,7 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
     files.forEach((file) => formData.append("image", file));
 
     try {
-        const response = await axios.post<ImageApiResponse>(aiApiUrl(config, "/images/edits"), formData, { headers: aiHeaders(config) });
+        const response = await axios.post<ImageApiResponse>(aiApiUrl(config, "/images/edits"), formData, { headers: aiHeaders(config), withCredentials: true });
         return await unwrapImageResponse(config, response.data, onQueue);
     } catch (error) {
         throw new Error(readAxiosError(error, "请求失败") || "请求失败");
@@ -289,19 +291,19 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
 }
 
 export async function fetchGenerationTask(config: AiConfig, id: string) {
-    const response = await axios.get<{ code?: number; data?: GenerationTaskView; msg?: string }>(aiApiUrl(config, `/generation-tasks/${encodeURIComponent(id)}`), { headers: aiHeaders(config) });
+    const response = await axios.get<{ code?: number; data?: GenerationTaskView; msg?: string }>(aiApiUrl(config, `/generation-tasks/${encodeURIComponent(id)}`), { headers: aiHeaders(config), withCredentials: true });
     if (typeof response.data.code === "number" && response.data.code !== 0) throw new Error(response.data.msg || "任务查询失败");
     if (!response.data.data) throw new Error("任务不存在");
     return response.data.data;
 }
 
 export async function fetchGenerationTaskResult(config: AiConfig, id: string) {
-    const response = await axios.get<ImageApiResponse>(aiApiUrl(config, `/generation-tasks/${encodeURIComponent(id)}/result`), { headers: aiHeaders(config) });
+    const response = await axios.get<ImageApiResponse>(aiApiUrl(config, `/generation-tasks/${encodeURIComponent(id)}/result`), { headers: aiHeaders(config), withCredentials: true });
     return response.data;
 }
 
 export async function cancelGenerationTask(config: AiConfig, id: string) {
-    const response = await axios.delete<{ code?: number; msg?: string }>(aiApiUrl(config, `/generation-tasks/${encodeURIComponent(id)}`), { headers: aiHeaders(config) });
+    const response = await axios.delete<{ code?: number; msg?: string }>(aiApiUrl(config, `/generation-tasks/${encodeURIComponent(id)}`), { headers: aiHeaders(config), withCredentials: true });
     if (typeof response.data.code === "number" && response.data.code !== 0) throw new Error(response.data.msg || "撤销失败");
     refreshRemoteUser(config);
 }
@@ -311,7 +313,7 @@ async function resolveQueuedChat(config: AiConfig, task: GenerationTaskSubmitRes
         await new Promise((resolve) => setTimeout(resolve, 2000));
         const current = await fetchGenerationTask(config, task.taskId);
         if (current.status === "succeeded") {
-            const response = await axios.get<string>(aiApiUrl(config, `/generation-tasks/${encodeURIComponent(task.taskId)}/result`), { headers: aiHeaders(config), responseType: "text" });
+            const response = await axios.get<string>(aiApiUrl(config, `/generation-tasks/${encodeURIComponent(task.taskId)}/result`), { headers: aiHeaders(config), responseType: "text", withCredentials: true });
             const answer = parseChatPayload(String(response.data), onDelta);
             refreshRemoteUser(config);
             return answer;
@@ -363,6 +365,7 @@ export async function requestImageQuestion(config: AiConfig, messages: ChatCompl
                     ...aiHeaders(config, "application/json"),
                 } as Record<string, string>,
                 responseType: "text",
+                withCredentials: true,
                 onDownloadProgress: (event) => {
                     const responseText = String(event.event?.target?.responseText || "");
                     const nextText = responseText.slice(processedLength);

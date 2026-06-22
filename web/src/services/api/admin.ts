@@ -222,6 +222,7 @@ export type AdminPublicSettings = {
         allowRegister: boolean;
         emailVerification: boolean;
         turnstileSiteKey: string;
+        captcha: AdminPublicCaptchaSettings;
         linuxDo: AdminPublicAuthProvider;
         google: AdminPublicAuthProvider;
         github: AdminPublicAuthProvider;
@@ -231,6 +232,14 @@ export type AdminPublicSettings = {
     pages: AdminPublicPagesSettings;
     pageAccess: AdminPublicPageAccessSettings;
     adSense: AdminAdSenseSettings;
+};
+
+export type AdminCaptchaProvider = "turnstile" | "hcaptcha";
+
+export type AdminPublicCaptchaSettings = {
+    enabled: boolean;
+    provider: AdminCaptchaProvider;
+    siteKey: string;
 };
 
 export type AdminPublicPagesSettings = {
@@ -292,6 +301,7 @@ export type AdminPrivateSettings = {
     };
     aiQueue: AdminAIQueueSettings;
     canvasAssist: AdminCanvasAssistSettings;
+    captcha: AdminCaptchaSettings;
     turnstile: AdminTurnstileSettings;
     auth: {
         linuxDo: AdminPrivateAuthProvider;
@@ -308,6 +318,18 @@ export type AdminPrivateSettings = {
 
 export type AdminTurnstileSettings = {
     enabled: boolean;
+    siteKey: string;
+    secretKey: string;
+};
+
+export type AdminCaptchaSettings = {
+    enabled: boolean;
+    provider: AdminCaptchaProvider;
+    turnstile: AdminCaptchaKeySettings;
+    hcaptcha: AdminCaptchaKeySettings;
+};
+
+export type AdminCaptchaKeySettings = {
     siteKey: string;
     secretKey: string;
 };

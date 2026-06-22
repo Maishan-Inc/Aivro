@@ -15,6 +15,8 @@ type Config struct {
 	AdminPassword       string `env:"ADMIN_PASSWORD" envDefault:"aivro"`
 	JWTSecret           string `env:"JWT_SECRET" envDefault:"aivro"`
 	JWTExpireHours      int    `env:"JWT_EXPIRE_HOURS" envDefault:"168"`
+	AppOrigin           string `env:"APP_ORIGIN"`
+	AllowedOrigins      string `env:"ALLOWED_ORIGINS"`
 	StorageDriver       string `env:"STORAGE_DRIVER" envDefault:"sqlite"`
 	DatabaseDSN         string `env:"DATABASE_DSN" envDefault:"data/aivro.db"`
 	LocalFileDir        string `env:"LOCAL_FILE_DIR" envDefault:"data/files"`

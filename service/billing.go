@@ -151,9 +151,12 @@ func HandleStripeWebhook(r *http.Request) error {
 	if err != nil {
 		return err
 	}
+	if strings.TrimSpace(stripeSetting.WebhookSecret) == "" {
+		return &webhookSignatureError{message: "Stripe webhook 签名未配置"}
+	}
 	event, err := webhook.ConstructEvent(body, r.Header.Get("Stripe-Signature"), stripeSetting.WebhookSecret)
 	if err != nil {
-		return safeMessageError{message: "Stripe webhook 签名无效"}
+		return &webhookSignatureError{message: "Stripe webhook 签名无效"}
 	}
 	if event.Type != "checkout.session.completed" {
 		return nil

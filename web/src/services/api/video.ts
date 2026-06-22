@@ -2,6 +2,7 @@ import axios from "axios";
 
 import { dataUrlToFile } from "@/lib/image-utils";
 import { imageToDataUrl } from "@/services/image-storage";
+import { authHeader } from "@/services/api/request";
 import type { AiConfig } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
 import type { ReferenceImage } from "@/types/image";
@@ -20,7 +21,7 @@ function aiApiUrl(_config: AiConfig, path: string) {
 
 function aiHeaders(_config: AiConfig) {
     const token = useUserStore.getState().token;
-    return token ? { Authorization: `Bearer ${token}` } : undefined;
+    return authHeader(token);
 }
 
 function refreshRemoteUser(_config: AiConfig) {
@@ -39,16 +40,16 @@ export async function requestVideoGeneration(config: AiConfig, prompt: string, r
     const files = await Promise.all(references.slice(0, 7).map(async (image) => dataUrlToFile({ ...image, dataUrl: await imageToDataUrl(image) })));
     files.forEach((file) => body.append("input_reference[]", file));
     try {
-        const createdPayload = (await axios.post<ApiVideoResponse>(aiApiUrl(config, "/videos"), body, { headers: aiHeaders(config) })).data;
+        const createdPayload = (await axios.post<ApiVideoResponse>(aiApiUrl(config, "/videos"), body, { headers: aiHeaders(config), withCredentials: true })).data;
         const created = isQueuedVideoEnvelope(createdPayload) ? await waitForQueuedVideo(config, createdPayload.data, onQueue) : unwrapVideoResponse(createdPayload);
         if (!created.id) throw new Error("视频接口没有返回任务 ID");
         for (;;) {
-            const video = unwrapVideoResponse((await axios.get<ApiVideoResponse>(aiApiUrl(config, `/videos/${created.id}`), { headers: aiHeaders(config), params: { model } })).data);
+            const video = unwrapVideoResponse((await axios.get<ApiVideoResponse>(aiApiUrl(config, `/videos/${created.id}`), { headers: aiHeaders(config), params: { model }, withCredentials: true })).data);
             if (video.status === "completed") break;
             if (video.status === "failed" || video.status === "cancelled") throw new Error(video.error?.message || "视频生成失败");
             await new Promise((resolve) => setTimeout(resolve, 2500));
         }
-        const content = await axios.get<Blob>(aiApiUrl(config, `/videos/${created.id}/content`), { headers: aiHeaders(config), params: { model }, responseType: "blob" });
+        const content = await axios.get<Blob>(aiApiUrl(config, `/videos/${created.id}/content`), { headers: aiHeaders(config), params: { model }, responseType: "blob", withCredentials: true });
         const cloudFile = await readCloudVideoFile(content.data);
         if (cloudFile) {
             refreshRemoteUser(config);
@@ -104,7 +105,7 @@ async function waitForQueuedVideo(config: AiConfig, task: GenerationTaskSubmitRe
         const current = await fetchGenerationTask(config, task.taskId);
         onQueue?.({ taskId: current.id, status: current.status, queuePosition: current.queuePosition, aheadCount: current.aheadCount });
         if (current.status === "succeeded") {
-            return unwrapVideoResponse((await axios.get<ApiVideoResponse>(aiApiUrl(config, `/generation-tasks/${encodeURIComponent(task.taskId)}/result`), { headers: aiHeaders(config) })).data);
+            return unwrapVideoResponse((await axios.get<ApiVideoResponse>(aiApiUrl(config, `/generation-tasks/${encodeURIComponent(task.taskId)}/result`), { headers: aiHeaders(config), withCredentials: true })).data);
         }
         if (current.status === "failed" || current.status === "canceled") {
             refreshRemoteUser(config);
@@ -114,7 +115,7 @@ async function waitForQueuedVideo(config: AiConfig, task: GenerationTaskSubmitRe
 }
 
 async function fetchGenerationTask(config: AiConfig, id: string): Promise<GenerationTaskView> {
-    const response = await axios.get<{ code?: number; data?: GenerationTaskView; msg?: string }>(aiApiUrl(config, `/generation-tasks/${encodeURIComponent(id)}`), { headers: aiHeaders(config) });
+    const response = await axios.get<{ code?: number; data?: GenerationTaskView; msg?: string }>(aiApiUrl(config, `/generation-tasks/${encodeURIComponent(id)}`), { headers: aiHeaders(config), withCredentials: true });
     if (typeof response.data.code === "number" && response.data.code !== 0) throw new Error(response.data.msg || "任务查询失败");
     if (!response.data.data) throw new Error("任务不存在");
     return response.data.data;

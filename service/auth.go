@@ -41,11 +41,8 @@ type TokenClaims struct {
 }
 
 type userExtra struct {
-	LinuxDo   any    `json:"linuxDo,omitempty"`
-	OAuth     any    `json:"oauth,omitempty"`
-	Wallet    string `json:"wallet,omitempty"`
-	Message   string `json:"message,omitempty"`
-	Signature string `json:"signature,omitempty"`
+	LinuxDo any `json:"linuxDo,omitempty"`
+	OAuth   any `json:"oauth,omitempty"`
 }
 
 type MailTemplateContext struct {
@@ -57,6 +54,13 @@ type MailTemplateContext struct {
 type RegisterProfileInput struct {
 	AccountType model.UserAccountType
 	Name        string
+}
+
+type MetaMaskChallengeResponse struct {
+	WalletAddress string `json:"walletAddress"`
+	Nonce         string `json:"nonce"`
+	Message       string `json:"message"`
+	ExpiresAt     string `json:"expiresAt"`
 }
 
 var usernameSlugReplacer = strings.NewReplacer("-", "", "_", "", ".", "")
@@ -189,7 +193,7 @@ func Register(username string, password string, email string, code string, profi
 	return newSession(user)
 }
 
-func CompleteUserProfile(user model.AuthUser, username string, accountType model.UserAccountType, name string) (model.AuthUser, error) {
+func CompleteUserProfile(user model.AuthUser, username string, accountType model.UserAccountType, name string, avatarURL string) (model.AuthUser, error) {
 	saved, ok, err := repository.GetUserByID(user.ID)
 	if err != nil || !ok {
 		if err != nil {
@@ -197,26 +201,28 @@ func CompleteUserProfile(user model.AuthUser, username string, accountType model
 		}
 		return model.AuthUser{}, safeMessageError{message: "用户不存在"}
 	}
-	if saved.ProfileCompleted {
-		return model.AuthUser{}, safeMessageError{message: "用户名称暂不支持修改"}
-	}
-	username = strings.TrimSpace(username)
-	if err := validatePublicUsername(username); err != nil {
-		return model.AuthUser{}, err
-	}
-	if username != saved.Username {
-		if _, ok, err := repository.GetUserByUsername(username); err != nil || ok {
-			if err != nil {
-				return model.AuthUser{}, err
-			}
-			return model.AuthUser{}, safeMessageError{message: "用户名称已存在"}
+	if !saved.ProfileCompleted {
+		username = strings.TrimSpace(username)
+		if err := validatePublicUsername(username); err != nil {
+			return model.AuthUser{}, err
 		}
+		if username != saved.Username {
+			if _, ok, err := repository.GetUserByUsername(username); err != nil || ok {
+				if err != nil {
+					return model.AuthUser{}, err
+				}
+				return model.AuthUser{}, safeMessageError{message: "用户名称已存在"}
+			}
+		}
+		saved.Username = username
+		saved.ProfileCompleted = true
 	}
 	profile := normalizeRegisterProfile(RegisterProfileInput{AccountType: accountType, Name: name}, saved.Username)
-	saved.Username = username
 	saved.AccountType = profile.AccountType
 	saved.DisplayName = profile.Name
-	saved.ProfileCompleted = true
+	if avatarURL = strings.TrimSpace(avatarURL); avatarURL != "" {
+		saved.AvatarURL = avatarURL
+	}
 	saved.UpdatedAt = now()
 	saved, err = repository.SaveUser(saved)
 	if err != nil {
@@ -445,6 +451,36 @@ func LoginWithOAuth(r *http.Request, provider string, code string, state string)
 	return session, redirect, err
 }
 
+func CreateMetaMaskChallenge(walletAddress string) (MetaMaskChallengeResponse, error) {
+	settings, err := repository.GetSettings()
+	if err != nil {
+		return MetaMaskChallengeResponse{}, err
+	}
+	settings = normalizeSettings(settings)
+	if !settings.Public.Auth.MetaMask.Enabled || !settings.Private.Auth.MetaMask.Enabled {
+		return MetaMaskChallengeResponse{}, safeMessageError{message: "MetaMask 登录未开启"}
+	}
+	walletAddress = strings.ToLower(strings.TrimSpace(walletAddress))
+	if walletAddress == "" {
+		return MetaMaskChallengeResponse{}, safeMessageError{message: "缺少钱包地址"}
+	}
+	nonce := mustRandomToken(24)
+	expiresAt := time.Now().Add(5 * time.Minute).Format(time.RFC3339)
+	message := buildMetaMaskChallengeMessage(settings.Private.Auth.MetaMask, walletAddress, nonce, expiresAt)
+	item := model.MetaMaskChallenge{
+		ID:            newID("mm"),
+		WalletAddress: walletAddress,
+		Nonce:         nonce,
+		Message:       message,
+		ExpiresAt:     expiresAt,
+		CreatedAt:     now(),
+	}
+	if _, err := repository.SaveMetaMaskChallenge(item); err != nil {
+		return MetaMaskChallengeResponse{}, err
+	}
+	return MetaMaskChallengeResponse{WalletAddress: walletAddress, Nonce: nonce, Message: message, ExpiresAt: expiresAt}, nil
+}
+
 func LoginWithMetaMask(walletAddress string, message string, signature string, email string, code string) (model.AuthSession, error) {
 	settings, err := repository.GetSettings()
 	if err != nil {
@@ -458,7 +494,11 @@ func LoginWithMetaMask(walletAddress string, message string, signature string, e
 	if walletAddress == "" || strings.TrimSpace(signature) == "" {
 		return model.AuthSession{}, safeMessageError{message: "缺少钱包签名"}
 	}
-	if !validMetaMaskMessage(settings.Private.Auth.MetaMask, walletAddress, message) {
+	challenge, ok, err := activeMetaMaskChallenge(walletAddress, message)
+	if err != nil {
+		return model.AuthSession{}, err
+	}
+	if !ok {
 		return model.AuthSession{}, safeMessageError{message: "MetaMask 签名内容无效"}
 	}
 	if !validMetaMaskSignature(walletAddress, message, signature) {
@@ -497,10 +537,15 @@ func LoginWithMetaMask(walletAddress string, message string, signature string, e
 	} else if user.Status == model.UserStatusBan {
 		return model.AuthSession{}, safeMessageError{message: "账号已被禁用"}
 	}
+	consumed, err := repository.ConsumeMetaMaskChallenge(challenge.ID, now())
+	if err != nil {
+		return model.AuthSession{}, err
+	}
+	if !consumed {
+		return model.AuthSession{}, safeMessageError{message: "MetaMask 签名已过期，请重试"}
+	}
 	user.LastLoginAt = now()
 	user.UpdatedAt = now()
-	extra, _ := json.Marshal(userExtra{Wallet: walletAddress, Message: message, Signature: signature})
-	user.Extra = string(extra)
 	user, err = repository.SaveUser(user)
 	if err != nil {
 		return model.AuthSession{}, err
@@ -792,6 +837,50 @@ func newToken(user model.User) (string, error) {
 	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(config.Cfg.JWTSecret))
 }
 
+func AuthTokenFromRequest(r *http.Request) string {
+	token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+	if strings.TrimSpace(token) != "" {
+		return strings.TrimSpace(token)
+	}
+	if cookie, err := r.Cookie(authCookieName); err == nil {
+		return strings.TrimSpace(cookie.Value)
+	}
+	return ""
+}
+
+func SetAuthCookie(w http.ResponseWriter, r *http.Request, token string) {
+	maxAge := config.Cfg.JWTExpireHours * 3600
+	if maxAge <= 0 {
+		maxAge = 168 * 3600
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     authCookieName,
+		Value:    token,
+		Path:     "/",
+		MaxAge:   maxAge,
+		HttpOnly: true,
+		Secure:   requestSecure(r),
+		SameSite: http.SameSiteLaxMode,
+	})
+}
+
+func ClearAuthCookie(w http.ResponseWriter, r *http.Request) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     authCookieName,
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   requestSecure(r),
+		SameSite: http.SameSiteLaxMode,
+	})
+}
+
+func requestSecure(r *http.Request) bool {
+	proto := trustedForwardedValue(r, "X-Forwarded-Proto")
+	return strings.EqualFold(proto, "https") || r.TLS != nil || strings.HasPrefix(normalizedConfiguredOrigin(), "https://")
+}
+
 func hashPassword(password string) (string, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	return string(hash), err
@@ -842,25 +931,48 @@ func validMetaMaskSignature(walletAddress string, message string, signature stri
 	return strings.EqualFold(crypto.PubkeyToAddress(*pubKey).Hex(), walletAddress)
 }
 
-func validMetaMaskMessage(setting model.PrivateMetaMaskAuthSetting, walletAddress string, message string) bool {
-	message = strings.TrimSpace(message)
-	if message == "" {
-		return false
+func activeMetaMaskChallenge(walletAddress string, message string) (model.MetaMaskChallenge, bool, error) {
+	nonce := metaMaskMessageValue(message, "Nonce")
+	if nonce == "" {
+		return model.MetaMaskChallenge{}, false, nil
 	}
+	challenge, ok, err := repository.GetActiveMetaMaskChallenge(nonce, now())
+	if err != nil || !ok {
+		return model.MetaMaskChallenge{}, false, err
+	}
+	if !strings.EqualFold(challenge.WalletAddress, walletAddress) || challenge.Message != strings.TrimSpace(message) {
+		return model.MetaMaskChallenge{}, false, nil
+	}
+	return challenge, true, nil
+}
+
+func buildMetaMaskChallengeMessage(setting model.PrivateMetaMaskAuthSetting, walletAddress string, nonce string, expiresAt string) string {
 	siteName := strings.TrimSpace(firstNonEmpty(setting.SiteName, "Aivro"))
-	if !strings.Contains(message, siteName+" MetaMask login") {
-		return false
+	lines := []string{
+		siteName + " MetaMask login",
+		"Wallet: " + strings.ToLower(strings.TrimSpace(walletAddress)),
+		"Nonce: " + nonce,
+		"Issued At: " + now(),
+		"Expires At: " + expiresAt,
 	}
-	if !strings.Contains(strings.ToLower(message), "wallet: "+strings.ToLower(walletAddress)) {
-		return false
+	if siteURL := strings.TrimSpace(setting.SiteURL); siteURL != "" {
+		lines = append(lines[:1], append([]string{"Site URL: " + siteURL}, lines[1:]...)...)
 	}
-	if siteURL := strings.TrimSpace(setting.SiteURL); siteURL != "" && !strings.Contains(message, "Site URL: "+siteURL) {
-		return false
+	if logoURL := strings.TrimSpace(setting.SignatureLogoURL); logoURL != "" {
+		lines = append(lines[:2], append([]string{"Logo: " + logoURL}, lines[2:]...)...)
 	}
-	if logoURL := strings.TrimSpace(setting.SignatureLogoURL); logoURL != "" && !strings.Contains(message, "Logo: "+logoURL) {
-		return false
+	return strings.Join(lines, "\n")
+}
+
+func metaMaskMessageValue(message string, key string) string {
+	prefix := strings.ToLower(strings.TrimSpace(key)) + ":"
+	for _, line := range strings.Split(strings.TrimSpace(message), "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(strings.ToLower(line), prefix) {
+			return strings.TrimSpace(line[len(prefix):])
+		}
 	}
-	return strings.Contains(message, "Time:")
+	return ""
 }
 
 func now() string {
@@ -1402,7 +1514,15 @@ func (err mailDeliveryError) DetailMessage() string {
 	if message == "" {
 		return "请检查 SMTP 配置"
 	}
+	if isSMTPAuthFailureMessage(message) {
+		return "SMTP 认证失败：服务器拒绝了当前 SMTP 用户名和密码/授权码。请确认邮箱已开启 SMTP 或客户端授权，SMTP 用户名通常是完整发件邮箱，密码通常应填写邮箱服务商生成的 SMTP 授权码而不是网页登录密码。原始错误：" + message
+	}
 	return message
+}
+
+func isSMTPAuthFailureMessage(message string) bool {
+	text := strings.ToLower(message)
+	return strings.Contains(text, "authentication failure") || strings.Contains(text, "authentication failed") || strings.Contains(text, "auth plain") || strings.Contains(text, "auth login")
 }
 
 func sendMailPlain(addr string, host string, username string, password string, from string, to []string, msg []byte) error {
@@ -1483,9 +1603,10 @@ func sendMailWithAuthFallback(newClient func() (*smtp.Client, error), host strin
 type mailAuthMethod string
 
 const (
-	mailAuthNone  mailAuthMethod = "none"
-	mailAuthPlain mailAuthMethod = "plain"
-	mailAuthLogin mailAuthMethod = "login"
+	authCookieName                = "aivro_auth"
+	mailAuthNone   mailAuthMethod = "none"
+	mailAuthPlain  mailAuthMethod = "plain"
+	mailAuthLogin  mailAuthMethod = "login"
 )
 
 func mailAuthMethods(username string, password string) []mailAuthMethod {
@@ -1610,19 +1731,32 @@ func normalizeMailTemplateContext(context MailTemplateContext) MailTemplateConte
 }
 
 func requestIP(r *http.Request) string {
-	if forwarded := strings.TrimSpace(r.Header.Get("X-Forwarded-For")); forwarded != "" {
-		if parts := strings.Split(forwarded, ","); strings.TrimSpace(parts[0]) != "" {
-			return strings.TrimSpace(parts[0])
+	host, _, err := net.SplitHostPort(strings.TrimSpace(r.RemoteAddr))
+	if err != nil {
+		host = strings.TrimSpace(r.RemoteAddr)
+	}
+	if trustedForwardPeer(host) {
+		if forwarded := forwardedIP(r.Header.Get("X-Forwarded-For")); forwarded != "" {
+			return forwarded
+		}
+		if realIP := forwardedIP(r.Header.Get("X-Real-IP")); realIP != "" {
+			return realIP
 		}
 	}
-	if realIP := strings.TrimSpace(r.Header.Get("X-Real-IP")); realIP != "" {
-		return realIP
+	return host
+}
+
+func trustedForwardPeer(host string) bool {
+	ip := net.ParseIP(strings.Trim(host, "[]"))
+	return ip != nil && (ip.IsLoopback() || ip.IsPrivate())
+}
+
+func forwardedIP(value string) string {
+	ipText := firstForwardedValue(value)
+	if ip := net.ParseIP(strings.Trim(ipText, "[]")); ip != nil {
+		return ip.String()
 	}
-	host, _, err := net.SplitHostPort(strings.TrimSpace(r.RemoteAddr))
-	if err == nil {
-		return host
-	}
-	return strings.TrimSpace(r.RemoteAddr)
+	return ""
 }
 
 type oauthStatePayload struct {
@@ -1640,7 +1774,7 @@ func newOAuthState(w http.ResponseWriter, r *http.Request, provider string, redi
 		Path:     "/api/auth",
 		MaxAge:   600,
 		HttpOnly: true,
-		Secure:   strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https") || r.TLS != nil,
+		Secure:   requestSecure(r),
 		SameSite: http.SameSiteLaxMode,
 	})
 	return base64.RawURLEncoding.EncodeToString(body)
@@ -1669,7 +1803,7 @@ func ClearOAuthState(w http.ResponseWriter, r *http.Request, provider string) {
 		Path:     "/api/auth",
 		MaxAge:   -1,
 		HttpOnly: true,
-		Secure:   strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https") || r.TLS != nil,
+		Secure:   requestSecure(r),
 		SameSite: http.SameSiteLaxMode,
 	})
 }
@@ -1683,15 +1817,24 @@ func oauthStateCookie(provider string) string {
 }
 
 func RequestOrigin(r *http.Request) string {
-	host := firstForwardedValue(r.Header.Get("X-Forwarded-Host"))
+	if origin := normalizedConfiguredOrigin(); origin != "" {
+		return origin
+	}
+	host := trustedForwardedValue(r, "X-Forwarded-Host")
 	if host == "" {
 		host = r.Host
 	}
-	proto := firstForwardedValue(r.Header.Get("X-Forwarded-Proto"))
-	if proto == "" && strings.EqualFold(strings.TrimSpace(r.Header.Get("X-Forwarded-Ssl")), "on") {
+	if !validRequestHost(host) || !allowedRequestHost(host) {
+		return "http://localhost:3000"
+	}
+	if origin := configuredAllowedOrigin(host); origin != "" {
+		return origin
+	}
+	proto := trustedForwardedValue(r, "X-Forwarded-Proto")
+	if proto == "" && trustedForwardHeader(r) && strings.EqualFold(strings.TrimSpace(r.Header.Get("X-Forwarded-Ssl")), "on") {
 		proto = "https"
 	}
-	if proto == "" && strings.Contains(strings.ToLower(r.Header.Get("CF-Visitor")), `"scheme":"https"`) {
+	if proto == "" && trustedForwardHeader(r) && strings.Contains(strings.ToLower(r.Header.Get("CF-Visitor")), `"scheme":"https"`) {
 		proto = "https"
 	}
 	if proto == "" && r.TLS != nil {
@@ -1703,12 +1846,106 @@ func RequestOrigin(r *http.Request) string {
 	return proto + "://" + host
 }
 
+func normalizedConfiguredOrigin() string {
+	raw := strings.TrimRight(strings.TrimSpace(config.Cfg.AppOrigin), "/")
+	if raw == "" {
+		return ""
+	}
+	parsed, err := url.Parse(raw)
+	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" {
+		return ""
+	}
+	return parsed.Scheme + "://" + parsed.Host
+}
+
+func configuredAllowedOrigin(host string) string {
+	host = strings.ToLower(strings.TrimSpace(host))
+	for _, item := range strings.Split(config.Cfg.AllowedOrigins, ",") {
+		origin := strings.TrimRight(strings.TrimSpace(item), "/")
+		if origin == "" {
+			continue
+		}
+		parsed, err := url.Parse(origin)
+		if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+			continue
+		}
+		if strings.EqualFold(host, parsed.Host) {
+			return parsed.Scheme + "://" + parsed.Host
+		}
+	}
+	return ""
+}
+
+func allowedRequestHost(host string) bool {
+	host = strings.ToLower(strings.TrimSpace(host))
+	if host == "" {
+		return false
+	}
+	hostname := requestHostname(host)
+	if localRequestHostname(hostname) {
+		return true
+	}
+	if strings.TrimSpace(config.Cfg.AllowedOrigins) == "" {
+		return false
+	}
+	for _, item := range strings.Split(config.Cfg.AllowedOrigins, ",") {
+		origin := strings.TrimRight(strings.TrimSpace(item), "/")
+		if origin == "" {
+			continue
+		}
+		if parsed, err := url.Parse(origin); err == nil && parsed.Host != "" {
+			if strings.EqualFold(host, parsed.Host) {
+				return true
+			}
+			continue
+		}
+		originHost := strings.ToLower(origin)
+		if strings.EqualFold(host, originHost) || (!strings.Contains(host, ":") && strings.EqualFold(hostname, originHost)) {
+			return true
+		}
+	}
+	return false
+}
+
+func requestHostname(host string) string {
+	host = strings.TrimSpace(host)
+	if parsedHost, _, err := net.SplitHostPort(host); err == nil {
+		return strings.Trim(parsedHost, "[]")
+	}
+	return strings.Trim(host, "[]")
+}
+
+func localRequestHostname(hostname string) bool {
+	hostname = strings.ToLower(strings.Trim(hostname, "[]"))
+	return hostname == "localhost" || hostname == "127.0.0.1" || hostname == "::1"
+}
+
+func validRequestHost(host string) bool {
+	host = strings.TrimSpace(host)
+	return host != "" && !strings.Contains(host, "@") && !strings.ContainsAny(host, `/\`)
+}
+
 func firstForwardedValue(value string) string {
 	parts := strings.Split(value, ",")
 	if len(parts) == 0 {
 		return ""
 	}
 	return strings.TrimSpace(parts[0])
+}
+
+func trustedForwardedValue(r *http.Request, key string) string {
+	if !trustedForwardHeader(r) {
+		return ""
+	}
+	return firstForwardedValue(r.Header.Get(key))
+}
+
+func trustedForwardHeader(r *http.Request) bool {
+	host, _, err := net.SplitHostPort(strings.TrimSpace(r.RemoteAddr))
+	if err != nil {
+		host = strings.TrimSpace(r.RemoteAddr)
+	}
+	return trustedForwardPeer(host)
 }
 
 func firstNonEmpty(values ...string) string {

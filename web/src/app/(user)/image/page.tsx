@@ -2,6 +2,7 @@
 
 import { BookOpen, CheckSquare, ClipboardPaste, Download, FolderPlus, History, ImagePlus, PenLine, Plus, SlidersHorizontal, Sparkles, Trash2, Upload } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { App, Button, Checkbox, Drawer, Empty, Image, Input, Modal, Tag, Typography } from "antd";
 import { saveAs } from "file-saver";
 
@@ -72,6 +73,7 @@ type UpdateAiConfig = <K extends keyof AiConfig>(key: K, value: AiConfig[K]) => 
 
 export default function ImagePage() {
     const { message } = App.useApp();
+    const searchParams = useSearchParams();
     const { locale } = useI18n();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const config = useConfigStore((state) => state.config);
@@ -110,6 +112,11 @@ export default function ImagePage() {
     useEffect(() => {
         void refreshLogs();
     }, [token]);
+
+    useEffect(() => {
+        const urlPrompt = searchParams.get("prompt");
+        if (urlPrompt) setPrompt(urlPrompt);
+    }, [searchParams]);
 
     const addReferences = async (files?: FileList | null) => {
         const imageFiles = Array.from(files || []).filter((file) => file.type.startsWith("image/"));

@@ -44,7 +44,7 @@ func NotFoundJSON(c *gin.Context) {
 }
 
 func authUser(c *gin.Context) (model.AuthUser, bool) {
-	token := strings.TrimPrefix(c.GetHeader("Authorization"), "Bearer ")
+	token := service.AuthTokenFromRequest(c.Request)
 	if strings.TrimSpace(token) == "" {
 		return model.AuthUser{}, false
 	}

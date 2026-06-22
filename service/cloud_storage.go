@@ -29,13 +29,13 @@ import (
 )
 
 const (
-	maxUserUploadBytes       = 50 << 20
-	maxUpstreamImageBytes    = 64 << 20
-	maxUpstreamVideoBytes    = 512 << 20
-	maxUpstreamModel3DBytes  = 100 << 20
-	maxAIJSONResponseBytes   = 80 << 20
-	storageModeLocalOnly     = "local_only"
-	storageModeS3Only        = "s3_only"
+	maxUserUploadBytes        = 50 << 20
+	maxUpstreamImageBytes     = 64 << 20
+	maxUpstreamVideoBytes     = 512 << 20
+	maxUpstreamModel3DBytes   = 100 << 20
+	maxAIJSONResponseBytes    = 80 << 20
+	storageModeLocalOnly      = "local_only"
+	storageModeS3Only         = "s3_only"
 	storageModeS3WithFallback = "s3_with_local_fallback"
 )
 
@@ -882,9 +882,14 @@ func fileContentURL(id string, accessToken string) string {
 func defaultTempExpiresAt(fileType model.CloudFileType) string {
 	setting, _, err := CloudStorageEnabled()
 	if err != nil {
-		return time.Now().Add(7 * 24 * time.Hour).Format(time.RFC3339)
+		return time.Now().Add(24 * time.Hour).Format(time.RFC3339)
 	}
-	return cloudExpiresAt(setting, fileType)
+	expiresAt := cloudExpiresAt(setting, fileType)
+	limit := time.Now().Add(24 * time.Hour).Format(time.RFC3339)
+	if expiresAt == "" || expiresAt > limit {
+		return limit
+	}
+	return expiresAt
 }
 
 func firstPurpose(purpose model.CloudFilePurpose) model.CloudFilePurpose {

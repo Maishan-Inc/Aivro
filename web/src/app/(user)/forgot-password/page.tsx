@@ -9,7 +9,7 @@ import { useState } from "react";
 import { useAuthLoadingOverlay } from "@/hooks/use-auth-loading-overlay";
 import { useI18n } from "@/hooks/use-i18n";
 import { useLocalizedPath } from "@/hooks/use-localized-path";
-import { useTurnstileChallenge } from "@/hooks/use-turnstile-challenge";
+import { useCaptchaChallenge } from "@/hooks/use-captcha-challenge";
 import { resetPassword, sendEmailCode } from "@/services/api/auth";
 import { useConfigStore } from "@/stores/use-config-store";
 
@@ -29,9 +29,9 @@ export default function ForgotPasswordPage() {
     const [sendingCode, setSendingCode] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const publicSettings = useConfigStore((state) => state.publicSettings);
-    const turnstileSiteKey = publicSettings?.auth?.turnstileSiteKey || "";
+    const captcha = publicSettings?.auth?.captcha?.enabled ? publicSettings.auth.captcha : publicSettings?.auth?.turnstileSiteKey ? { enabled: true, provider: "turnstile" as const, siteKey: publicSettings.auth.turnstileSiteKey } : undefined;
     const { overlay, runWithOverlay } = useAuthLoadingOverlay();
-    const { verify: verifyTurnstile, challenge: turnstileChallenge } = useTurnstileChallenge(turnstileSiteKey);
+    const { verify: verifyCaptcha, challenge: captchaChallenge } = useCaptchaChallenge(captcha);
 
     const requestCode = async () => {
         const email = form.getFieldValue("email");
@@ -45,8 +45,8 @@ export default function ForgotPasswordPage() {
         }
         setSendingCode(true);
         try {
-            const turnstileToken = await verifyTurnstile();
-            await sendEmailCode(email, "reset", turnstileToken);
+            const captchaToken = await verifyCaptcha();
+            await sendEmailCode(email, "reset", captchaToken);
             message.success("验证码已发送");
         } catch (error) {
             message.error(error instanceof Error ? error.message : "发送失败");
@@ -66,8 +66,8 @@ export default function ForgotPasswordPage() {
         }
         setSubmitting(true);
         try {
-            const turnstileToken = await verifyTurnstile();
-            await runWithOverlay("正在重置密码", () => resetPassword({ email: values.email, code: values.code, password: values.password, turnstileToken }));
+            const captchaToken = await verifyCaptcha();
+            await runWithOverlay("正在重置密码", () => resetPassword({ email: values.email, code: values.code, password: values.password, captchaToken }));
             message.success("密码已重置");
             router.replace(localizedPath("/login"));
         } catch (error) {
@@ -114,7 +114,7 @@ export default function ForgotPasswordPage() {
                     </Space>
                 </Form>
             </section>
-            {turnstileChallenge}
+            {captchaChallenge}
             {overlay}
         </main>
     );
