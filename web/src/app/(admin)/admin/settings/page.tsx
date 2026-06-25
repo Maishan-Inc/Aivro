@@ -165,6 +165,11 @@ const emptySettings: AdminSettings = {
     },
     private: {
         channels: [],
+        runtime: {
+            appOrigin: "",
+            allowedOrigins: "",
+            jwtExpireHours: 168,
+        },
         promptSync: { enabled: true, cron: "*/5 * * * *", githubRawProxyEnabled: false },
         aiQueue: { enabled: true, backend: "database", redisUrl: "", defaultPerMinute: 50, modelPerMinute: [], maxQueuedPerUser: 20, taskRetentionHours: 24 },
         canvasAssist: { historyRetentionDays: 7 },
@@ -233,7 +238,7 @@ const emptySettings: AdminSettings = {
 };
 const emptyChannel: AdminModelChannel = { protocol: "openai", name: "", baseUrl: "", apiKey: "", models: [], weight: 1, enabled: true, remark: "" };
 
-type SettingsTabKey = "model" | "public" | "private" | "mail" | "thirdParty" | "cloudStorage" | "billingKyc" | "pages";
+type SettingsTabKey = "model" | "public" | "runtime" | "private" | "mail" | "thirdParty" | "cloudStorage" | "billingKyc" | "pages";
 type EditorMode = "visual" | "json";
 type ModelSelectTabKey = "new" | "current";
 type MailTemplateKey = "register" | "reset" | "metamask";
@@ -284,7 +289,7 @@ export default function AdminSettingsPage() {
     const channelModels = useMemo(() => collectChannelModels(channels), [channels]);
     const channelTableData = useMemo(() => channels.map((channel, index) => ({ ...channel, _index: index, _rowKey: `${index}-${channel.name}-${channel.baseUrl}` })), [channels]);
     const standaloneTab = activeTab === "model" || activeTab === "mail";
-    const activeMode = activeTab === "model" || activeTab === "mail" || activeTab === "thirdParty" || activeTab === "cloudStorage" || activeTab === "billingKyc" || activeTab === "pages" ? "visual" : editorMode[activeTab];
+    const activeMode = activeTab === "model" || activeTab === "mail" || activeTab === "thirdParty" || activeTab === "cloudStorage" || activeTab === "billingKyc" || activeTab === "pages" || activeTab === "runtime" ? "visual" : editorMode[activeTab];
     const activeJsonText = jsonText[activeTab] || "";
     const jsonError = activeMode === "json" ? getJsonError(activeJsonText) : "";
     const modelSelectGroups = useMemo(() => buildModelSelectGroups(modelSelectSource, modelSelectExisting), [modelSelectSource, modelSelectExisting]);
@@ -687,6 +692,7 @@ export default function AdminSettingsPage() {
                                 style={{ flex: 1, minWidth: 0 }}
                                 items={[
                                     { key: "public", label: "注册与访问" },
+                                    { key: "runtime", label: "运行配置" },
                                     { key: "pages", label: "页面设置" },
                                     { key: "private", label: "后台配置" },
                                     { key: "cloudStorage", label: t("cloud.tab") },
@@ -721,7 +727,7 @@ export default function AdminSettingsPage() {
                                 ]}
                             />
                         ) : (
-                            <Typography.Text type="secondary">{activeTab === "model" ? "配置模型渠道、开放模型、默认模型和算力点消耗" : activeTab === "mail" ? "SMTP 验证码和邮件模板" : activeTab === "cloudStorage" ? t("cloud.description") : activeTab === "billingKyc" ? "配置 Stripe 私有密钥和 Didit KYC 奖励" : activeTab === "pages" ? "配置前台隐私政策和服务条款内容" : "OAuth、MetaMask 和自定义登录入口"}</Typography.Text>
+                            <Typography.Text type="secondary">{activeTab === "model" ? "配置模型渠道、开放模型、默认模型和算力点消耗" : activeTab === "mail" ? "SMTP 验证码和邮件模板" : activeTab === "cloudStorage" ? t("cloud.description") : activeTab === "billingKyc" ? "配置 Stripe 私有密钥和 Didit KYC 奖励" : activeTab === "pages" ? "配置前台隐私政策和服务条款内容" : activeTab === "runtime" ? "配置站点域名、可信来源和登录有效期" : "OAuth、MetaMask 和自定义登录入口"}</Typography.Text>
                         )}
                         {activeMode === "json" ? (
                             <Space>
@@ -958,6 +964,24 @@ export default function AdminSettingsPage() {
                                 />
                             </div>
                         )
+                    ) : activeTab === "runtime" ? (
+                        <Form form={form} layout="vertical" initialValues={emptySettings} requiredMark={false} onValuesChange={handleFormValuesChange}>
+                            <Row gutter={[16, 16]}>
+                                <Col xs={24}>
+                                    <Card size="small" title="站点来源" extra={sectionSaveButton()}>
+                                        <Form.Item name={["private", "runtime", "appOrigin"]} label="站点主域名" extra="用于 OAuth 回调、支付回跳、KYC 回调和分享链接。留空时沿用 APP_ORIGIN 环境变量。">
+                                            <Input placeholder="https://aivro.org" />
+                                        </Form.Item>
+                                        <Form.Item name={["private", "runtime", "allowedOrigins"]} label="允许推断来源" extra="多个域名用英文逗号分隔。未配置站点主域名时，后端可从这些 Host 推断来源。留空时沿用 ALLOWED_ORIGINS。">
+                                            <Input.TextArea rows={3} placeholder="http://localhost:3000,https://aivro.org" />
+                                        </Form.Item>
+                                        <Form.Item name={["private", "runtime", "jwtExpireHours"]} label="登录有效期" extra="影响新签发 token 和登录 Cookie 的有效期，不会修改 JWT_SECRET。">
+                                            <InputNumber min={1} max={8760} precision={0} addonAfter="小时" className="!w-full" />
+                                        </Form.Item>
+                                    </Card>
+                                </Col>
+                            </Row>
+                        </Form>
                     ) : activeTab === "pages" ? (
                         <Form form={form} layout="vertical" initialValues={emptySettings} requiredMark={false} onValuesChange={handleFormValuesChange}>
                             <Row gutter={[16, 16]}>
@@ -1816,7 +1840,9 @@ function OAuthProviderEditorModal({ form, state, snapshot, currentOrigin, onClos
 function OAuthProviderFields({ providerKey, currentOrigin }: { providerKey: "linuxDo" | "google" | "github"; currentOrigin: string }) {
     const providerId = { linuxDo: "linux-do", google: "google", github: "github" }[providerKey];
     const callbackPath = providerKey === "linuxDo" ? "/api/auth/linux-do/callback" : `/api/auth/oauth/${providerId}/callback`;
-    const callbackUrl = currentOrigin ? `${currentOrigin}${callbackPath}` : `当前站点域名${callbackPath}`;
+    const runtimeOrigin = Form.useWatch(["private", "runtime", "appOrigin"]) as string | undefined;
+    const origin = (runtimeOrigin || currentOrigin).trim().replace(/\/+$/, "");
+    const callbackUrl = origin ? `${origin}${callbackPath}` : `当前站点域名${callbackPath}`;
     return (
         <Row gutter={16}>
             <Col xs={24} md={6}>
@@ -2015,7 +2041,7 @@ function renderTemplatePreview(template: string, expireMinutes: number) {
 }
 
 function normalizeSettingsTab(tab: string | null): SettingsTabKey {
-    if (tab === "model" || tab === "private" || tab === "mail" || tab === "thirdParty" || tab === "cloudStorage" || tab === "billingKyc" || tab === "pages") return tab;
+    if (tab === "model" || tab === "runtime" || tab === "private" || tab === "mail" || tab === "thirdParty" || tab === "cloudStorage" || tab === "billingKyc" || tab === "pages") return tab;
     return "public";
 }
 
@@ -2138,6 +2164,7 @@ function normalizePrivateSetting(setting: Partial<AdminSettings["private"]> = {}
     } as AdminSettings["private"]["captcha"];
     return {
         channels: (setting.channels || []).map(normalizeChannel),
+        runtime: normalizeRuntimeSetting(setting.runtime),
         promptSync: {
             enabled: setting.promptSync?.enabled !== false,
             cron: setting.promptSync?.cron || "*/5 * * * *",
@@ -2196,6 +2223,14 @@ function normalizePrivateSetting(setting: Partial<AdminSettings["private"]> = {}
             rewardWorkflowCreateCredits: Math.max(0, Number(setting.kyc?.rewardWorkflowCreateCredits) || 0),
             rewardOnce: setting.kyc?.rewardOnce !== false,
         },
+    };
+}
+
+function normalizeRuntimeSetting(setting: Partial<AdminSettings["private"]["runtime"]> = {}): AdminSettings["private"]["runtime"] {
+    return {
+        appOrigin: (setting.appOrigin || "").trim().replace(/\/+$/, ""),
+        allowedOrigins: setting.allowedOrigins || "",
+        jwtExpireHours: Math.max(1, Number(setting.jwtExpireHours) || 168),
     };
 }
 

@@ -819,7 +819,7 @@ func newSession(user model.User) (model.AuthSession, error) {
 }
 
 func newToken(user model.User) (string, error) {
-	expireHours := config.Cfg.JWTExpireHours
+	expireHours := RuntimeSetting().JWTExpireHours
 	if expireHours <= 0 {
 		expireHours = 168
 	}
@@ -849,7 +849,7 @@ func AuthTokenFromRequest(r *http.Request) string {
 }
 
 func SetAuthCookie(w http.ResponseWriter, r *http.Request, token string) {
-	maxAge := config.Cfg.JWTExpireHours * 3600
+	maxAge := RuntimeSetting().JWTExpireHours * 3600
 	if maxAge <= 0 {
 		maxAge = 168 * 3600
 	}
@@ -1847,7 +1847,7 @@ func RequestOrigin(r *http.Request) string {
 }
 
 func normalizedConfiguredOrigin() string {
-	raw := strings.TrimRight(strings.TrimSpace(config.Cfg.AppOrigin), "/")
+	raw := strings.TrimRight(strings.TrimSpace(firstNonEmpty(RuntimeSetting().AppOrigin, config.Cfg.AppOrigin)), "/")
 	if raw == "" {
 		return ""
 	}
@@ -1860,7 +1860,7 @@ func normalizedConfiguredOrigin() string {
 
 func configuredAllowedOrigin(host string) string {
 	host = strings.ToLower(strings.TrimSpace(host))
-	for _, item := range strings.Split(config.Cfg.AllowedOrigins, ",") {
+	for _, item := range strings.Split(configuredAllowedOrigins(), ",") {
 		origin := strings.TrimRight(strings.TrimSpace(item), "/")
 		if origin == "" {
 			continue
@@ -1885,10 +1885,10 @@ func allowedRequestHost(host string) bool {
 	if localRequestHostname(hostname) {
 		return true
 	}
-	if strings.TrimSpace(config.Cfg.AllowedOrigins) == "" {
+	if strings.TrimSpace(configuredAllowedOrigins()) == "" {
 		return false
 	}
-	for _, item := range strings.Split(config.Cfg.AllowedOrigins, ",") {
+	for _, item := range strings.Split(configuredAllowedOrigins(), ",") {
 		origin := strings.TrimRight(strings.TrimSpace(item), "/")
 		if origin == "" {
 			continue
@@ -1905,6 +1905,10 @@ func allowedRequestHost(host string) bool {
 		}
 	}
 	return false
+}
+
+func configuredAllowedOrigins() string {
+	return firstNonEmpty(RuntimeSetting().AllowedOrigins, config.Cfg.AllowedOrigins)
 }
 
 func requestHostname(host string) string {

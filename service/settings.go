@@ -369,6 +369,7 @@ func normalizePrivateSetting(setting model.PrivateSetting) model.PrivateSetting 
 	if setting.Channels == nil {
 		setting.Channels = []model.ModelChannel{}
 	}
+	setting.Runtime = normalizeRuntimeSetting(setting.Runtime)
 	setting.PromptSync = normalizePromptSyncSetting(setting.PromptSync)
 	setting.AIQueue = normalizeAIQueueSetting(setting.AIQueue)
 	setting.CanvasAssist = normalizeCanvasAssistSetting(setting.CanvasAssist)
@@ -391,6 +392,26 @@ func normalizePrivateSetting(setting model.PrivateSetting) model.PrivateSetting 
 		}
 	}
 	return setting
+}
+
+func normalizeRuntimeSetting(setting model.RuntimeSetting) model.RuntimeSetting {
+	setting.AppOrigin = strings.TrimRight(strings.TrimSpace(setting.AppOrigin), "/")
+	setting.AllowedOrigins = strings.TrimSpace(setting.AllowedOrigins)
+	if setting.JWTExpireHours <= 0 {
+		setting.JWTExpireHours = config.Cfg.JWTExpireHours
+	}
+	if setting.JWTExpireHours <= 0 {
+		setting.JWTExpireHours = 168
+	}
+	return setting
+}
+
+func RuntimeSetting() model.RuntimeSetting {
+	settings, err := repository.GetSettings()
+	if err != nil {
+		return normalizeRuntimeSetting(model.RuntimeSetting{})
+	}
+	return normalizeRuntimeSetting(settings.Private.Runtime)
 }
 
 func normalizeCanvasAssistSetting(setting model.CanvasAssistSetting) model.CanvasAssistSetting {

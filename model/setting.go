@@ -141,6 +141,7 @@ type PublicOAuthProviderSetting struct {
 // PrivateSetting 私有配置。
 type PrivateSetting struct {
 	Channels     []ModelChannel      `json:"channels"`
+	Runtime      RuntimeSetting      `json:"runtime"`
 	PromptSync   PromptSyncSetting   `json:"promptSync"`
 	AIQueue      AIQueueSetting      `json:"aiQueue"`
 	CanvasAssist CanvasAssistSetting `json:"canvasAssist"`
@@ -151,6 +152,12 @@ type PrivateSetting struct {
 	CloudStorage CloudStorageSetting `json:"cloudStorage"`
 	Stripe       StripeSetting       `json:"stripe"`
 	KYC          KYCSetting          `json:"kyc"`
+}
+
+type RuntimeSetting struct {
+	AppOrigin      string `json:"appOrigin"`
+	AllowedOrigins string `json:"allowedOrigins"`
+	JWTExpireHours int    `json:"jwtExpireHours"`
 }
 
 type TurnstileSetting struct {

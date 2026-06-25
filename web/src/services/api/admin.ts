@@ -294,6 +294,7 @@ export type AdminPublicAuthProvider = {
 
 export type AdminPrivateSettings = {
     channels: AdminModelChannel[];
+    runtime: AdminRuntimeSettings;
     promptSync: {
         enabled: boolean;
         cron: string;
@@ -314,6 +315,12 @@ export type AdminPrivateSettings = {
     cloudStorage: AdminCloudStorageSettings;
     stripe: AdminStripeSettings;
     kyc: AdminKycSettings;
+};
+
+export type AdminRuntimeSettings = {
+    appOrigin: string;
+    allowedOrigins: string;
+    jwtExpireHours: number;
 };
 
 export type AdminTurnstileSettings = {
