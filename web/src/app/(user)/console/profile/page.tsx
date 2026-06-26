@@ -87,8 +87,8 @@ export default function ConsoleProfilePage() {
                             <Form.Item name="avatarUrl" label="头像 URL">
                                 <Input prefix={<UserRound className="size-4 text-stone-400" />} placeholder="填写图片 URL 修改头像" />
                             </Form.Item>
-                            <Form.Item name="displayName" label="显示名称" rules={[{ required: true, message: "请输入显示名称" }]}>
-                                <Input placeholder="显示在站内的名称" />
+                            <Form.Item name="displayName" label="公开名称" extra="展示在个人资料、工作流卡片和分享页面中。" rules={[{ required: true, message: "请输入公开名称" }]}>
+                                <Input placeholder="输入公开名称" />
                             </Form.Item>
                             <Form.Item name="accountType" label="账号类型">
                                 <Segmented block options={[{ label: "个人", value: "personal" }, { label: "公司", value: "company" }]} />

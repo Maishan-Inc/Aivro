@@ -551,7 +551,7 @@ function AssistantModeSwitch({ mode, theme, onChange }: { mode: AssistantMode; t
     return (
         <div className="canvas-composer-mode-switch flex h-8 shrink-0 items-center rounded-full p-0.5" style={{ background: theme.node.fill }}>
             {[
-                { value: "ask" as const, title: "Agent", icon: <MessageSquare className="size-4" /> },
+                { value: "ask" as const, title: "画布助手", icon: <MessageSquare className="size-4" /> },
                 { value: "image" as const, title: "生图", icon: <ImageIcon className="size-4" /> },
             ].map((item) => (
                 <Tooltip key={item.value} title={item.title}>

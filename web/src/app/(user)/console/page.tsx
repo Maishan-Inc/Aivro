@@ -63,7 +63,7 @@ export default function ConsolePage() {
                             <p className="mt-2 text-sm leading-6 text-stone-500 dark:text-stone-400">管理工作流、余额、身份认证和个人资料，创作工具仍保持原页面体验。</p>
                         </div>
                         <div className="flex flex-wrap gap-2">
-                            <Button type="primary" href={localizedPath("/console/workflows")} icon={<Layers3 className="size-4" />}>
+                            <Button type="primary" href={localizedPath("/canvas")} icon={<Layers3 className="size-4" />}>
                                 我的工作流
                             </Button>
                             <Button href={localizedPath("/image")} icon={<ImagePlus className="size-4" />}>
@@ -89,7 +89,7 @@ export default function ConsolePage() {
                             </Link>
                         </div>
                         <div className="grid gap-3 sm:grid-cols-2">
-                            <QuickLink href="/console/workflows" icon={<Layers3 className="size-5" />} title="我的工作流" description="继续编辑、重命名、删除和新建工作流。" />
+                            <QuickLink href="/canvas" icon={<Layers3 className="size-5" />} title="我的工作流" description="继续编辑、重命名、删除和新建工作流。" />
                             <QuickLink href="/console/shares" icon={<BookOpen className="size-5" />} title="我的分享" description="查看 Fork 的独立副本和自动更新工作流。" />
                             <QuickLink href="/console/wallet" icon={<WalletCards className="size-5" />} title="我的钱包" description="查看算力点余额、额度和扣费说明。" />
                             <QuickLink href="/console/profile" icon={<UserCircle className="size-5" />} title="个人中心" description="修改头像、名称并发起 KYC 身份验证。" />

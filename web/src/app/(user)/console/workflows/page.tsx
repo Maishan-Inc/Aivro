@@ -1,7 +1,11 @@
-"use client";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 
-import { WorkflowLibraryView } from "@/app/(user)/canvas/components/workflow-library-view";
+import { isLocale } from "@/i18n/routing";
 
-export default function ConsoleWorkflowsPage() {
-    return <WorkflowLibraryView initialTab="workflows" lockTab redirectPath="/console/workflows" embedded />;
+export default async function ConsoleWorkflowsPage() {
+    const headerStore = await headers();
+    const locale = headerStore.get("x-aivro-locale");
+
+    redirect(isLocale(locale || undefined) ? `/${locale}/canvas` : "/canvas");
 }

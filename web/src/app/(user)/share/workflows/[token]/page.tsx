@@ -102,7 +102,7 @@ export default function WorkflowSharePage() {
             <main className="grid min-h-screen place-items-center bg-background px-6">
                 <section className="w-full max-w-sm rounded-xl border bg-white p-6 shadow-sm dark:bg-stone-950">
                     <Lock className="mb-4 size-8 text-stone-500" />
-                    <h1 className="text-xl font-semibold">请输入分享密码</h1>
+                    <h1 className="text-xl font-semibold">请输入分享密码进入分享预览</h1>
                     <div className="mt-6 grid gap-4">
                         <Input.Password value={password} onChange={(event) => setPassword(event.target.value)} onPressEnter={verify} />
                         <Button type="primary" block onClick={verify}>进入分享预览</Button>

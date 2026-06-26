@@ -63,7 +63,7 @@ function LoginContent() {
     const [sendingCode, setSendingCode] = useState(false);
     const [codeSeconds, setCodeSeconds] = useState(0);
     const [metaMaskAvailable, setMetaMaskAvailable] = useState(true);
-    const redirect = safeRedirect(searchParams.get("redirect") || localizedPath("/"));
+    const redirect = safeRedirect(searchParams.get("redirect") || localizedPath("/canvas"));
     const thirdPartyProviders = ([authSettings?.google, authSettings?.github, authSettings?.linuxDo, ...(authSettings?.customProviders || [])] as Array<AdminPublicAuthProvider | undefined>).filter((item): item is AdminPublicAuthProvider => item?.enabled === true && item.id !== "metamask");
 
     useEffect(() => {
@@ -300,10 +300,10 @@ function RegisterFields({ step, locale, sendingCode, codeSeconds, publicReady, o
                     <>
                         <Form.Item
                             name="username"
-                            label={<span className="font-medium text-stone-200">{locale === "en-US" ? "Username" : "用户名称"}</span>}
-                            extra={<span className="text-stone-400">{locale === "en-US" ? "Only lowercase letters and numbers. It cannot be changed later." : "仅支持小写字母和数字，当前系统暂不支持修改用户名称。"}</span>}
+                            label={<span className="font-medium text-stone-200">{locale === "en-US" ? "Route name" : "路由名称"}</span>}
+                            extra={<span className="text-stone-400">{locale === "en-US" ? "Used in public URLs. Only lowercase letters and numbers. It cannot be changed later." : "用于系统中的公开路由，仅支持小写字母和数字，当前系统暂不支持修改。"}</span>}
                             rules={[
-                                { required: true, message: locale === "en-US" ? "Enter a username" : "请输入用户名称" },
+                                { required: true, message: locale === "en-US" ? "Enter a route name" : "请输入路由名称" },
                                 { pattern: /^[a-z0-9]{3,24}$/, message: locale === "en-US" ? "Use 3-24 lowercase letters or numbers" : "请输入 3-24 位小写字母或数字" },
                             ]}
                         >
@@ -312,7 +312,7 @@ function RegisterFields({ step, locale, sendingCode, codeSeconds, publicReady, o
                         <Form.Item name="accountType" initialValue="personal">
                             <Segmented block options={[{ label: locale === "en-US" ? "Personal" : "个人", value: "personal" }, { label: locale === "en-US" ? "Company" : "公司", value: "company" }]} />
                         </Form.Item>
-                        <Form.Item name="displayName" label={<span className="font-medium text-stone-200">{locale === "en-US" ? "Name" : "名称"}</span>} rules={[{ required: true, message: "请输入名称" }]}>
+                        <Form.Item name="displayName" label={<span className="font-medium text-stone-200">{locale === "en-US" ? "Public name" : "公开名称"}</span>} extra={<span className="text-stone-400">{locale === "en-US" ? "Shown on your profile, workflow cards, and shared pages." : "展示在个人资料、工作流卡片和分享页面中。"}</span>} rules={[{ required: true, message: locale === "en-US" ? "Enter a public name" : "请输入公开名称" }]}>
                             <Input prefix={<UserOutlined />} autoComplete="name" />
                         </Form.Item>
                     </>

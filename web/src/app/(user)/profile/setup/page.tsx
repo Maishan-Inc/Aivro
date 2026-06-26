@@ -34,7 +34,7 @@ function ProfileSetupContent() {
     const { locale } = useI18n();
     const localizedPath = useLocalizedPath();
     const [saving, setSaving] = useState(false);
-    const redirect = safeRedirect(search.get("redirect") || localizedPath("/"));
+    const redirect = safeRedirect(search.get("redirect") || localizedPath("/canvas"));
 
     useEffect(() => {
         if (user?.profileCompleted) router.replace(redirect);
@@ -64,15 +64,15 @@ function ProfileSetupContent() {
             <section className="w-full max-w-[420px]">
                 <div className="mb-7 text-center">
                     <h1 className="text-3xl font-semibold tracking-normal text-stone-950 dark:text-stone-100">{locale === "en-US" ? "Complete profile" : "完善账户信息"}</h1>
-                <p className="mt-3 text-base leading-7 text-stone-500 dark:text-stone-400">{locale === "en-US" ? "Confirm the username, choose account type, and enter the display name." : "确认用户名称，选择账户类型并填写显示名称。"}</p>
+                    <p className="mt-3 text-base leading-7 text-stone-500 dark:text-stone-400">{locale === "en-US" ? "Confirm the route name, choose account type, and enter the public name." : "确认路由名称，选择账户类型并填写公开名称。"}</p>
                 </div>
                 <Form<ProfileValues> layout="vertical" size="large" requiredMark={false} initialValues={{ username: user?.username || "", accountType: "personal", displayName: user?.displayName || "" }} onFinish={submit}>
                     <Form.Item
                         name="username"
-                        label={locale === "en-US" ? "Username" : "用户名称"}
-                        extra={locale === "en-US" ? "Only lowercase letters and numbers. Usernames cannot be changed yet." : "仅支持小写字母和数字，当前系统暂不支持修改用户名称。"}
+                        label={locale === "en-US" ? "Route name" : "路由名称"}
+                        extra={locale === "en-US" ? "Used in public URLs. Only lowercase letters and numbers. It cannot be changed yet." : "用于系统中的公开路由，仅支持小写字母和数字，当前系统暂不支持修改。"}
                         rules={[
-                            { required: true, message: locale === "en-US" ? "Enter a username" : "请输入用户名称" },
+                            { required: true, message: locale === "en-US" ? "Enter a route name" : "请输入路由名称" },
                             { pattern: /^[a-z0-9]{3,24}$/, message: locale === "en-US" ? "Use 3-24 lowercase letters or numbers" : "请输入 3-24 位小写字母或数字" },
                         ]}
                     >
@@ -81,7 +81,7 @@ function ProfileSetupContent() {
                     <Form.Item name="accountType">
                         <Segmented block options={[{ label: locale === "en-US" ? "Personal" : "个人", value: "personal" }, { label: locale === "en-US" ? "Company" : "公司", value: "company" }]} />
                     </Form.Item>
-                    <Form.Item name="displayName" label={locale === "en-US" ? "Name" : "名称"} rules={[{ required: true, message: locale === "en-US" ? "Enter a name" : "请输入名称" }]}>
+                    <Form.Item name="displayName" label={locale === "en-US" ? "Public name" : "公开名称"} extra={locale === "en-US" ? "Shown on your profile, workflow cards, and shared pages." : "展示在个人资料、工作流卡片和分享页面中。"} rules={[{ required: true, message: locale === "en-US" ? "Enter a public name" : "请输入公开名称" }]}>
                         <Input prefix={<UserOutlined />} autoComplete="name" />
                     </Form.Item>
                     <Button block type="primary" htmlType="submit" loading={saving}>
