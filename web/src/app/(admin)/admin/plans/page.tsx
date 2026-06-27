@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { App, Card, Form, Input, InputNumber, Modal, Segmented, Switch, Tabs, Tag } from "antd";
-import { Pencil, Plus, Sparkles } from "lucide-react";
+import { App, Button, Card, Form, Input, InputNumber, Modal, Segmented, Switch, Tabs, Tag } from "antd";
+import { Pencil, Plus, Sparkles, Trash2 } from "lucide-react";
 
 import { fetchAdminPlans, saveAdminPlan } from "@/services/api/admin";
 import type { Plan, PlanTranslation } from "@/services/api/billing";
@@ -14,6 +14,7 @@ const localeKeys = Object.keys(localeLabels) as Locale[];
 const emptyTranslation: PlanTranslation = {
     name: "",
     description: "",
+    features: [],
     priceCents: 0,
     currency: "",
     credits: 0,
@@ -26,6 +27,7 @@ function blankPlan(): Plan {
         code: "go",
         name: "",
         description: "",
+        features: [],
         priceCents: 0,
         currency: "USD",
         credits: 0,
@@ -75,7 +77,7 @@ export default function AdminPlansPage() {
         for (const key of localeKeys) {
             translations[key] = { ...emptyTranslation, ...(translations[key] || {}) };
         }
-        const next = { ...plan, translations };
+        const next = { ...plan, features: plan.features || [], translations };
         setEditing(next);
         form.setFieldsValue(next);
     };
@@ -88,11 +90,12 @@ export default function AdminPlansPage() {
     const submit = async () => {
         if (!token || !editing) return;
         const values = await form.validateFields();
+        values.features = cleanFeatureInputs(values.features);
         // Drop fully-empty translation entries so the backend only stores real overrides.
         const translations: Record<string, PlanTranslation> = {};
         for (const key of localeKeys) {
-            const tr = (values.translations?.[key] || {}) as PlanTranslation;
-            const hasOverride = tr.name || tr.description || tr.currency || tr.priceCents || tr.credits || tr.workflowCreateCredits;
+            const tr = { ...((values.translations?.[key] || {}) as PlanTranslation), features: cleanFeatureInputs(values.translations?.[key]?.features) };
+            const hasOverride = tr.name || tr.description || tr.features?.length || tr.currency || tr.priceCents || tr.credits || tr.workflowCreateCredits;
             if (hasOverride) translations[key] = { ...emptyTranslation, ...tr };
         }
         setSaving(true);
@@ -181,6 +184,11 @@ function formatPrice(plan: Plan) {
     return new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(plan.priceCents / 100);
 }
 
+function cleanFeatureInputs(items: unknown) {
+    if (!Array.isArray(items)) return [];
+    return items.map((item) => String(item || "").trim()).filter(Boolean);
+}
+
 type PlanFormInstance = ReturnType<typeof Form.useForm>[0];
 
 function PlanEditorModal({
@@ -243,6 +251,7 @@ function PlanBaseFields() {
             <Form.Item name="description" label="描述" className="col-span-2">
                 <Input.TextArea rows={2} placeholder="适合 AI 创作的灵活额度。" />
             </Form.Item>
+            <PlanFeatureFields name="features" label="卡片功能点" className="col-span-2" />
             <Form.Item name="priceCents" label="价格（分）" className="col-span-1">
                 <InputNumber min={0} className="w-full" />
             </Form.Item>
@@ -284,6 +293,7 @@ function PlanTranslationFields({ locale }: { locale: Locale }) {
                 <Form.Item name={["translations", locale, "description"]} label="描述" className="col-span-2">
                     <Input.TextArea rows={2} placeholder="沿用基础设置" />
                 </Form.Item>
+                <PlanFeatureFields name={["translations", locale, "features"]} label="卡片功能点" className="col-span-2" />
                 <Form.Item name={["translations", locale, "priceCents"]} label="价格（分）" className="col-span-1">
                     <InputNumber min={0} className="w-full" placeholder="沿用基础设置" />
                 </Form.Item>
@@ -295,5 +305,29 @@ function PlanTranslationFields({ locale }: { locale: Locale }) {
                 </Form.Item>
             </div>
         </div>
+    );
+}
+
+function PlanFeatureFields({ name, label, className }: { name: string | (string | number)[]; label: string; className?: string }) {
+    return (
+        <Form.Item label={label} className={className}>
+            <Form.List name={name}>
+                {(fields, { add, remove }) => (
+                    <div className="flex flex-col gap-2">
+                        {fields.map((field) => (
+                            <div key={field.key} className="flex gap-2">
+                                <Form.Item {...field} className="mb-0 flex-1">
+                                    <Input placeholder="例如：300 算力点" />
+                                </Form.Item>
+                                <Button aria-label="删除功能点" icon={<Trash2 className="size-4" />} onClick={() => remove(field.name)} />
+                            </div>
+                        ))}
+                        <Button type="dashed" icon={<Plus className="size-4" />} onClick={() => add("")}>
+                            新增功能点
+                        </Button>
+                    </div>
+                )}
+            </Form.List>
+        </Form.Item>
     );
 }

@@ -15,7 +15,7 @@ export function ConsoleKycCard({ kyc, loading, onStart }: { kyc: KycStatus | nul
     const rewardText = rewards ? (en ? `Reward on pass: ${rewards.credits} Credits, ${rewards.workflowCreateCredits} workflow creations.` : `通过奖励：${rewards.credits} 算力点，${rewards.workflowCreateCredits} 次工作流创建次数。`) : "";
 
     return (
-        <div className="rounded-lg border border-stone-200 bg-background p-5 dark:border-stone-800">
+        <div className="flex h-full flex-col rounded-lg border border-stone-200 bg-background p-5 dark:border-stone-800">
             <div className="mb-4 flex size-10 items-center justify-center rounded-md bg-stone-100 dark:bg-stone-900">
                 <BadgeCheck className="size-5" />
             </div>
@@ -26,9 +26,11 @@ export function ConsoleKycCard({ kyc, loading, onStart }: { kyc: KycStatus | nul
                 {kyc?.enabled ? <Tag className="m-0">{en ? "Enabled" : "已启用"}</Tag> : <Tag className="m-0">{en ? "Not configured" : "未配置"}</Tag>}
             </div>
             {rewardText ? <p className="mt-4 text-sm leading-6 text-stone-500 dark:text-stone-400">{rewardText}</p> : null}
-            <Button className="mt-8" block type="primary" disabled={!kyc?.enabled || kyc?.status === "approved"} loading={loading} onClick={onStart}>
-                {kyc?.status === "approved" ? (en ? "Verification completed" : "已完成认证") : en ? "Start KYC verification" : "开始 KYC 认证"}
-            </Button>
+            <div className="mt-auto pt-8">
+                <Button block type="primary" disabled={!kyc?.enabled || kyc?.status === "approved"} loading={loading} onClick={onStart}>
+                    {kyc?.status === "approved" ? (en ? "Verification completed" : "已完成认证") : en ? "Start KYC verification" : "开始 KYC 认证"}
+                </Button>
+            </div>
         </div>
     );
 }

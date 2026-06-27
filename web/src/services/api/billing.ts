@@ -3,6 +3,7 @@ import { apiGet, apiPost } from "@/services/api/request";
 export type PlanTranslation = {
     name: string;
     description: string;
+    features: string[];
     priceCents: number;
     currency: string;
     credits: number;
@@ -14,6 +15,7 @@ export type Plan = {
     code: "go" | "plus" | "pro" | "max";
     name: string;
     description: string;
+    features: string[];
     priceCents: number;
     currency: string;
     credits: number;
@@ -34,6 +36,7 @@ export function resolvePlanLocale(plan: Plan, locale: string): Plan {
         ...plan,
         name: tr.name || plan.name,
         description: tr.description || plan.description,
+        features: tr.features?.length ? tr.features : plan.features,
         currency: tr.currency || plan.currency,
         priceCents: tr.priceCents > 0 ? tr.priceCents : plan.priceCents,
         credits: tr.credits > 0 ? tr.credits : plan.credits,

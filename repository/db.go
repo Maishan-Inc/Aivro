@@ -297,10 +297,10 @@ func EnsureDefaultPlans() error {
 func ensureDefaultPlans(db *gorm.DB) error {
 	now := time.Now().Format(time.RFC3339)
 	defaults := []model.Plan{
-		{ID: "plan-go", Code: model.PlanCodeGO, Name: "GO", Description: "适合轻量体验的入门套餐", PriceCents: 900, Currency: "USD", Credits: 100, WorkflowCreateCredits: 1, Enabled: true, Sort: 10, CreatedAt: now, UpdatedAt: now},
-		{ID: "plan-plus", Code: model.PlanCodePlus, Name: "Plus", Description: "适合稳定创作的标准套餐", PriceCents: 1900, Currency: "USD", Credits: 300, WorkflowCreateCredits: 5, Enabled: true, Recommended: true, Sort: 20, CreatedAt: now, UpdatedAt: now},
-		{ID: "plan-pro", Code: model.PlanCodePro, Name: "Pro", Description: "适合高频生成和多个云端工作流", PriceCents: 4900, Currency: "USD", Credits: 900, WorkflowCreateCredits: 20, Enabled: true, Sort: 30, CreatedAt: now, UpdatedAt: now},
-		{ID: "plan-max", Code: model.PlanCodeMax, Name: "Max", Description: "适合团队或重度创作", PriceCents: 9900, Currency: "USD", Credits: 2200, WorkflowCreateCredits: 60, Enabled: true, Sort: 40, CreatedAt: now, UpdatedAt: now},
+		{ID: "plan-go", Code: model.PlanCodeGO, Name: "GO", Description: "适合轻量体验的入门套餐", Features: []string{"100 算力点", "1 次工作流创建", "适合轻量体验"}, PriceCents: 900, Currency: "USD", Credits: 100, WorkflowCreateCredits: 1, Enabled: true, Sort: 10, CreatedAt: now, UpdatedAt: now},
+		{ID: "plan-plus", Code: model.PlanCodePlus, Name: "Plus", Description: "适合稳定创作的标准套餐", Features: []string{"300 算力点", "5 次工作流创建", "适合稳定创作"}, PriceCents: 1900, Currency: "USD", Credits: 300, WorkflowCreateCredits: 5, Enabled: true, Recommended: true, Sort: 20, CreatedAt: now, UpdatedAt: now},
+		{ID: "plan-pro", Code: model.PlanCodePro, Name: "Pro", Description: "适合高频生成和多个云端工作流", Features: []string{"900 算力点", "20 次工作流创建", "适合高频生成"}, PriceCents: 4900, Currency: "USD", Credits: 900, WorkflowCreateCredits: 20, Enabled: true, Sort: 30, CreatedAt: now, UpdatedAt: now},
+		{ID: "plan-max", Code: model.PlanCodeMax, Name: "Max", Description: "适合团队或重度创作", Features: []string{"2200 算力点", "60 次工作流创建", "适合团队或重度创作"}, PriceCents: 9900, Currency: "USD", Credits: 2200, WorkflowCreateCredits: 60, Enabled: true, Sort: 40, CreatedAt: now, UpdatedAt: now},
 	}
 	for _, item := range defaults {
 		var count int64

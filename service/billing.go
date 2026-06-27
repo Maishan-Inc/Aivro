@@ -66,8 +66,24 @@ func SavePlan(input model.Plan) (model.Plan, error) {
 		input.Currency = "USD"
 	}
 	input.Currency = strings.ToUpper(input.Currency)
+	input.Features = cleanPlanFeatures(input.Features)
+	for key, tr := range input.Translations {
+		tr.Features = cleanPlanFeatures(tr.Features)
+		input.Translations[key] = tr
+	}
 	input.UpdatedAt = now()
 	return input, db.Save(&input).Error
+}
+
+func cleanPlanFeatures(items []string) []string {
+	result := make([]string, 0, len(items))
+	for _, item := range items {
+		text := strings.TrimSpace(item)
+		if text != "" {
+			result = append(result, text)
+		}
+	}
+	return result
 }
 
 func CreateStripeCheckout(r *http.Request, userID string, input CheckoutInput) (map[string]string, error) {

@@ -14,6 +14,7 @@ type Plan struct {
 	Code                  PlanCode                   `json:"code" gorm:"uniqueIndex"`
 	Name                  string                     `json:"name"`
 	Description           string                     `json:"description" gorm:"type:text"`
+	Features              []string                   `json:"features" gorm:"serializer:json"`
 	PriceCents            int                        `json:"priceCents"`
 	Currency              string                     `json:"currency"`
 	Credits               int                        `json:"credits"`
@@ -30,12 +31,13 @@ type Plan struct {
 // values for a single locale. When present for a locale it overrides the base
 // plan fields wholesale; locales without a translation fall back to the base.
 type PlanTranslation struct {
-	Name                  string `json:"name"`
-	Description           string `json:"description"`
-	PriceCents            int    `json:"priceCents"`
-	Currency              string `json:"currency"`
-	Credits               int    `json:"credits"`
-	WorkflowCreateCredits int    `json:"workflowCreateCredits"`
+	Name                  string   `json:"name"`
+	Description           string   `json:"description"`
+	Features              []string `json:"features"`
+	PriceCents            int      `json:"priceCents"`
+	Currency              string   `json:"currency"`
+	Credits               int      `json:"credits"`
+	WorkflowCreateCredits int      `json:"workflowCreateCredits"`
 }
 
 // ResolveForLocale returns a copy of the plan with base display and entitlement
@@ -52,6 +54,9 @@ func (p Plan) ResolveForLocale(locale string) Plan {
 	}
 	if tr.Description != "" {
 		resolved.Description = tr.Description
+	}
+	if len(tr.Features) > 0 {
+		resolved.Features = tr.Features
 	}
 	if tr.Currency != "" {
 		resolved.Currency = tr.Currency

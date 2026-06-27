@@ -4,11 +4,12 @@ import { type ComponentType, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { App, Button } from "antd";
-import { ArrowRight, BadgeCheck, Brain, CircleDot, Code2, Crown, Image, MessageCircle, Network, Rocket, ShieldCheck, Sparkles, TrendingUp, Users, X, Zap } from "lucide-react";
+import { ArrowRight, BadgeCheck, Layers3, Sparkles, Users, X } from "lucide-react";
 
 import { createStripeCheckout, fetchPlans, resolvePlanLocale, type Plan } from "@/services/api/billing";
 import { useI18n } from "@/hooks/use-i18n";
 import { localeFromPath, withLocalePath } from "@/i18n/routing";
+import { cn } from "@/lib/utils";
 import { useUserStore } from "@/stores/use-user-store";
 
 type PlanCode = "go" | "plus" | "pro" | "max";
@@ -16,87 +17,14 @@ type Feature = { icon: ComponentType<{ className?: string }>; text: string; stro
 type PricingCard = {
     code: PlanCode;
     title: string;
-    headline: string;
     price: string;
     currency: string;
     subtitle: string;
     cta: string;
     badge?: string;
     highlighted?: boolean;
-    intro?: string;
-    footnote: string;
     features: Feature[];
     plan?: Plan;
-};
-
-const planFeatures: Record<PlanCode, Feature[]> = {
-    go: [
-        { icon: Sparkles, text: "核心模型", strong: true },
-        { icon: MessageCircle, text: "更多消息和上传限额" },
-        { icon: Image, text: "更多图片生成限额" },
-        { icon: Brain, text: "更多记忆内容" },
-        { icon: Zap, text: "扩展额度的语音模式" },
-    ],
-    plus: [
-        { icon: Sparkles, text: "高级模型", strong: true },
-        { icon: Image, text: "高级图像创建和编辑" },
-        { icon: Brain, text: "扩展容量的跨聊天记忆" },
-        { icon: Code2, text: "Codex 编程智能体" },
-        { icon: Network, text: "更高级别的深度研究" },
-        { icon: BadgeCheck, text: "项目和自定义 GPT" },
-    ],
-    pro: [
-        { icon: TrendingUp, text: "相比 Plus 更高使用额度", strong: true },
-        { icon: Sparkles, text: "Pro 前沿模型" },
-        { icon: CircleDot, text: "对 Codex 的最大访问权限" },
-        { icon: Network, text: "最高级别的深度研究" },
-        { icon: MessageCircle, text: "高额度核心聊天" },
-        { icon: Image, text: "更快速的图片生成" },
-        { icon: Brain, text: "全面的记忆和背景信息" },
-    ],
-    max: [
-        { icon: Crown, text: "最高等级个人额度", strong: true },
-        { icon: Rocket, text: "优先访问最新模型能力" },
-        { icon: ShieldCheck, text: "更高并发和更高稳定性" },
-        { icon: Network, text: "团队前的高级工作流体验" },
-        { icon: Image, text: "高频图片、视频、3D 创作" },
-        { icon: Sparkles, text: "更多自动化与实验功能" },
-    ],
-};
-
-const englishFeatures: Record<PlanCode, Feature[]> = {
-    go: [
-        { icon: Sparkles, text: "Core models", strong: true },
-        { icon: MessageCircle, text: "Higher message and upload limits" },
-        { icon: Image, text: "More image generation capacity" },
-        { icon: Brain, text: "More memory" },
-        { icon: Zap, text: "Expanded voice quota" },
-    ],
-    plus: [
-        { icon: Sparkles, text: "Advanced models", strong: true },
-        { icon: Image, text: "Advanced image creation and editing" },
-        { icon: Brain, text: "Expanded memory across chats" },
-        { icon: Code2, text: "Codex coding agent" },
-        { icon: Network, text: "Higher-level deep research" },
-        { icon: BadgeCheck, text: "Projects and custom GPTs" },
-    ],
-    pro: [
-        { icon: TrendingUp, text: "Higher usage than Plus", strong: true },
-        { icon: Sparkles, text: "Pro frontier models" },
-        { icon: CircleDot, text: "Maximum Codex access" },
-        { icon: Network, text: "Top-level deep research" },
-        { icon: MessageCircle, text: "High-volume core chat" },
-        { icon: Image, text: "Faster image generation" },
-        { icon: Brain, text: "Full memory and context" },
-    ],
-    max: [
-        { icon: Crown, text: "Highest personal quota", strong: true },
-        { icon: Rocket, text: "Priority access to the newest models" },
-        { icon: ShieldCheck, text: "Higher concurrency and stability" },
-        { icon: Network, text: "Advanced workflow experience before Enterprise" },
-        { icon: Image, text: "High-frequency image, video, and 3D creation" },
-        { icon: Sparkles, text: "More automation and experiments" },
-    ],
 };
 
 export default function PricingPage() {
@@ -144,40 +72,41 @@ export default function PricingPage() {
 
     const cards: PricingCard[] = (["go", "plus", "pro", "max"] as PlanCode[]).map((code) => {
         const plan = planByCode[code];
+        const title = plan?.name || planName(code);
+        const highlighted = plan ? plan.recommended : code === "plus";
         return {
             code,
-            title: `ChatGPT ${planName(code)}`,
-            headline: fallbackHeadline(code, en),
+            title,
             price: displayPrice(plan, fallbackPrice(code)),
             currency: displayCurrency(plan),
-            subtitle: fallbackSubtitle(code, en),
-            cta: en ? `Upgrade to ${planName(code)}` : `升级至 ${planName(code)}`,
-            badge: code === "plus" ? (en ? "Recommended" : "推荐") : undefined,
-            highlighted: code === "plus",
-            intro: code === "pro" ? (en ? "Everything in Plus, plus:" : "Plus 中的所有内容，以及：") : code === "max" ? (en ? "Everything in Pro, plus:" : "Pro 中的所有内容，以及：") : undefined,
-            footnote: en ? "Credits and workflow quota are issued after payment confirmation." : "额度会在支付确认后发放到账户。",
-            features: en ? englishFeatures[code] : planFeatures[code],
+            subtitle: plan?.description || fallbackSubtitle(code, en),
+            cta: en ? `Upgrade to ${title}` : `升级至 ${title}`,
+            badge: highlighted ? (en ? "Recommended" : "推荐") : undefined,
+            highlighted,
+            features: planFeaturesFromPlan(plan, en),
             plan,
         };
     });
 
     return (
-        <main className="h-full overflow-y-auto bg-[#202020] text-[#f9f9f9]">
-            <Link href={withLocalePath("/", locale)} aria-label={en ? "Close pricing" : "关闭套餐页"} className="fixed right-5 top-5 z-10 inline-flex size-8 items-center justify-center rounded-full border border-white/12 bg-white/[0.03] text-white/50 transition hover:border-white/20 hover:bg-white/[0.06] hover:text-white">
+        <main className="aivro-wire-surface h-full overflow-y-auto bg-background text-stone-950 dark:text-stone-100">
+            <Link href={withLocalePath("/", locale)} aria-label={en ? "Close pricing" : "关闭套餐页"} className="fixed right-5 top-5 z-10 inline-flex size-9 items-center justify-center rounded-full border border-stone-200 bg-background/70 text-stone-500 backdrop-blur transition hover:border-stone-300 hover:text-stone-950 dark:border-stone-800 dark:bg-stone-950/70 dark:text-stone-400 dark:hover:border-stone-700 dark:hover:text-white">
                 <X className="size-4" />
             </Link>
-            <div className="mx-auto flex min-h-full w-full max-w-[1296px] flex-col px-4 pb-10 pt-12 sm:px-6 lg:pt-16">
-                <h1 className="mb-12 text-center text-[2rem] font-semibold leading-none tracking-[0] text-white">{en ? "Upgrade plan" : "升级套餐"}</h1>
-                <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-                    {cards.map((card) => (
-                        <PricingCardView key={card.code} card={card} loading={!!card.plan && loadingPlanId === card.plan.id} en={en} onBuy={() => void buy(card.plan)} />
-                    ))}
-                </div>
-                <div className="mx-auto mt-16 flex flex-col items-center text-center text-[13px] font-medium leading-5 text-white/56">
-                    <Users className="mb-3 size-4 text-white/72" />
+            <div className="mx-auto flex min-h-full w-full max-w-[1680px] flex-col px-5 pb-6 pt-6 sm:px-8">
+                <section className="flex flex-1 flex-col justify-center pb-10 pt-28 md:pt-32">
+                    <h1 className="mb-14 text-center text-[3rem] font-semibold leading-none tracking-[0] text-stone-950 dark:text-white md:text-[4rem]">{en ? "Upgrade plan" : "升级套餐"}</h1>
+                    <div className="grid gap-7 md:grid-cols-2 2xl:grid-cols-4">
+                        {cards.map((card) => (
+                            <PricingCardView key={card.code} card={card} loading={!!card.plan && loadingPlanId === card.plan.id} en={en} onBuy={() => void buy(card.plan)} />
+                        ))}
+                    </div>
+                </section>
+                <div className="mx-auto mt-auto flex shrink-0 flex-col items-center pb-2 text-center text-sm font-medium leading-6 text-stone-500 dark:text-stone-400">
+                    <Users className="mb-3 size-5 text-stone-500 dark:text-stone-300" />
                     <p>{en ? "Need more for your organization?" : "贵组织需要更多功能？"}</p>
-                    <a href="https://chatgpt.com/business/enterprise/" target="_blank" rel="noreferrer" className="group inline-flex items-center gap-1 text-white/86 underline decoration-white/35 underline-offset-4 transition hover:text-white">
-                        {en ? "View ChatGPT Enterprise" : "查看 ChatGPT Enterprise"}
+                    <a href="mailto:enterprise@aivro.org?subject=Aivro%20Enterprise" className="group inline-flex items-center gap-1 text-stone-900 underline decoration-stone-400 underline-offset-4 transition hover:text-black dark:text-stone-100 dark:decoration-stone-600 dark:hover:text-white">
+                        {en ? "View Aivro Enterprise" : "查看Aivro Enterprise"}
                         <ArrowRight className="size-4 transition group-hover:translate-x-0.5" />
                     </a>
                 </div>
@@ -189,20 +118,19 @@ export default function PricingPage() {
 function PricingCardView({ card, loading, en, onBuy }: { card: PricingCard; loading: boolean; en: boolean; onBuy: () => void }) {
     return (
         <section
-            className={`group relative flex min-h-[41.375rem] flex-col overflow-hidden rounded-[18px] border px-6 pb-6 pt-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition duration-300 hover:-translate-y-1 ${
-                card.highlighted ? "border-[#4e7fac] bg-[linear-gradient(180deg,#2b547d_0%,#1c2d3b_100%)] shadow-[0_0_52px_rgba(64,133,199,.22)]" : "border-white/[0.10] bg-[#202020]"
-            }`}
+            className={cn(
+                "group relative flex min-h-[34rem] min-w-0 flex-col overflow-hidden rounded-lg px-8 pb-8 pt-8 transition duration-300 hover:-translate-y-1",
+                card.highlighted ? "border border-stone-900 bg-stone-950 text-white shadow-[0_22px_70px_rgba(28,25,23,0.22)] dark:border-stone-100 dark:bg-stone-100 dark:text-stone-950" : "aivro-wire-card",
+            )}
         >
-            <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent opacity-0 transition group-hover:opacity-100" />
-            {card.badge && <span className="absolute right-6 top-6 rounded-full bg-[#e8f3ff] px-2.5 py-1 text-[11px] font-semibold leading-none text-[#1f77c9]">{card.badge}</span>}
-            <div className="min-h-[15.25rem]">
-                <h2 className="text-[15px] font-bold leading-none tracking-[0] text-white/88">{card.title}</h2>
-                <h3 className="mt-8 text-[1.55rem] font-semibold leading-tight tracking-[0] text-white">{card.headline}</h3>
-                <p className="mt-3 min-h-10 text-[13px] font-medium leading-5 text-white/58">{card.subtitle}</p>
-                <div className="mt-11 flex items-end gap-1.5">
-                    <span className="pb-5 text-[2.35rem] font-medium leading-none text-white">{currencySymbol(card.currency)}</span>
-                    <span className="text-[3.25rem] font-medium leading-[0.85] tracking-[0] text-white">{card.price}</span>
-                    <span className="pb-1 text-sm font-bold tracking-[0] text-white/58">{card.currency === "KRW" ? (en ? "/ mo" : "/月") : en ? "/ month" : "/ 月"}</span>
+            {card.badge && <span className={cn("absolute right-8 top-8 rounded-full px-3 py-1 text-xs font-semibold leading-none", card.highlighted ? "bg-white text-stone-950 dark:bg-stone-950 dark:text-white" : "bg-stone-950 text-white dark:bg-stone-100 dark:text-stone-950")}>{card.badge}</span>}
+            <div className="min-h-[14rem]">
+                <h2 className={cn("max-w-[76%] truncate text-2xl font-semibold leading-none tracking-[0]", card.highlighted ? "text-white dark:text-stone-950" : "text-stone-950 dark:text-white")}>{card.title}</h2>
+                <p className={cn("mt-5 min-h-16 text-base font-medium leading-7", card.highlighted ? "text-white/72 dark:text-stone-600" : "text-stone-500 dark:text-stone-400")}>{card.subtitle}</p>
+                <div className="mt-9 flex items-baseline gap-2">
+                    <span className={cn("text-[3.15rem] font-medium leading-none tracking-[0]", card.highlighted ? "text-white dark:text-stone-950" : "text-stone-950 dark:text-white")}>{currencySymbol(card.currency)}</span>
+                    <span className={cn("text-[4.5rem] font-medium leading-none tracking-[0] tabular-nums", card.highlighted ? "text-white dark:text-stone-950" : "text-stone-950 dark:text-white")}>{card.price}</span>
+                    <span className={cn("text-base font-semibold tracking-[0]", card.highlighted ? "text-white/62 dark:text-stone-500" : "text-stone-500 dark:text-stone-400")}>{pricePeriodLabel(card.currency, en)}</span>
                 </div>
             </div>
             <Button
@@ -210,29 +138,27 @@ function PricingCardView({ card, loading, en, onBuy }: { card: PricingCard; load
                 loading={loading}
                 disabled={!card.plan}
                 onClick={onBuy}
-                className={`mt-4 h-10 rounded-full border-0 text-[13px] font-medium shadow-none ${
-                    card.highlighted ? "bg-[#48a5f4] text-white hover:!bg-[#57aff8] hover:!text-white" : "bg-[#f7f7f7] text-[#1f1f1f] hover:!bg-white hover:!text-[#111]"
+                className={`mt-5 h-12 rounded-full border-0 text-base font-medium shadow-none ${
+                    card.highlighted ? "bg-white text-stone-950 hover:!bg-stone-100 hover:!text-stone-950 dark:bg-stone-950 dark:text-white dark:hover:!bg-stone-800 dark:hover:!text-white" : "bg-stone-950 text-white hover:!bg-stone-800 hover:!text-white dark:bg-stone-100 dark:text-stone-950 dark:hover:!bg-white dark:hover:!text-stone-950"
                 }`}
             >
                 {card.cta}
             </Button>
-            {card.intro && <p className="mt-7 text-[13px] font-bold leading-none text-white/90">{card.intro}</p>}
-            <ul className={`flex flex-col gap-4 ${card.intro ? "mt-6" : "mt-7"}`}>
+            <ul className="mt-auto flex flex-col gap-4 pt-8">
                 {card.features.map((feature) => (
-                    <PlanFeature key={feature.text} feature={feature} />
+                    <PlanFeature key={feature.text} feature={feature} highlighted={card.highlighted} />
                 ))}
             </ul>
-            <p className="mt-auto pt-8 text-[11px] font-semibold leading-5 text-white/40">{card.footnote}</p>
         </section>
     );
 }
 
-function PlanFeature({ feature }: { feature: Feature }) {
+function PlanFeature({ feature, highlighted }: { feature: Feature; highlighted?: boolean }) {
     const Icon = feature.icon;
     return (
-        <li className="flex items-center gap-3 text-[13px] leading-5 text-white/72">
-            <Icon className="size-4 shrink-0 text-white/76" />
-            <span className={feature.strong ? "font-bold text-white/90" : "font-semibold"}>{feature.text}</span>
+        <li className={cn("flex items-center gap-3 text-base leading-6", highlighted ? "text-white/76 dark:text-stone-600" : "text-stone-600 dark:text-stone-300")}>
+            <Icon className={cn("size-5 shrink-0", highlighted ? "text-white/82 dark:text-stone-700" : "text-stone-800 dark:text-stone-100")} />
+            <span className={feature.strong ? cn("font-bold", highlighted ? "text-white dark:text-stone-950" : "text-stone-950 dark:text-white") : "font-medium"}>{feature.text}</span>
         </li>
     );
 }
@@ -254,24 +180,13 @@ function currencySymbol(currency: string) {
     return "$";
 }
 
-function planName(code: PlanCode) {
-    return code === "max" ? "Max" : code[0].toUpperCase() + code.slice(1);
+function pricePeriodLabel(currency: string, en: boolean) {
+    if (currency === "KRW") return en ? "/ mo" : "/月";
+    return en ? "/ month" : "/ 月";
 }
 
-function fallbackHeadline(code: PlanCode, en: boolean) {
-    const zh: Record<PlanCode, string> = {
-        go: "扩展访问权限",
-        plus: "你的 AI 助手",
-        pro: "顶级能力",
-        max: "最高额度",
-    };
-    const enText: Record<PlanCode, string> = {
-        go: "Expanded access",
-        plus: "Your AI assistant",
-        pro: "Top capabilities",
-        max: "Maximum capacity",
-    };
-    return en ? enText[code] : zh[code];
+function planName(code: PlanCode) {
+    return code === "max" ? "Max" : code[0].toUpperCase() + code.slice(1);
 }
 
 function fallbackPrice(code: PlanCode) {
@@ -292,4 +207,27 @@ function fallbackSubtitle(code: PlanCode, en: boolean) {
         max: "The highest usage room for intensive creators",
     };
     return en ? enText[code] : zh[code];
+}
+
+function planFeaturesFromPlan(plan: Plan | undefined, en: boolean): Feature[] {
+    const icons = [Sparkles, Layers3, BadgeCheck];
+    if (!plan) {
+        return [
+            { icon: Sparkles, text: en ? "Configured credits" : "可配置算力点", strong: true },
+            { icon: Layers3, text: en ? "Configurable workflow quota" : "可配置工作流创建次数" },
+            { icon: BadgeCheck, text: en ? "Managed in plan management" : "内容由套餐管理维护" },
+        ];
+    }
+    if (plan.features?.length) {
+        return plan.features.map((text, index) => ({ icon: icons[index % icons.length], text, strong: index === 0 }));
+    }
+    return [
+        { icon: Sparkles, text: en ? `${formatQuota(plan.credits)} credits` : `${formatQuota(plan.credits)} 算力点`, strong: true },
+        { icon: Layers3, text: en ? `${formatQuota(plan.workflowCreateCredits)} workflow creations` : `${formatQuota(plan.workflowCreateCredits)} 次工作流创建` },
+        { icon: BadgeCheck, text: en ? "Name, description, price, currency, and quota are customizable" : "名称、描述、价格、币种和额度均可在套餐管理中自定义" },
+    ];
+}
+
+function formatQuota(value: number) {
+    return new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(value || 0);
 }
