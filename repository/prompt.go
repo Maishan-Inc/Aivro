@@ -16,7 +16,11 @@ func PromptCategories() []model.PromptCategory {
 
 // PromptCategoryByCode 根据分类编码查找内置提示词分类。
 func PromptCategoryByCode(category string) (model.PromptCategory, bool) {
-	for _, item := range promptCategories {
+	categories, err := ListPromptCategories()
+	if err != nil {
+		categories = PromptCategories()
+	}
+	for _, item := range categories {
 		if item.Category == category {
 			return item, true
 		}
@@ -26,17 +30,79 @@ func PromptCategoryByCode(category string) (model.PromptCategory, bool) {
 
 // ListPromptCategories 返回内置提示词分类。
 func ListPromptCategories() ([]model.PromptCategory, error) {
-	return PromptCategories(), nil
+	db, err := DB()
+	if err != nil {
+		return nil, err
+	}
+	if err := ensureDefaultPromptCategories(db); err != nil {
+		return nil, err
+	}
+	var stored []model.PromptCategory
+	if err := db.Find(&stored).Error; err != nil {
+		return nil, err
+	}
+	byCategory := map[string]model.PromptCategory{}
+	for _, item := range stored {
+		byCategory[item.Category] = item
+	}
+	result := []model.PromptCategory{}
+	seen := map[string]bool{}
+	for _, item := range promptCategories {
+		if storedItem, ok := byCategory[item.Category]; ok {
+			result = append(result, storedItem)
+		} else {
+			result = append(result, item)
+		}
+		seen[item.Category] = true
+	}
+	for _, item := range stored {
+		if !seen[item.Category] {
+			result = append(result, item)
+		}
+	}
+	return result, nil
+}
+
+// UpdatePromptCategory 保存提示词分类的可配置字段。
+func UpdatePromptCategory(category string, enabled bool) ([]model.PromptCategory, error) {
+	db, err := DB()
+	if err != nil {
+		return nil, err
+	}
+	if err := ensureDefaultPromptCategories(db); err != nil {
+		return nil, err
+	}
+	existing := model.PromptCategory{}
+	err = db.Where("category = ?", category).First(&existing).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, errors.New("未知提示词分类")
+	}
+	if err != nil {
+		return nil, err
+	}
+	if err := db.Model(&existing).Update("enabled", enabled).Error; err != nil {
+		return nil, err
+	}
+	return ListPromptCategories()
 }
 
 // ListPrompts 按查询条件返回提示词分页列表。
 func ListPrompts(q model.Query) ([]model.Prompt, int64, error) {
+	return listPrompts(q, nil)
+}
+
+// ListPromptsInCategories 按查询条件和分类白名单返回提示词分页列表。
+func ListPromptsInCategories(q model.Query, categories []string) ([]model.Prompt, int64, error) {
+	return listPrompts(q, categories)
+}
+
+func listPrompts(q model.Query, categories []string) ([]model.Prompt, int64, error) {
 	db, err := DB()
 	if err != nil {
 		return nil, 0, err
 	}
 	q.Normalize()
-	tx := applyPromptFilters(db.Model(&model.Prompt{}), q)
+	tx := applyPromptFilters(db.Model(&model.Prompt{}), q, categories)
 
 	var total int64
 	if err := tx.Count(&total).Error; err != nil {
@@ -60,13 +126,22 @@ func ListPrompts(q model.Query) ([]model.Prompt, int64, error) {
 
 // ListPromptTags 返回当前提示词查询条件下的全部标签。
 func ListPromptTags(q model.Query) ([]string, error) {
+	return listPromptTags(q, nil)
+}
+
+// ListPromptTagsInCategories 返回分类白名单范围内的全部标签。
+func ListPromptTagsInCategories(q model.Query, categories []string) ([]string, error) {
+	return listPromptTags(q, categories)
+}
+
+func listPromptTags(q model.Query, categories []string) ([]string, error) {
 	db, err := DB()
 	if err != nil {
 		return nil, err
 	}
 	q.Normalize()
 	q.Tags = nil
-	tx := applyPromptFilters(db.Model(&model.Prompt{}), q)
+	tx := applyPromptFilters(db.Model(&model.Prompt{}), q, categories)
 
 	var items []model.Prompt
 	if err := tx.Select("tags").Find(&items).Error; err != nil {
@@ -130,7 +205,14 @@ func ReplacePromptCategory(category model.PromptCategory, items []model.Prompt) 
 }
 
 // applyPromptFilters 应用提示词列表的搜索条件。
-func applyPromptFilters(tx *gorm.DB, q model.Query) *gorm.DB {
+func applyPromptFilters(tx *gorm.DB, q model.Query, categories []string) *gorm.DB {
+	if categories != nil {
+		if len(categories) == 0 {
+			tx = tx.Where("1 = 0")
+		} else {
+			tx = tx.Where("category IN ?", categories)
+		}
+	}
 	if q.Keyword != "" {
 		like := "%" + q.Keyword + "%"
 		tx = tx.Where("title LIKE ? OR prompt LIKE ?", like, like)

@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Avatar, App, Button, Form, Input, Segmented, Tag } from "antd";
-import { BadgeCheck, Save, UserRound } from "lucide-react";
+import { Avatar, App, Button, Form, Input, Segmented } from "antd";
+import { Save, UserRound } from "lucide-react";
 
+import { ConsoleKycCard } from "@/components/console-kyc-card";
 import { COOKIE_SESSION_TOKEN, completeProfile, type AuthUser } from "@/services/api/auth";
 import { createKycSession, fetchKycStatus } from "@/services/api/billing";
 import { useUserStore } from "@/stores/use-user-store";
@@ -99,31 +100,9 @@ export default function ConsoleProfilePage() {
                         </Form>
                     </div>
 
-                    <div className="rounded-lg border border-stone-200 bg-background p-5 dark:border-stone-800">
-                        <div className="mb-4 flex size-10 items-center justify-center rounded-md bg-stone-100 dark:bg-stone-900">
-                            <BadgeCheck className="size-5" />
-                        </div>
-                        <h2 className="text-base font-semibold">KYC 身份验证</h2>
-                        <p className="mt-3 text-sm leading-6 text-stone-500 dark:text-stone-400">通过验证后按后台配置发放奖励。认证服务由管理员配置的 KYC 提供商处理。</p>
-                        <div className="mt-4 flex flex-wrap gap-2">
-                            <Tag className="m-0">{formatKycStatus(kyc?.status)}</Tag>
-                            {kyc?.enabled ? <Tag className="m-0">已启用</Tag> : <Tag className="m-0">未配置</Tag>}
-                        </div>
-                        {kyc?.rewards ? <p className="mt-4 text-sm leading-6 text-stone-500 dark:text-stone-400">通过奖励：{kyc.rewards.credits} 算力点，{kyc.rewards.workflowCreateCredits} 次工作流创建次数。</p> : null}
-                        <Button className="mt-5" block type="primary" disabled={!kyc?.enabled || kyc?.status === "approved"} loading={kycLoading} onClick={startKyc}>
-                            {kyc?.status === "approved" ? "已完成认证" : "开始 KYC 认证"}
-                        </Button>
-                    </div>
+                    <ConsoleKycCard kyc={kyc} loading={kycLoading} onStart={startKyc} />
                 </section>
             </div>
         </div>
     );
-}
-
-function formatKycStatus(status?: string) {
-    if (status === "approved") return "已通过";
-    if (status === "pending") return "认证中";
-    if (status === "rejected") return "未通过";
-    if (status === "expired") return "已过期";
-    return "未认证";
 }

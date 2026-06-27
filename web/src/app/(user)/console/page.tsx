@@ -3,9 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { App, Button, Tag } from "antd";
+import { App, Button } from "antd";
 import { ArrowRight, BadgeCheck, BookOpen, ImagePlus, Layers3, Sparkles, UserCircle, WalletCards } from "lucide-react";
 
+import { ConsoleKycCard } from "@/components/console-kyc-card";
 import { CreditSymbol } from "@/constant/credits";
 import { useLocalizedPath } from "@/hooks/use-localized-path";
 import { createKycSession, fetchKycStatus } from "@/services/api/billing";
@@ -95,17 +96,7 @@ export default function ConsolePage() {
                             <QuickLink href="/console/profile" icon={<UserCircle className="size-5" />} title="个人中心" description="修改头像、名称并发起 KYC 身份验证。" />
                         </div>
                     </div>
-                    <div className="rounded-lg border border-stone-200 bg-background p-5 dark:border-stone-800">
-                        <h2 className="text-base font-semibold">身份验证</h2>
-                        <p className="mt-3 text-sm leading-6 text-stone-500 dark:text-stone-400">完成 KYC 后可按后台配置领取算力点和工作流创建次数奖励。</p>
-                        <div className="mt-4 flex flex-wrap gap-2">
-                            <Tag className="m-0">{formatKycStatus(kyc?.status)}</Tag>
-                            {kyc?.rewards ? <Tag className="m-0">奖励 {kyc.rewards.credits} 算力点 / {kyc.rewards.workflowCreateCredits} 次工作流</Tag> : null}
-                        </div>
-                        <Button className="mt-5" block type="primary" disabled={!kyc?.enabled || kyc?.status === "approved"} loading={kycLoading} onClick={startKyc}>
-                            {kyc?.status === "approved" ? "已完成认证" : "开始 KYC 认证"}
-                        </Button>
-                    </div>
+                    <ConsoleKycCard kyc={kyc} loading={kycLoading} onStart={startKyc} />
                 </section>
             </div>
         </div>

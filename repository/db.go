@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"errors"
 	"log"
 	"net/url"
 	"os"
@@ -19,13 +20,13 @@ import (
 )
 
 var promptCategories = []model.PromptCategory{
-	{Category: "system", Name: "系统", Description: "系统提示词分类"},
-	{Category: "gpt-image-2-prompts", Name: "GPT Image 2 Prompts", Description: "EvoLinkAI 的 GPT Image 2 案例提示词分类", GithubURL: "https://github.com/EvoLinkAI/awesome-gpt-image-2-API-and-Prompts", Remote: true},
-	{Category: "awesome-gpt-image", Name: "Awesome GPT Image", Description: "ZeroLu 的中文 GPT Image 提示词分类", GithubURL: "https://github.com/ZeroLu/awesome-gpt-image", Remote: true},
-	{Category: "awesome-gpt4o-image-prompts", Name: "Awesome GPT4o Image Prompts", Description: "ImgEdify 的 GPT-4o 图像提示词分类", GithubURL: "https://github.com/ImgEdify/Awesome-GPT4o-Image-Prompts", Remote: true},
-	{Category: "youmind-gpt-image-2", Name: "YouMind GPT Image 2", Description: "YouMind OpenLab 的 GPT Image 2 中文提示词分类", GithubURL: "https://github.com/YouMind-OpenLab/awesome-gpt-image-2", Remote: true},
-	{Category: "youmind-nano-banana-pro", Name: "YouMind Nano Banana Pro", Description: "YouMind OpenLab 的 Nano Banana Pro 中文提示词分类", GithubURL: "https://github.com/YouMind-OpenLab/awesome-nano-banana-pro-prompts", Remote: true},
-	{Category: "davidwu-gpt-image2-prompts", Name: "awesome-gpt-image2-prompts", Description: "davidwuw0811-boop 整理的 GPT Image 2 提示词分类", GithubURL: "https://github.com/davidwuw0811-boop/awesome-gpt-image2-prompts", Remote: true},
+	{Category: "system", Name: "系统", Description: "系统提示词分类", Enabled: true},
+	{Category: "gpt-image-2-prompts", Name: "GPT Image 2 Prompts", Description: "EvoLinkAI 的 GPT Image 2 案例提示词分类", GithubURL: "https://github.com/EvoLinkAI/awesome-gpt-image-2-API-and-Prompts", Remote: true, Enabled: true},
+	{Category: "awesome-gpt-image", Name: "Awesome GPT Image", Description: "ZeroLu 的中文 GPT Image 提示词分类", GithubURL: "https://github.com/ZeroLu/awesome-gpt-image", Remote: true, Enabled: true},
+	{Category: "awesome-gpt4o-image-prompts", Name: "Awesome GPT4o Image Prompts", Description: "ImgEdify 的 GPT-4o 图像提示词分类", GithubURL: "https://github.com/ImgEdify/Awesome-GPT4o-Image-Prompts", Remote: true, Enabled: true},
+	{Category: "youmind-gpt-image-2", Name: "YouMind GPT Image 2", Description: "YouMind OpenLab 的 GPT Image 2 中文提示词分类", GithubURL: "https://github.com/YouMind-OpenLab/awesome-gpt-image-2", Remote: true, Enabled: true},
+	{Category: "youmind-nano-banana-pro", Name: "YouMind Nano Banana Pro", Description: "YouMind OpenLab 的 Nano Banana Pro 中文提示词分类", GithubURL: "https://github.com/YouMind-OpenLab/awesome-nano-banana-pro-prompts", Remote: true, Enabled: true},
+	{Category: "davidwu-gpt-image2-prompts", Name: "awesome-gpt-image2-prompts", Description: "davidwuw0811-boop 整理的 GPT Image 2 提示词分类", GithubURL: "https://github.com/davidwuw0811-boop/awesome-gpt-image2-prompts", Remote: true, Enabled: true},
 }
 
 var (
@@ -136,6 +137,7 @@ func migrateModels(db *gorm.DB) error {
 		&model.EmailVerification{},
 		&model.MetaMaskChallenge{},
 		&model.CreditLog{},
+		&model.PromptCategory{},
 		&model.Prompt{},
 		&model.Asset{},
 		&model.Setting{},
@@ -163,10 +165,34 @@ func migrateModels(db *gorm.DB) error {
 	if err := backfillUserProfileFields(db); err != nil {
 		return err
 	}
+	if err := ensureDefaultPromptCategories(db); err != nil {
+		return err
+	}
 	if err := createOptimizedIndexes(db); err != nil {
 		return err
 	}
 	return ensureDefaultPlans(db)
+}
+
+func ensureDefaultPromptCategories(db *gorm.DB) error {
+	for _, item := range promptCategories {
+		existing := model.PromptCategory{}
+		err := db.Where("category = ?", item.Category).First(&existing).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			if err := db.Create(&item).Error; err != nil {
+				return err
+			}
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		updates := map[string]any{"name": item.Name, "description": item.Description, "github_url": item.GithubURL, "remote": item.Remote}
+		if err := db.Model(&model.PromptCategory{}).Where("category = ?", item.Category).Updates(updates).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func dropLegacyGenerationTaskBlobColumns(db *gorm.DB) error {
@@ -209,6 +235,7 @@ func databaseMigrationModelItems() []struct {
 		{"model.EmailVerification", &model.EmailVerification{}},
 		{"model.MetaMaskChallenge", &model.MetaMaskChallenge{}},
 		{"model.CreditLog", &model.CreditLog{}},
+		{"model.PromptCategory", &model.PromptCategory{}},
 		{"model.Prompt", &model.Prompt{}},
 		{"model.Asset", &model.Asset{}},
 		{"model.Setting", &model.Setting{}},

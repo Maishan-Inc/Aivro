@@ -24,17 +24,18 @@ var publicPromptCache = struct {
 }{items: map[string]publicPromptCacheItem{}}
 
 func ListPrompts(q model.Query) (model.PromptList, error) {
-	items, total, err := repository.ListPrompts(q)
+	categories := EnabledPromptCategories()
+	categoryCodes := promptCategoryCodes(categories)
+	items, total, err := repository.ListPromptsInCategories(q, categoryCodes)
 	if err != nil {
 		return model.PromptList{}, err
 	}
 	items = applyPromptImageProxy(items, false)
-	tags, err := repository.ListPromptTags(q)
+	tags, err := repository.ListPromptTagsInCategories(q, categoryCodes)
 	if err != nil {
 		return model.PromptList{}, err
 	}
-	categories := promptCategoryCodes(ListPromptCategories())
-	return model.PromptList{Items: items, Tags: tags, Categories: categories, Total: int(total)}, nil
+	return model.PromptList{Items: items, Tags: tags, Categories: categoryCodes, Total: int(total)}, nil
 }
 
 func ListPublicPrompts(q model.Query) (model.PromptList, error) {
@@ -69,6 +70,25 @@ func ClearPublicPromptCache() {
 func ListPromptCategories() []model.PromptCategory {
 	categories, _ := repository.ListPromptCategories()
 	return categories
+}
+
+func EnabledPromptCategories() []model.PromptCategory {
+	categories := ListPromptCategories()
+	enabled := []model.PromptCategory{}
+	for _, category := range categories {
+		if category.Enabled {
+			enabled = append(enabled, category)
+		}
+	}
+	return enabled
+}
+
+func UpdatePromptCategory(category string, enabled bool) ([]model.PromptCategory, error) {
+	categories, err := repository.UpdatePromptCategory(category, enabled)
+	if err == nil {
+		ClearPublicPromptCache()
+	}
+	return categories, err
 }
 
 func SavePrompt(item model.Prompt) (model.Prompt, error) {

@@ -24,6 +24,7 @@ export default function AdminPromptsPage() {
         isPromptSettingsLoading,
         isLoading,
         isSyncing,
+        isSavingCategory,
         searchPrompts,
         changeCategory,
         changeTag,
@@ -33,6 +34,7 @@ export default function AdminPromptsPage() {
         refreshPrompts,
         savePromptImageProxyEnabled,
         syncCategory,
+        updateCategory,
         savePrompt: saveAdminPrompt,
         deletePrompt,
         deletePrompts,
@@ -46,9 +48,10 @@ export default function AdminPromptsPage() {
     const [selectedPromptIds, setSelectedPromptIds] = useState<string[]>([]);
     const [isBatchDeleteOpen, setIsBatchDeleteOpen] = useState(false);
     const [isSyncOpen, setIsSyncOpen] = useState(false);
-    const defaultCategory = categories[0]?.category || "";
+    const defaultCategory = categories.find((item) => item.enabled)?.category || categories[0]?.category || "";
     const categoryName = (category: string) => categories.find((item) => item.category === category)?.name || category;
-    const categoryOptions = [{ label: "全部分类", value: "" }, ...categories.map((item) => ({ label: item.name, value: item.category }))];
+    const categoryOptions = [{ label: "全部分类", value: "" }, ...categories.map((item) => ({ label: item.enabled ? item.name : `${item.name}（已关闭）`, value: item.category }))];
+    const promptCategoryOptions = categories.map((item) => ({ label: item.enabled ? item.name : `${item.name}（已关闭）`, value: item.category }));
     const tagOptions = tags.map((item) => ({ label: item, value: item }));
 
     useEffect(() => {
@@ -183,6 +186,23 @@ export default function AdminPromptsPage() {
                         <Switch checked={promptImageProxyEnabled} loading={isPromptSettingsLoading} onChange={(checked) => void savePromptImageProxyEnabled(checked)} />
                     </Flex>
                 </Card>
+                <Card variant="borderless">
+                    <Flex vertical gap={12}>
+                        <Flex vertical gap={4}>
+                            <Typography.Text strong>分组显示</Typography.Text>
+                            <Typography.Text type="secondary">关闭后，该分组内容不会出现在首页、提示词库和当前提示词列表中，已有数据不会删除。</Typography.Text>
+                        </Flex>
+                        <Flex gap={10} wrap>
+                            {categories.map((item) => (
+                                <Flex key={item.category} align="center" gap={8} style={{ border: "1px solid #f0f0f0", borderRadius: 8, padding: "8px 10px" }}>
+                                    <Typography.Text>{item.name}</Typography.Text>
+                                    {!item.enabled ? <Tag color="default">已关闭</Tag> : null}
+                                    <Switch size="small" checked={item.enabled} loading={isSavingCategory} onChange={(checked) => void updateCategory(item.category, checked)} />
+                                </Flex>
+                            ))}
+                        </Flex>
+                    </Flex>
+                </Card>
                 <ProTable<Prompt>
                     rowKey="id"
                     columns={columns}
@@ -229,7 +249,7 @@ export default function AdminPromptsPage() {
                         <Input />
                     </Form.Item>
                     <Form.Item name="category" label="分类">
-                        <Select options={categories.map((item) => ({ label: item.name, value: item.category }))} />
+                        <Select options={promptCategoryOptions} />
                     </Form.Item>
                     <Form.Item name="coverUrl" label="封面 URL">
                         <Input />
@@ -312,6 +332,12 @@ export default function AdminPromptsPage() {
                             ),
                         },
                         {
+                            title: "显示",
+                            key: "enabled",
+                            width: 92,
+                            render: (_, item) => <Switch size="small" checked={item.enabled} loading={isSavingCategory} onChange={(checked) => void updateCategory(item.category, checked)} />,
+                        },
+                        {
                             title: "",
                             key: "sync",
                             width: 96,
@@ -320,6 +346,7 @@ export default function AdminPromptsPage() {
                                 <Button
                                     type="primary"
                                     loading={isSyncing}
+                                    disabled={!item.enabled}
                                     onClick={async () => {
                                         try {
                                             await syncCategory(item.category);

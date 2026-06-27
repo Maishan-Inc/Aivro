@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { App } from "antd";
 
-import { deleteAdminPrompt, deleteAdminPrompts, fetchAdminPrompts, fetchAdminPromptCategories, fetchAdminSettings, saveAdminPrompt, saveAdminSettings, syncAdminPromptCategory, type AdminPromptCategory } from "@/services/api/admin";
+import { deleteAdminPrompt, deleteAdminPrompts, fetchAdminPrompts, fetchAdminPromptCategories, fetchAdminSettings, saveAdminPrompt, saveAdminSettings, syncAdminPromptCategory, updateAdminPromptCategory, type AdminPromptCategory } from "@/services/api/admin";
 import type { Prompt } from "@/services/api/prompts";
 import { useUserStore } from "@/stores/use-user-store";
 import { adminRealtimeQueryOptions } from "../admin-query-options";
@@ -82,6 +82,18 @@ export function useAdminPrompts() {
         },
     });
 
+    const categoryMutation = useMutation({
+        mutationFn: ({ category, enabled }: { category: string; enabled: boolean }) => updateAdminPromptCategory(token, category, enabled),
+        onSuccess: async (categories) => {
+            queryClient.setQueryData<AdminPromptCategory[]>(["admin", "prompt-categories", token], categories);
+            await queryClient.invalidateQueries({ queryKey: ["admin"] });
+            message.success("分组显示状态已保存");
+        },
+        onError: (error) => {
+            message.error(error instanceof Error ? error.message : "保存分组失败");
+        },
+    });
+
     const saveMutation = useMutation({
         mutationFn: (prompt: Partial<Prompt>) => saveAdminPrompt(token, prompt),
         onSuccess: async (_, prompt) => {
@@ -147,10 +159,12 @@ export function useAdminPrompts() {
         total: data?.total || 0,
         promptImageProxyEnabled: settingsQuery.data?.private.promptSync.githubRawProxyEnabled === true,
         isPromptSettingsLoading: settingsQuery.isFetching || settingsMutation.isPending,
-        isLoading: categoriesQuery.isFetching || promptsQuery.isFetching || saveMutation.isPending || deleteMutation.isPending || batchDeleteMutation.isPending,
+        isLoading: categoriesQuery.isFetching || promptsQuery.isFetching || saveMutation.isPending || deleteMutation.isPending || batchDeleteMutation.isPending || categoryMutation.isPending,
         isSyncing: syncMutation.isPending,
+        isSavingCategory: categoryMutation.isPending,
         savePromptImageProxyEnabled: (value: boolean) => settingsMutation.mutateAsync(value),
         syncCategory: (category: string) => syncMutation.mutateAsync(category),
+        updateCategory: (category: string, enabled: boolean) => categoryMutation.mutateAsync({ category, enabled }),
         searchPrompts: (value = keyword) => updateFilters({ keyword: value }),
         changeCategory: (value: string) => updateFilters({ category: value, tag: [] }),
         changeTag: (value: string[]) => updateFilters({ tag: value }),

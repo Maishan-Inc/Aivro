@@ -29,5 +29,6 @@ type PromptCategory struct {
 	Description string `json:"description"`
 	GithubURL   string `json:"githubUrl"`
 	Remote      bool   `json:"remote"`
+	Enabled     bool   `json:"enabled" gorm:"default:true"`
 	UpdatedAt   string `json:"updatedAt"`
 }

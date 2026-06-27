@@ -31,7 +31,7 @@ export function AppTopNav() {
         setLocale(nextLocale);
         window.location.href = withLocalePath(cleanPathname, nextLocale);
     };
-    const hideHeader = cleanPathname === "/canvas" || /^\/canvas\/[^/]+/.test(cleanPathname);
+    const hideHeader = cleanPathname === "/canvas" || cleanPathname === "/console" || /^\/(canvas|console)\//.test(cleanPathname);
     const slug = cleanPathname.split("/").filter(Boolean)[0];
     const activeToolSlug = navigationTools.some((tool) => tool.slug === slug) ? (slug as NavigationToolSlug) : undefined;
     const languageItems = (Object.keys(localeLabels) as Locale[]).map((item) => ({

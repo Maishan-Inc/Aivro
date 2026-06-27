@@ -13,12 +13,31 @@ type adminSyncRequest struct {
 	Category string `json:"category"`
 }
 
+type adminPromptCategoryRequest struct {
+	Enabled *bool `json:"enabled"`
+}
+
 type adminBatchDeleteRequest struct {
 	IDs []string `json:"ids"`
 }
 
 func AdminPromptCategories(w http.ResponseWriter, r *http.Request) {
 	OK(w, service.ListPromptCategories())
+}
+
+func AdminSavePromptCategory(w http.ResponseWriter, r *http.Request, category string) {
+	var request adminPromptCategoryRequest
+	_ = json.NewDecoder(r.Body).Decode(&request)
+	if request.Enabled == nil {
+		Fail(w, "请设置分组显示状态")
+		return
+	}
+	categories, err := service.UpdatePromptCategory(category, *request.Enabled)
+	if err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, categories)
 }
 
 func AdminPrompts(w http.ResponseWriter, r *http.Request) {

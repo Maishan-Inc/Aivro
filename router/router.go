@@ -189,6 +189,9 @@ func New() *gin.Engine {
 	admin.POST("/plans", gin.WrapF(handler.AdminSavePlan))
 	admin.PUT("/plans/:id", gin.WrapF(handler.AdminSavePlan))
 	admin.GET("/prompt-categories", gin.WrapF(handler.AdminPromptCategories))
+	admin.PUT("/prompt-categories/:category", func(c *gin.Context) {
+		handler.AdminSavePromptCategory(c.Writer, c.Request, c.Param("category"))
+	})
 	admin.POST("/prompt-categories/sync", gin.WrapF(handler.AdminSyncPromptCategories))
 	admin.GET("/prompts", gin.WrapF(handler.AdminPrompts))
 	admin.POST("/prompts", gin.WrapF(handler.AdminSavePrompt))

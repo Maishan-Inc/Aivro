@@ -1,4 +1,4 @@
-import { apiDelete, apiGet, apiPost, compactApiParams } from "@/services/api/request";
+import { apiDelete, apiGet, apiPost, apiPut, compactApiParams } from "@/services/api/request";
 import type { Prompt, PromptListResponse } from "@/services/api/prompts";
 import type { Plan } from "@/services/api/billing";
 import type { WorkflowCommunityListResponse, WorkflowCommunityPost } from "@/services/api/workflows";
@@ -10,6 +10,7 @@ export type AdminPromptCategory = {
     file: string;
     githubUrl: string;
     remote: boolean;
+    enabled: boolean;
 };
 
 export type AdminUser = {
@@ -108,6 +109,10 @@ export async function fetchAdminPromptCategories(token: string) {
 
 export async function syncAdminPromptCategory(token: string, category: string) {
     return apiPost<AdminPromptCategory[]>("/api/admin/prompt-categories/sync", { category }, token);
+}
+
+export async function updateAdminPromptCategory(token: string, category: string, enabled: boolean) {
+    return apiPut<AdminPromptCategory[]>(`/api/admin/prompt-categories/${encodeURIComponent(category)}`, { enabled }, token);
 }
 
 export type AdminPromptQuery = {
