@@ -113,9 +113,9 @@ func listPrompts(q model.Query, categories []string) ([]model.Prompt, int64, err
 	if err := tx.Order("updated_at desc").Offset(q.Offset()).Limit(q.PageSize).Find(&items).Error; err != nil {
 		return nil, 0, err
 	}
-	categories, _ := ListPromptCategories()
+	promptCategories, _ := ListPromptCategories()
 	githubURLs := map[string]string{}
-	for _, item := range categories {
+	for _, item := range promptCategories {
 		githubURLs[item.Category] = item.GithubURL
 	}
 	for i := range items {

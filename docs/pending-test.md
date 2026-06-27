@@ -51,7 +51,7 @@
 - 第三方登录配置待测：自定义 OAuth 保存后应同步前台显示和服务端启用状态，后台卡片不再显示“未开启 / 前台隐藏 / 服务端未启用”；MetaMask 支持配置签名网站名称、网站 URL 和 Logo URL，并用于登录签名校验。
 - 管理后台左侧导航新增“模型配置”和“邮件配置”独立入口；模型配置集中管理开放模型、默认模型、算力点和模型渠道，邮件配置独立进入 SMTP 与模板配置，系统设置保留通用配置分类。
 - 生图、视频和画布节点生成中的 Aivro anime.js 加载动画统一为首页同款描边字标效果待测。
-- Docker 镜像构建待测：云存储上传对象编译错误已修复，GitHub Actions 的 Go 构建阶段不应再出现 `no new variables on left side of :=`。
+- Docker 镜像构建待测：提示词分类 GitHubURL 回填的变量冲突已修复，GitHub Actions 的 Go 构建阶段不应再出现 `repository/prompt.go` 的 `no new variables on left side of :=`。
 - Docker 镜像仓库名已切换为 `maishanhub/aivro`，CI 推送、docker-compose 和部署文档引用需要按新仓库名验证。
 - `/ads.txt` 根路径待测：前端 Next route 会转发到后端 ads.txt 接口，浏览器访问不应再进入 404 页面。
 - 云存储新增存储策略待测：后台可选择只使用本地存储、只使用 S3/R2、优先 S3/R2 失败后自动切本地；后端按文件记录的 provider 读取和删除。
