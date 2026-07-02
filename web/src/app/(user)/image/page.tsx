@@ -40,6 +40,7 @@ type GeneratedImage = {
 type GenerationResult = {
     id: string;
     status: "pending" | "queued" | "executing" | "success" | "failed";
+    aspectRatio?: string;
     image?: GeneratedImage;
     error?: string;
     taskId?: string;
@@ -168,7 +169,8 @@ export default function ImagePage() {
         setRunning(true);
         setPreviewLog(null);
         setPendingLog(buildPendingLog({ prompt: text, model, config: { ...snapshot.config, count: String(generationCount) }, references: snapshot.references, imageCount: generationCount }));
-        setResults(Array.from({ length: generationCount }, () => ({ id: nanoid(), status: "pending" })));
+        const aspectRatio = imagePreviewAspectRatio(snapshot.config.size);
+        setResults(Array.from({ length: generationCount }, () => ({ id: nanoid(), status: "pending", aspectRatio })));
         const batchStartedAt = performance.now();
         setStartedAt(batchStartedAt);
 
@@ -491,13 +493,13 @@ export default function ImagePage() {
                                     return result.status === "success" && result.image ? (
                                         <ResultImageCard key={result.id} single={single} image={result.image} index={index} onEdit={addResultToReferences} onDownload={downloadImage} onSaveAsset={saveResultToAssets} />
                                     ) : result.status === "failed" ? (
-                                        <FailedImageCard key={result.id} single={single} error={result.error || "生成失败"} />
+                                        <FailedImageCard key={result.id} single={single} aspectRatio={result.aspectRatio} error={result.error || "生成失败"} />
                                     ) : result.status === "queued" ? (
-                                        <QueuedImageCard key={result.id} single={single} aheadCount={result.aheadCount ?? 0} queuePosition={result.queuePosition ?? 0} onCancel={() => void cancelQueuedResult(result)} />
+                                        <QueuedImageCard key={result.id} single={single} aspectRatio={result.aspectRatio} aheadCount={result.aheadCount ?? 0} queuePosition={result.queuePosition ?? 0} onCancel={() => void cancelQueuedResult(result)} />
                                     ) : result.status === "executing" ? (
-                                        <PendingImageCard key={result.id} single={single} label="生成中" />
+                                        <PendingImageCard key={result.id} single={single} aspectRatio={result.aspectRatio} label="生成中" />
                                     ) : (
-                                        <PendingImageCard key={result.id} single={single} />
+                                        <PendingImageCard key={result.id} single={single} aspectRatio={result.aspectRatio} />
                                     );
                                 })}
                             </div>
@@ -605,9 +607,10 @@ function ResultImageCard({
     );
 }
 
-function PendingImageCard({ label = "生成中", single }: { label?: string; single?: boolean }) {
+function PendingImageCard({ label = "生成中", single, aspectRatio }: { label?: string; single?: boolean; aspectRatio?: string }) {
+    const ratioStyle = single && aspectRatio ? { aspectRatio } : undefined;
     return (
-        <div className={`relative ${single ? "min-h-[280px]" : "aspect-square"} overflow-hidden rounded-lg border border-dashed border-stone-300 bg-stone-50 dark:border-stone-700 dark:bg-stone-900`}>
+        <div className={`relative ${single ? (aspectRatio ? "" : "min-h-[280px]") : "aspect-square"} overflow-hidden rounded-lg border border-dashed border-stone-300 bg-stone-50 dark:border-stone-700 dark:bg-stone-900`} style={ratioStyle}>
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-stone-500 dark:text-stone-400">
                 <AivroDrawableLoader className="h-28 w-80 text-stone-900 dark:text-stone-100" />
                 <span className="text-sm">{label}</span>
@@ -616,9 +619,10 @@ function PendingImageCard({ label = "生成中", single }: { label?: string; sin
     );
 }
 
-function QueuedImageCard({ aheadCount, queuePosition, onCancel, single }: { aheadCount: number; queuePosition: number; onCancel: () => void; single?: boolean }) {
+function QueuedImageCard({ aheadCount, queuePosition, onCancel, single, aspectRatio }: { aheadCount: number; queuePosition: number; onCancel: () => void; single?: boolean; aspectRatio?: string }) {
+    const ratioStyle = single && aspectRatio ? { aspectRatio } : undefined;
     return (
-        <div className={`relative ${single ? "min-h-[280px]" : "aspect-square"} overflow-hidden rounded-lg border border-dashed border-blue-300 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/20`}>
+        <div className={`relative ${single ? (aspectRatio ? "" : "min-h-[280px]") : "aspect-square"} overflow-hidden rounded-lg border border-dashed border-blue-300 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/20`} style={ratioStyle}>
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-5 text-center text-blue-700 dark:text-blue-200">
                 <AivroDrawableLoader className="h-24 w-72 text-blue-700 dark:text-blue-200" />
                 <div className="text-sm font-medium">排队中</div>
@@ -629,10 +633,11 @@ function QueuedImageCard({ aheadCount, queuePosition, onCancel, single }: { ahea
     );
 }
 
-function FailedImageCard({ error, single }: { error: string; single?: boolean }) {
+function FailedImageCard({ error, single, aspectRatio }: { error: string; single?: boolean; aspectRatio?: string }) {
+    const ratioStyle = single && aspectRatio ? { aspectRatio } : undefined;
     return (
         <div className="overflow-hidden rounded-lg border border-red-200 bg-red-50 dark:border-red-950 dark:bg-red-950/20">
-            <div className={`flex ${single ? "min-h-[200px]" : "aspect-square"} flex-col items-center justify-center gap-3 p-5 text-center`}>
+            <div className={`flex ${single ? (aspectRatio ? "" : "min-h-[200px]") : "aspect-square"} flex-col items-center justify-center gap-3 p-5 text-center`} style={ratioStyle}>
                 <div className="text-sm font-medium text-red-600 dark:text-red-300">生成失败</div>
                 <Typography.Paragraph ellipsis={{ rows: 4 }} className="!mb-0 !text-xs !text-red-500 dark:!text-red-300">
                     {error}
@@ -644,6 +649,18 @@ function FailedImageCard({ error, single }: { error: string; single?: boolean })
 
 function updateResultAt(results: GenerationResult[], index: number, next: Partial<GenerationResult>) {
     return results.map((item, itemIndex) => (itemIndex === index ? { ...item, ...next } : item));
+}
+
+function imagePreviewAspectRatio(size?: string) {
+    const normalized = (size || "").trim().replace(/：/g, ":").toLowerCase();
+    if (!normalized || normalized === "auto") return undefined;
+    const dimensions = normalized.match(/^(\d+)\s*x\s*(\d+)$/);
+    const ratio = dimensions || normalized.match(/^(\d+(?:\.\d+)?)\s*:\s*(\d+(?:\.\d+)?)/);
+    if (!ratio) return undefined;
+    const width = Number(ratio[1]);
+    const height = Number(ratio[2]);
+    if (!width || !height) return undefined;
+    return `${width} / ${height}`;
 }
 
 function LogPanel({
