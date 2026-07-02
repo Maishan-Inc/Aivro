@@ -2251,7 +2251,7 @@ function normalizeModelCosts(items: Partial<AdminSettings["public"]["modelChanne
     const seen = new Set<string>();
     return items
         .filter((item) => item.model)
-        .map((item) => ({ model: item.model || "", credits: Math.max(0, Number(item.credits) || 0), billingType: item.billingType === "token" ? "token" : "fixed" }))
+        .map((item): AdminModelCost => ({ model: item.model || "", credits: Math.max(0, Number(item.credits) || 0), billingType: item.billingType === "token" ? "token" : "fixed" }))
         .filter((item) => {
             if (seen.has(item.model)) return false;
             seen.add(item.model);
