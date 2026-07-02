@@ -55,7 +55,7 @@ func AIQueueEnabled() bool {
 	return queue.Enabled != nil && *queue.Enabled
 }
 
-func SubmitAITask(ctx context.Context, user model.AuthUser, body []byte, contentType string, modelName string, path string) (model.GenerationTaskSubmitResult, *AIProxyResponse, error) {
+func SubmitAITask(ctx context.Context, user model.AuthUser, body []byte, contentType string, modelName string, path string, meta RequestLogMeta) (model.GenerationTaskSubmitResult, *AIProxyResponse, error) {
 	settings, err := repository.GetSettings()
 	if err != nil {
 		return model.GenerationTaskSubmitResult{}, nil, err
@@ -84,25 +84,25 @@ func SubmitAITask(ctx context.Context, user model.AuthUser, body []byte, content
 			return model.GenerationTaskSubmitResult{}, nil, safeMessageError{message: "排队任务过多，请稍后再试"}
 		}
 	}
-	if err := ConsumeUserCredits(user.ID, modelName, credits, path); err != nil {
+	if err := ConsumeUserCreditsWithMeta(user.ID, modelName, credits, path, meta); err != nil {
 		queueMu.Unlock()
 		_ = deleteTaskPayload(requestFile.File.ID)
 		return model.GenerationTaskSubmitResult{}, nil, err
 	}
 	now := time.Now().Format(time.RFC3339)
 	task := model.GenerationTask{
-		ID:           newID("task"),
-		UserID:       user.ID,
-		Username:     user.Username,
-		Model:        modelName,
-		Path:         path,
-		ContentType:  contentType,
+		ID:            newID("task"),
+		UserID:        user.ID,
+		Username:      user.Username,
+		Model:         modelName,
+		Path:          path,
+		ContentType:   contentType,
 		RequestFileID: requestFile.File.ID,
-		Credits:      credits,
-		RequestCount: requestCount,
-		Status:       model.GenerationTaskQueued,
-		CreatedAt:    now,
-		UpdatedAt:    now,
+		Credits:       credits,
+		RequestCount:  requestCount,
+		Status:        model.GenerationTaskQueued,
+		CreatedAt:     now,
+		UpdatedAt:     now,
 	}
 	canRun, err := canDispatchModel(modelName, queue)
 	if err != nil {
@@ -438,7 +438,9 @@ func ReadAIRequest(body io.Reader, contentType string) ([]byte, string, error) {
 	if strings.HasPrefix(contentType, "multipart/form-data") {
 		modelName = readMultipartValue(payload, contentType, "model")
 	} else {
-		var data struct{ Model string `json:"model"` }
+		var data struct {
+			Model string `json:"model"`
+		}
 		_ = json.Unmarshal(payload, &data)
 		modelName = data.Model
 	}
@@ -448,6 +450,80 @@ func ReadAIRequest(body io.Reader, contentType string) ([]byte, string, error) {
 	return payload, strings.TrimSpace(modelName), nil
 }
 
+func RewriteAIRequestModel(body []byte, contentType string, modelName string) ([]byte, string, error) {
+	modelName = strings.TrimSpace(modelName)
+	if modelName == "" {
+		return body, contentType, nil
+	}
+	if strings.HasPrefix(contentType, "multipart/form-data") {
+		return rewriteMultipartModel(body, contentType, modelName)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return nil, contentType, err
+	}
+	payload["model"] = modelName
+	next, err := json.Marshal(payload)
+	if err != nil {
+		return nil, contentType, err
+	}
+	if strings.TrimSpace(contentType) == "" {
+		contentType = "application/json"
+	}
+	return next, contentType, nil
+}
+
+func rewriteMultipartModel(body []byte, contentType string, modelName string) ([]byte, string, error) {
+	_, params, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		return nil, contentType, err
+	}
+	form, err := multipart.NewReader(bytes.NewReader(body), params["boundary"]).ReadForm(32 << 20)
+	if err != nil {
+		return nil, contentType, err
+	}
+	defer form.RemoveAll()
+	var buffer bytes.Buffer
+	writer := multipart.NewWriter(&buffer)
+	wroteModel := false
+	for key, values := range form.Value {
+		for _, value := range values {
+			if key == "model" {
+				value = modelName
+				wroteModel = true
+			}
+			if err := writer.WriteField(key, value); err != nil {
+				return nil, contentType, err
+			}
+		}
+	}
+	if !wroteModel {
+		if err := writer.WriteField("model", modelName); err != nil {
+			return nil, contentType, err
+		}
+	}
+	for key, files := range form.File {
+		for _, fileHeader := range files {
+			src, err := fileHeader.Open()
+			if err != nil {
+				return nil, contentType, err
+			}
+			part, err := writer.CreateFormFile(key, fileHeader.Filename)
+			if err == nil {
+				_, err = io.Copy(part, src)
+			}
+			_ = src.Close()
+			if err != nil {
+				return nil, contentType, err
+			}
+		}
+	}
+	if err := writer.Close(); err != nil {
+		return nil, contentType, err
+	}
+	return buffer.Bytes(), writer.FormDataContentType(), nil
+}
+
 func ReadAIRequestCount(body []byte, contentType string) int {
 	count := 1
 	if strings.HasPrefix(contentType, "multipart/form-data") {
@@ -455,7 +531,9 @@ func ReadAIRequestCount(body []byte, contentType string) int {
 			_, _ = fmt.Sscan(value, &count)
 		}
 	} else {
-		var payload struct{ N int `json:"n"` }
+		var payload struct {
+			N int `json:"n"`
+		}
 		_ = json.Unmarshal(body, &payload)
 		count = payload.N
 	}

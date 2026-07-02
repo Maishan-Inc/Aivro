@@ -48,16 +48,39 @@ export type AdminCreditLog = {
     id: string;
     userId: string;
     type: string;
+    model: string;
+    path: string;
     amount: number;
     balance: number;
     relatedId: string;
     remark: string;
+    ip: string;
+    country: string;
     extra: string;
     createdAt: string;
 };
 
 export type AdminCreditLogListResponse = {
     items: AdminCreditLog[];
+    total: number;
+};
+
+export type AdminAuditLog = {
+    id: string;
+    action: string;
+    actorId: string;
+    actorUsername: string;
+    targetType: string;
+    targetId: string;
+    remark: string;
+    ip: string;
+    country: string;
+    extra: string;
+    createdAt: string;
+};
+
+export type AdminAuditLogListResponse = {
+    items: AdminAuditLog[];
     total: number;
 };
 
@@ -92,7 +115,7 @@ export async function deleteAdminUser(token: string, id: string) {
 }
 
 export async function fetchAdminCreditLogs(token: string, query: AdminUserQuery = {}) {
-    return apiGet<AdminCreditLogListResponse>("/api/admin/credit-logs", compactApiParams(query), token);
+    return apiGet<AdminCreditLogListResponse>("/api/admin/request-logs", compactApiParams(query), token);
 }
 
 export async function saveAdminCreditLog(token: string, log: Partial<AdminCreditLog>) {
@@ -101,6 +124,10 @@ export async function saveAdminCreditLog(token: string, log: Partial<AdminCredit
 
 export async function deleteAdminCreditLog(token: string, id: string) {
     return apiDelete<boolean>(`/api/admin/credit-logs/${encodeURIComponent(id)}`, token);
+}
+
+export async function fetchAdminAuditLogs(token: string, query: AdminUserQuery = {}) {
+    return apiGet<AdminAuditLogListResponse>("/api/admin/audit-logs", compactApiParams(query), token);
 }
 
 export async function fetchAdminPromptCategories(token: string) {
@@ -198,12 +225,20 @@ export async function saveAdminPlan(token: string, plan: Partial<Plan>) {
 export type AdminModelChannel = {
     protocol: "openai";
     name: string;
+    color: string;
     baseUrl: string;
     apiKey: string;
     models: string[];
+    modelMappings: AdminModelChannelModel[];
     weight: number;
     enabled: boolean;
     remark: string;
+};
+
+export type AdminModelChannelModel = {
+    name: string;
+    upstreamName: string;
+    capability: "image" | "text" | "video" | "model3d";
 };
 
 export type AdminPublicModelChannelSettings = {
@@ -219,6 +254,7 @@ export type AdminPublicModelChannelSettings = {
 export type AdminModelCost = {
     model: string;
     credits: number;
+    billingType: "fixed" | "token";
 };
 
 export type AdminPublicSettings = {

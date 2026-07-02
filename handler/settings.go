@@ -60,6 +60,9 @@ func AdminSaveSettings(w http.ResponseWriter, r *http.Request) {
 		FailError(w, err)
 		return
 	}
+	admin, _ := service.UserFromContext(r.Context())
+	meta := service.RequestLogMetaFromRequest(r)
+	_ = service.SaveAuditLog(model.AuditLog{Action: model.AuditLogActionConfigUpdate, ActorID: admin.ID, ActorUsername: admin.Username, TargetType: "settings", TargetID: "system", Remark: "管理员修改系统配置", IP: meta.IP, Country: meta.Country})
 	OK(w, result)
 }
 

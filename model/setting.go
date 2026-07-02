@@ -27,20 +27,29 @@ type AIQueueSetting struct {
 
 // ModelChannel 模型渠道配置。
 type ModelChannel struct {
-	Protocol string   `json:"protocol"`
-	Name     string   `json:"name"`
-	BaseURL  string   `json:"baseUrl"`
-	APIKey   string   `json:"apiKey"`
-	Models   []string `json:"models"`
-	Weight   int      `json:"weight"`
-	Enabled  bool     `json:"enabled"`
-	Remark   string   `json:"remark"`
+	Protocol      string              `json:"protocol"`
+	Name          string              `json:"name"`
+	Color         string              `json:"color"`
+	BaseURL       string              `json:"baseUrl"`
+	APIKey        string              `json:"apiKey"`
+	Models        []string            `json:"models"`
+	ModelMappings []ModelChannelModel `json:"modelMappings"`
+	Weight        int                 `json:"weight"`
+	Enabled       bool                `json:"enabled"`
+	Remark        string              `json:"remark"`
 }
 
-// ModelCost 模型算力点配置。
+type ModelChannelModel struct {
+	Name         string `json:"name"`
+	UpstreamName string `json:"upstreamName"`
+	Capability   string `json:"capability"`
+}
+
+// ModelCost 模型计费配置。
 type ModelCost struct {
-	Model   string `json:"model"`
-	Credits int    `json:"credits"`
+	Model       string `json:"model"`
+	Credits     int    `json:"credits"`
+	BillingType string `json:"billingType"`
 }
 
 // PublicModelChannelSetting 公开模型渠道配置。

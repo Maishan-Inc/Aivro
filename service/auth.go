@@ -51,6 +51,11 @@ type MailTemplateContext struct {
 	Region  string
 }
 
+type RequestLogMeta struct {
+	IP      string
+	Country string
+}
+
 type RegisterProfileInput struct {
 	AccountType model.UserAccountType
 	Name        string
@@ -732,8 +737,35 @@ func AdjustUserWorkflowCreateCredits(id string, credits int) (model.User, error)
 }
 
 func ConsumeUserCredits(userID string, modelName string, credits int, path string) error {
+	return ConsumeUserCreditsWithMeta(userID, modelName, credits, path, RequestLogMeta{})
+}
+
+func ConsumeUserCreditsWithMeta(userID string, modelName string, credits int, path string, meta RequestLogMeta) error {
+	meta = normalizeRequestLogMeta(meta)
 	if credits <= 0 {
-		return nil
+		user, ok, err := repository.GetUserByID(userID)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return safeMessageError{message: "用户不存在"}
+		}
+		extra, _ := json.Marshal(map[string]string{"model": modelName, "path": path, "ip": meta.IP, "country": meta.Country})
+		_, err = repository.SaveCreditLog(model.CreditLog{
+			ID:        newID("credit"),
+			UserID:    userID,
+			Type:      model.CreditLogTypeAIConsume,
+			Model:     modelName,
+			Path:      path,
+			Amount:    0,
+			Balance:   user.Credits,
+			Remark:    "调用模型 " + modelName,
+			IP:        meta.IP,
+			Country:   meta.Country,
+			Extra:     string(extra),
+			CreatedAt: now(),
+		})
+		return err
 	}
 	user, ok, err := repository.ConsumeUserCredits(userID, credits, now())
 	if err != nil {
@@ -742,14 +774,18 @@ func ConsumeUserCredits(userID string, modelName string, credits int, path strin
 	if !ok {
 		return safeMessageError{message: "算力点不足"}
 	}
-	extra, _ := json.Marshal(map[string]string{"model": modelName, "path": path})
+	extra, _ := json.Marshal(map[string]string{"model": modelName, "path": path, "ip": meta.IP, "country": meta.Country})
 	_, err = repository.SaveCreditLog(model.CreditLog{
 		ID:        newID("credit"),
 		UserID:    userID,
 		Type:      model.CreditLogTypeAIConsume,
+		Model:     modelName,
+		Path:      path,
 		Amount:    -credits,
 		Balance:   user.Credits,
 		Remark:    "调用模型 " + modelName,
+		IP:        meta.IP,
+		Country:   meta.Country,
 		Extra:     string(extra),
 		CreatedAt: now(),
 	})
@@ -757,6 +793,10 @@ func ConsumeUserCredits(userID string, modelName string, credits int, path strin
 }
 
 func RefundUserCredits(userID string, modelName string, credits int, path string) error {
+	return RefundUserCreditsWithMeta(userID, modelName, credits, path, RequestLogMeta{})
+}
+
+func RefundUserCreditsWithMeta(userID string, modelName string, credits int, path string, meta RequestLogMeta) error {
 	if credits <= 0 {
 		return nil
 	}
@@ -767,14 +807,19 @@ func RefundUserCredits(userID string, modelName string, credits int, path string
 	if !ok {
 		return safeMessageError{message: "用户不存在"}
 	}
-	extra, _ := json.Marshal(map[string]string{"model": modelName, "path": path})
+	meta = normalizeRequestLogMeta(meta)
+	extra, _ := json.Marshal(map[string]string{"model": modelName, "path": path, "ip": meta.IP, "country": meta.Country})
 	_, err = repository.SaveCreditLog(model.CreditLog{
 		ID:        newID("credit"),
 		UserID:    userID,
 		Type:      model.CreditLogTypeAIRefund,
+		Model:     modelName,
+		Path:      path,
 		Amount:    credits,
 		Balance:   user.Credits,
 		Remark:    "模型调用失败返还 " + modelName,
+		IP:        meta.IP,
+		Country:   meta.Country,
 		Extra:     string(extra),
 		CreatedAt: now(),
 	})
@@ -787,6 +832,27 @@ func ListCreditLogs(q model.Query) (model.CreditLogList, error) {
 		return model.CreditLogList{}, err
 	}
 	return model.CreditLogList{Items: logs, Total: int(total)}, nil
+}
+
+func ListAuditLogs(q model.Query) (model.AuditLogList, error) {
+	logs, total, err := repository.ListAuditLogs(q)
+	if err != nil {
+		return model.AuditLogList{}, err
+	}
+	return model.AuditLogList{Items: logs, Total: int(total)}, nil
+}
+
+func SaveAuditLog(log model.AuditLog) error {
+	if log.ID == "" {
+		log.ID = newID("audit")
+	}
+	log.IP = strings.TrimSpace(log.IP)
+	log.Country = strings.TrimSpace(log.Country)
+	if log.CreatedAt == "" {
+		log.CreatedAt = now()
+	}
+	_, err := repository.SaveAuditLog(log)
+	return err
 }
 
 func SaveCreditLog(log model.CreditLog) (model.CreditLog, error) {
@@ -1715,6 +1781,23 @@ func MailTemplateContextFromRequest(r *http.Request) MailTemplateContext {
 		Country: firstNonEmpty(r.Header.Get("CF-IPCountry"), r.Header.Get("X-Vercel-IP-Country"), r.Header.Get("CloudFront-Viewer-Country")),
 		Region:  firstNonEmpty(r.Header.Get("CF-Region"), r.Header.Get("X-Vercel-IP-Country-Region"), r.Header.Get("X-Region")),
 	})
+}
+
+func RequestLogMetaFromRequest(r *http.Request) RequestLogMeta {
+	context := MailTemplateContextFromRequest(r)
+	return normalizeRequestLogMeta(RequestLogMeta{IP: context.IP, Country: context.Country})
+}
+
+func normalizeRequestLogMeta(meta RequestLogMeta) RequestLogMeta {
+	meta.IP = strings.TrimSpace(meta.IP)
+	meta.Country = strings.TrimSpace(meta.Country)
+	if meta.IP == "" {
+		meta.IP = "未知"
+	}
+	if meta.Country == "" {
+		meta.Country = "未知"
+	}
+	return meta
 }
 
 func normalizeMailTemplateContext(context MailTemplateContext) MailTemplateContext {

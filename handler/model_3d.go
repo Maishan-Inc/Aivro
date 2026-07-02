@@ -18,7 +18,7 @@ func AIModel3DGenerations(w http.ResponseWriter, r *http.Request) {
 		Fail(w, "请求参数错误")
 		return
 	}
-	result, err := service.CreateModel3DGeneration(r.Context(), user, input)
+	result, err := service.CreateModel3DGeneration(r.Context(), user, input, service.RequestLogMetaFromRequest(r))
 	if err != nil {
 		FailError(w, err)
 		return

@@ -117,10 +117,14 @@ type CreditLog struct {
 	ID        string        `json:"id" gorm:"primaryKey"`
 	UserID    string        `json:"userId" gorm:"index"`
 	Type      CreditLogType `json:"type"`
+	Model     string        `json:"model" gorm:"index"`
+	Path      string        `json:"path"`
 	Amount    int           `json:"amount"`
 	Balance   int           `json:"balance"`
 	RelatedID string        `json:"relatedId"`
 	Remark    string        `json:"remark"`
+	IP        string        `json:"ip"`
+	Country   string        `json:"country"`
 	Extra     string        `json:"extra" gorm:"type:text"`
 	CreatedAt string        `json:"createdAt"`
 }
@@ -128,6 +132,33 @@ type CreditLog struct {
 type CreditLogList struct {
 	Items []CreditLog `json:"items"`
 	Total int         `json:"total"`
+}
+
+type AuditLogAction string
+
+const (
+	AuditLogActionUserRegister AuditLogAction = "user_register"
+	AuditLogActionAdminModify  AuditLogAction = "admin_modify"
+	AuditLogActionConfigUpdate AuditLogAction = "config_update"
+)
+
+type AuditLog struct {
+	ID            string         `json:"id" gorm:"primaryKey"`
+	Action        AuditLogAction `json:"action" gorm:"index"`
+	ActorID       string         `json:"actorId" gorm:"index"`
+	ActorUsername string         `json:"actorUsername"`
+	TargetType    string         `json:"targetType" gorm:"index"`
+	TargetID      string         `json:"targetId" gorm:"index"`
+	Remark        string         `json:"remark"`
+	IP            string         `json:"ip"`
+	Country       string         `json:"country"`
+	Extra         string         `json:"extra" gorm:"type:text"`
+	CreatedAt     string         `json:"createdAt" gorm:"index"`
+}
+
+type AuditLogList struct {
+	Items []AuditLog `json:"items"`
+	Total int        `json:"total"`
 }
 
 // EmailVerification 邮箱验证码。

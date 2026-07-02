@@ -44,6 +44,12 @@ export default function AdminCreditLogsPage() {
             render: (_, item) => <Typography.Text copyable>{item.userId}</Typography.Text>,
         },
         {
+            title: "模型",
+            dataIndex: "model",
+            width: 220,
+            render: (_, item) => <Typography.Text>{item.model || parseCreditLogExtra(item.extra).model || "-"}</Typography.Text>,
+        },
+        {
             title: "类型",
             dataIndex: "type",
             width: 140,
@@ -67,6 +73,15 @@ export default function AdminCreditLogsPage() {
             render: (_, item) => <Typography.Text type="secondary">{item.remark || "-"}</Typography.Text>,
         },
         {
+            title: "IP地址/国家",
+            dataIndex: "ip",
+            width: 180,
+            render: (_, item) => {
+                const extra = parseCreditLogExtra(item.extra);
+                return <Typography.Text type="secondary">{[item.ip || extra.ip, item.country || extra.country].filter(Boolean).join(" / ") || "-"}</Typography.Text>;
+            },
+        },
+        {
             title: "创建时间",
             dataIndex: "createdAt",
             width: 180,
@@ -77,6 +92,7 @@ export default function AdminCreditLogsPage() {
             key: "actions",
             width: 96,
             align: "right",
+            hideInTable: true,
             render: (_, item) => (
                 <Space size={4}>
                     <Tooltip title="编辑">
@@ -98,7 +114,7 @@ export default function AdminCreditLogsPage() {
                         <Row gutter={16} align="bottom">
                             <Col flex="360px">
                                 <Form.Item label="关键词">
-                                    <Input.Search value={keywordText} placeholder="搜索用户 ID、类型、备注或关联 ID" allowClear enterButton={<SearchOutlined />} onSearch={() => searchLogs(keywordText)} onChange={(event) => setKeywordText(event.target.value)} />
+                                                <Input.Search value={keywordText} placeholder="搜索用户 ID、模型、备注、IP 或国家" allowClear enterButton={<SearchOutlined />} onSearch={() => searchLogs(keywordText)} onChange={(event) => setKeywordText(event.target.value)} />
                                 </Form.Item>
                             </Col>
                             <Col flex="none">
@@ -132,16 +148,12 @@ export default function AdminCreditLogsPage() {
                     cardProps={{ variant: "borderless" }}
                     headerTitle={
                         <Space>
-                            <Typography.Text strong>算力点日志</Typography.Text>
+                            <Typography.Text strong>请求日志</Typography.Text>
                             <Tag>{total} 条</Tag>
                         </Space>
                     }
                     options={{ density: true, setting: true, reload: () => void refreshLogs() }}
-                    toolBarRender={() => [
-                        <Button key="add" type="primary" icon={<PlusOutlined />} onClick={() => setEditingLog({ type: "admin_adjust", amount: 0, balance: 0 })}>
-                            新增
-                        </Button>,
-                    ]}
+                    toolBarRender={() => []}
                     pagination={{
                         current: page,
                         pageSize,
@@ -214,8 +226,16 @@ export default function AdminCreditLogsPage() {
                 okButtonProps={{ danger: true }}
                 cancelText="取消"
             >
-                确定删除这条算力点日志吗？
+                确定删除这条请求日志吗？
             </Modal>
         </main>
     );
+}
+
+function parseCreditLogExtra(value: string): Record<string, string> {
+    try {
+        return JSON.parse(value || "{}");
+    } catch {
+        return {};
+    }
 }

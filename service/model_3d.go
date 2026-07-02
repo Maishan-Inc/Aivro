@@ -20,16 +20,16 @@ import (
 const model3DPath = "/model-3d/generations"
 
 type Model3DGenerationInput struct {
-	Model            string                         `json:"model"`
-	Mode             string                         `json:"mode"`
-	Prompt           string                         `json:"prompt"`
-	Images           []Model3DGenerationReference   `json:"images"`
-	TextureEnabled   bool                           `json:"textureEnabled"`
-	PBREnabled       bool                           `json:"pbrEnabled"`
-	MeshQuality      string                         `json:"meshQuality"`
-	TargetFaceCount  int                            `json:"targetFaceCount"`
-	Quantity         int                            `json:"quantity"`
-	AdvancedOptions  map[string]any                 `json:"advancedOptions"`
+	Model           string                       `json:"model"`
+	Mode            string                       `json:"mode"`
+	Prompt          string                       `json:"prompt"`
+	Images          []Model3DGenerationReference `json:"images"`
+	TextureEnabled  bool                         `json:"textureEnabled"`
+	PBREnabled      bool                         `json:"pbrEnabled"`
+	MeshQuality     string                       `json:"meshQuality"`
+	TargetFaceCount int                          `json:"targetFaceCount"`
+	Quantity        int                          `json:"quantity"`
+	AdvancedOptions map[string]any               `json:"advancedOptions"`
 }
 
 type Model3DGenerationReference struct {
@@ -40,36 +40,36 @@ type Model3DGenerationReference struct {
 }
 
 type Model3DGenerationResult struct {
-	ID              string                      `json:"id"`
-	ProviderTaskID  string                      `json:"providerTaskId"`
-	Status          string                      `json:"status"`
-	Model           string                      `json:"model"`
-	Mode            string                      `json:"mode"`
-	Prompt          string                      `json:"prompt"`
-	EnergyCost      int                         `json:"energyCost"`
-	Results         []Model3DGeneratedAsset     `json:"results"`
-	Config          map[string]string           `json:"config"`
-	References      []model.GenerationHistoryReference `json:"references"`
-	DurationMs      int64                       `json:"durationMs"`
-	Error           string                      `json:"error"`
-	CreatedAt       string                      `json:"createdAt"`
-	CompletedAt     string                      `json:"completedAt"`
+	ID             string                             `json:"id"`
+	ProviderTaskID string                             `json:"providerTaskId"`
+	Status         string                             `json:"status"`
+	Model          string                             `json:"model"`
+	Mode           string                             `json:"mode"`
+	Prompt         string                             `json:"prompt"`
+	EnergyCost     int                                `json:"energyCost"`
+	Results        []Model3DGeneratedAsset            `json:"results"`
+	Config         map[string]string                  `json:"config"`
+	References     []model.GenerationHistoryReference `json:"references"`
+	DurationMs     int64                              `json:"durationMs"`
+	Error          string                             `json:"error"`
+	CreatedAt      string                             `json:"createdAt"`
+	CompletedAt    string                             `json:"completedAt"`
 }
 
 type Model3DGeneratedAsset struct {
-	ID          string `json:"id"`
-	URL         string `json:"url"`
-	StorageKey  string `json:"storageKey"`
-	CloudFileID string `json:"cloudFileId"`
-	Bytes       int64  `json:"bytes"`
-	MimeType    string `json:"mimeType"`
+	ID           string `json:"id"`
+	URL          string `json:"url"`
+	StorageKey   string `json:"storageKey"`
+	CloudFileID  string `json:"cloudFileId"`
+	Bytes        int64  `json:"bytes"`
+	MimeType     string `json:"mimeType"`
 	ThumbnailURL string `json:"thumbnailUrl"`
-	Vertices    int    `json:"vertices"`
-	Faces       int    `json:"faces"`
-	ExpiresAt   string `json:"expiresAt"`
+	Vertices     int    `json:"vertices"`
+	Faces        int    `json:"faces"`
+	ExpiresAt    string `json:"expiresAt"`
 }
 
-func CreateModel3DGeneration(ctx context.Context, user model.AuthUser, input Model3DGenerationInput) (Model3DGenerationResult, error) {
+func CreateModel3DGeneration(ctx context.Context, user model.AuthUser, input Model3DGenerationInput, meta RequestLogMeta) (Model3DGenerationResult, error) {
 	input = normalizeModel3DInput(input)
 	if err := validateModel3DInput(input); err != nil {
 		return Model3DGenerationResult{}, err
@@ -79,12 +79,12 @@ func CreateModel3DGeneration(ctx context.Context, user model.AuthUser, input Mod
 	if err != nil {
 		return Model3DGenerationResult{}, err
 	}
-	if err := ConsumeUserCredits(user.ID, input.Model, credits, model3DPath); err != nil {
+	if err := ConsumeUserCreditsWithMeta(user.ID, input.Model, credits, model3DPath, meta); err != nil {
 		return Model3DGenerationResult{}, err
 	}
 	result, err := requestHunyuanModel3D(ctx, user, input, credits)
 	if err != nil {
-		_ = RefundUserCredits(user.ID, input.Model, credits, model3DPath)
+		_ = RefundUserCreditsWithMeta(user.ID, input.Model, credits, model3DPath, meta)
 		return Model3DGenerationResult{}, err
 	}
 	if result.ID == "" {
@@ -184,19 +184,21 @@ func validateModel3DInput(input Model3DGenerationInput) error {
 }
 
 func requestHunyuanModel3D(ctx context.Context, user model.AuthUser, input Model3DGenerationInput, credits int) (Model3DGenerationResult, error) {
-	channel, err := SelectModelChannel(input.Model)
-	if err != nil || strings.TrimSpace(channel.BaseURL) == "" {
+	route, err := SelectModelChannelRoute(input.Model)
+	if err != nil || strings.TrimSpace(route.Channel.BaseURL) == "" {
 		log.Printf("model3d channel unavailable, returning preview placeholder: model=%s err=%v", input.Model, err)
 		return mockModel3DResult(input, credits), nil
 	}
-	payload, _ := json.Marshal(input)
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, BuildModelChannelURL(channel, "/model-3d/generations"), bytes.NewReader(payload))
+	upstreamInput := input
+	upstreamInput.Model = route.UpstreamModel
+	payload, _ := json.Marshal(upstreamInput)
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, BuildModelChannelURL(route.Channel, "/model-3d/generations"), bytes.NewReader(payload))
 	if err != nil {
 		return Model3DGenerationResult{}, err
 	}
 	request.Header.Set("Content-Type", "application/json")
-	if strings.TrimSpace(channel.APIKey) != "" {
-		request.Header.Set("Authorization", "Bearer "+channel.APIKey)
+	if strings.TrimSpace(route.Channel.APIKey) != "" {
+		request.Header.Set("Authorization", "Bearer "+route.Channel.APIKey)
 	}
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
@@ -322,13 +324,13 @@ func mockModel3DResult(input Model3DGenerationInput, credits int) Model3DGenerat
 
 func model3DConfig(input Model3DGenerationInput, result Model3DGenerationResult) map[string]string {
 	config := map[string]string{
-		"mode":             input.Mode,
-		"textureEnabled":   strconv.FormatBool(input.TextureEnabled),
-		"pbrEnabled":       strconv.FormatBool(input.PBREnabled),
-		"meshQuality":      input.MeshQuality,
-		"targetFaceCount":  strconv.Itoa(input.TargetFaceCount),
-		"quantity":         strconv.Itoa(input.Quantity),
-		"energyCost":       strconv.Itoa(result.EnergyCost),
+		"mode":            input.Mode,
+		"textureEnabled":  strconv.FormatBool(input.TextureEnabled),
+		"pbrEnabled":      strconv.FormatBool(input.PBREnabled),
+		"meshQuality":     input.MeshQuality,
+		"targetFaceCount": strconv.Itoa(input.TargetFaceCount),
+		"quantity":        strconv.Itoa(input.Quantity),
+		"energyCost":      strconv.Itoa(result.EnergyCost),
 	}
 	if len(result.Results) > 0 {
 		config["vertices"] = strconv.Itoa(result.Results[0].Vertices)

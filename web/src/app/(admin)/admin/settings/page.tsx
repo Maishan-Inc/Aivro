@@ -8,7 +8,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EditorView } from "@uiw/react-codemirror";
 
-import { fetchAdminSettings, fetchAuthProviderStats, fetchChannelModels, saveAdminSettings, testChannelModel, testCloudStorage, testMailSettings, type AdminCloudStorageSettings, type AdminModelChannel, type AdminModelCost, type AdminPrivateAuthProvider, type AdminPublicAuthProvider, type AdminSettings } from "@/services/api/admin";
+import { fetchAdminSettings, fetchAuthProviderStats, fetchChannelModels, saveAdminSettings, testChannelModel, testCloudStorage, testMailSettings, type AdminCloudStorageSettings, type AdminModelChannel, type AdminModelChannelModel, type AdminModelCost, type AdminPrivateAuthProvider, type AdminPublicAuthProvider, type AdminSettings } from "@/services/api/admin";
 import { useI18n } from "@/hooks/use-i18n";
 import { useUserStore } from "@/stores/use-user-store";
 
@@ -236,10 +236,11 @@ const emptySettings: AdminSettings = {
         },
     },
 };
-const emptyChannel: AdminModelChannel = { protocol: "openai", name: "", baseUrl: "", apiKey: "", models: [], weight: 1, enabled: true, remark: "" };
+const emptyChannel: AdminModelChannel = { protocol: "openai", name: "", color: "", baseUrl: "", apiKey: "", models: [], modelMappings: [], weight: 1, enabled: true, remark: "" };
 
 type SettingsTabKey = "model" | "public" | "runtime" | "private" | "mail" | "thirdParty" | "cloudStorage" | "billingKyc" | "pages";
 type EditorMode = "visual" | "json";
+type ModelConfigTabKey = "publicModels" | "billing" | "channels";
 type ModelSelectTabKey = "new" | "current";
 type MailTemplateKey = "register" | "reset" | "metamask";
 type AuthProviderEditorState = { type: "oauth"; providerKey: "linuxDo" | "google" | "github" } | { type: "metamask" } | { type: "custom"; index: number };
@@ -252,6 +253,7 @@ export default function AdminSettingsPage() {
     const searchParams = useSearchParams();
     const [form] = Form.useForm<AdminSettings>();
     const [activeTab, setActiveTab] = useState<SettingsTabKey>(normalizeSettingsTab(searchParams.get("tab")));
+    const [modelConfigTab, setModelConfigTab] = useState<ModelConfigTabKey>("publicModels");
     const [editorMode, setEditorMode] = useState<Record<string, EditorMode>>({ public: "visual", private: "visual" });
     const [jsonText, setJsonText] = useState<Record<string, string>>({ public: "", private: "" });
     const [channels, setChannels] = useState<AdminModelChannel[]>([]);
@@ -287,6 +289,7 @@ export default function AdminSettingsPage() {
     const publicModels = Form.useWatch(["public", "modelChannel", "availableModels"], form) || [];
     const customAuthProviders = Form.useWatch(["private", "auth", "customProviders"], { form, preserve: true }) || [];
     const channelModels = useMemo(() => collectChannelModels(channels), [channels]);
+    const channelColorByModel = useMemo(() => collectChannelModelColors(channels), [channels]);
     const channelTableData = useMemo(() => channels.map((channel, index) => ({ ...channel, _index: index, _rowKey: `${index}-${channel.name}-${channel.baseUrl}` })), [channels]);
     const standaloneTab = activeTab === "model" || activeTab === "mail";
     const activeMode = activeTab === "model" || activeTab === "mail" || activeTab === "thirdParty" || activeTab === "cloudStorage" || activeTab === "billingKyc" || activeTab === "pages" || activeTab === "runtime" ? "visual" : editorMode[activeTab];
@@ -501,9 +504,9 @@ export default function AdminSettingsPage() {
     const openChannelDrawer = (index: number | null) => {
         setEditingChannelIndex(index);
         setIsChannelDrawerOpen(true);
-        const channel = index === null ? emptyChannel : normalizeChannel(channels[index]);
+        const channel = index === null ? { ...emptyChannel, color: randomChannelColor() } : normalizeChannel(channels[index]);
         channelForm.setFieldsValue(channel);
-        rememberModels(channel.models);
+        rememberModels([...channel.models, ...channel.modelMappings.map((item) => item.upstreamName)]);
     };
 
     const closeChannelDrawer = () => {
@@ -514,7 +517,7 @@ export default function AdminSettingsPage() {
 
     const saveChannel = async () => {
         const channel = normalizeChannel(await channelForm.validateFields());
-        rememberModels(channel.models);
+        rememberModels([...channel.models, ...channel.modelMappings.map((item) => item.upstreamName)]);
         const nextChannels = [...channels];
         if (editingChannelIndex === null) nextChannels.push(channel);
         else nextChannels[editingChannelIndex] = channel;
@@ -536,7 +539,7 @@ export default function AdminSettingsPage() {
         setIsFetchingChannelModels(true);
         try {
             const channelModels = await fetchChannelModels(token, { index: editingChannelIndex ?? undefined, channel: normalizeChannel(channel) });
-            const current = isModelSelectorOpen ? uniqueModels(modelSelectSelected) : uniqueModels(channelForm.getFieldValue("models") || []);
+            const current = isModelSelectorOpen ? uniqueModels(modelSelectSelected) : currentChannelUpstreamModels();
             rememberModels(channelModels);
             setModelSelectExisting(current);
             setModelSelectSource(uniqueModels(channelModels));
@@ -554,7 +557,7 @@ export default function AdminSettingsPage() {
     };
 
     const openChannelModelSelector = (sourceModels?: string[]) => {
-        const current = uniqueModels(channelForm.getFieldValue("models") || []);
+        const current = currentChannelUpstreamModels();
         const source = uniqueModels(sourceModels !== undefined ? sourceModels : [...knownModels, ...current]);
         setModelSelectExisting(current);
         setModelSelectSource(source);
@@ -572,9 +575,13 @@ export default function AdminSettingsPage() {
     };
 
     const confirmChannelModelSelector = () => {
-        const models = uniqueModels(modelSelectSelected);
-        channelForm.setFieldValue("models", models);
-        rememberModels(models);
+        const upstreamModels = uniqueModels(modelSelectSelected);
+        const current = normalizeChannelMappings(channelForm.getFieldValue("modelMappings") || []);
+        const byUpstream = new Map(current.map((item) => [item.upstreamName, item]));
+        const channelName = channelForm.getFieldValue("name") || "";
+        const mappings = upstreamModels.map((upstreamName) => byUpstream.get(upstreamName) || defaultChannelMapping(channelName, upstreamName));
+        channelForm.setFieldsValue({ modelMappings: mappings, models: mappings.map((item) => item.name) });
+        rememberModels([...mappings.map((item) => item.name), ...upstreamModels]);
         closeChannelModelSelector();
     };
 
@@ -606,6 +613,10 @@ export default function AdminSettingsPage() {
 
     function rememberKnownModels(settings: AdminSettings) {
         rememberModels(collectKnownModels(settings));
+    }
+
+    function currentChannelUpstreamModels() {
+        return uniqueModels(normalizeChannelMappings(channelForm.getFieldValue("modelMappings") || []).map((item) => item.upstreamName));
     }
 
     const openTestDialog = (index: number) => {
@@ -749,154 +760,209 @@ export default function AdminSettingsPage() {
 
                     {activeTab === "model" ? (
                         <Form form={form} layout="vertical" initialValues={emptySettings} requiredMark={false} onValuesChange={handleFormValuesChange}>
-                            <Flex vertical gap={16}>
-                                <Card size="small" title="开放给前台的模型" extra={sectionSaveButton()}>
-                                    <Row gutter={16}>
-                                        <Col span={24}>
-                                            <Form.Item name={["public", "modelChannel", "availableModels"]} label="系统可用模型" extra="可选项来自已启用渠道中选择的模型，最终开放哪些模型由这里勾选决定。">
-                                                <Select mode="multiple" placeholder="请选择系统可用模型" options={channelModels.map((item) => ({ label: item, value: item }))} />
-                                            </Form.Item>
-                                        </Col>
-                                        <Col xs={24} md={6}>
-                                            <Form.Item name={["public", "modelChannel", "defaultModel"]} label="默认模型">
-                                                <Select showSearch allowClear options={publicModels.map((item) => ({ label: item, value: item }))} />
-                                            </Form.Item>
-                                        </Col>
-                                        <Col xs={24} md={6}>
-                                            <Form.Item name={["public", "modelChannel", "defaultImageModel"]} label="默认图片模型">
-                                                <Select showSearch allowClear options={publicModels.map((item) => ({ label: item, value: item }))} />
-                                            </Form.Item>
-                                        </Col>
-                                        <Col xs={24} md={6}>
-                                            <Form.Item name={["public", "modelChannel", "defaultVideoModel"]} label="默认视频模型">
-                                                <Select showSearch allowClear options={publicModels.map((item) => ({ label: item, value: item }))} />
-                                            </Form.Item>
-                                        </Col>
-                                        <Col xs={24} md={6}>
-                                            <Form.Item name={["public", "modelChannel", "defaultTextModel"]} label="默认文本模型">
-                                                <Select showSearch allowClear options={publicModels.map((item) => ({ label: item, value: item }))} />
-                                            </Form.Item>
-                                        </Col>
-                                        <Col span={24}>
-                                            <Form.Item name={["public", "modelChannel", "systemPrompt"]} label="系统提示词">
-                                                <Input.TextArea rows={4} />
-                                            </Form.Item>
-                                        </Col>
-                                    </Row>
-                                </Card>
-                                <Card size="small" title="模型算力点" extra={sectionSaveButton()}>
-                                    <Table
-                                        rowKey="model"
-                                        pagination={false}
-                                        size="small"
-                                        dataSource={[...publicModels.map((model) => ({ model, credits: modelCostCredits(modelCosts, model) })), ...modelCosts.filter((c) => !publicModels.includes(c.model)).map((c) => ({ model: c.model, credits: c.credits }))]}
-                                        columns={[
-                                            { title: "模型", dataIndex: "model" },
-                                            {
-                                                title: "每次调用扣除",
-                                                dataIndex: "credits",
-                                                width: 220,
-                                                render: (_, item) => (
-                                                    <InputNumber
-                                                        min={0}
-                                                        step={1}
-                                                        precision={0}
-                                                        className="!w-full"
-                                                        value={item.credits}
-                                                        addonAfter="点"
-                                                        onChange={(value) => {
-                                                            setModelCost(form, setModelCosts, item.model, Number(value) || 0);
+                            <Tabs
+                                activeKey={modelConfigTab}
+                                onChange={(key) => setModelConfigTab(key as ModelConfigTabKey)}
+                                items={[
+                                    {
+                                        key: "publicModels",
+                                        label: "开放给前台的模型",
+                                        children: (
+                                            <Card size="small" extra={sectionSaveButton()}>
+                                                <Row gutter={16}>
+                                                    <Col span={24}>
+                                                        <Form.Item name={["public", "modelChannel", "availableModels"]} label="系统可用模型" extra="可选项来自已启用渠道中的前台模型名，最终开放哪些模型由这里勾选决定。">
+                                                            <Select mode="multiple" placeholder="请选择系统可用模型" options={channelModels.map((item) => ({ label: <ModelTag model={item} color={channelColorByModel[item]} />, value: item }))} />
+                                                        </Form.Item>
+                                                    </Col>
+                                                    <Col xs={24} md={6}>
+                                                        <Form.Item name={["public", "modelChannel", "defaultModel"]} label="默认模型">
+                                                            <Select showSearch allowClear options={publicModels.map((item) => ({ label: <ModelTag model={item} color={channelColorByModel[item]} />, value: item }))} />
+                                                        </Form.Item>
+                                                    </Col>
+                                                    <Col xs={24} md={6}>
+                                                        <Form.Item name={["public", "modelChannel", "defaultImageModel"]} label="默认图片模型">
+                                                            <Select showSearch allowClear options={publicModels.map((item) => ({ label: <ModelTag model={item} color={channelColorByModel[item]} />, value: item }))} />
+                                                        </Form.Item>
+                                                    </Col>
+                                                    <Col xs={24} md={6}>
+                                                        <Form.Item name={["public", "modelChannel", "defaultVideoModel"]} label="默认视频模型">
+                                                            <Select showSearch allowClear options={publicModels.map((item) => ({ label: <ModelTag model={item} color={channelColorByModel[item]} />, value: item }))} />
+                                                        </Form.Item>
+                                                    </Col>
+                                                    <Col xs={24} md={6}>
+                                                        <Form.Item name={["public", "modelChannel", "defaultTextModel"]} label="默认文本模型">
+                                                            <Select showSearch allowClear options={publicModels.map((item) => ({ label: <ModelTag model={item} color={channelColorByModel[item]} />, value: item }))} />
+                                                        </Form.Item>
+                                                    </Col>
+                                                    <Col span={24}>
+                                                        <Form.Item name={["public", "modelChannel", "systemPrompt"]} label="系统提示词">
+                                                            <Input.TextArea rows={4} />
+                                                        </Form.Item>
+                                                    </Col>
+                                                </Row>
+                                            </Card>
+                                        ),
+                                    },
+                                    {
+                                        key: "billing",
+                                        label: "模型计费",
+                                        children: (
+                                            <Card size="small" extra={sectionSaveButton()}>
+                                                <Table
+                                                    rowKey="model"
+                                                    pagination={false}
+                                                    size="small"
+                                                    dataSource={modelCosts}
+                                                    columns={[
+                                                        { title: "模型", dataIndex: "model", render: (value) => <ModelTag model={value} color={channelColorByModel[value]} /> },
+                                                        {
+                                                            title: "计费方式",
+                                                            dataIndex: "billingType",
+                                                            width: 180,
+                                                            render: (_, item) => (
+                                                                <Select
+                                                                    value={item.billingType || "fixed"}
+                                                                    options={[
+                                                                        { label: "按次计费", value: "fixed" },
+                                                                        { label: "Token 计费", value: "token" },
+                                                                    ]}
+                                                                    onChange={(value) => {
+                                                                        setModelCost(form, setModelCosts, item.model, item.credits, value as AdminModelCost["billingType"]);
+                                                                        markUnsaved();
+                                                                    }}
+                                                                />
+                                                            ),
+                                                        },
+                                                        {
+                                                            title: "计费值",
+                                                            dataIndex: "credits",
+                                                            width: 220,
+                                                            render: (_, item) => (
+                                                                <InputNumber
+                                                                    min={0}
+                                                                    step={1}
+                                                                    precision={0}
+                                                                    className="!w-full"
+                                                                    value={item.credits}
+                                                                    addonAfter={item.billingType === "token" ? "点/千 token" : "点/次"}
+                                                                    onChange={(value) => {
+                                                                        setModelCost(form, setModelCosts, item.model, Number(value) || 0, item.billingType);
+                                                                        markUnsaved();
+                                                                    }}
+                                                                />
+                                                            ),
+                                                        },
+                                                        {
+                                                            title: "操作",
+                                                            key: "actions",
+                                                            width: 88,
+                                                            align: "right",
+                                                            render: (_, item) => (
+                                                                <Button
+                                                                    danger
+                                                                    size="small"
+                                                                    icon={<DeleteOutlined />}
+                                                                    onClick={() => {
+                                                                        removeModelCost(form, setModelCosts, item.model);
+                                                                        markUnsaved();
+                                                                    }}
+                                                                />
+                                                            ),
+                                                        },
+                                                    ]}
+                                                />
+                                                <Space.Compact style={{ marginTop: 8, width: "100%" }}>
+                                                    <Select showSearch allowClear placeholder="选择或输入模型名称以新增计费" value={newCostModel || undefined} onSearch={setNewCostModel} onChange={(value) => setNewCostModel(value || "")} options={uniqueModels([...publicModels, ...channelModels, ...knownModels]).map((model) => ({ label: model, value: model }))} style={{ minWidth: 260 }} />
+                                                    <Button
+                                                        icon={<PlusOutlined />}
+                                                        onClick={() => {
+                                                            const m = newCostModel.trim();
+                                                            if (!m) return;
+                                                            setModelCost(form, setModelCosts, m, modelCostCredits(modelCosts, m), "fixed");
                                                             markUnsaved();
+                                                            setNewCostModel("");
                                                         }}
-                                                    />
-                                                ),
-                                            },
-                                        ]}
-                                    />
-                                    <Space.Compact style={{ marginTop: 8, width: "100%" }}>
-                                        <Input
-                                            placeholder="输入模型名称以新增算力点配置"
-                                            value={newCostModel}
-                                            onChange={(e) => setNewCostModel(e.target.value)}
-                                            onPressEnter={() => {
-                                                const m = newCostModel.trim();
-                                                if (!m) return;
-                                                setModelCost(form, setModelCosts, m, modelCostCredits(modelCosts, m));
-                                                markUnsaved();
-                                                setNewCostModel("");
-                                            }}
-                                        />
-                                        <Button
-                                            icon={<PlusOutlined />}
-                                            onClick={() => {
-                                                const m = newCostModel.trim();
-                                                if (!m) return;
-                                                setModelCost(form, setModelCosts, m, modelCostCredits(modelCosts, m));
-                                                markUnsaved();
-                                                setNewCostModel("");
-                                            }}
-                                        >
-                                            新增
-                                        </Button>
-                                    </Space.Compact>
-                                </Card>
-                                <Card
-                                    size="small"
-                                    title="模型渠道"
-                                    extra={
-                                        <Button type="primary" size="small" icon={<PlusOutlined />} onClick={() => openChannelDrawer(null)}>
-                                            新增渠道
-                                        </Button>
-                                    }
-                                >
-                                    <Table
-                                        rowKey="_rowKey"
-                                        pagination={false}
-                                        dataSource={channelTableData}
-                                        columns={[
-                                            { title: "名称", dataIndex: "name", render: (value) => value || "未命名渠道" },
-                                            { title: "协议", dataIndex: "protocol", width: 96, render: (value) => <Tag>{value || "openai"}</Tag> },
-                                            { title: "状态", dataIndex: "enabled", width: 96, render: (value) => <Tag color={value ? "success" : "default"}>{value ? "已启用" : "已停用"}</Tag> },
-                                            {
-                                                title: "模型",
-                                                dataIndex: "models",
-                                                render: (value: string[]) => (
-                                                    <Typography.Text ellipsis style={{ maxWidth: 360 }}>
-                                                        {modelSummary(value || [])}
-                                                    </Typography.Text>
-                                                ),
-                                            },
-                                            { title: "权重", dataIndex: "weight", width: 88 },
-                                            {
-                                                title: "操作",
-                                                key: "actions",
-                                                width: 220,
-                                                align: "right",
-                                                render: (_, item) => (
-                                                    <Space size={4}>
-                                                        <Button size="small" onClick={() => openTestDialog(item._index)}>
-                                                            测试
-                                                        </Button>
-                                                        <Button size="small" onClick={() => openChannelDrawer(item._index)}>
-                                                            编辑
-                                                        </Button>
-                                                        <Button
-                                                            danger
-                                                            size="small"
-                                                            icon={<DeleteOutlined />}
-                                                            onClick={() => {
-                                                                const nextChannels = [...channels];
-                                                                nextChannels.splice(item._index, 1);
-                                                                void persistChannels(nextChannels);
-                                                            }}
-                                                        />
-                                                    </Space>
-                                                ),
-                                            },
-                                        ]}
-                                    />
-                                </Card>
-                            </Flex>
+                                                    >
+                                                        新增
+                                                    </Button>
+                                                </Space.Compact>
+                                            </Card>
+                                        ),
+                                    },
+                                    {
+                                        key: "channels",
+                                        label: "模型渠道",
+                                        children: (
+                                            <Card
+                                                size="small"
+                                                extra={
+                                                    <Button type="primary" size="small" icon={<PlusOutlined />} onClick={() => openChannelDrawer(null)}>
+                                                        新增渠道
+                                                    </Button>
+                                                }
+                                            >
+                                                <Table
+                                                    rowKey="_rowKey"
+                                                    pagination={false}
+                                                    dataSource={channelTableData}
+                                                    columns={[
+                                                        {
+                                                            title: "名称",
+                                                            dataIndex: "name",
+                                                            render: (value, item) => (
+                                                                <Space size={8}>
+                                                                    <span style={{ width: 10, height: 10, borderRadius: 3, background: item.color, display: "inline-block" }} />
+                                                                    <Typography.Text>{value || "未命名渠道"}</Typography.Text>
+                                                                </Space>
+                                                            ),
+                                                        },
+                                                        { title: "协议", dataIndex: "protocol", width: 96, render: (value) => <Tag>{value || "openai"}</Tag> },
+                                                        { title: "状态", dataIndex: "enabled", width: 96, render: (value) => <Tag color={value ? "success" : "default"}>{value ? "已启用" : "已停用"}</Tag> },
+                                                        {
+                                                            title: "模型映射",
+                                                            dataIndex: "modelMappings",
+                                                            render: (value: AdminModelChannelModel[], item) => (
+                                                                <Flex gap={4} wrap>
+                                                                    {(value || []).slice(0, 4).map((mapping) => <ModelTag key={mapping.name} model={mapping.name} color={item.color} />)}
+                                                                    {(value || []).length > 4 ? <Tag>+{(value || []).length - 4}</Tag> : null}
+                                                                </Flex>
+                                                            ),
+                                                        },
+                                                        { title: "权重", dataIndex: "weight", width: 88 },
+                                                        {
+                                                            title: "操作",
+                                                            key: "actions",
+                                                            width: 220,
+                                                            align: "right",
+                                                            render: (_, item) => (
+                                                                <Space size={4}>
+                                                                    <Button size="small" onClick={() => openTestDialog(item._index)}>
+                                                                        测试
+                                                                    </Button>
+                                                                    <Button size="small" onClick={() => openChannelDrawer(item._index)}>
+                                                                        编辑
+                                                                    </Button>
+                                                                    <Button
+                                                                        danger
+                                                                        size="small"
+                                                                        icon={<DeleteOutlined />}
+                                                                        onClick={() => {
+                                                                            const nextChannels = [...channels];
+                                                                            nextChannels.splice(item._index, 1);
+                                                                            void persistChannels(nextChannels);
+                                                                        }}
+                                                                    />
+                                                                </Space>
+                                                            ),
+                                                        },
+                                                    ]}
+                                                />
+                                            </Card>
+                                        ),
+                                    },
+                                ]}
+                            />
                         </Form>
                     ) : activeTab === "public" ? (
                         activeMode === "visual" ? (
@@ -1459,7 +1525,7 @@ export default function AdminSettingsPage() {
                 <Drawer
                     title={editingChannelIndex === null ? "新增渠道" : "编辑渠道"}
                     open={isChannelDrawerOpen}
-                    size={560}
+                    width={760}
                     onClose={closeChannelDrawer}
                     extra={
                         <Space>
@@ -1484,6 +1550,11 @@ export default function AdminSettingsPage() {
                                 </Form.Item>
                             </Col>
                             <Col span={12}>
+                                <Form.Item name="color" label="渠道颜色">
+                                    <Input type="color" />
+                                </Form.Item>
+                            </Col>
+                            <Col span={12}>
                                 <Form.Item name="weight" label="权重">
                                     <InputNumber min={1} step={1} className="!w-full" />
                                 </Form.Item>
@@ -1505,12 +1576,48 @@ export default function AdminSettingsPage() {
                             </Col>
                             <Col span={24}>
                                 <Form.Item label="渠道可用模型">
-                                    <Space.Compact style={{ width: "100%" }}>
-                                        <Form.Item name="models" noStyle>
-                                            <Select mode="tags" maxTagCount="responsive" tokenSeparators={[",", "\n"]} options={knownModels.map((model) => ({ label: model, value: model }))} />
-                                        </Form.Item>
-                                        <Button onClick={() => openChannelModelSelector()}>选择模型</Button>
-                                    </Space.Compact>
+                                    <Form.List name="modelMappings">
+                                        {(fields, { add, remove }) => (
+                                            <Flex vertical gap={8}>
+                                                <Flex justify="space-between" align="center">
+                                                    <Typography.Text type="secondary">前台模型名用于用户选择和计费，上游模型名会发送给对应渠道。</Typography.Text>
+                                                    <Space>
+                                                        <Button size="small" onClick={() => add(defaultChannelMapping(channelForm.getFieldValue("name") || "", ""))}>手动新增</Button>
+                                                        <Button size="small" onClick={() => openChannelModelSelector()}>选择模型</Button>
+                                                    </Space>
+                                                </Flex>
+                                                {fields.map((field) => (
+                                                    <Row gutter={8} key={field.key} align="middle">
+                                                        <Col span={8}>
+                                                            <Form.Item {...field} name={[field.name, "name"]} rules={[{ required: true, message: "请输入前台模型名" }]} style={{ marginBottom: 0 }}>
+                                                                <Input placeholder="前台模型名" />
+                                                            </Form.Item>
+                                                        </Col>
+                                                        <Col span={8}>
+                                                            <Form.Item {...field} name={[field.name, "upstreamName"]} rules={[{ required: true, message: "请输入上游模型名" }]} style={{ marginBottom: 0 }}>
+                                                                <Input placeholder="上游模型名" />
+                                                            </Form.Item>
+                                                        </Col>
+                                                        <Col span={6}>
+                                                            <Form.Item {...field} name={[field.name, "capability"]} style={{ marginBottom: 0 }}>
+                                                                <Select
+                                                                    options={[
+                                                                        { label: "图片", value: "image" },
+                                                                        { label: "对话", value: "text" },
+                                                                        { label: "视频", value: "video" },
+                                                                        { label: "3D", value: "model3d" },
+                                                                    ]}
+                                                                />
+                                                            </Form.Item>
+                                                        </Col>
+                                                        <Col span={2}>
+                                                            <Button danger type="text" icon={<DeleteOutlined />} onClick={() => remove(field.name)} />
+                                                        </Col>
+                                                    </Row>
+                                                ))}
+                                            </Flex>
+                                        )}
+                                    </Form.List>
                                 </Form.Item>
                             </Col>
                             <Col span={24}>
@@ -2141,7 +2248,15 @@ function normalizeAdSenseSetting(setting: Partial<AdminSettings["public"]["adSen
 }
 
 function normalizeModelCosts(items: Partial<AdminSettings["public"]["modelChannel"]["modelCosts"][number]>[]) {
-    return items.filter((item) => item.model).map((item) => ({ model: item.model || "", credits: Math.max(0, Number(item.credits) || 0) }));
+    const seen = new Set<string>();
+    return items
+        .filter((item) => item.model)
+        .map((item) => ({ model: item.model || "", credits: Math.max(0, Number(item.credits) || 0), billingType: item.billingType === "token" ? "token" : "fixed" }))
+        .filter((item) => {
+            if (seen.has(item.model)) return false;
+            seen.add(item.model);
+            return true;
+        });
 }
 
 function normalizePrivateSetting(setting: Partial<AdminSettings["private"]> = {}): AdminSettings["private"] {
@@ -2277,26 +2392,74 @@ function normalizeMetaMaskSetting(item: Partial<AdminSettings["private"]["auth"]
 }
 
 function normalizeChannel(item: Partial<AdminModelChannel> = {}): AdminModelChannel {
+    const modelMappings = normalizeChannelMappings(item.modelMappings?.length ? item.modelMappings : (item.models || []).map((model) => ({ name: model, upstreamName: model, capability: "image" })));
     return {
         protocol: "openai",
         name: item.name || "",
+        color: normalizeChannelColor(item.color),
         baseUrl: item.baseUrl || "",
         apiKey: item.apiKey || "",
-        models: item.models || [],
+        models: modelMappings.map((model) => model.name),
+        modelMappings,
         weight: Math.max(1, Number(item.weight) || 1),
         enabled: item.enabled !== false,
         remark: item.remark || "",
     };
 }
 
+function normalizeChannelMappings(items: Partial<AdminModelChannelModel>[] = []): AdminModelChannelModel[] {
+    const seen = new Set<string>();
+    return items
+        .map((item) => ({
+            name: (item.name || "").trim(),
+            upstreamName: (item.upstreamName || item.name || "").trim(),
+            capability: item.capability === "text" || item.capability === "video" || item.capability === "model3d" ? item.capability : "image",
+        }))
+        .filter((item) => {
+            if (!item.name || !item.upstreamName || seen.has(item.name)) return false;
+            seen.add(item.name);
+            return true;
+        });
+}
+
+function defaultChannelMapping(channelName: string, upstreamName: string): AdminModelChannelModel {
+    const prefix = channelName.trim();
+    const name = upstreamName ? `${prefix ? `${prefix}-` : ""}${upstreamName}` : "";
+    return { name, upstreamName, capability: "image" };
+}
+
+function normalizeChannelColor(value?: string) {
+    return /^#[0-9a-f]{6}$/i.test(value || "") ? value || "" : randomChannelColor();
+}
+
+function randomChannelColor() {
+    const colors = ["#2563eb", "#16a34a", "#f97316", "#9333ea", "#0891b2", "#dc2626", "#4f46e5", "#ca8a04"];
+    return colors[Math.floor(Math.random() * colors.length)];
+}
+
+function ModelTag({ model, color }: { model: string; color?: string }) {
+    if (!color) return <Tag>{model}</Tag>;
+    return (
+        <Tag style={{ marginInlineEnd: 0, borderColor: `${color}33`, background: `${color}18`, color }}>
+            {model}
+        </Tag>
+    );
+}
+
 function modelCostCredits(items: AdminSettings["public"]["modelChannel"]["modelCosts"], model: string) {
     return items.find((item) => item.model === model)?.credits || 0;
 }
 
-function setModelCost(form: any, setModelCosts: (items: AdminModelCost[]) => void, model: string, credits: number) {
+function setModelCost(form: any, setModelCosts: (items: AdminModelCost[]) => void, model: string, credits: number, billingType: AdminModelCost["billingType"] = "fixed") {
     const current = (form.getFieldValue(["public", "modelChannel", "modelCosts"]) || []) as AdminSettings["public"]["modelChannel"]["modelCosts"];
     const next = current.filter((item) => item.model !== model);
-    next.push({ model, credits: Math.max(0, credits) });
+    next.push({ model, credits: Math.max(0, credits), billingType: billingType === "token" ? "token" : "fixed" });
+    form.setFieldValue(["public", "modelChannel", "modelCosts"], next);
+    setModelCosts(next);
+}
+
+function removeModelCost(form: any, setModelCosts: (items: AdminModelCost[]) => void, model: string) {
+    const next = ((form.getFieldValue(["public", "modelChannel", "modelCosts"]) || []) as AdminSettings["public"]["modelChannel"]["modelCosts"]).filter((item) => item.model !== model);
     form.setFieldValue(["public", "modelChannel", "modelCosts"], next);
     setModelCosts(next);
 }
@@ -2360,11 +2523,23 @@ function collectChannelModels(channels: AdminModelChannel[]) {
     return uniqueModels(channels.filter((channel) => channel.enabled).flatMap((channel) => channel.models || []));
 }
 
+function collectChannelModelColors(channels: AdminModelChannel[]) {
+    const result: Record<string, string> = {};
+    channels.forEach((channel) => {
+        if (!channel.enabled) return;
+        (channel.models || []).forEach((model) => {
+            if (!result[model]) result[model] = channel.color;
+        });
+    });
+    return result;
+}
+
 function collectKnownModels(settings: AdminSettings) {
     return uniqueModels([
         ...(settings.public.modelChannel.availableModels || []),
         ...(settings.public.modelChannel.modelCosts || []).map((item) => item.model),
         ...settings.private.channels.flatMap((channel) => channel.models || []),
+        ...settings.private.channels.flatMap((channel) => (channel.modelMappings || []).map((item) => item.upstreamName)),
     ]);
 }
 

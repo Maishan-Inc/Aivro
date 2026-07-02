@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math/rand"
 	"net/http"
 	"sort"
 	"strings"
@@ -130,6 +129,17 @@ func AdminTestChannelModel(index *int, channel model.ModelChannel, modelName str
 	if err != nil {
 		return "", err
 	}
+	resolved = normalizeModelChannel(resolved)
+	modelName = strings.TrimSpace(modelName)
+	for _, item := range resolved.ModelMappings {
+		if item.Name == modelName || item.UpstreamName == modelName {
+			modelName = item.UpstreamName
+			break
+		}
+	}
+	if modelName == "" && len(resolved.ModelMappings) > 0 {
+		modelName = resolved.ModelMappings[0].UpstreamName
+	}
 	return testAdminChannelModel(resolved, modelName)
 }
 
@@ -178,15 +188,27 @@ func normalizePublicSetting(setting model.PublicSetting) model.PublicSetting {
 	if setting.ModelChannel.AvailableModels == nil {
 		setting.ModelChannel.AvailableModels = []string{}
 	}
+	setting.ModelChannel.AvailableModels = uniqueNonEmptyStrings(setting.ModelChannel.AvailableModels)
 	if setting.ModelChannel.ModelCosts == nil {
 		setting.ModelChannel.ModelCosts = []model.ModelCost{}
 	}
+	costs := make([]model.ModelCost, 0, len(setting.ModelChannel.ModelCosts))
+	seenCosts := map[string]bool{}
 	for i := range setting.ModelChannel.ModelCosts {
 		setting.ModelChannel.ModelCosts[i].Model = strings.TrimSpace(setting.ModelChannel.ModelCosts[i].Model)
 		if setting.ModelChannel.ModelCosts[i].Credits < 0 {
 			setting.ModelChannel.ModelCosts[i].Credits = 0
 		}
+		if setting.ModelChannel.ModelCosts[i].BillingType != "token" {
+			setting.ModelChannel.ModelCosts[i].BillingType = "fixed"
+		}
+		if setting.ModelChannel.ModelCosts[i].Model == "" || seenCosts[setting.ModelChannel.ModelCosts[i].Model] {
+			continue
+		}
+		seenCosts[setting.ModelChannel.ModelCosts[i].Model] = true
+		costs = append(costs, setting.ModelChannel.ModelCosts[i])
 	}
+	setting.ModelChannel.ModelCosts = costs
 	if setting.Auth.AllowRegister == nil {
 		enabled := true
 		setting.Auth.AllowRegister = &enabled
@@ -352,17 +374,25 @@ We may update these terms for feature and compliance reasons. Updated content wi
 }
 
 func ModelCost(modelName string) (int, error) {
-	settings, err := repository.GetSettings()
+	billing, err := ModelBilling(modelName)
 	if err != nil {
 		return 0, err
+	}
+	return billing.Credits, nil
+}
+
+func ModelBilling(modelName string) (model.ModelCost, error) {
+	settings, err := repository.GetSettings()
+	if err != nil {
+		return model.ModelCost{}, err
 	}
 	modelName = strings.TrimSpace(modelName)
 	for _, item := range normalizePublicSetting(settings.Public).ModelChannel.ModelCosts {
 		if item.Model == modelName {
-			return item.Credits, nil
+			return item, nil
 		}
 	}
-	return 0, nil
+	return model.ModelCost{Model: modelName, BillingType: "fixed"}, nil
 }
 
 func normalizePrivateSetting(setting model.PrivateSetting) model.PrivateSetting {
@@ -381,15 +411,7 @@ func normalizePrivateSetting(setting model.PrivateSetting) model.PrivateSetting 
 	setting.Stripe = normalizeStripeSetting(setting.Stripe)
 	setting.KYC = normalizeKYCSetting(setting.KYC)
 	for i := range setting.Channels {
-		if setting.Channels[i].Protocol == "" {
-			setting.Channels[i].Protocol = "openai"
-		}
-		if setting.Channels[i].Models == nil {
-			setting.Channels[i].Models = []string{}
-		}
-		if setting.Channels[i].Weight <= 0 {
-			setting.Channels[i].Weight = 1
-		}
+		setting.Channels[i] = normalizeModelChannelWithIndex(setting.Channels[i], i)
 	}
 	return setting
 }
@@ -694,27 +716,51 @@ func findSavedChannel(channel model.ModelChannel, saved []model.ModelChannel, in
 	return model.ModelChannel{}, false
 }
 
+type ModelChannelRoute struct {
+	Channel       model.ModelChannel
+	PublicModel   string
+	UpstreamModel string
+	Capability    string
+}
+
 func SelectModelChannel(modelName string) (model.ModelChannel, error) {
+	route, err := SelectModelChannelRoute(modelName)
+	return route.Channel, err
+}
+
+func SelectModelChannelRoute(modelName string) (ModelChannelRoute, error) {
+	routes, err := SelectModelChannelRoutes(modelName)
+	if err != nil {
+		return ModelChannelRoute{}, err
+	}
+	return routes[0], nil
+}
+
+func SelectModelChannelRoutes(modelName string) ([]ModelChannelRoute, error) {
 	settings, err := repository.GetSettings()
 	if err != nil {
-		return model.ModelChannel{}, err
+		return nil, err
 	}
-	channels := modelChannelsForModel(normalizePrivateSetting(settings.Private).Channels, modelName)
-	if len(channels) == 0 {
-		return model.ModelChannel{}, errors.New("没有可用模型渠道")
+	routes := modelChannelRoutesForModel(normalizePrivateSetting(settings.Private).Channels, modelName)
+	if len(routes) == 0 {
+		return nil, errors.New("没有可用模型渠道")
 	}
-	total := 0
-	for _, channel := range channels {
-		total += channel.Weight
-	}
-	hit := rand.Intn(total)
-	for _, channel := range channels {
-		hit -= channel.Weight
-		if hit < 0 {
-			return channel, nil
+	sort.SliceStable(routes, func(i int, j int) bool {
+		if routes[i].Channel.Weight == routes[j].Channel.Weight {
+			return routes[i].Channel.Name < routes[j].Channel.Name
 		}
+		return routes[i].Channel.Weight > routes[j].Channel.Weight
+	})
+	return routes, nil
+}
+
+func ModelChannelRouteAttempts(routes []ModelChannelRoute) []ModelChannelRoute {
+	if len(routes) == 0 {
+		return nil
 	}
-	return channels[0], nil
+	result := append([]ModelChannelRoute{}, routes...)
+	result = append(result, routes[len(routes)-1])
+	return result
 }
 
 func BuildModelChannelURL(channel model.ModelChannel, path string) string {
@@ -726,16 +772,89 @@ func BuildModelChannelURL(channel model.ModelChannel, path string) string {
 }
 
 func normalizeModelChannel(channel model.ModelChannel) model.ModelChannel {
+	return normalizeModelChannelWithIndex(channel, 0)
+}
+
+func normalizeModelChannelWithIndex(channel model.ModelChannel, index int) model.ModelChannel {
 	if channel.Protocol == "" {
 		channel.Protocol = "openai"
 	}
+	channel.Name = strings.TrimSpace(channel.Name)
+	channel.Color = normalizeChannelColor(channel.Color, index)
+	channel.BaseURL = strings.TrimSpace(channel.BaseURL)
 	if channel.Models == nil {
 		channel.Models = []string{}
+	}
+	if len(channel.ModelMappings) == 0 {
+		for _, item := range channel.Models {
+			item = strings.TrimSpace(item)
+			if item != "" {
+				channel.ModelMappings = append(channel.ModelMappings, model.ModelChannelModel{Name: item, UpstreamName: item})
+			}
+		}
+	}
+	channel.ModelMappings = normalizeModelMappings(channel.ModelMappings)
+	channel.Models = make([]string, 0, len(channel.ModelMappings))
+	for _, item := range channel.ModelMappings {
+		channel.Models = append(channel.Models, item.Name)
 	}
 	if channel.Weight <= 0 {
 		channel.Weight = 1
 	}
 	return channel
+}
+
+func normalizeModelMappings(items []model.ModelChannelModel) []model.ModelChannelModel {
+	result := make([]model.ModelChannelModel, 0, len(items))
+	seen := map[string]bool{}
+	for _, item := range items {
+		item.Name = strings.TrimSpace(item.Name)
+		item.UpstreamName = strings.TrimSpace(item.UpstreamName)
+		item.Capability = strings.TrimSpace(item.Capability)
+		if item.Name == "" {
+			continue
+		}
+		if item.UpstreamName == "" {
+			item.UpstreamName = item.Name
+		}
+		switch item.Capability {
+		case "text", "video", "model3d":
+		default:
+			item.Capability = "image"
+		}
+		if seen[item.Name] {
+			continue
+		}
+		seen[item.Name] = true
+		result = append(result, item)
+	}
+	return result
+}
+
+func normalizeChannelColor(value string, index int) string {
+	value = strings.TrimSpace(value)
+	if strings.HasPrefix(value, "#") && (len(value) == 4 || len(value) == 7) {
+		return value
+	}
+	palette := []string{"#2563eb", "#16a34a", "#f97316", "#9333ea", "#0891b2", "#dc2626", "#4f46e5", "#ca8a04"}
+	if index < 0 {
+		index = 0
+	}
+	return palette[index%len(palette)]
+}
+
+func uniqueNonEmptyStrings(items []string) []string {
+	result := make([]string, 0, len(items))
+	seen := map[string]bool{}
+	for _, item := range items {
+		item = strings.TrimSpace(item)
+		if item == "" || seen[item] {
+			continue
+		}
+		seen[item] = true
+		result = append(result, item)
+	}
+	return result
 }
 
 func resolveAdminChannel(index *int, channel model.ModelChannel) (model.ModelChannel, error) {
@@ -883,15 +1002,22 @@ func (err safeMessageError) SafeMessage() string {
 	return err.message
 }
 
-func modelChannelsForModel(channels []model.ModelChannel, modelName string) []model.ModelChannel {
-	result := []model.ModelChannel{}
-	for _, channel := range channels {
+func modelChannelRoutesForModel(channels []model.ModelChannel, modelName string) []ModelChannelRoute {
+	modelName = strings.TrimSpace(modelName)
+	result := []ModelChannelRoute{}
+	for i, channel := range channels {
+		channel = normalizeModelChannelWithIndex(channel, i)
 		if !channel.Enabled || channel.BaseURL == "" || channel.APIKey == "" {
 			continue
 		}
-		for _, item := range channel.Models {
-			if strings.TrimSpace(item) == modelName {
-				result = append(result, channel)
+		for _, item := range channel.ModelMappings {
+			if item.Name == modelName {
+				result = append(result, ModelChannelRoute{
+					Channel:       channel,
+					PublicModel:   item.Name,
+					UpstreamModel: item.UpstreamName,
+					Capability:    item.Capability,
+				})
 				break
 			}
 		}

@@ -113,6 +113,16 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		FailError(w, err)
 		return
 	}
+	_ = service.SaveAuditLog(model.AuditLog{
+		Action:        model.AuditLogActionUserRegister,
+		ActorID:       session.User.ID,
+		ActorUsername: session.User.Username,
+		TargetType:    "user",
+		TargetID:      session.User.ID,
+		Remark:        "用户注册",
+		IP:            service.RequestLogMetaFromRequest(r).IP,
+		Country:       service.RequestLogMetaFromRequest(r).Country,
+	})
 	service.SetAuthCookie(w, r, session.Token)
 	OK(w, session)
 }
@@ -381,6 +391,9 @@ func AdminSaveUser(w http.ResponseWriter, r *http.Request) {
 		FailError(w, err)
 		return
 	}
+	admin, _ := service.UserFromContext(r.Context())
+	meta := service.RequestLogMetaFromRequest(r)
+	_ = service.SaveAuditLog(model.AuditLog{Action: model.AuditLogActionAdminModify, ActorID: admin.ID, ActorUsername: admin.Username, TargetType: "user", TargetID: user.ID, Remark: "管理员保存用户", IP: meta.IP, Country: meta.Country})
 	OK(w, user)
 }
 
@@ -393,6 +406,8 @@ func AdminAdjustUserCredits(w http.ResponseWriter, r *http.Request, id string) {
 		FailError(w, err)
 		return
 	}
+	meta := service.RequestLogMetaFromRequest(r)
+	_ = service.SaveAuditLog(model.AuditLog{Action: model.AuditLogActionAdminModify, ActorID: admin.ID, ActorUsername: admin.Username, TargetType: "user", TargetID: user.ID, Remark: "管理员调整算力点", IP: meta.IP, Country: meta.Country})
 	OK(w, user)
 }
 
@@ -404,11 +419,23 @@ func AdminAdjustUserWorkflowCreateCredits(w http.ResponseWriter, r *http.Request
 		FailError(w, err)
 		return
 	}
+	admin, _ := service.UserFromContext(r.Context())
+	meta := service.RequestLogMetaFromRequest(r)
+	_ = service.SaveAuditLog(model.AuditLog{Action: model.AuditLogActionAdminModify, ActorID: admin.ID, ActorUsername: admin.Username, TargetType: "user", TargetID: user.ID, Remark: "管理员调整工作流创建次数", IP: meta.IP, Country: meta.Country})
 	OK(w, user)
 }
 
 func AdminCreditLogs(w http.ResponseWriter, r *http.Request) {
 	logs, err := service.ListCreditLogs(parseQuery(r))
+	if err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, logs)
+}
+
+func AdminAuditLogs(w http.ResponseWriter, r *http.Request) {
+	logs, err := service.ListAuditLogs(parseQuery(r))
 	if err != nil {
 		FailError(w, err)
 		return
@@ -463,5 +490,8 @@ func AdminDeleteUser(w http.ResponseWriter, r *http.Request, id string) {
 		FailError(w, err)
 		return
 	}
+	admin, _ := service.UserFromContext(r.Context())
+	meta := service.RequestLogMetaFromRequest(r)
+	_ = service.SaveAuditLog(model.AuditLog{Action: model.AuditLogActionAdminModify, ActorID: admin.ID, ActorUsername: admin.Username, TargetType: "user", TargetID: id, Remark: "管理员删除用户", IP: meta.IP, Country: meta.Country})
 	OK(w, true)
 }

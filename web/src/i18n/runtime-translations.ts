@@ -8,6 +8,8 @@ export const runtimeEnglishTranslations: Record<string, string> = {
     "前往工作流": "Open workflow",
     "用户管理": "Users",
     "算力点日志": "Credit logs",
+    "请求日志": "Request logs",
+    "日志审计": "Audit logs",
     "套餐管理": "Plans",
     "提示词管理": "Prompts",
     "素材库": "Asset Library",

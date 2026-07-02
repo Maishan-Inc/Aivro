@@ -35,7 +35,7 @@ func SendCanvasAssistantMessage(w http.ResponseWriter, r *http.Request, workflow
 		Fail(w, "请求参数无效或过大")
 		return
 	}
-	result, err := service.SendCanvasAssistantMessage(r.Context(), user.ID, workflowID, input)
+	result, err := service.SendCanvasAssistantMessage(r.Context(), user.ID, workflowID, input, service.RequestLogMetaFromRequest(r))
 	if err != nil {
 		FailError(w, err)
 		return
@@ -55,7 +55,7 @@ func PlanCanvasAgent(w http.ResponseWriter, r *http.Request, workflowID string) 
 		Fail(w, "请求参数无效或过大")
 		return
 	}
-	result, err := service.PlanCanvasAgent(r.Context(), user.ID, workflowID, input)
+	result, err := service.PlanCanvasAgent(r.Context(), user.ID, workflowID, input, service.RequestLogMetaFromRequest(r))
 	if err != nil {
 		FailError(w, err)
 		return

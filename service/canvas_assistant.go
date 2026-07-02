@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"math"
 	"net/http"
@@ -217,7 +218,7 @@ func ListCanvasAssistantSessions(userID string, workflowID string) (CanvasAssist
 	return CanvasAssistantSessionListView{Items: views, Total: int(total)}, nil
 }
 
-func SendCanvasAssistantMessage(ctx context.Context, userID string, workflowID string, input CanvasAssistantSendInput) (CanvasAssistantSendResult, error) {
+func SendCanvasAssistantMessage(ctx context.Context, userID string, workflowID string, input CanvasAssistantSendInput, meta RequestLogMeta) (CanvasAssistantSendResult, error) {
 	if _, err := GetWorkflow(userID, workflowID); err != nil {
 		return CanvasAssistantSendResult{}, err
 	}
@@ -237,7 +238,7 @@ func SendCanvasAssistantMessage(ctx context.Context, userID string, workflowID s
 		References: normalizeCanvasAssistantReferences(input.References),
 	}
 	messages := append(normalizeCanvasAssistantMessages(input.Messages), userMessage)
-	answer, _, err := requestCanvasAssistantAnswer(ctx, userID, messages)
+	answer, _, err := requestCanvasAssistantAnswer(ctx, userID, messages, meta)
 	if err != nil {
 		return CanvasAssistantSendResult{}, err
 	}
@@ -250,7 +251,7 @@ func SendCanvasAssistantMessage(ctx context.Context, userID string, workflowID s
 	return CanvasAssistantSendResult{Session: canvasAssistantSessionView(saved), Message: assistantMessage}, nil
 }
 
-func PlanCanvasAgent(ctx context.Context, userID string, workflowID string, input CanvasAgentPlanInput) (CanvasAgentPlanResult, error) {
+func PlanCanvasAgent(ctx context.Context, userID string, workflowID string, input CanvasAgentPlanInput, meta RequestLogMeta) (CanvasAgentPlanResult, error) {
 	if _, err := GetWorkflow(userID, workflowID); err != nil {
 		return CanvasAgentPlanResult{}, err
 	}
@@ -283,7 +284,7 @@ func PlanCanvasAgent(ctx context.Context, userID string, workflowID string, inpu
 		References: normalizeCanvasAssistantReferences(input.References),
 	}
 	messages := append(normalizeCanvasAssistantMessages(input.Messages), userMessage)
-	plan, _, usage, err := requestCanvasAgentPlan(ctx, userID, input, messages)
+	plan, _, usage, err := requestCanvasAgentPlan(ctx, userID, input, messages, meta)
 	if err != nil {
 		return CanvasAgentPlanResult{}, err
 	}
@@ -374,7 +375,7 @@ func saveCanvasAssistantSession(userID string, workflowID string, session model.
 	return session, db.Save(&session).Error
 }
 
-func requestCanvasAssistantAnswer(ctx context.Context, userID string, messages []CanvasAssistantMessage) (string, string, error) {
+func requestCanvasAssistantAnswer(ctx context.Context, userID string, messages []CanvasAssistantMessage, meta RequestLogMeta) (string, string, error) {
 	settings, err := repository.GetSettings()
 	if err != nil {
 		return "", "", err
@@ -388,44 +389,51 @@ func requestCanvasAssistantAnswer(ctx context.Context, userID string, messages [
 	if err != nil {
 		return "", "", err
 	}
-	channel, err := SelectModelChannel(modelName)
+	routes, err := SelectModelChannelRoutes(modelName)
 	if err != nil {
 		return "", "", safeMessageError{message: "管理员尚未配置可用文本模型渠道"}
 	}
-	body, _ := json.Marshal(map[string]any{
-		"model":    modelName,
-		"messages": canvasAssistantOpenAIMessages(messages),
-		"stream":   false,
-	})
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, BuildModelChannelURL(channel, "/chat/completions"), bytes.NewReader(body))
-	if err != nil {
+	if err := ConsumeUserCreditsWithMeta(userID, modelName, credits, "/canvas-assistant/chat", meta); err != nil {
 		return "", "", err
 	}
-	request.Header.Set("Authorization", "Bearer "+channel.APIKey)
-	request.Header.Set("Content-Type", "application/json")
-	if err := ConsumeUserCredits(userID, modelName, credits, "/canvas-assistant/chat"); err != nil {
-		return "", "", err
+	var lastStatus int
+	for _, route := range ModelChannelRouteAttempts(routes) {
+		body, _ := json.Marshal(map[string]any{
+			"model":    route.UpstreamModel,
+			"messages": canvasAssistantOpenAIMessages(messages),
+			"stream":   false,
+		})
+		request, err := http.NewRequestWithContext(ctx, http.MethodPost, BuildModelChannelURL(route.Channel, "/chat/completions"), bytes.NewReader(body))
+		if err != nil {
+			_ = RefundUserCreditsWithMeta(userID, modelName, credits, "/canvas-assistant/chat", meta)
+			return "", "", err
+		}
+		request.Header.Set("Authorization", "Bearer "+route.Channel.APIKey)
+		request.Header.Set("Content-Type", "application/json")
+		response, err := http.DefaultClient.Do(request)
+		if err != nil {
+			continue
+		}
+		responseBody, _ := io.ReadAll(io.LimitReader(response.Body, 4<<20))
+		_ = response.Body.Close()
+		if response.StatusCode >= http.StatusBadRequest {
+			lastStatus = response.StatusCode
+			continue
+		}
+		answer := parseCanvasAssistantAnswer(responseBody)
+		if strings.TrimSpace(answer) == "" {
+			continue
+		}
+		return answer, modelName, nil
 	}
-	response, err := http.DefaultClient.Do(request)
-	if err != nil {
-		_ = RefundUserCredits(userID, modelName, credits, "/canvas-assistant/chat")
-		return "", "", safeMessageError{message: "AI 接口请求失败"}
+	_ = RefundUserCreditsWithMeta(userID, modelName, credits, "/canvas-assistant/chat", meta)
+	if lastStatus > 0 {
+		return "", "", safeMessageError{message: fmt.Sprintf("AI 接口请求失败：%d", lastStatus)}
 	}
-	defer response.Body.Close()
-	responseBody, _ := io.ReadAll(io.LimitReader(response.Body, 4<<20))
-	if response.StatusCode >= http.StatusBadRequest {
-		_ = RefundUserCredits(userID, modelName, credits, "/canvas-assistant/chat")
-		return "", "", readAdminChannelError(responseBody, response.StatusCode, "AI 接口请求失败")
-	}
-	answer := parseCanvasAssistantAnswer(responseBody)
-	if strings.TrimSpace(answer) == "" {
-		_ = RefundUserCredits(userID, modelName, credits, "/canvas-assistant/chat")
-		return "", "", safeMessageError{message: "AI 响应为空"}
-	}
-	return answer, modelName, nil
+	return "", "", safeMessageError{message: "AI 接口请求失败"}
 }
 
-func requestCanvasAgentPlan(ctx context.Context, userID string, input CanvasAgentPlanInput, messages []CanvasAssistantMessage) (canvasAgentPlanPayload, string, CanvasAgentUsage, error) {
+func requestCanvasAgentPlan(ctx context.Context, userID string, input CanvasAgentPlanInput, messages []CanvasAssistantMessage, meta RequestLogMeta) (canvasAgentPlanPayload, string, CanvasAgentUsage, error) {
 	settings, err := repository.GetSettings()
 	if err != nil {
 		return canvasAgentPlanPayload{}, "", CanvasAgentUsage{}, err
@@ -435,11 +443,11 @@ func requestCanvasAgentPlan(ctx context.Context, userID string, input CanvasAgen
 	if modelName == "" {
 		return canvasAgentPlanPayload{}, "", CanvasAgentUsage{}, safeMessageError{message: "管理员尚未配置默认文本模型"}
 	}
-	channel, err := SelectModelChannel(modelName)
+	routes, err := SelectModelChannelRoutes(modelName)
 	if err != nil {
 		return canvasAgentPlanPayload{}, "", CanvasAgentUsage{}, safeMessageError{message: "管理员尚未配置可用文本模型渠道"}
 	}
-	unitCost, err := ModelCost(modelName)
+	billing, err := ModelBilling(modelName)
 	if err != nil {
 		return canvasAgentPlanPayload{}, "", CanvasAgentUsage{}, err
 	}
@@ -454,42 +462,66 @@ func requestCanvasAgentPlan(ctx context.Context, userID string, input CanvasAgen
 	if len(body) > canvasAgentModelRequestMaxBytes {
 		return canvasAgentPlanPayload{}, "", CanvasAgentUsage{}, safeMessageError{message: "画布上下文过大，请减少选中内容后重试"}
 	}
-	reservedCredits := canvasAgentReserveCredits(body, canvasAgentMaxOutputTokens, unitCost)
+	reservedCredits := canvasAgentReserveCredits(body, canvasAgentMaxOutputTokens, billing)
 	if reservedCredits > 0 {
-		if err := ConsumeUserCredits(userID, modelName, reservedCredits, "/canvas-agent/plan-reserve"); err != nil {
+		if err := ConsumeUserCreditsWithMeta(userID, modelName, reservedCredits, "/canvas-agent/plan-reserve", meta); err != nil {
 			return canvasAgentPlanPayload{}, "", CanvasAgentUsage{}, err
 		}
-	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, BuildModelChannelURL(channel, "/chat/completions"), bytes.NewReader(body))
-	if err != nil {
-		_ = RefundUserCredits(userID, modelName, reservedCredits, "/canvas-agent/plan-reserve")
+	} else if err := ConsumeUserCreditsWithMeta(userID, modelName, 0, "/canvas-agent/plan", meta); err != nil {
 		return canvasAgentPlanPayload{}, "", CanvasAgentUsage{}, err
 	}
-	request.Header.Set("Authorization", "Bearer "+channel.APIKey)
-	request.Header.Set("Content-Type", "application/json")
-	response, err := http.DefaultClient.Do(request)
-	if err != nil {
-		_ = RefundUserCredits(userID, modelName, reservedCredits, "/canvas-agent/plan-reserve")
-		return canvasAgentPlanPayload{}, "", CanvasAgentUsage{}, safeMessageError{message: "AI 接口请求失败"}
+	var responseBody []byte
+	var rawUsage canvasAgentResponseUsage
+	var lastStatus int
+	success := false
+	for _, route := range ModelChannelRouteAttempts(routes) {
+		routeBody, _ := json.Marshal(map[string]any{
+			"model":           route.UpstreamModel,
+			"messages":        messagesPayload,
+			"stream":          false,
+			"response_format": map[string]string{"type": "json_object"},
+			"max_tokens":      canvasAgentMaxOutputTokens,
+		})
+		request, err := http.NewRequestWithContext(ctx, http.MethodPost, BuildModelChannelURL(route.Channel, "/chat/completions"), bytes.NewReader(routeBody))
+		if err != nil {
+			_ = RefundUserCreditsWithMeta(userID, modelName, reservedCredits, "/canvas-agent/plan-reserve", meta)
+			return canvasAgentPlanPayload{}, "", CanvasAgentUsage{}, err
+		}
+		request.Header.Set("Authorization", "Bearer "+route.Channel.APIKey)
+		request.Header.Set("Content-Type", "application/json")
+		response, err := http.DefaultClient.Do(request)
+		if err != nil {
+			continue
+		}
+		responseBody, _ = io.ReadAll(io.LimitReader(response.Body, 8<<20))
+		_ = response.Body.Close()
+		if response.StatusCode >= http.StatusBadRequest {
+			lastStatus = response.StatusCode
+			continue
+		}
+		_, rawUsage = parseCanvasAgentResponse(responseBody)
+		success = true
+		break
 	}
-	defer response.Body.Close()
-	responseBody, _ := io.ReadAll(io.LimitReader(response.Body, 8<<20))
-	if response.StatusCode >= http.StatusBadRequest {
-		_ = RefundUserCredits(userID, modelName, reservedCredits, "/canvas-agent/plan-reserve")
-		return canvasAgentPlanPayload{}, "", CanvasAgentUsage{}, readAdminChannelError(responseBody, response.StatusCode, "AI 接口请求失败")
+	if !success {
+		_ = RefundUserCreditsWithMeta(userID, modelName, reservedCredits, "/canvas-agent/plan-reserve", meta)
+		if lastStatus > 0 {
+			return canvasAgentPlanPayload{}, "", CanvasAgentUsage{}, safeMessageError{message: fmt.Sprintf("AI 接口请求失败：%d", lastStatus)}
+		}
+		return canvasAgentPlanPayload{}, "", CanvasAgentUsage{}, safeMessageError{message: "AI 接口请求失败"}
 	}
 	content, rawUsage := parseCanvasAgentResponse(responseBody)
 	plan, err := parseCanvasAgentPlanContent(content)
 	if err != nil {
-		_, _ = canvasAgentBillUsage(userID, modelName, unitCost, reservedCredits, rawUsage, body, responseBody)
+		_, _ = canvasAgentBillUsage(userID, modelName, billing, reservedCredits, rawUsage, body, responseBody, meta)
 		return canvasAgentPlanPayload{}, "", CanvasAgentUsage{}, err
 	}
 	plan.Ops, err = sanitizeCanvasAgentOps(plan.Ops, input.Snapshot)
 	if err != nil {
-		_, _ = canvasAgentBillUsage(userID, modelName, unitCost, reservedCredits, rawUsage, body, responseBody)
+		_, _ = canvasAgentBillUsage(userID, modelName, billing, reservedCredits, rawUsage, body, responseBody, meta)
 		return canvasAgentPlanPayload{}, "", CanvasAgentUsage{}, err
 	}
-	usage, err := canvasAgentBillUsage(userID, modelName, unitCost, reservedCredits, rawUsage, body, responseBody)
+	usage, err := canvasAgentBillUsage(userID, modelName, billing, reservedCredits, rawUsage, body, responseBody, meta)
 	if err != nil {
 		return canvasAgentPlanPayload{}, "", CanvasAgentUsage{}, err
 	}
@@ -878,12 +910,15 @@ func compactCanvasAgentOpMetadata(nodeType string, metadata map[string]any) map[
 	return result
 }
 
-func canvasAgentReserveCredits(requestBody []byte, maxOutputTokens int, unitCost int) int {
-	if unitCost <= 0 {
+func canvasAgentReserveCredits(requestBody []byte, maxOutputTokens int, billing model.ModelCost) int {
+	if billing.Credits <= 0 {
 		return 0
 	}
+	if billing.BillingType != "token" {
+		return billing.Credits
+	}
 	inputTokens := canvasAgentEstimatedTokens(requestBody) + 512
-	return canvasAgentCreditsForTokens(inputTokens+maxOutputTokens, unitCost)
+	return canvasAgentCreditsForTokens(inputTokens+maxOutputTokens, billing.Credits)
 }
 
 func canvasAgentEstimatedTokens(body []byte) int {
@@ -901,7 +936,7 @@ func canvasAgentCreditsForTokens(tokens int, unitCost int) int {
 	return credits
 }
 
-func canvasAgentBillUsage(userID string, modelName string, unitCost int, reservedCredits int, usage canvasAgentResponseUsage, requestBody []byte, responseBody []byte) (CanvasAgentUsage, error) {
+func canvasAgentBillUsage(userID string, modelName string, billing model.ModelCost, reservedCredits int, usage canvasAgentResponseUsage, requestBody []byte, responseBody []byte, meta RequestLogMeta) (CanvasAgentUsage, error) {
 	result := CanvasAgentUsage{
 		InputTokens:  firstPositive(usage.InputTokens, usage.PromptTokens),
 		OutputTokens: firstPositive(usage.OutputTokens, usage.CompletionTokens),
@@ -914,16 +949,20 @@ func canvasAgentBillUsage(userID string, modelName string, unitCost int, reserve
 		result.TotalTokens = canvasAgentEstimatedTokens(requestBody) + canvasAgentEstimatedTokens(responseBody)
 		result.Estimated = true
 	}
-	result.Credits = canvasAgentCreditsForTokens(result.TotalTokens, unitCost)
+	if billing.BillingType != "token" {
+		result.Credits = reservedCredits
+		return result, nil
+	}
+	result.Credits = canvasAgentCreditsForTokens(result.TotalTokens, billing.Credits)
 	delta := result.Credits - reservedCredits
 	if delta > 0 {
-		if err := ConsumeUserCredits(userID, modelName, delta, "/canvas-agent/plan"); err != nil {
+		if err := ConsumeUserCreditsWithMeta(userID, modelName, delta, "/canvas-agent/plan", meta); err != nil {
 			result.Credits = reservedCredits
 			result.Estimated = true
 			return result, nil
 		}
 	} else if delta < 0 {
-		if err := RefundUserCredits(userID, modelName, -delta, "/canvas-agent/plan"); err != nil {
+		if err := RefundUserCreditsWithMeta(userID, modelName, -delta, "/canvas-agent/plan", meta); err != nil {
 			return CanvasAgentUsage{}, err
 		}
 	}

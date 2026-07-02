@@ -190,7 +190,7 @@ func ListCreditLogs(q model.Query) ([]model.CreditLog, int64, error) {
 	tx := db.Model(&model.CreditLog{})
 	if keyword := strings.TrimSpace(q.Keyword); keyword != "" {
 		like := "%" + keyword + "%"
-		tx = tx.Where("user_id LIKE ? OR type LIKE ? OR remark LIKE ? OR related_id LIKE ?", like, like, like, like)
+		tx = tx.Where("user_id LIKE ? OR type LIKE ? OR model LIKE ? OR path LIKE ? OR remark LIKE ? OR related_id LIKE ? OR ip LIKE ? OR country LIKE ?", like, like, like, like, like, like, like, like)
 	}
 	var total int64
 	if err := tx.Count(&total).Error; err != nil {
@@ -207,6 +207,34 @@ func DeleteCreditLog(id string) error {
 		return err
 	}
 	return db.Delete(&model.CreditLog{}, "id = ?", id).Error
+}
+
+func SaveAuditLog(log model.AuditLog) (model.AuditLog, error) {
+	db, err := DB()
+	if err != nil {
+		return log, err
+	}
+	return log, db.Save(&log).Error
+}
+
+func ListAuditLogs(q model.Query) ([]model.AuditLog, int64, error) {
+	db, err := DB()
+	if err != nil {
+		return nil, 0, err
+	}
+	q.Normalize()
+	tx := db.Model(&model.AuditLog{})
+	if keyword := strings.TrimSpace(q.Keyword); keyword != "" {
+		like := "%" + keyword + "%"
+		tx = tx.Where("action LIKE ? OR actor_id LIKE ? OR actor_username LIKE ? OR target_type LIKE ? OR target_id LIKE ? OR remark LIKE ? OR ip LIKE ? OR country LIKE ?", like, like, like, like, like, like, like, like)
+	}
+	var total int64
+	if err := tx.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	var logs []model.AuditLog
+	err = tx.Order("created_at desc").Offset(q.Offset()).Limit(q.PageSize).Find(&logs).Error
+	return logs, total, err
 }
 
 // DeleteUser 删除指定用户。
