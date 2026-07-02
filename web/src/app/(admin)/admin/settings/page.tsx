@@ -2247,7 +2247,7 @@ function normalizeAdSenseSetting(setting: Partial<AdminSettings["public"]["adSen
     };
 }
 
-function normalizeModelCosts(items: Partial<AdminSettings["public"]["modelChannel"]["modelCosts"][number]>[]) {
+function normalizeModelCosts(items: Partial<AdminSettings["public"]["modelChannel"]["modelCosts"][number]>[]): AdminModelCost[] {
     const seen = new Set<string>();
     return items
         .filter((item) => item.model)
