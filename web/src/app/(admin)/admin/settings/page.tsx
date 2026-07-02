@@ -2410,7 +2410,7 @@ function normalizeChannel(item: Partial<AdminModelChannel> = {}): AdminModelChan
 function normalizeChannelMappings(items: Partial<AdminModelChannelModel>[] = []): AdminModelChannelModel[] {
     const seen = new Set<string>();
     return items
-        .map((item) => ({
+        .map((item): AdminModelChannelModel => ({
             name: (item.name || "").trim(),
             upstreamName: (item.upstreamName || item.name || "").trim(),
             capability: item.capability === "text" || item.capability === "video" || item.capability === "model3d" ? item.capability : "image",
