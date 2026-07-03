@@ -931,11 +931,10 @@ func filterModels(models []string, options []string) []string {
 }
 
 func normalizeScopedModels(models []string, availableModels []string, capabilityModels []string) []string {
-	result := filterModels(models, availableModels)
-	if len(result) > 0 {
-		return result
+	if models != nil {
+		return filterModels(models, availableModels)
 	}
-	result = filterModels(capabilityModels, availableModels)
+	result := filterModels(capabilityModels, availableModels)
 	if len(result) > 0 {
 		return result
 	}

@@ -2614,8 +2614,7 @@ function filterModels(models: string[], options: string[]) {
 }
 
 function scopedModelOptions(models: string[], publicModels: string[]) {
-    const scoped = filterModels(models, publicModels);
-    return scoped.length ? scoped : publicModels;
+    return filterModels(models, publicModels);
 }
 
 function normalizeModelChannelScopes(modelChannel: AdminSettings["public"]["modelChannel"]) {
