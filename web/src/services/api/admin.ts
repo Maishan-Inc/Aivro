@@ -44,9 +44,17 @@ export type AdminUserListResponse = {
     total: number;
 };
 
+export type AdminLogUser = {
+    id: string;
+    username: string;
+    displayName: string;
+    avatarUrl: string;
+};
+
 export type AdminCreditLog = {
     id: string;
     userId: string;
+    category: string;
     type: string;
     model: string;
     path: string;
@@ -57,6 +65,7 @@ export type AdminCreditLog = {
     ip: string;
     country: string;
     extra: string;
+    user?: AdminLogUser;
     createdAt: string;
 };
 
@@ -67,6 +76,7 @@ export type AdminCreditLogListResponse = {
 
 export type AdminAuditLog = {
     id: string;
+    category: string;
     action: string;
     actorId: string;
     actorUsername: string;
@@ -76,6 +86,8 @@ export type AdminAuditLog = {
     ip: string;
     country: string;
     extra: string;
+    actor?: AdminLogUser;
+    target?: AdminLogUser;
     createdAt: string;
 };
 
@@ -86,6 +98,16 @@ export type AdminAuditLogListResponse = {
 
 export type AdminUserQuery = {
     keyword?: string;
+    page?: number;
+    pageSize?: number;
+};
+
+export type AdminLogQuery = {
+    keyword?: string;
+    category?: string;
+    type?: string;
+    startTime?: string;
+    endTime?: string;
     page?: number;
     pageSize?: number;
 };
@@ -114,7 +136,11 @@ export async function deleteAdminUser(token: string, id: string) {
     return apiDelete<boolean>(`/api/admin/users/${encodeURIComponent(id)}`, token);
 }
 
-export async function fetchAdminCreditLogs(token: string, query: AdminUserQuery = {}) {
+export async function fetchAdminCreditLogs(token: string, query: AdminLogQuery = {}) {
+    return apiGet<AdminCreditLogListResponse>("/api/admin/credit-logs", compactApiParams(query), token);
+}
+
+export async function fetchAdminRequestLogs(token: string, query: AdminLogQuery = {}) {
     return apiGet<AdminCreditLogListResponse>("/api/admin/request-logs", compactApiParams(query), token);
 }
 
@@ -126,7 +152,7 @@ export async function deleteAdminCreditLog(token: string, id: string) {
     return apiDelete<boolean>(`/api/admin/credit-logs/${encodeURIComponent(id)}`, token);
 }
 
-export async function fetchAdminAuditLogs(token: string, query: AdminUserQuery = {}) {
+export async function fetchAdminAuditLogs(token: string, query: AdminLogQuery = {}) {
     return apiGet<AdminAuditLogListResponse>("/api/admin/audit-logs", compactApiParams(query), token);
 }
 

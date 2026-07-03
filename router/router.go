@@ -9,6 +9,7 @@ import (
 
 	"github.com/basketikun/aivro/handler"
 	"github.com/basketikun/aivro/middleware"
+	"github.com/basketikun/aivro/service"
 	"github.com/gin-gonic/gin"
 )
 
@@ -217,11 +218,18 @@ func New() *gin.Engine {
 }
 
 func accessLogFormatter(param gin.LogFormatterParams) string {
+	ip := ""
+	if param.Request != nil {
+		ip = service.RequestLogMetaFromRequest(param.Request).IP
+	}
+	if ip == "" {
+		ip = param.ClientIP
+	}
 	return fmt.Sprintf("[GIN] %v | %3d | %13v | %15s | %-7s %#v\n",
 		param.TimeStamp.Format(time.RFC3339),
 		param.StatusCode,
 		param.Latency,
-		param.ClientIP,
+		ip,
 		param.Method,
 		redactedRequestPath(param.Path),
 	)

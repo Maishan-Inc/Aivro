@@ -116,6 +116,7 @@ const (
 type CreditLog struct {
 	ID        string        `json:"id" gorm:"primaryKey"`
 	UserID    string        `json:"userId" gorm:"index"`
+	Category  string        `json:"category" gorm:"index"`
 	Type      CreditLogType `json:"type"`
 	Model     string        `json:"model" gorm:"index"`
 	Path      string        `json:"path"`
@@ -126,6 +127,7 @@ type CreditLog struct {
 	IP        string        `json:"ip"`
 	Country   string        `json:"country"`
 	Extra     string        `json:"extra" gorm:"type:text"`
+	User      *LogUser      `json:"user,omitempty" gorm:"-"`
 	CreatedAt string        `json:"createdAt"`
 }
 
@@ -138,12 +140,16 @@ type AuditLogAction string
 
 const (
 	AuditLogActionUserRegister AuditLogAction = "user_register"
-	AuditLogActionAdminModify  AuditLogAction = "admin_modify"
+	AuditLogActionUserUpdate   AuditLogAction = "user_update"
+	AuditLogActionUserDelete   AuditLogAction = "user_delete"
+	AuditLogActionUserCredit   AuditLogAction = "user_credit_adjust"
+	AuditLogActionUserWorkflow AuditLogAction = "user_workflow_credit_adjust"
 	AuditLogActionConfigUpdate AuditLogAction = "config_update"
 )
 
 type AuditLog struct {
 	ID            string         `json:"id" gorm:"primaryKey"`
+	Category      string         `json:"category" gorm:"index"`
 	Action        AuditLogAction `json:"action" gorm:"index"`
 	ActorID       string         `json:"actorId" gorm:"index"`
 	ActorUsername string         `json:"actorUsername"`
@@ -153,7 +159,16 @@ type AuditLog struct {
 	IP            string         `json:"ip"`
 	Country       string         `json:"country"`
 	Extra         string         `json:"extra" gorm:"type:text"`
+	Actor         *LogUser       `json:"actor,omitempty" gorm:"-"`
+	Target        *LogUser       `json:"target,omitempty" gorm:"-"`
 	CreatedAt     string         `json:"createdAt" gorm:"index"`
+}
+
+type LogUser struct {
+	ID          string `json:"id"`
+	Username    string `json:"username"`
+	DisplayName string `json:"displayName"`
+	AvatarURL   string `json:"avatarUrl"`
 }
 
 type AuditLogList struct {

@@ -9,6 +9,8 @@ type Query struct {
 	Category string
 	Type     string
 	Locale   string
+	StartTime string
+	EndTime   string
 	Page     int
 	PageSize int
 }

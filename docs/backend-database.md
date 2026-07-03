@@ -712,6 +712,7 @@ KYC 认证记录表。当前服务商为 Didit。
 |--------------|--------|--------------------------|
 | `id`         | string | 主键                       |
 | `user_id`    | string | 关联用户 ID                  |
+| `category`   | string | 分类：`后台调整`、`模型请求`、`失败返还` 等       |
 | `type`       | string | 类型：`admin_adjust`、`ai_consume`、`ai_refund` |
 | `model`      | string | 请求模型名，使用前台模型名 |
 | `path`       | string | 后端模型接口路径 |
@@ -724,6 +725,8 @@ KYC 认证记录表。当前服务商为 Didit。
 | `extra`      | json   | 扩展信息                     |
 | `created_at` | string | 创建时间                     |
 
+后台请求日志接口会根据 `user_id` 关联用户表返回头像和公开名称，便于后台直接显示，不再展示用户 ID。
+
 `type` 当前取值：
 
 | 值 | 说明 |
@@ -734,12 +737,13 @@ KYC 认证记录表。当前服务商为 Didit。
 
 ### audit_logs
 
-后台审计日志表。当前记录用户注册、管理员修改用户、管理员调整额度、删除用户和保存系统配置。
+后台审计日志表。当前记录用户注册、管理员修改用户资料、管理员调整算力点、管理员调整工作流创建次数、删除用户和保存系统配置。
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
 | `id` | string | 主键 |
-| `action` | string | 动作：`user_register`、`admin_modify`、`config_update` |
+| `category` | string | 分类：`用户注册`、`用户资料`、`用户额度`、`用户管理`、`系统配置` |
+| `action` | string | 动作：`user_register`、`user_update`、`user_delete`、`user_credit_adjust`、`user_workflow_credit_adjust`、`config_update` |
 | `actor_id` | string | 操作者用户 ID，系统动作可为空 |
 | `actor_username` | string | 操作者用户名 |
 | `target_type` | string | 目标类型，例如 `user`、`settings` |
@@ -749,3 +753,5 @@ KYC 认证记录表。当前服务商为 Didit。
 | `country` | string | 请求国家或地区 |
 | `extra` | json | 扩展信息 |
 | `created_at` | string | 创建时间 |
+
+审计日志接口会把操作者和目标用户补全为头像 + 公开名称，便于直接判断是谁改了什么、改到了谁。

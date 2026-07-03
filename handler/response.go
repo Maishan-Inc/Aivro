@@ -79,6 +79,8 @@ func parseQuery(r *http.Request) model.Query {
 		Category: q.Get("category"),
 		Type:     q.Get("type"),
 		Locale:   q.Get("locale"),
+		StartTime: q.Get("startTime"),
+		EndTime:   q.Get("endTime"),
 		Page:     page,
 		PageSize: pageSize,
 	}

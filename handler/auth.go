@@ -113,15 +113,17 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		FailError(w, err)
 		return
 	}
+	meta := service.RequestLogMetaFromRequest(r)
 	_ = service.SaveAuditLog(model.AuditLog{
 		Action:        model.AuditLogActionUserRegister,
+		Category:      "用户注册",
 		ActorID:       session.User.ID,
 		ActorUsername: session.User.Username,
 		TargetType:    "user",
 		TargetID:      session.User.ID,
 		Remark:        "用户注册",
-		IP:            service.RequestLogMetaFromRequest(r).IP,
-		Country:       service.RequestLogMetaFromRequest(r).Country,
+		IP:            meta.IP,
+		Country:       meta.Country,
 	})
 	service.SetAuthCookie(w, r, session.Token)
 	OK(w, session)
@@ -393,7 +395,7 @@ func AdminSaveUser(w http.ResponseWriter, r *http.Request) {
 	}
 	admin, _ := service.UserFromContext(r.Context())
 	meta := service.RequestLogMetaFromRequest(r)
-	_ = service.SaveAuditLog(model.AuditLog{Action: model.AuditLogActionAdminModify, ActorID: admin.ID, ActorUsername: admin.Username, TargetType: "user", TargetID: user.ID, Remark: "管理员保存用户", IP: meta.IP, Country: meta.Country})
+	_ = service.SaveAuditLog(model.AuditLog{Action: model.AuditLogActionUserUpdate, Category: "用户资料", ActorID: admin.ID, ActorUsername: admin.Username, TargetType: "user", TargetID: user.ID, Remark: "管理员修改用户资料", IP: meta.IP, Country: meta.Country})
 	OK(w, user)
 }
 
@@ -407,7 +409,7 @@ func AdminAdjustUserCredits(w http.ResponseWriter, r *http.Request, id string) {
 		return
 	}
 	meta := service.RequestLogMetaFromRequest(r)
-	_ = service.SaveAuditLog(model.AuditLog{Action: model.AuditLogActionAdminModify, ActorID: admin.ID, ActorUsername: admin.Username, TargetType: "user", TargetID: user.ID, Remark: "管理员调整算力点", IP: meta.IP, Country: meta.Country})
+	_ = service.SaveAuditLog(model.AuditLog{Action: model.AuditLogActionUserCredit, Category: "用户额度", ActorID: admin.ID, ActorUsername: admin.Username, TargetType: "user", TargetID: user.ID, Remark: "管理员调整算力点", IP: meta.IP, Country: meta.Country})
 	OK(w, user)
 }
 
@@ -421,7 +423,7 @@ func AdminAdjustUserWorkflowCreateCredits(w http.ResponseWriter, r *http.Request
 	}
 	admin, _ := service.UserFromContext(r.Context())
 	meta := service.RequestLogMetaFromRequest(r)
-	_ = service.SaveAuditLog(model.AuditLog{Action: model.AuditLogActionAdminModify, ActorID: admin.ID, ActorUsername: admin.Username, TargetType: "user", TargetID: user.ID, Remark: "管理员调整工作流创建次数", IP: meta.IP, Country: meta.Country})
+	_ = service.SaveAuditLog(model.AuditLog{Action: model.AuditLogActionUserWorkflow, Category: "用户额度", ActorID: admin.ID, ActorUsername: admin.Username, TargetType: "user", TargetID: user.ID, Remark: "管理员调整工作流创建次数", IP: meta.IP, Country: meta.Country})
 	OK(w, user)
 }
 
@@ -492,6 +494,6 @@ func AdminDeleteUser(w http.ResponseWriter, r *http.Request, id string) {
 	}
 	admin, _ := service.UserFromContext(r.Context())
 	meta := service.RequestLogMetaFromRequest(r)
-	_ = service.SaveAuditLog(model.AuditLog{Action: model.AuditLogActionAdminModify, ActorID: admin.ID, ActorUsername: admin.Username, TargetType: "user", TargetID: id, Remark: "管理员删除用户", IP: meta.IP, Country: meta.Country})
+	_ = service.SaveAuditLog(model.AuditLog{Action: model.AuditLogActionUserDelete, Category: "用户管理", ActorID: admin.ID, ActorUsername: admin.Username, TargetType: "user", TargetID: id, Remark: "管理员删除用户", IP: meta.IP, Country: meta.Country})
 	OK(w, true)
 }

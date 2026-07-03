@@ -269,8 +269,8 @@ export function WorkflowLibraryView({ initialTab = "workflows", lockTab = false,
             ) : null}
 
             <section className={`${lockTab ? "flex-1" : "order-1 lg:order-2"} flex min-h-0 flex-col`}>
-                <header className={`${embedded ? "rounded-t-lg border" : "border-b"} border-stone-200 bg-card/80 px-4 py-2 backdrop-blur lg:overflow-x-auto lg:px-6 dark:border-stone-800`}>
-                    <div className="flex min-w-0 flex-wrap items-center gap-2 lg:min-w-max lg:flex-nowrap">
+                <header className={`${embedded ? "rounded-t-lg border" : "border-b"} border-stone-200 bg-background px-4 lg:h-24 lg:overflow-x-auto lg:px-6 dark:border-stone-800`}>
+                    <div className="flex min-w-0 flex-wrap items-center gap-2 py-2 lg:h-full lg:min-w-max lg:flex-nowrap lg:py-0">
                         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 lg:flex-none lg:flex-nowrap">{controlBar}</div>
                         <div className="flex w-full min-w-0 gap-2 overflow-x-auto lg:ml-auto lg:w-auto lg:min-w-max lg:overflow-visible">
                             <HeaderMetric label="剩余创建次数" value={user?.workflowCreateCredits ?? 0} />
@@ -514,10 +514,10 @@ function CommunityCard({ item, source, mine, onOpen, onSync, onDelete }: { item:
     const [detailOpen, setDetailOpen] = useState(false);
     return (
         <>
-            <article className="group relative aspect-square min-h-[220px] cursor-pointer overflow-hidden rounded-lg border border-stone-200 bg-card text-stone-900 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:aspect-[1.18] dark:border-stone-800 dark:text-stone-100" onClick={() => setDetailOpen(true)}>
+            <article className="group relative aspect-square min-h-[220px] cursor-pointer overflow-hidden rounded-lg border border-stone-200 bg-card text-stone-900 shadow-none transition hover:-translate-y-0.5 hover:shadow-none sm:aspect-[1.18] dark:border-stone-800 dark:text-stone-100 dark:shadow-sm dark:hover:shadow-md" onClick={() => setDetailOpen(true)}>
                 <WorkflowPreviewBackdrop nodes={nodes} connections={connections} />
                 <div className="absolute inset-0 bg-gradient-to-b from-black/18 via-transparent to-black/62 dark:from-black/8 dark:to-black/74" />
-                <div className="absolute left-3 right-3 top-3 flex items-center justify-end gap-2 rounded-md border border-white/30 bg-white/80 px-2.5 py-1 text-right text-sm font-semibold shadow-sm backdrop-blur sm:left-auto sm:max-w-[76%] dark:border-white/10 dark:bg-stone-950/72">
+                <div className="absolute left-3 right-3 top-3 flex items-center justify-end gap-2 rounded-md border border-white/30 bg-white/80 px-2.5 py-1 text-right text-sm font-semibold shadow-none backdrop-blur sm:left-auto sm:max-w-[76%] dark:border-white/10 dark:bg-stone-950/72 dark:shadow-sm">
                     <span className="truncate">{item.title}</span>
                     <Tag className="m-0" color={item.status === "banned" ? "red" : item.locale === "en-US" ? "cyan" : "green"}>{item.status === "banned" ? "封禁" : item.locale === "en-US" ? "EN" : "中文"}</Tag>
                 </div>
@@ -568,11 +568,11 @@ function SideButton({ active, icon, label, onClick }: { active: boolean; icon: R
 }
 
 function HeaderMetric({ label, value, wide }: { label: string; value: ReactNode; wide?: boolean }) {
-    return <div className={`${wide ? "min-w-28" : "min-w-20"} rounded-md border border-stone-200 bg-stone-50 px-3 py-2 dark:border-stone-800 dark:bg-stone-900`}><div className="text-[11px] text-stone-500 dark:text-stone-400">{label}</div><div className="mt-1 text-sm font-semibold">{value}</div></div>;
+    return <div className={`${wide ? "min-w-28" : "min-w-20"} rounded-md border border-stone-200 bg-stone-50 px-3 py-2 shadow-none dark:border-stone-800 dark:bg-stone-900 dark:shadow-sm`}><div className="text-[11px] text-stone-500 dark:text-stone-400">{label}</div><div className="mt-1 text-sm font-semibold">{value}</div></div>;
 }
 
 function CardMetric({ label, value }: { label: string; value: ReactNode }) {
-    return <div className="min-w-0 rounded-md border border-white/25 bg-white/82 px-2 py-1 text-center text-[11px] shadow-sm backdrop-blur dark:border-white/10 dark:bg-stone-950/72"><div className="truncate text-stone-500 dark:text-stone-400">{label}</div><div className="truncate font-semibold text-stone-900 dark:text-stone-100">{value}</div></div>;
+    return <div className="min-w-0 rounded-md border border-white/25 bg-white/82 px-2 py-1 text-center text-[11px] shadow-none backdrop-blur dark:border-white/10 dark:bg-stone-950/72 dark:shadow-sm"><div className="truncate text-stone-500 dark:text-stone-400">{label}</div><div className="truncate font-semibold text-stone-900 dark:text-stone-100">{value}</div></div>;
 }
 
 function EmptyState({ title, description, action }: { title: string; description: string; action: ReactNode }) {

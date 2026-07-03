@@ -706,6 +706,7 @@ func AdjustUserCredits(id string, credits int, operator model.AuthUser) (model.U
 		_, err = repository.SaveCreditLog(model.CreditLog{
 			ID:        newID("credit"),
 			UserID:    user.ID,
+			Category:  creditLogCategory(model.CreditLogTypeAdminAdjust),
 			Type:      model.CreditLogTypeAdminAdjust,
 			Amount:    credits - oldCredits,
 			Balance:   credits,
@@ -754,6 +755,7 @@ func ConsumeUserCreditsWithMeta(userID string, modelName string, credits int, pa
 		_, err = repository.SaveCreditLog(model.CreditLog{
 			ID:        newID("credit"),
 			UserID:    userID,
+			Category:  creditLogCategory(model.CreditLogTypeAIConsume),
 			Type:      model.CreditLogTypeAIConsume,
 			Model:     modelName,
 			Path:      path,
@@ -778,6 +780,7 @@ func ConsumeUserCreditsWithMeta(userID string, modelName string, credits int, pa
 	_, err = repository.SaveCreditLog(model.CreditLog{
 		ID:        newID("credit"),
 		UserID:    userID,
+		Category:  creditLogCategory(model.CreditLogTypeAIConsume),
 		Type:      model.CreditLogTypeAIConsume,
 		Model:     modelName,
 		Path:      path,
@@ -812,6 +815,7 @@ func RefundUserCreditsWithMeta(userID string, modelName string, credits int, pat
 	_, err = repository.SaveCreditLog(model.CreditLog{
 		ID:        newID("credit"),
 		UserID:    userID,
+		Category:  creditLogCategory(model.CreditLogTypeAIRefund),
 		Type:      model.CreditLogTypeAIRefund,
 		Model:     modelName,
 		Path:      path,
@@ -831,6 +835,7 @@ func ListCreditLogs(q model.Query) (model.CreditLogList, error) {
 	if err != nil {
 		return model.CreditLogList{}, err
 	}
+	enrichCreditLogs(logs)
 	return model.CreditLogList{Items: logs, Total: int(total)}, nil
 }
 
@@ -839,12 +844,16 @@ func ListAuditLogs(q model.Query) (model.AuditLogList, error) {
 	if err != nil {
 		return model.AuditLogList{}, err
 	}
+	enrichAuditLogs(logs)
 	return model.AuditLogList{Items: logs, Total: int(total)}, nil
 }
 
 func SaveAuditLog(log model.AuditLog) error {
 	if log.ID == "" {
 		log.ID = newID("audit")
+	}
+	if log.Category == "" {
+		log.Category = auditLogCategory(log.Action, log.TargetType)
 	}
 	log.IP = strings.TrimSpace(log.IP)
 	log.Country = strings.TrimSpace(log.Country)
@@ -859,6 +868,9 @@ func SaveCreditLog(log model.CreditLog) (model.CreditLog, error) {
 	if log.ID == "" {
 		log.ID = newID("credit")
 		log.CreatedAt = now()
+	}
+	if log.Category == "" {
+		log.Category = creditLogCategory(log.Type)
 	}
 	return repository.SaveCreditLog(log)
 }
@@ -1819,11 +1831,10 @@ func requestIP(r *http.Request) string {
 		host = strings.TrimSpace(r.RemoteAddr)
 	}
 	if trustedForwardPeer(host) {
-		if forwarded := forwardedIP(r.Header.Get("X-Forwarded-For")); forwarded != "" {
-			return forwarded
-		}
-		if realIP := forwardedIP(r.Header.Get("X-Real-IP")); realIP != "" {
-			return realIP
+		for _, key := range []string{"CF-Connecting-IP", "True-Client-IP", "X-Client-IP", "X-Cluster-Client-IP", "X-Forwarded-For", "X-Real-IP", "Forwarded"} {
+			if forwarded := forwardedIP(r.Header.Get(key)); forwarded != "" {
+				return forwarded
+			}
 		}
 	}
 	return host
@@ -1835,11 +1846,157 @@ func trustedForwardPeer(host string) bool {
 }
 
 func forwardedIP(value string) string {
-	ipText := firstForwardedValue(value)
-	if ip := net.ParseIP(strings.Trim(ipText, "[]")); ip != nil {
+	fallbackIP := ""
+	for _, part := range strings.Split(value, ",") {
+		if ipText := parseForwardedIPToken(part); ipText != "" {
+			if fallbackIP == "" {
+				fallbackIP = ipText
+			}
+			if isPublicIP(net.ParseIP(ipText)) {
+				return ipText
+			}
+		}
+	}
+	return fallbackIP
+}
+
+func parseForwardedIPToken(value string) string {
+	text := strings.TrimSpace(strings.Trim(value, `"`))
+	if text == "" {
+		return ""
+	}
+	lower := strings.ToLower(text)
+	if strings.HasPrefix(lower, "for=") {
+		text = strings.TrimSpace(text[4:])
+	}
+	if idx := strings.Index(text, ";"); idx >= 0 {
+		text = text[:idx]
+	}
+	text = strings.TrimSpace(strings.Trim(text, `"`))
+	if idx := strings.Index(text, ":"); idx >= 0 && strings.Count(text, ":") == 1 && !strings.Contains(text, "]") {
+		text = text[:idx]
+	}
+	if host, _, err := net.SplitHostPort(text); err == nil {
+		text = host
+	}
+	text = strings.Trim(text, "[]")
+	if ip := net.ParseIP(text); ip != nil {
 		return ip.String()
 	}
 	return ""
+}
+
+func creditLogCategory(logType model.CreditLogType) string {
+	switch logType {
+	case model.CreditLogTypeAdminAdjust:
+		return "后台调整"
+	case model.CreditLogTypeAIRefund:
+		return "失败返还"
+	case model.CreditLogTypeAIConsume:
+		return "模型请求"
+	default:
+		return "其他"
+	}
+}
+
+func auditLogCategory(action model.AuditLogAction, targetType string) string {
+	switch action {
+	case model.AuditLogActionUserRegister:
+		return "用户注册"
+	case model.AuditLogActionUserUpdate:
+		return "用户资料"
+	case model.AuditLogActionUserCredit, model.AuditLogActionUserWorkflow:
+		return "用户额度"
+	case model.AuditLogActionUserDelete:
+		return "用户管理"
+	case model.AuditLogActionConfigUpdate:
+		return "系统配置"
+	default:
+		if strings.TrimSpace(targetType) != "" {
+			return targetType
+		}
+		return "其他"
+	}
+}
+
+func enrichCreditLogs(logs []model.CreditLog) {
+	userIDs := make([]string, 0, len(logs))
+	seen := map[string]struct{}{}
+	for _, log := range logs {
+		if log.UserID == "" {
+			continue
+		}
+		if _, ok := seen[log.UserID]; ok {
+			continue
+		}
+		seen[log.UserID] = struct{}{}
+		userIDs = append(userIDs, log.UserID)
+	}
+	users, err := repository.ListUsersByIDs(userIDs)
+	if err != nil {
+		return
+	}
+	userMap := map[string]model.LogUser{}
+	for _, user := range users {
+		userMap[user.ID] = logUserFromModel(user)
+	}
+	for i := range logs {
+		if user, ok := userMap[logs[i].UserID]; ok {
+			logs[i].User = &user
+		}
+		if logs[i].Category == "" {
+			logs[i].Category = creditLogCategory(logs[i].Type)
+		}
+	}
+}
+
+func enrichAuditLogs(logs []model.AuditLog) {
+	userIDs := make([]string, 0, len(logs)*2)
+	seen := map[string]struct{}{}
+	for _, log := range logs {
+		if log.ActorID != "" {
+			if _, ok := seen[log.ActorID]; !ok {
+				seen[log.ActorID] = struct{}{}
+				userIDs = append(userIDs, log.ActorID)
+			}
+		}
+		if log.TargetType == "user" && log.TargetID != "" {
+			if _, ok := seen[log.TargetID]; !ok {
+				seen[log.TargetID] = struct{}{}
+				userIDs = append(userIDs, log.TargetID)
+			}
+		}
+	}
+	users, err := repository.ListUsersByIDs(userIDs)
+	if err != nil {
+		return
+	}
+	userMap := map[string]model.LogUser{}
+	for _, user := range users {
+		userMap[user.ID] = logUserFromModel(user)
+	}
+	for i := range logs {
+		if user, ok := userMap[logs[i].ActorID]; ok {
+			logs[i].Actor = &user
+		}
+		if logs[i].TargetType == "user" {
+			if user, ok := userMap[logs[i].TargetID]; ok {
+				logs[i].Target = &user
+			}
+		}
+		if logs[i].Category == "" {
+			logs[i].Category = auditLogCategory(logs[i].Action, logs[i].TargetType)
+		}
+	}
+}
+
+func logUserFromModel(user model.User) model.LogUser {
+	return model.LogUser{
+		ID:          user.ID,
+		Username:    user.Username,
+		DisplayName: user.DisplayName,
+		AvatarURL:   user.AvatarURL,
+	}
 }
 
 type oauthStatePayload struct {

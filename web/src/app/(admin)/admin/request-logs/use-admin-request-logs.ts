@@ -4,13 +4,13 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { App } from "antd";
 
-import { fetchAdminAuditLogs } from "@/services/api/admin";
+import { fetchAdminRequestLogs } from "@/services/api/admin";
 import { useUserStore } from "@/stores/use-user-store";
 import { adminRealtimeQueryOptions } from "../admin-query-options";
 
 const defaultPageSize = 10;
 
-export function useAdminAuditLogs() {
+export function useAdminRequestLogs() {
     const { message } = App.useApp();
     const token = useUserStore((state) => state.token);
     const clearSession = useUserStore((state) => state.clearSession);
@@ -22,8 +22,8 @@ export function useAdminAuditLogs() {
     const [pageSize, setPageSize] = useState(defaultPageSize);
 
     const query = useQuery({
-        queryKey: ["admin", "audit-logs", token, keyword, category, startTime, endTime, page, pageSize],
-        queryFn: () => fetchAdminAuditLogs(token, { keyword, category, startTime, endTime, page, pageSize }),
+        queryKey: ["admin", "request-logs", token, keyword, category, startTime, endTime, page, pageSize],
+        queryFn: () => fetchAdminRequestLogs(token, { keyword, category, startTime, endTime, page, pageSize }),
         enabled: Boolean(token),
         retry: false,
         ...adminRealtimeQueryOptions,
@@ -31,7 +31,7 @@ export function useAdminAuditLogs() {
 
     useEffect(() => {
         if (query.isError) {
-            const errorMessage = query.error instanceof Error ? query.error.message : "读取审计日志失败";
+            const errorMessage = query.error instanceof Error ? query.error.message : "读取请求日志失败";
             message.error(errorMessage);
             if (errorMessage.includes("未登录") || errorMessage.includes("权限不足") || errorMessage.includes("登录状态无效")) clearSession();
         }

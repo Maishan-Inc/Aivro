@@ -2,43 +2,78 @@
 
 import { ReloadOutlined, SearchOutlined } from "@ant-design/icons";
 import { ProTable, type ProColumns } from "@ant-design/pro-components";
-import { Button, Card, Col, Form, Input, Row, Space, Tag, Typography } from "antd";
-import dayjs from "dayjs";
-import { useEffect, useState } from "react";
+import { Avatar, Button, Card, Col, DatePicker, Flex, Form, Input, Row, Select, Space, Tag, Typography } from "antd";
+import dayjs, { type Dayjs } from "dayjs";
+import { useState } from "react";
 
 import type { AdminAuditLog } from "@/services/api/admin";
 import { useAdminAuditLogs } from "./use-admin-audit-logs";
 
 const auditActionLabels: Record<string, string> = {
     user_register: "用户注册",
+    user_update: "用户资料",
+    user_delete: "用户管理",
+    user_credit_adjust: "用户额度",
+    user_workflow_credit_adjust: "用户额度",
+    config_update: "系统配置",
     admin_modify: "管理员修改",
-    config_update: "配置修改",
 };
 
-export default function AdminAuditLogsPage() {
-    const { logs, keyword, page, pageSize, total, isLoading, searchLogs, changePage, changePageSize, resetFilters, refreshLogs } = useAdminAuditLogs();
-    const [keywordText, setKeywordText] = useState(keyword);
+const auditCategoryLabels: Record<string, string> = {
+    user_register: "用户注册",
+    user_update: "用户资料",
+    user_delete: "用户管理",
+    user_credit_adjust: "用户额度",
+    user_workflow_credit_adjust: "用户额度",
+    config_update: "系统配置",
+    用户注册: "用户注册",
+    用户资料: "用户资料",
+    用户额度: "用户额度",
+    用户管理: "用户管理",
+    系统配置: "系统配置",
+};
 
-    useEffect(() => setKeywordText(keyword), [keyword]);
+const auditCategoryOptions = [
+    { label: "全部分类", value: "" },
+    { label: "用户注册", value: "用户注册" },
+    { label: "用户资料", value: "用户资料" },
+    { label: "用户额度", value: "用户额度" },
+    { label: "用户管理", value: "用户管理" },
+    { label: "系统配置", value: "系统配置" },
+];
+
+export default function AdminAuditLogsPage() {
+    const { logs, keyword, category, startTime, endTime, page, pageSize, total, isLoading, searchLogs, changePage, changePageSize, resetFilters, refreshLogs } = useAdminAuditLogs();
+    const [keywordText, setKeywordText] = useState(keyword);
+    const [categoryValue, setCategoryValue] = useState(category);
+    const [rangeValue, setRangeValue] = useState<[Dayjs, Dayjs] | null>(startTime && endTime ? [dayjs(startTime), dayjs(endTime)] : null);
+
+    const applySearch = () => searchLogs(keywordText.trim(), categoryValue, rangeValue?.[0]?.toISOString() || "", rangeValue?.[1]?.toISOString() || "");
 
     const columns: ProColumns<AdminAuditLog>[] = [
+        {
+            title: "分类",
+            dataIndex: "category",
+            width: 120,
+            render: (_, item) => <Tag>{auditCategoryLabels[item.category] || item.category || "-"}</Tag>,
+        },
         {
             title: "动作",
             dataIndex: "action",
             width: 140,
-            render: (_, item) => <Tag>{auditActionLabels[item.action] || item.action || "-"}</Tag>,
+            render: (_, item) => <Tag color="blue">{auditActionLabels[item.action] || item.action || "-"}</Tag>,
         },
         {
             title: "操作者",
-            dataIndex: "actorUsername",
-            width: 180,
-            render: (_, item) => <Typography.Text>{item.actorUsername || item.actorId || "系统"}</Typography.Text>,
+            dataIndex: "actor",
+            width: 240,
+            render: (_, item) => <LogUserCell user={item.actor} fallback={item.actorUsername || "系统"} />,
         },
         {
             title: "目标",
-            dataIndex: "targetId",
+            dataIndex: "target",
             width: 240,
-            render: (_, item) => <Typography.Text copyable={Boolean(item.targetId)}>{[item.targetType, item.targetId].filter(Boolean).join(" / ") || "-"}</Typography.Text>,
+            render: (_, item) => (item.targetType === "user" ? <LogUserCell user={item.target} fallback="用户" /> : <Typography.Text type="secondary">{[item.targetType, item.targetId].filter(Boolean).join(" / ") || "-"}</Typography.Text>),
         },
         {
             title: "备注",
@@ -47,13 +82,13 @@ export default function AdminAuditLogsPage() {
             render: (_, item) => <Typography.Text type="secondary">{item.remark || "-"}</Typography.Text>,
         },
         {
-            title: "IP地址/国家",
+            title: "IP/国家",
             dataIndex: "ip",
             width: 180,
             render: (_, item) => <Typography.Text type="secondary">{[item.ip, item.country].filter(Boolean).join(" / ") || "-"}</Typography.Text>,
         },
         {
-            title: "创建时间",
+            title: "时间",
             dataIndex: "createdAt",
             width: 180,
             render: (_, item) => <Typography.Text type="secondary">{item.createdAt ? dayjs(item.createdAt).format("YYYY-MM-DD HH:mm:ss") : "-"}</Typography.Text>,
@@ -62,13 +97,30 @@ export default function AdminAuditLogsPage() {
 
     return (
         <main style={{ padding: 24 }}>
-            <Space direction="vertical" size={16} style={{ width: "100%" }}>
+            <Flex vertical gap={16}>
                 <Card variant="borderless">
                     <Form layout="vertical">
                         <Row gutter={16} align="bottom">
                             <Col flex="360px">
                                 <Form.Item label="关键词">
-                                    <Input.Search value={keywordText} placeholder="搜索动作、操作者、目标、备注、IP 或国家" allowClear enterButton={<SearchOutlined />} onSearch={() => searchLogs(keywordText)} onChange={(event) => setKeywordText(event.target.value)} />
+                                    <Input.Search value={keywordText} placeholder="搜索分类、动作、操作者、目标、备注、IP 或国家" allowClear enterButton={<SearchOutlined />} onSearch={applySearch} onChange={(event) => setKeywordText(event.target.value)} />
+                                </Form.Item>
+                            </Col>
+                            <Col flex="180px">
+                                <Form.Item label="分类">
+                                    <Select value={categoryValue} options={auditCategoryOptions} onChange={(value) => setCategoryValue(value)} />
+                                </Form.Item>
+                            </Col>
+                            <Col flex="360px">
+                                <Form.Item label="时间范围">
+                                    <DatePicker.RangePicker
+                                        value={rangeValue}
+                                        className="w-full"
+                                        showTime={{ format: "HH:mm:ss" }}
+                                        format="YYYY-MM-DD HH:mm:ss"
+                                        allowClear
+                                        onChange={(value) => setRangeValue(value as [Dayjs, Dayjs] | null)}
+                                    />
                                 </Form.Item>
                             </Col>
                             <Col flex="none">
@@ -77,12 +129,14 @@ export default function AdminAuditLogsPage() {
                                         <Button
                                             onClick={() => {
                                                 setKeywordText("");
+                                                setCategoryValue("");
+                                                setRangeValue(null);
                                                 resetFilters();
                                             }}
                                         >
                                             重置
                                         </Button>
-                                        <Button type="primary" icon={<ReloadOutlined />} onClick={() => searchLogs(keywordText)}>
+                                        <Button type="primary" icon={<ReloadOutlined />} onClick={applySearch}>
                                             查询
                                         </Button>
                                     </Space>
@@ -99,6 +153,7 @@ export default function AdminAuditLogsPage() {
                     search={false}
                     defaultSize="middle"
                     tableLayout="fixed"
+                    scroll={{ x: 1320 }}
                     cardProps={{ variant: "borderless" }}
                     headerTitle={
                         <Space>
@@ -117,7 +172,22 @@ export default function AdminAuditLogsPage() {
                         onChange: (nextPage, nextPageSize) => (nextPageSize !== pageSize ? changePageSize(nextPageSize) : changePage(nextPage)),
                     }}
                 />
-            </Space>
+            </Flex>
         </main>
+    );
+}
+
+function LogUserCell({ user, fallback }: { user?: { avatarUrl: string; displayName: string; username: string }; fallback: string }) {
+    const name = user?.displayName || user?.username || fallback;
+    const avatarUrl = user?.avatarUrl?.trim();
+    return (
+        <Flex align="center" gap={10} style={{ minWidth: 0 }}>
+            <Avatar size={32} src={avatarUrl ? <img src={avatarUrl} alt={name} referrerPolicy="no-referrer" /> : undefined}>
+                {(name[0] || "U").toUpperCase()}
+            </Avatar>
+            <Typography.Text strong ellipsis>
+                {name}
+            </Typography.Text>
+        </Flex>
     );
 }

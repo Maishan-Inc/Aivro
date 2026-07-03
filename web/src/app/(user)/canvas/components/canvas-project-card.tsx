@@ -56,11 +56,11 @@ export function CanvasProjectCard({ project, onRename, onDelete }: { project: Cl
                     },
                 }}
             >
-                <article className={`group relative aspect-square min-h-[220px] cursor-pointer overflow-hidden rounded-lg border bg-card text-stone-900 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:aspect-[1.18] dark:text-stone-100 ${selected ? "border-stone-400 ring-2 ring-stone-300/70 dark:border-stone-600 dark:ring-stone-700/70" : "border-stone-200 dark:border-stone-800"}`} onClick={open}>
+                <article className={`group relative aspect-square min-h-[220px] cursor-pointer overflow-hidden rounded-lg border bg-card text-stone-900 shadow-none transition hover:-translate-y-0.5 hover:shadow-none sm:aspect-[1.18] dark:text-stone-100 dark:shadow-sm dark:hover:shadow-md ${selected ? "border-stone-400 ring-2 ring-stone-300/70 dark:border-stone-600 dark:ring-stone-700/70" : "border-stone-200 dark:border-stone-800"}`} onClick={open}>
                     <WorkflowPreviewBackdrop nodes={project.nodes} connections={project.connections} />
                     <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/38 dark:from-black/8 dark:to-black/48" />
                     <input type="checkbox" checked={selected} onClick={(event) => event.stopPropagation()} onChange={(event) => toggleSelected(project.id, event.target.checked)} className="absolute left-3 top-3 z-10 size-4 accent-stone-900 dark:accent-stone-100" aria-label={`选择 ${project.title}`} />
-                    <div className="absolute left-10 right-3 top-3 rounded-md border border-white/30 bg-white/80 px-2.5 py-1 text-right text-sm font-semibold shadow-sm backdrop-blur sm:left-auto sm:max-w-[70%] dark:border-white/10 dark:bg-stone-950/72">
+                    <div className="absolute left-10 right-3 top-3 rounded-md border border-white/30 bg-white/80 px-2.5 py-1 text-right text-sm font-semibold shadow-none backdrop-blur sm:left-auto sm:max-w-[70%] dark:border-white/10 dark:bg-stone-950/72 dark:shadow-sm">
                         <span className="block truncate">{project.title}</span>
                     </div>
                     <div className="absolute inset-x-3 bottom-3 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
@@ -206,7 +206,7 @@ function stringPreview(value: string, maxLength: number) {
 }
 
 function CardMetric({ label, value }: { label: string; value: ReactNode }) {
-    return <div className="min-w-0 rounded-md border border-white/25 bg-white/82 px-2 py-1 text-center text-[11px] shadow-sm backdrop-blur dark:border-white/10 dark:bg-stone-950/72"><div className="truncate text-stone-500 dark:text-stone-400">{label}</div><div className="truncate font-semibold text-stone-900 dark:text-stone-100">{value}</div></div>;
+    return <div className="min-w-0 rounded-md border border-white/25 bg-white/82 px-2 py-1 text-center text-[11px] shadow-none backdrop-blur dark:border-white/10 dark:bg-stone-950/72 dark:shadow-sm"><div className="truncate text-stone-500 dark:text-stone-400">{label}</div><div className="truncate font-semibold text-stone-900 dark:text-stone-100">{value}</div></div>;
 }
 
 function ProjectMetric({ icon, label, value, suffix }: { icon: ReactNode; label: string; value: number; suffix?: string }) {

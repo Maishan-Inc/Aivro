@@ -3,6 +3,7 @@ package repository
 import (
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/basketikun/aivro/model"
 	"gorm.io/gorm"
@@ -105,6 +106,19 @@ func GetUserByID(id string) (model.User, bool, error) {
 	return findUser(db, "id = ?", id)
 }
 
+// ListUsersByIDs 根据 ID 批量查询用户。
+func ListUsersByIDs(ids []string) ([]model.User, error) {
+	db, err := DB()
+	if err != nil {
+		return nil, err
+	}
+	if len(ids) == 0 {
+		return []model.User{}, nil
+	}
+	var users []model.User
+	return users, db.Where("id IN ?", ids).Find(&users).Error
+}
+
 // GetUserByUsername 根据用户名查询用户。
 func GetUserByUsername(username string) (model.User, bool, error) {
 	db, err := DB()
@@ -188,9 +202,21 @@ func ListCreditLogs(q model.Query) ([]model.CreditLog, int64, error) {
 	}
 	q.Normalize()
 	tx := db.Model(&model.CreditLog{})
+	if q.Category != "" {
+		tx = tx.Where("category = ?", q.Category)
+	}
+	if q.Type != "" {
+		tx = tx.Where("type = ?", q.Type)
+	}
+	if q.StartTime != "" {
+		tx = tx.Where("created_at >= ?", normalizeQueryTime(q.StartTime))
+	}
+	if q.EndTime != "" {
+		tx = tx.Where("created_at <= ?", normalizeQueryTime(q.EndTime))
+	}
 	if keyword := strings.TrimSpace(q.Keyword); keyword != "" {
 		like := "%" + keyword + "%"
-		tx = tx.Where("user_id LIKE ? OR type LIKE ? OR model LIKE ? OR path LIKE ? OR remark LIKE ? OR related_id LIKE ? OR ip LIKE ? OR country LIKE ?", like, like, like, like, like, like, like, like)
+		tx = tx.Where("user_id LIKE ? OR category LIKE ? OR type LIKE ? OR model LIKE ? OR path LIKE ? OR remark LIKE ? OR related_id LIKE ? OR ip LIKE ? OR country LIKE ?", like, like, like, like, like, like, like, like, like)
 	}
 	var total int64
 	if err := tx.Count(&total).Error; err != nil {
@@ -224,9 +250,21 @@ func ListAuditLogs(q model.Query) ([]model.AuditLog, int64, error) {
 	}
 	q.Normalize()
 	tx := db.Model(&model.AuditLog{})
+	if q.Category != "" {
+		tx = tx.Where("category = ?", q.Category)
+	}
+	if q.Type != "" {
+		tx = tx.Where("action = ?", q.Type)
+	}
+	if q.StartTime != "" {
+		tx = tx.Where("created_at >= ?", normalizeQueryTime(q.StartTime))
+	}
+	if q.EndTime != "" {
+		tx = tx.Where("created_at <= ?", normalizeQueryTime(q.EndTime))
+	}
 	if keyword := strings.TrimSpace(q.Keyword); keyword != "" {
 		like := "%" + keyword + "%"
-		tx = tx.Where("action LIKE ? OR actor_id LIKE ? OR actor_username LIKE ? OR target_type LIKE ? OR target_id LIKE ? OR remark LIKE ? OR ip LIKE ? OR country LIKE ?", like, like, like, like, like, like, like, like)
+		tx = tx.Where("category LIKE ? OR action LIKE ? OR actor_id LIKE ? OR actor_username LIKE ? OR target_type LIKE ? OR target_id LIKE ? OR remark LIKE ? OR ip LIKE ? OR country LIKE ?", like, like, like, like, like, like, like, like, like)
 	}
 	var total int64
 	if err := tx.Count(&total).Error; err != nil {
@@ -292,6 +330,17 @@ func escapeLike(value string) string {
 	value = strings.ReplaceAll(value, `\`, `\\`)
 	value = strings.ReplaceAll(value, `%`, `\%`)
 	return strings.ReplaceAll(value, `_`, `\_`)
+}
+
+func normalizeQueryTime(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	if parsed, err := time.Parse(time.RFC3339, value); err == nil {
+		return parsed.In(time.Local).Format(time.RFC3339)
+	}
+	return value
 }
 
 func SaveEmailVerification(item model.EmailVerification) (model.EmailVerification, error) {
