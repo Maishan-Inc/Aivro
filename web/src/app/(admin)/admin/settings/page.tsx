@@ -2468,8 +2468,9 @@ function setModelCost(form: any, setModelCosts: (items: AdminModelCost[]) => voi
     const publicModels = (form.getFieldValue(["public", "modelChannel", "availableModels"]) || []) as string[];
     const channels = normalizePrivateSetting(form.getFieldValue(["private"]) || {}).channels;
     const key = modelCostKey(item);
-    const next = syncModelCostsWithPublicModels(current, publicModels, channels).map((cost) =>
-        modelCostKey(cost) === key ? { ...cost, credits: Math.max(0, credits), billingType: billingType === "token" ? "token" : "fixed" } : cost,
+    const nextBillingType: AdminModelCost["billingType"] = billingType === "token" ? "token" : "fixed";
+    const next: AdminModelCost[] = syncModelCostsWithPublicModels(current, publicModels, channels).map((cost) =>
+        modelCostKey(cost) === key ? { ...cost, credits: Math.max(0, credits), billingType: nextBillingType } : cost,
     );
     form.setFieldValue(["public", "modelChannel", "modelCosts"], next);
     setModelCosts(next);
