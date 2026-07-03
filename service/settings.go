@@ -179,36 +179,24 @@ func AdminDatabaseStatus() (model.DatabaseStatus, error) {
 }
 
 func normalizeSettings(settings model.Settings) model.Settings {
-	settings.Public = normalizePublicSetting(settings.Public)
 	settings.Private = normalizePrivateSetting(settings.Private)
+	settings.Public = normalizePublicSettingWithChannels(settings.Public, settings.Private.Channels)
 	return settings
 }
 
 func normalizePublicSetting(setting model.PublicSetting) model.PublicSetting {
+	return normalizePublicSettingWithChannels(setting, nil)
+}
+
+func normalizePublicSettingWithChannels(setting model.PublicSetting, channels []model.ModelChannel) model.PublicSetting {
 	if setting.ModelChannel.AvailableModels == nil {
 		setting.ModelChannel.AvailableModels = []string{}
 	}
-	setting.ModelChannel.AvailableModels = uniqueNonEmptyStrings(setting.ModelChannel.AvailableModels)
+	setting.ModelChannel.AvailableModels = filterModels(setting.ModelChannel.AvailableModels, collectChannelModelNames(channels))
 	if setting.ModelChannel.ModelCosts == nil {
 		setting.ModelChannel.ModelCosts = []model.ModelCost{}
 	}
-	costs := make([]model.ModelCost, 0, len(setting.ModelChannel.ModelCosts))
-	seenCosts := map[string]bool{}
-	for i := range setting.ModelChannel.ModelCosts {
-		setting.ModelChannel.ModelCosts[i].Model = strings.TrimSpace(setting.ModelChannel.ModelCosts[i].Model)
-		if setting.ModelChannel.ModelCosts[i].Credits < 0 {
-			setting.ModelChannel.ModelCosts[i].Credits = 0
-		}
-		if setting.ModelChannel.ModelCosts[i].BillingType != "token" {
-			setting.ModelChannel.ModelCosts[i].BillingType = "fixed"
-		}
-		if setting.ModelChannel.ModelCosts[i].Model == "" || seenCosts[setting.ModelChannel.ModelCosts[i].Model] {
-			continue
-		}
-		seenCosts[setting.ModelChannel.ModelCosts[i].Model] = true
-		costs = append(costs, setting.ModelChannel.ModelCosts[i])
-	}
-	setting.ModelChannel.ModelCosts = costs
+	setting.ModelChannel.ModelCosts = normalizeModelCosts(setting.ModelChannel.ModelCosts, setting.ModelChannel.AvailableModels, channels)
 	if setting.Auth.AllowRegister == nil {
 		enabled := true
 		setting.Auth.AllowRegister = &enabled
@@ -386,13 +374,19 @@ func ModelBilling(modelName string) (model.ModelCost, error) {
 	if err != nil {
 		return model.ModelCost{}, err
 	}
+	settings = normalizeSettings(settings)
 	modelName = strings.TrimSpace(modelName)
-	for _, item := range normalizePublicSetting(settings.Public).ModelChannel.ModelCosts {
-		if item.Model == modelName {
+	modelID := modelIDForName(settings.Private.Channels, modelName)
+	for _, item := range settings.Public.ModelChannel.ModelCosts {
+		if modelID != "" && item.ModelID == modelID {
+			item.Model = modelName
+			return item, nil
+		}
+		if modelID == "" && item.Model == modelName {
 			return item, nil
 		}
 	}
-	return model.ModelCost{Model: modelName, BillingType: "fixed"}, nil
+	return model.ModelCost{ModelID: modelID, Model: modelName, BillingType: "fixed"}, nil
 }
 
 func normalizePrivateSetting(setting model.PrivateSetting) model.PrivateSetting {
@@ -410,9 +404,7 @@ func normalizePrivateSetting(setting model.PrivateSetting) model.PrivateSetting 
 	setting.CloudStorage = normalizeCloudStorageSetting(setting.CloudStorage)
 	setting.Stripe = normalizeStripeSetting(setting.Stripe)
 	setting.KYC = normalizeKYCSetting(setting.KYC)
-	for i := range setting.Channels {
-		setting.Channels[i] = normalizeModelChannelWithIndex(setting.Channels[i], i)
-	}
+	setting.Channels, setting.ModelIDSeq = normalizeModelChannelsWithSeq(setting.Channels, setting.ModelIDSeq)
 	return setting
 }
 
@@ -772,10 +764,39 @@ func BuildModelChannelURL(channel model.ModelChannel, path string) string {
 }
 
 func normalizeModelChannel(channel model.ModelChannel) model.ModelChannel {
-	return normalizeModelChannelWithIndex(channel, 0)
+	channels := normalizeModelChannels([]model.ModelChannel{channel})
+	if len(channels) == 0 {
+		return model.ModelChannel{}
+	}
+	return channels[0]
 }
 
-func normalizeModelChannelWithIndex(channel model.ModelChannel, index int) model.ModelChannel {
+func normalizeModelChannels(channels []model.ModelChannel) []model.ModelChannel {
+	result, _ := normalizeModelChannelsWithSeq(channels, 0)
+	return result
+}
+
+func normalizeModelChannelsWithSeq(channels []model.ModelChannel, currentSeq int) ([]model.ModelChannel, int) {
+	usedIDs := map[string]bool{}
+	maxID := currentSeq
+	for _, channel := range channels {
+		for _, item := range channel.ModelMappings {
+			if id := strings.TrimSpace(item.ID); id != "" {
+				if seq := modelIDSeq(id); seq > maxID {
+					maxID = seq
+				}
+			}
+		}
+	}
+	result := make([]model.ModelChannel, 0, len(channels))
+	for index := range channels {
+		channel := normalizeModelChannelWithIDs(channels[index], index, usedIDs, &maxID)
+		result = append(result, channel)
+	}
+	return result, maxID
+}
+
+func normalizeModelChannelWithIDs(channel model.ModelChannel, index int, usedIDs map[string]bool, maxID *int) model.ModelChannel {
 	if channel.Protocol == "" {
 		channel.Protocol = "openai"
 	}
@@ -793,7 +814,7 @@ func normalizeModelChannelWithIndex(channel model.ModelChannel, index int) model
 			}
 		}
 	}
-	channel.ModelMappings = normalizeModelMappings(channel.ModelMappings)
+	channel.ModelMappings = normalizeModelMappingsWithIDs(channel.ModelMappings, usedIDs, maxID)
 	channel.Models = make([]string, 0, len(channel.ModelMappings))
 	for _, item := range channel.ModelMappings {
 		channel.Models = append(channel.Models, item.Name)
@@ -805,9 +826,14 @@ func normalizeModelChannelWithIndex(channel model.ModelChannel, index int) model
 }
 
 func normalizeModelMappings(items []model.ModelChannelModel) []model.ModelChannelModel {
+	return normalizeModelMappingsWithIDs(items, nil, nil)
+}
+
+func normalizeModelMappingsWithIDs(items []model.ModelChannelModel, usedIDs map[string]bool, maxID *int) []model.ModelChannelModel {
 	result := make([]model.ModelChannelModel, 0, len(items))
 	seen := map[string]bool{}
 	for _, item := range items {
+		item.ID = strings.TrimSpace(item.ID)
 		item.Name = strings.TrimSpace(item.Name)
 		item.UpstreamName = strings.TrimSpace(item.UpstreamName)
 		item.Capability = strings.TrimSpace(item.Capability)
@@ -825,10 +851,120 @@ func normalizeModelMappings(items []model.ModelChannelModel) []model.ModelChanne
 		if seen[item.Name] {
 			continue
 		}
+		if usedIDs != nil && maxID != nil {
+			if item.ID == "" || usedIDs[item.ID] {
+				*maxID = *maxID + 1
+				item.ID = fmt.Sprintf("model_%d", *maxID)
+			}
+			usedIDs[item.ID] = true
+		}
 		seen[item.Name] = true
 		result = append(result, item)
 	}
 	return result
+}
+
+func modelIDSeq(id string) int {
+	var seq int
+	_, _ = fmt.Sscanf(id, "model_%d", &seq)
+	return seq
+}
+
+func collectChannelModelNames(channels []model.ModelChannel) []string {
+	names := []string{}
+	for _, channel := range channels {
+		if !channel.Enabled {
+			continue
+		}
+		for _, item := range channel.ModelMappings {
+			names = append(names, item.Name)
+		}
+	}
+	if len(names) == 0 {
+		return nil
+	}
+	return uniqueNonEmptyStrings(names)
+}
+
+func filterModels(models []string, options []string) []string {
+	if len(options) == 0 {
+		return uniqueNonEmptyStrings(models)
+	}
+	optionSet := map[string]bool{}
+	for _, item := range options {
+		optionSet[item] = true
+	}
+	result := []string{}
+	for _, item := range uniqueNonEmptyStrings(models) {
+		if optionSet[item] {
+			result = append(result, item)
+		}
+	}
+	return result
+}
+
+func normalizeModelCosts(items []model.ModelCost, availableModels []string, channels []model.ModelChannel) []model.ModelCost {
+	byID := map[string]model.ModelCost{}
+	byName := map[string]model.ModelCost{}
+	for _, item := range items {
+		item.ModelID = strings.TrimSpace(item.ModelID)
+		item.Model = strings.TrimSpace(item.Model)
+		if item.Credits < 0 {
+			item.Credits = 0
+		}
+		if item.BillingType != "token" {
+			item.BillingType = "fixed"
+		}
+		if item.ModelID != "" {
+			byID[item.ModelID] = item
+		}
+		if item.Model != "" {
+			byName[item.Model] = item
+		}
+	}
+	result := make([]model.ModelCost, 0, len(availableModels))
+	seenIDs := map[string]bool{}
+	for _, modelName := range availableModels {
+		modelName = strings.TrimSpace(modelName)
+		if modelName == "" {
+			continue
+		}
+		modelID := modelIDForName(channels, modelName)
+		item := byID[modelID]
+		if item.ModelID == "" {
+			item = byName[modelName]
+		}
+		item.ModelID = modelID
+		item.Model = modelName
+		if item.BillingType != "token" {
+			item.BillingType = "fixed"
+		}
+		if item.Credits < 0 {
+			item.Credits = 0
+		}
+		key := firstNonEmpty(modelID, modelName)
+		if key == "" || seenIDs[key] {
+			continue
+		}
+		seenIDs[key] = true
+		result = append(result, item)
+	}
+	return result
+}
+
+func modelIDForName(channels []model.ModelChannel, modelName string) string {
+	modelName = strings.TrimSpace(modelName)
+	for _, channel := range channels {
+		if !channel.Enabled {
+			continue
+		}
+		for _, item := range channel.ModelMappings {
+			if item.Name == modelName {
+				return item.ID
+			}
+		}
+	}
+	return ""
 }
 
 func normalizeChannelColor(value string, index int) string {
@@ -1005,8 +1141,7 @@ func (err safeMessageError) SafeMessage() string {
 func modelChannelRoutesForModel(channels []model.ModelChannel, modelName string) []ModelChannelRoute {
 	modelName = strings.TrimSpace(modelName)
 	result := []ModelChannelRoute{}
-	for i, channel := range channels {
-		channel = normalizeModelChannelWithIndex(channel, i)
+	for _, channel := range normalizeModelChannels(channels) {
 		if !channel.Enabled || channel.BaseURL == "" || channel.APIKey == "" {
 			continue
 		}

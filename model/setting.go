@@ -40,6 +40,7 @@ type ModelChannel struct {
 }
 
 type ModelChannelModel struct {
+	ID           string `json:"id"`
 	Name         string `json:"name"`
 	UpstreamName string `json:"upstreamName"`
 	Capability   string `json:"capability"`
@@ -47,6 +48,7 @@ type ModelChannelModel struct {
 
 // ModelCost 模型计费配置。
 type ModelCost struct {
+	ModelID     string `json:"modelId"`
 	Model       string `json:"model"`
 	Credits     int    `json:"credits"`
 	BillingType string `json:"billingType"`
@@ -150,6 +152,7 @@ type PublicOAuthProviderSetting struct {
 // PrivateSetting 私有配置。
 type PrivateSetting struct {
 	Channels     []ModelChannel      `json:"channels"`
+	ModelIDSeq   int                 `json:"modelIdSeq"`
 	Runtime      RuntimeSetting      `json:"runtime"`
 	PromptSync   PromptSyncSetting   `json:"promptSync"`
 	AIQueue      AIQueueSetting      `json:"aiQueue"`

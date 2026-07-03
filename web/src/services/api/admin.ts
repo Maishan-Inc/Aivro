@@ -262,6 +262,7 @@ export type AdminModelChannel = {
 };
 
 export type AdminModelChannelModel = {
+    id: string;
     name: string;
     upstreamName: string;
     capability: "image" | "text" | "video" | "model3d";
@@ -278,6 +279,7 @@ export type AdminPublicModelChannelSettings = {
 };
 
 export type AdminModelCost = {
+    modelId: string;
     model: string;
     credits: number;
     billingType: "fixed" | "token";
@@ -361,6 +363,7 @@ export type AdminPublicAuthProvider = {
 
 export type AdminPrivateSettings = {
     channels: AdminModelChannel[];
+    modelIdSeq: number;
     runtime: AdminRuntimeSettings;
     promptSync: {
         enabled: boolean;

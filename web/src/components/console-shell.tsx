@@ -60,11 +60,11 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
     return (
         <main className="grid h-full min-h-0 grid-rows-[1fr_auto] overflow-hidden bg-stone-50 text-stone-950 lg:grid-cols-[232px_minmax(0,1fr)] lg:grid-rows-1 dark:bg-stone-950 dark:text-stone-100">
             <aside className="order-2 flex min-h-0 border-t border-stone-200 bg-background lg:order-1 lg:flex-col lg:border-r lg:border-t-0 dark:border-stone-800">
-                <div className="hidden h-24 shrink-0 items-center justify-center gap-3 border-b border-stone-200 px-5 lg:flex dark:border-stone-800">
+                <div className="hidden h-24 shrink-0 items-center gap-3 border-b border-stone-200 px-5 lg:flex dark:border-stone-800">
                     <Avatar size={40} src={user?.avatarUrl || undefined} className="border border-stone-200 bg-transparent dark:border-stone-700">
                         {(userName[0] || "U").toUpperCase()}
                     </Avatar>
-                    <div className="min-w-0 text-center">
+                    <div className="min-w-0">
                         <div className="truncate text-sm font-semibold">{userName || "Aivro User"}</div>
                     </div>
                 </div>

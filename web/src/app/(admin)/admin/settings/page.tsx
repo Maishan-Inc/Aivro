@@ -165,6 +165,7 @@ const emptySettings: AdminSettings = {
     },
     private: {
         channels: [],
+        modelIdSeq: 0,
         runtime: {
             appOrigin: "",
             allowedOrigins: "",
@@ -284,13 +285,13 @@ export default function AdminSettingsPage() {
     const [authProviderStats, setAuthProviderStats] = useState<Record<string, number>>({});
     const [currentOrigin, setCurrentOrigin] = useState("");
     const [modelCosts, setModelCosts] = useState<AdminModelCost[]>([]);
-    const [newCostModel, setNewCostModel] = useState("");
     const [knownModels, setKnownModels] = useState<string[]>([]);
     const publicModels = Form.useWatch(["public", "modelChannel", "availableModels"], form) || [];
     const customAuthProviders = Form.useWatch(["private", "auth", "customProviders"], { form, preserve: true }) || [];
     const channelModels = useMemo(() => collectChannelModels(channels), [channels]);
     const channelColorByModel = useMemo(() => collectChannelModelColors(channels), [channels]);
     const channelTableData = useMemo(() => channels.map((channel, index) => ({ ...channel, _index: index, _rowKey: `${index}-${channel.name}-${channel.baseUrl}` })), [channels]);
+    const billingModelCosts = useMemo(() => syncModelCostsWithPublicModels(modelCosts, publicModels, channels), [channels, modelCosts, publicModels]);
     const standaloneTab = activeTab === "model" || activeTab === "mail";
     const activeMode = activeTab === "model" || activeTab === "mail" || activeTab === "thirdParty" || activeTab === "cloudStorage" || activeTab === "billingKyc" || activeTab === "pages" || activeTab === "runtime" ? "visual" : editorMode[activeTab];
     const activeJsonText = jsonText[activeTab] || "";
@@ -669,9 +670,11 @@ export default function AdminSettingsPage() {
         if (!token) return;
         const values = normalizeSettings(form.getFieldsValue(true) as AdminSettings);
         const nextChannelModels = collectChannelModels(nextChannels);
+        const availableModels = filterModels(values.public.modelChannel.availableModels, nextChannelModels);
+        const modelCosts = syncModelCostsWithPublicModels(values.public.modelChannel.modelCosts, availableModels, nextChannels);
         const nextSettings = normalizeSettings({
             ...values,
-            public: { ...values.public, modelChannel: { ...values.public.modelChannel, availableModels: filterModels(values.public.modelChannel.availableModels, nextChannelModels) } },
+            public: { ...values.public, modelChannel: { ...values.public.modelChannel, availableModels, modelCosts } },
             private: { ...values.private, channels: nextChannels },
         });
         const saved = normalizeSettings(await saveAdminSettings(token, nextSettings));
@@ -809,11 +812,15 @@ export default function AdminSettingsPage() {
                                         label: "模型计费",
                                         children: (
                                             <Card size="small" extra={sectionSaveButton()}>
+                                                <Typography.Text type="secondary">
+                                                    计费项只跟随“开放给前台的模型”。需要新增或移除计费模型，请先在上方系统可用模型中调整。
+                                                </Typography.Text>
                                                 <Table
-                                                    rowKey="model"
+                                                    rowKey={(item) => item.modelId || item.model}
                                                     pagination={false}
                                                     size="small"
-                                                    dataSource={modelCosts}
+                                                    dataSource={billingModelCosts}
+                                                    style={{ marginTop: 8 }}
                                                     columns={[
                                                         { title: "模型", dataIndex: "model", render: (value) => <ModelTag model={value} color={channelColorByModel[value]} /> },
                                                         {
@@ -828,7 +835,7 @@ export default function AdminSettingsPage() {
                                                                         { label: "Token 计费", value: "token" },
                                                                     ]}
                                                                     onChange={(value) => {
-                                                                        setModelCost(form, setModelCosts, item.model, item.credits, value as AdminModelCost["billingType"]);
+                                                                        setModelCost(form, setModelCosts, item, item.credits, value as AdminModelCost["billingType"]);
                                                                         markUnsaved();
                                                                     }}
                                                                 />
@@ -847,24 +854,7 @@ export default function AdminSettingsPage() {
                                                                     value={item.credits}
                                                                     addonAfter={item.billingType === "token" ? "点/千 token" : "点/次"}
                                                                     onChange={(value) => {
-                                                                        setModelCost(form, setModelCosts, item.model, Number(value) || 0, item.billingType);
-                                                                        markUnsaved();
-                                                                    }}
-                                                                />
-                                                            ),
-                                                        },
-                                                        {
-                                                            title: "操作",
-                                                            key: "actions",
-                                                            width: 88,
-                                                            align: "right",
-                                                            render: (_, item) => (
-                                                                <Button
-                                                                    danger
-                                                                    size="small"
-                                                                    icon={<DeleteOutlined />}
-                                                                    onClick={() => {
-                                                                        removeModelCost(form, setModelCosts, item.model);
+                                                                        setModelCost(form, setModelCosts, item, Number(value) || 0, item.billingType);
                                                                         markUnsaved();
                                                                     }}
                                                                 />
@@ -872,21 +862,6 @@ export default function AdminSettingsPage() {
                                                         },
                                                     ]}
                                                 />
-                                                <Space.Compact style={{ marginTop: 8, width: "100%" }}>
-                                                    <Select showSearch allowClear placeholder="选择或输入模型名称以新增计费" value={newCostModel || undefined} onSearch={setNewCostModel} onChange={(value) => setNewCostModel(value || "")} options={uniqueModels([...publicModels, ...channelModels, ...knownModels]).map((model) => ({ label: model, value: model }))} style={{ minWidth: 260 }} />
-                                                    <Button
-                                                        icon={<PlusOutlined />}
-                                                        onClick={() => {
-                                                            const m = newCostModel.trim();
-                                                            if (!m) return;
-                                                            setModelCost(form, setModelCosts, m, modelCostCredits(modelCosts, m), "fixed");
-                                                            markUnsaved();
-                                                            setNewCostModel("");
-                                                        }}
-                                                    >
-                                                        新增
-                                                    </Button>
-                                                </Space.Compact>
                                             </Card>
                                         ),
                                     },
@@ -1588,6 +1563,9 @@ export default function AdminSettingsPage() {
                                                 </Flex>
                                                 {fields.map((field) => (
                                                     <Row gutter={8} key={field.key} align="middle">
+                                                        <Form.Item {...field} name={[field.name, "id"]} hidden>
+                                                            <Input />
+                                                        </Form.Item>
                                                         <Col span={8}>
                                                             <Form.Item {...field} name={[field.name, "name"]} rules={[{ required: true, message: "请输入前台模型名" }]} style={{ marginBottom: 0 }}>
                                                                 <Input placeholder="前台模型名" />
@@ -2251,10 +2229,11 @@ function normalizeModelCosts(items: Partial<AdminSettings["public"]["modelChanne
     const seen = new Set<string>();
     return items
         .filter((item) => item.model)
-        .map((item): AdminModelCost => ({ model: item.model || "", credits: Math.max(0, Number(item.credits) || 0), billingType: item.billingType === "token" ? "token" : "fixed" }))
+        .map((item): AdminModelCost => ({ modelId: item.modelId || "", model: item.model || "", credits: Math.max(0, Number(item.credits) || 0), billingType: item.billingType === "token" ? "token" : "fixed" }))
         .filter((item) => {
-            if (seen.has(item.model)) return false;
-            seen.add(item.model);
+            const key = modelCostKey(item);
+            if (seen.has(key)) return false;
+            seen.add(key);
             return true;
         });
 }
@@ -2279,6 +2258,7 @@ function normalizePrivateSetting(setting: Partial<AdminSettings["private"]> = {}
     } as AdminSettings["private"]["captcha"];
     return {
         channels: (setting.channels || []).map(normalizeChannel),
+        modelIdSeq: Math.max(0, Number(setting.modelIdSeq) || 0),
         runtime: normalizeRuntimeSetting(setting.runtime),
         promptSync: {
             enabled: setting.promptSync?.enabled !== false,
@@ -2411,6 +2391,7 @@ function normalizeChannelMappings(items: Partial<AdminModelChannelModel>[] = [])
     const seen = new Set<string>();
     return items
         .map((item): AdminModelChannelModel => ({
+            id: item.id || "",
             name: (item.name || "").trim(),
             upstreamName: (item.upstreamName || item.name || "").trim(),
             capability: item.capability === "text" || item.capability === "video" || item.capability === "model3d" ? item.capability : "image",
@@ -2425,7 +2406,7 @@ function normalizeChannelMappings(items: Partial<AdminModelChannelModel>[] = [])
 function defaultChannelMapping(channelName: string, upstreamName: string): AdminModelChannelModel {
     const prefix = channelName.trim();
     const name = upstreamName ? `${prefix ? `${prefix}-` : ""}${upstreamName}` : "";
-    return { name, upstreamName, capability: "image" };
+    return { id: "", name, upstreamName, capability: "image" };
 }
 
 function normalizeChannelColor(value?: string) {
@@ -2446,20 +2427,50 @@ function ModelTag({ model, color }: { model: string; color?: string }) {
     );
 }
 
-function modelCostCredits(items: AdminSettings["public"]["modelChannel"]["modelCosts"], model: string) {
-    return items.find((item) => item.model === model)?.credits || 0;
+function syncModelCostsWithPublicModels(items: AdminModelCost[], publicModels: string[], channels: AdminModelChannel[]) {
+    const byID = new Map(items.filter((item) => item.modelId).map((item) => [item.modelId, item]));
+    const byModel = new Map(items.map((item) => [item.model, item]));
+    const seen = new Set<string>();
+    return filterModels(publicModels, collectChannelModels(channels))
+        .map((model) => {
+            const modelId = channelModelId(channels, model);
+            const saved = (modelId && byID.get(modelId)) || byModel.get(model);
+            return {
+                modelId,
+                model,
+                credits: Math.max(0, Number(saved?.credits) || 0),
+                billingType: saved?.billingType === "token" ? "token" : "fixed",
+            } as AdminModelCost;
+        })
+        .filter((item) => {
+            const key = modelCostKey(item);
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
 }
 
-function setModelCost(form: any, setModelCosts: (items: AdminModelCost[]) => void, model: string, credits: number, billingType: AdminModelCost["billingType"] = "fixed") {
-    const current = (form.getFieldValue(["public", "modelChannel", "modelCosts"]) || []) as AdminSettings["public"]["modelChannel"]["modelCosts"];
-    const next = current.filter((item) => item.model !== model);
-    next.push({ model, credits: Math.max(0, credits), billingType: billingType === "token" ? "token" : "fixed" });
-    form.setFieldValue(["public", "modelChannel", "modelCosts"], next);
-    setModelCosts(next);
+function channelModelId(channels: AdminModelChannel[], model: string) {
+    for (const channel of channels) {
+        if (!channel.enabled) continue;
+        const mapping = (channel.modelMappings || []).find((item) => item.name === model);
+        if (mapping?.id) return mapping.id;
+    }
+    return "";
 }
 
-function removeModelCost(form: any, setModelCosts: (items: AdminModelCost[]) => void, model: string) {
-    const next = ((form.getFieldValue(["public", "modelChannel", "modelCosts"]) || []) as AdminSettings["public"]["modelChannel"]["modelCosts"]).filter((item) => item.model !== model);
+function modelCostKey(item: Pick<AdminModelCost, "modelId" | "model">) {
+    return item.modelId || `model:${item.model}`;
+}
+
+function setModelCost(form: any, setModelCosts: (items: AdminModelCost[]) => void, item: AdminModelCost, credits: number, billingType: AdminModelCost["billingType"] = "fixed") {
+    const current = (form.getFieldValue(["public", "modelChannel", "modelCosts"]) || []) as AdminModelCost[];
+    const publicModels = (form.getFieldValue(["public", "modelChannel", "availableModels"]) || []) as string[];
+    const channels = normalizePrivateSetting(form.getFieldValue(["private"]) || {}).channels;
+    const key = modelCostKey(item);
+    const next = syncModelCostsWithPublicModels(current, publicModels, channels).map((cost) =>
+        modelCostKey(cost) === key ? { ...cost, credits: Math.max(0, credits), billingType: billingType === "token" ? "token" : "fixed" } : cost,
+    );
     form.setFieldValue(["public", "modelChannel", "modelCosts"], next);
     setModelCosts(next);
 }
@@ -2598,6 +2609,7 @@ async function collectSettings(form: any, editorMode: Record<string, EditorMode>
         values.private = privateSetting;
     }
     values.public.modelChannel.availableModels = filterModels(values.public.modelChannel.availableModels, collectChannelModels(values.private.channels));
+    values.public.modelChannel.modelCosts = syncModelCostsWithPublicModels(values.public.modelChannel.modelCosts, values.public.modelChannel.availableModels, values.private.channels);
     values.public.auth.customProviders = values.private.auth.customProviders.map((provider) => ({
         id: provider.id,
         name: provider.name,
