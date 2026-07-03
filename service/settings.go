@@ -193,10 +193,19 @@ func normalizePublicSettingWithChannels(setting model.PublicSetting, channels []
 		setting.ModelChannel.AvailableModels = []string{}
 	}
 	setting.ModelChannel.AvailableModels = filterModels(setting.ModelChannel.AvailableModels, collectChannelModelNames(channels))
+	setting.ModelChannel.ImageModels = normalizeScopedModels(setting.ModelChannel.ImageModels, setting.ModelChannel.AvailableModels, collectChannelModelNamesByCapability(channels, "image"))
+	setting.ModelChannel.VideoModels = normalizeScopedModels(setting.ModelChannel.VideoModels, setting.ModelChannel.AvailableModels, collectChannelModelNamesByCapability(channels, "video"))
+	setting.ModelChannel.TextModels = normalizeScopedModels(setting.ModelChannel.TextModels, setting.ModelChannel.AvailableModels, collectChannelModelNamesByCapability(channels, "text"))
+	setting.ModelChannel.Model3DModels = normalizeScopedModels(setting.ModelChannel.Model3DModels, setting.ModelChannel.AvailableModels, collectChannelModelNamesByCapability(channels, "model3d"))
 	if setting.ModelChannel.ModelCosts == nil {
 		setting.ModelChannel.ModelCosts = []model.ModelCost{}
 	}
 	setting.ModelChannel.ModelCosts = normalizeModelCosts(setting.ModelChannel.ModelCosts, setting.ModelChannel.AvailableModels, channels)
+	setting.ModelChannel.DefaultImageModel = defaultScopedModel(setting.ModelChannel.ImageModels, setting.ModelChannel.DefaultImageModel)
+	setting.ModelChannel.DefaultVideoModel = defaultScopedModel(setting.ModelChannel.VideoModels, setting.ModelChannel.DefaultVideoModel)
+	setting.ModelChannel.DefaultTextModel = defaultScopedModel(setting.ModelChannel.TextModels, setting.ModelChannel.DefaultTextModel)
+	setting.ModelChannel.DefaultModel3D = defaultScopedModel(setting.ModelChannel.Model3DModels, setting.ModelChannel.DefaultModel3D)
+	setting.ModelChannel.DefaultModel = firstNonEmpty(setting.ModelChannel.DefaultTextModel, setting.ModelChannel.DefaultImageModel, setting.ModelChannel.DefaultVideoModel, setting.ModelChannel.DefaultModel3D)
 	if setting.Auth.AllowRegister == nil {
 		enabled := true
 		setting.Auth.AllowRegister = &enabled
@@ -886,6 +895,24 @@ func collectChannelModelNames(channels []model.ModelChannel) []string {
 	return uniqueNonEmptyStrings(names)
 }
 
+func collectChannelModelNamesByCapability(channels []model.ModelChannel, capability string) []string {
+	names := []string{}
+	for _, channel := range channels {
+		if !channel.Enabled {
+			continue
+		}
+		for _, item := range channel.ModelMappings {
+			if item.Capability == capability {
+				names = append(names, item.Name)
+			}
+		}
+	}
+	if len(names) == 0 {
+		return nil
+	}
+	return uniqueNonEmptyStrings(names)
+}
+
 func filterModels(models []string, options []string) []string {
 	if len(options) == 0 {
 		return uniqueNonEmptyStrings(models)
@@ -901,6 +928,31 @@ func filterModels(models []string, options []string) []string {
 		}
 	}
 	return result
+}
+
+func normalizeScopedModels(models []string, availableModels []string, capabilityModels []string) []string {
+	result := filterModels(models, availableModels)
+	if len(result) > 0 {
+		return result
+	}
+	result = filterModels(capabilityModels, availableModels)
+	if len(result) > 0 {
+		return result
+	}
+	return availableModels
+}
+
+func defaultScopedModel(models []string, current string) string {
+	current = strings.TrimSpace(current)
+	for _, item := range models {
+		if item == current {
+			return current
+		}
+	}
+	if len(models) > 0 {
+		return models[0]
+	}
+	return ""
 }
 
 func normalizeModelCosts(items []model.ModelCost, availableModels []string, channels []model.ModelChannel) []model.ModelCost {

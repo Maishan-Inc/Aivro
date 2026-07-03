@@ -111,6 +111,7 @@ export async function updateWorkflow(token: string, id: string, input: SaveWorkf
 export type CanvasAssistantSendInput = {
     sessionId: string;
     text: string;
+    model?: string;
     messages: CanvasAssistantSession["messages"];
     references?: NonNullable<CanvasAssistantSession["messages"][number]["references"]>;
 };

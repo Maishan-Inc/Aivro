@@ -109,11 +109,16 @@ const emptySettings: AdminSettings = {
     public: {
         modelChannel: {
             availableModels: [],
+            imageModels: [],
+            videoModels: [],
+            textModels: [],
+            model3DModels: [],
             modelCosts: [],
             defaultModel: "",
             defaultImageModel: "",
             defaultVideoModel: "",
             defaultTextModel: "",
+            defaultModel3D: "",
             systemPrompt: "",
         },
         auth: {
@@ -287,6 +292,10 @@ export default function AdminSettingsPage() {
     const [modelCosts, setModelCosts] = useState<AdminModelCost[]>([]);
     const [knownModels, setKnownModels] = useState<string[]>([]);
     const publicModels = Form.useWatch(["public", "modelChannel", "availableModels"], form) || [];
+    const imageModels = Form.useWatch(["public", "modelChannel", "imageModels"], form) || [];
+    const videoModels = Form.useWatch(["public", "modelChannel", "videoModels"], form) || [];
+    const textModels = Form.useWatch(["public", "modelChannel", "textModels"], form) || [];
+    const model3DModels = Form.useWatch(["public", "modelChannel", "model3DModels"], form) || [];
     const customAuthProviders = Form.useWatch(["private", "auth", "customProviders"], { form, preserve: true }) || [];
     const channelModels = useMemo(() => collectChannelModels(channels), [channels]);
     const channelColorByModel = useMemo(() => collectChannelModelColors(channels), [channels]);
@@ -671,10 +680,11 @@ export default function AdminSettingsPage() {
         const values = normalizeSettings(form.getFieldsValue(true) as AdminSettings);
         const nextChannelModels = collectChannelModels(nextChannels);
         const availableModels = filterModels(values.public.modelChannel.availableModels, nextChannelModels);
+        const modelChannel = normalizeModelChannelScopes({ ...values.public.modelChannel, availableModels });
         const modelCosts = syncModelCostsWithPublicModels(values.public.modelChannel.modelCosts, availableModels, nextChannels);
         const nextSettings = normalizeSettings({
             ...values,
-            public: { ...values.public, modelChannel: { ...values.public.modelChannel, availableModels, modelCosts } },
+            public: { ...values.public, modelChannel: { ...modelChannel, modelCosts } },
             private: { ...values.private, channels: nextChannels },
         });
         const saved = normalizeSettings(await saveAdminSettings(token, nextSettings));
@@ -779,23 +789,43 @@ export default function AdminSettingsPage() {
                                                         </Form.Item>
                                                     </Col>
                                                     <Col xs={24} md={6}>
-                                                        <Form.Item name={["public", "modelChannel", "defaultModel"]} label="默认模型">
-                                                            <Select showSearch allowClear options={publicModels.map((item) => ({ label: <ModelTag model={item} color={channelColorByModel[item]} />, value: item }))} />
+                                                        <Form.Item name={["public", "modelChannel", "imageModels"]} label="选择图片模型">
+                                                            <Select mode="multiple" placeholder="选择图片服务可用模型" options={publicModels.map((item) => ({ label: <ModelTag model={item} color={channelColorByModel[item]} />, value: item }))} />
+                                                        </Form.Item>
+                                                    </Col>
+                                                    <Col xs={24} md={6}>
+                                                        <Form.Item name={["public", "modelChannel", "videoModels"]} label="选择视频模型">
+                                                            <Select mode="multiple" placeholder="选择视频服务可用模型" options={publicModels.map((item) => ({ label: <ModelTag model={item} color={channelColorByModel[item]} />, value: item }))} />
+                                                        </Form.Item>
+                                                    </Col>
+                                                    <Col xs={24} md={6}>
+                                                        <Form.Item name={["public", "modelChannel", "textModels"]} label="选择对话模型">
+                                                            <Select mode="multiple" placeholder="选择对话服务可用模型" options={publicModels.map((item) => ({ label: <ModelTag model={item} color={channelColorByModel[item]} />, value: item }))} />
+                                                        </Form.Item>
+                                                    </Col>
+                                                    <Col xs={24} md={6}>
+                                                        <Form.Item name={["public", "modelChannel", "model3DModels"]} label="选择3D模型">
+                                                            <Select mode="multiple" placeholder="选择3D服务可用模型" options={publicModels.map((item) => ({ label: <ModelTag model={item} color={channelColorByModel[item]} />, value: item }))} />
                                                         </Form.Item>
                                                     </Col>
                                                     <Col xs={24} md={6}>
                                                         <Form.Item name={["public", "modelChannel", "defaultImageModel"]} label="默认图片模型">
-                                                            <Select showSearch allowClear options={publicModels.map((item) => ({ label: <ModelTag model={item} color={channelColorByModel[item]} />, value: item }))} />
+                                                            <Select showSearch allowClear options={scopedModelOptions(imageModels, publicModels).map((item) => ({ label: <ModelTag model={item} color={channelColorByModel[item]} />, value: item }))} />
                                                         </Form.Item>
                                                     </Col>
                                                     <Col xs={24} md={6}>
                                                         <Form.Item name={["public", "modelChannel", "defaultVideoModel"]} label="默认视频模型">
-                                                            <Select showSearch allowClear options={publicModels.map((item) => ({ label: <ModelTag model={item} color={channelColorByModel[item]} />, value: item }))} />
+                                                            <Select showSearch allowClear options={scopedModelOptions(videoModels, publicModels).map((item) => ({ label: <ModelTag model={item} color={channelColorByModel[item]} />, value: item }))} />
                                                         </Form.Item>
                                                     </Col>
                                                     <Col xs={24} md={6}>
-                                                        <Form.Item name={["public", "modelChannel", "defaultTextModel"]} label="默认文本模型">
-                                                            <Select showSearch allowClear options={publicModels.map((item) => ({ label: <ModelTag model={item} color={channelColorByModel[item]} />, value: item }))} />
+                                                        <Form.Item name={["public", "modelChannel", "defaultTextModel"]} label="默认对话模型">
+                                                            <Select showSearch allowClear options={scopedModelOptions(textModels, publicModels).map((item) => ({ label: <ModelTag model={item} color={channelColorByModel[item]} />, value: item }))} />
+                                                        </Form.Item>
+                                                    </Col>
+                                                    <Col xs={24} md={6}>
+                                                        <Form.Item name={["public", "modelChannel", "defaultModel3D"]} label="默认3D模型">
+                                                            <Select showSearch allowClear options={scopedModelOptions(model3DModels, publicModels).map((item) => ({ label: <ModelTag model={item} color={channelColorByModel[item]} />, value: item }))} />
                                                         </Form.Item>
                                                     </Col>
                                                     <Col span={24}>
@@ -2155,11 +2185,16 @@ function normalizePublicSetting(setting: Partial<AdminSettings["public"]> = {}):
         modelChannel: {
             ...emptySettings.public.modelChannel,
             availableModels: modelChannel.availableModels || [],
+            imageModels: normalizeModelScope(modelChannel.imageModels || [], modelChannel.availableModels || []),
+            videoModels: normalizeModelScope(modelChannel.videoModels || [], modelChannel.availableModels || []),
+            textModels: normalizeModelScope(modelChannel.textModels || [], modelChannel.availableModels || []),
+            model3DModels: normalizeModelScope(modelChannel.model3DModels || [], modelChannel.availableModels || []),
             modelCosts: normalizeModelCosts(modelChannel.modelCosts || []),
             defaultModel: modelChannel.defaultModel || "",
             defaultImageModel: modelChannel.defaultImageModel || "",
             defaultVideoModel: modelChannel.defaultVideoModel || "",
             defaultTextModel: modelChannel.defaultTextModel || "",
+            defaultModel3D: modelChannel.defaultModel3D || "",
             systemPrompt: modelChannel.systemPrompt || "",
         },
         auth: {
@@ -2236,6 +2271,10 @@ function normalizeModelCosts(items: Partial<AdminSettings["public"]["modelChanne
             seen.add(key);
             return true;
         });
+}
+
+function normalizeModelScope(models: string[], publicModels: string[]) {
+    return filterModels(models, publicModels);
 }
 
 function normalizePrivateSetting(setting: Partial<AdminSettings["private"]> = {}): AdminSettings["private"] {
@@ -2574,6 +2613,40 @@ function filterModels(models: string[], options: string[]) {
     return uniqueModels(models).filter((model) => optionSet.has(model));
 }
 
+function scopedModelOptions(models: string[], publicModels: string[]) {
+    const scoped = filterModels(models, publicModels);
+    return scoped.length ? scoped : publicModels;
+}
+
+function normalizeModelChannelScopes(modelChannel: AdminSettings["public"]["modelChannel"]) {
+    const availableModels = uniqueModels(modelChannel.availableModels || []);
+    const imageModels = filterModels(modelChannel.imageModels || [], availableModels);
+    const videoModels = filterModels(modelChannel.videoModels || [], availableModels);
+    const textModels = filterModels(modelChannel.textModels || [], availableModels);
+    const model3DModels = filterModels(modelChannel.model3DModels || [], availableModels);
+    return {
+        ...modelChannel,
+        availableModels,
+        imageModels,
+        videoModels,
+        textModels,
+        model3DModels,
+        defaultModel: firstModel(textModels) || firstModel(imageModels) || firstModel(videoModels) || firstModel(model3DModels),
+        defaultImageModel: modelInScope(modelChannel.defaultImageModel, imageModels),
+        defaultVideoModel: modelInScope(modelChannel.defaultVideoModel, videoModels),
+        defaultTextModel: modelInScope(modelChannel.defaultTextModel, textModels),
+        defaultModel3D: modelInScope(modelChannel.defaultModel3D, model3DModels),
+    };
+}
+
+function modelInScope(model: string, models: string[]) {
+    return models.includes(model) ? model : firstModel(models);
+}
+
+function firstModel(models: string[]) {
+    return models[0] || "";
+}
+
 function modelSummary(models: string[]) {
     if (!models.length) return "未配置模型";
     const preview = models.slice(0, 3).join(", ");
@@ -2610,6 +2683,7 @@ async function collectSettings(form: any, editorMode: Record<string, EditorMode>
         values.private = privateSetting;
     }
     values.public.modelChannel.availableModels = filterModels(values.public.modelChannel.availableModels, collectChannelModels(values.private.channels));
+    values.public.modelChannel = normalizeModelChannelScopes(values.public.modelChannel);
     values.public.modelChannel.modelCosts = syncModelCostsWithPublicModels(values.public.modelChannel.modelCosts, values.public.modelChannel.availableModels, values.private.channels);
     values.public.auth.customProviders = values.private.auth.customProviders.map((provider) => ({
         id: provider.id,

@@ -12,15 +12,20 @@
 ```json
 {
   "modelChannel": {
-    "availableModels": ["gpt-5.5", "gpt-image-2", "grok-imagine-video"],
+    "availableModels": ["gpt-5.5", "gpt-image-2", "grok-imagine-video", "hunyuan3d"],
+    "imageModels": ["gpt-image-2"],
+    "videoModels": ["grok-imagine-video"],
+    "textModels": ["gpt-5.5"],
+    "model3DModels": ["hunyuan3d"],
     "modelCosts": [
       { "model": "gpt-5.5", "credits": 1 },
       { "model": "gpt-image-2", "credits": 10 }
     ],
-    "defaultModel": "gpt-image-2",
+    "defaultModel": "gpt-5.5",
     "defaultImageModel": "gpt-image-2",
     "defaultVideoModel": "grok-imagine-video",
     "defaultTextModel": "gpt-5.5",
+    "defaultModel3D": "hunyuan3d",
     "systemPrompt": ""
   },
   "auth": {
@@ -80,11 +85,16 @@
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
 | `availableModels` | string[] | 系统可用模型，由管理员手动选择；页面下拉选项可来自私有渠道模型 |
+| `imageModels` | string[] | 图片生成服务可用模型范围 |
+| `videoModels` | string[] | 视频生成服务可用模型范围 |
+| `textModels` | string[] | 对话、文本和画布助手服务可用模型范围 |
+| `model3DModels` | string[] | 3D 模型服务可用模型范围 |
 | `modelCosts` | object[] | 模型算力点配置，后端模型接口调用前按模型预扣，上游失败时返还；未配置默认不扣除 |
-| `defaultModel` | string | 默认模型，从 `availableModels` 中选择 |
-| `defaultImageModel` | string | 默认图片模型，从 `availableModels` 中选择 |
-| `defaultVideoModel` | string | 默认视频模型，从 `availableModels` 中选择 |
-| `defaultTextModel` | string | 默认文本模型，从 `availableModels` 中选择 |
+| `defaultModel` | string | 兼容字段，保存当前通用默认模型 |
+| `defaultImageModel` | string | 默认图片模型，从 `imageModels` 中选择 |
+| `defaultVideoModel` | string | 默认视频模型，从 `videoModels` 中选择 |
+| `defaultTextModel` | string | 默认对话模型，从 `textModels` 中选择 |
+| `defaultModel3D` | string | 默认 3D 模型，从 `model3DModels` 中选择 |
 | `systemPrompt` | string | 系统提示词 |
 
 `modelCosts` 每项字段：

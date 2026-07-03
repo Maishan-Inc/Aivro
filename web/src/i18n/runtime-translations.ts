@@ -387,6 +387,8 @@ export const runtimeEnglishTranslations: Record<string, string> = {
     "默认图片模型": "Default image model",
     "默认视频模型": "Default video model",
     "默认文本模型": "Default text model",
+    "默认对话模型": "Default chat model",
+    "默认3D模型": "Default 3D model",
     "系统提示词": "System prompt",
     "登录方式": "Login methods",
     "允许注册": "Allow registration",

@@ -270,11 +270,16 @@ export type AdminModelChannelModel = {
 
 export type AdminPublicModelChannelSettings = {
     availableModels: string[];
+    imageModels: string[];
+    videoModels: string[];
+    textModels: string[];
+    model3DModels: string[];
     modelCosts: AdminModelCost[];
     defaultModel: string;
     defaultImageModel: string;
     defaultVideoModel: string;
     defaultTextModel: string;
+    defaultModel3D: string;
     systemPrompt: string;
 };
 

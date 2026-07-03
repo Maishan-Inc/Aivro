@@ -556,7 +556,7 @@ function GenerationSettings({ config, model, updateConfig, onMissingConfig }: { 
         <>
             <label className="col-span-2 block min-w-0 sm:col-span-1">
                 <span className="mb-1.5 block text-sm font-semibold sm:mb-2 sm:text-base">{locale === "en-US" ? "Model" : "模型"}</span>
-                <ModelPicker config={config} value={model} onChange={(value) => updateConfig("imageModel", value)} fullWidth onMissingConfig={onMissingConfig} />
+                <ModelPicker config={config} models={config.imageModels} value={model} onChange={(value) => updateConfig("imageModel", value)} fullWidth onMissingConfig={onMissingConfig} />
             </label>
             <div className="col-span-2">
                 <ImageSettingsPanel config={config} onConfigChange={(key, value) => updateConfig(key, value)} theme={theme} showTitle={false} className="space-y-4" maxCount={10} />

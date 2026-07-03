@@ -2,14 +2,15 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowUp, Eye, History, LoaderCircle, MessageSquare, PanelRightClose, Plus, RotateCcw, Sparkles, Trash2, X } from "lucide-react";
-import { App, Button, Modal, Tooltip } from "antd";
+import { App, Button, Modal, Segmented, Tooltip } from "antd";
 
 import { ImageGenerationPending } from "@/components/image-generation-pending";
-import { useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
+import { ModelPicker } from "@/components/model-picker";
+import { useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { nanoid } from "nanoid";
 import { cn } from "@/lib/utils";
-import { batchDeleteCanvasAssistantSessions, fetchCanvasAssistantSessions, planCanvasAgent } from "@/services/api/workflows";
+import { batchDeleteCanvasAssistantSessions, fetchCanvasAssistantSessions, planCanvasAgent, sendCanvasAssistantMessage } from "@/services/api/workflows";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { useUserStore } from "@/stores/use-user-store";
@@ -54,6 +55,8 @@ export function CanvasAssistantPanel({ workflowId, nodes, selectedNodeIds, snaps
     const [view, setView] = useState<"chat" | "history">("chat");
     const [prompt, setPrompt] = useState("");
     const [isRunning, setIsRunning] = useState(false);
+    const [assistantMode, setAssistantMode] = useState<"plan" | "chat">("plan");
+    const [assistantModel, setAssistantModel] = useState("");
     const [checkedChatIds, setCheckedChatIds] = useState<string[]>([]);
     const [deleteChatIds, setDeleteChatIds] = useState<string[]>([]);
     const [closing, setClosing] = useState(false);
@@ -100,6 +103,10 @@ export function CanvasAssistantPanel({ workflowId, nodes, selectedNodeIds, snaps
     const allSelectedReferences = useMemo(() => buildAssistantReferences(nodes, selectedNodeIds), [nodes, selectedNodeIds]);
     const selectedReferences = useMemo(() => allSelectedReferences.filter((item) => !removedReferenceIds.has(item.id)), [allSelectedReferences, removedReferenceIds]);
     const iconButtonStyle = { color: theme.node.muted };
+
+    useEffect(() => {
+        setAssistantModel((current) => (current && effectiveConfig.textModels.includes(current) ? current : effectiveConfig.textModel || effectiveConfig.model));
+    }, [effectiveConfig.model, effectiveConfig.textModel, effectiveConfig.textModels]);
 
     useEffect(() => {
         setRemovedReferenceIds(new Set());
@@ -197,7 +204,7 @@ export function CanvasAssistantPanel({ workflowId, nodes, selectedNodeIds, snaps
     };
 
     const sendMessage = async (text: string, history: CanvasAssistantMessage[], savedReferences?: CanvasAssistantReference[]) => {
-        const requestConfig = { ...effectiveConfig, model: effectiveConfig.textModel || effectiveConfig.model };
+        const requestConfig = { ...effectiveConfig, model: assistantModel || effectiveConfig.textModel || effectiveConfig.model };
         if (!token) {
             message.warning("请先登录后使用画布助手");
             return;
@@ -217,17 +224,21 @@ export function CanvasAssistantPanel({ workflowId, nodes, selectedNodeIds, snaps
         const userMessage: CanvasAssistantMessage = { id: nanoid(), role: "user", mode: "ask", text, references: refs };
         const assistantId = nanoid();
         appendMessage(session.id, userMessage);
-        appendMessage(session.id, { id: assistantId, role: "assistant", mode: "ask", text: "正在规划画布修改", isLoading: true });
+        appendMessage(session.id, { id: assistantId, role: "assistant", mode: "ask", text: assistantMode === "chat" ? "正在思考" : "正在规划画布修改", isLoading: true });
         setPrompt("");
         setIsRunning(true);
 
         try {
             const currentSnapshot = snapshotRef.current;
-            const result = await planCanvasAgent(token, workflowId, {
+            const baseInput = {
                 sessionId: session.id,
                 text,
+                model: requestConfig.model,
                 messages: sanitizeAgentMessages(history),
                 references: sanitizeAgentReferences(refs),
+            };
+            const result = assistantMode === "chat" ? await sendCanvasAssistantMessage(token, workflowId, baseInput) : await planCanvasAgent(token, workflowId, {
+                ...baseInput,
                 snapshot: sanitizeCanvasAgentSnapshot(currentSnapshot),
                 preview: previewOps.length ? { ops: previewOps, snapshot: sanitizeCanvasAgentSnapshot(currentSnapshot) } : undefined,
             });
@@ -381,6 +392,11 @@ export function CanvasAssistantPanel({ workflowId, nodes, selectedNodeIds, snaps
                         references={selectedReferences}
                         onPromptChange={setPrompt}
                         onSubmit={submit}
+                        mode={assistantMode}
+                        model={assistantModel}
+                        config={effectiveConfig}
+                        onModeChange={setAssistantMode}
+                        onModelChange={setAssistantModel}
                         onRemoveReference={(id) => {
                             setRemovedReferenceIds((prev) => new Set(prev).add(id));
                             if (selectedNodeIds.has(id)) onSelectNodeIds(new Set(Array.from(selectedNodeIds).filter((nodeId) => nodeId !== id)));
@@ -423,8 +439,13 @@ function AssistantComposer({
     prompt,
     isRunning,
     references,
+    mode,
+    model,
+    config,
     onPromptChange,
     onSubmit,
+    onModeChange,
+    onModelChange,
     onRemoveReference,
     onPasteImage,
     previewing,
@@ -432,8 +453,13 @@ function AssistantComposer({
     prompt: string;
     isRunning: boolean;
     references: CanvasAssistantReference[];
+    mode: "plan" | "chat";
+    model: string;
+    config: AiConfig;
     onPromptChange: (prompt: string) => void;
     onSubmit: () => void;
+    onModeChange: (mode: "plan" | "chat") => void;
+    onModelChange: (model: string) => void;
     onRemoveReference: (id: string) => void;
     onPasteImage: (file: File) => void;
     previewing?: boolean;
@@ -470,6 +496,16 @@ function AssistantComposer({
                 <div className="mt-2 flex items-center justify-between gap-2">
                     <div className="canvas-composer-tools flex min-w-0 flex-1 items-center gap-1">
                         <CanvasPromptLibrary onSelect={onPromptChange} />
+                        <Segmented
+                            size="small"
+                            value={mode}
+                            onChange={(value) => onModeChange(value as "plan" | "chat")}
+                            options={[
+                                { label: "规划", value: "plan" },
+                                { label: "对话", value: "chat" },
+                            ]}
+                        />
+                        <ModelPicker config={config} models={config.textModels} value={model} onChange={onModelChange} placeholder="对话模型" onMissingConfig={() => undefined} />
                     </div>
                     <Button
                         type="primary"

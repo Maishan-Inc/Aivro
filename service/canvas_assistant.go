@@ -74,6 +74,7 @@ type CanvasAssistantMessage struct {
 type CanvasAssistantSendInput struct {
 	SessionID  string                     `json:"sessionId"`
 	Text       string                     `json:"text"`
+	Model      string                     `json:"model"`
 	Messages   []CanvasAssistantMessage   `json:"messages"`
 	References []CanvasAssistantReference `json:"references"`
 }
@@ -152,6 +153,7 @@ type CanvasAgentPreviewInput struct {
 type CanvasAgentPlanInput struct {
 	SessionID  string                     `json:"sessionId"`
 	Text       string                     `json:"text"`
+	Model      string                     `json:"model"`
 	Messages   []CanvasAssistantMessage   `json:"messages"`
 	References []CanvasAssistantReference `json:"references"`
 	Snapshot   CanvasAgentSnapshot        `json:"snapshot"`
@@ -238,7 +240,7 @@ func SendCanvasAssistantMessage(ctx context.Context, userID string, workflowID s
 		References: normalizeCanvasAssistantReferences(input.References),
 	}
 	messages := append(normalizeCanvasAssistantMessages(input.Messages), userMessage)
-	answer, _, err := requestCanvasAssistantAnswer(ctx, userID, messages, meta)
+	answer, _, err := requestCanvasAssistantAnswer(ctx, userID, input, messages, meta)
 	if err != nil {
 		return CanvasAssistantSendResult{}, err
 	}
@@ -375,15 +377,15 @@ func saveCanvasAssistantSession(userID string, workflowID string, session model.
 	return session, db.Save(&session).Error
 }
 
-func requestCanvasAssistantAnswer(ctx context.Context, userID string, messages []CanvasAssistantMessage, meta RequestLogMeta) (string, string, error) {
+func requestCanvasAssistantAnswer(ctx context.Context, userID string, input CanvasAssistantSendInput, messages []CanvasAssistantMessage, meta RequestLogMeta) (string, string, error) {
 	settings, err := repository.GetSettings()
 	if err != nil {
 		return "", "", err
 	}
 	settings = normalizeSettings(settings)
-	modelName := strings.TrimSpace(firstNonEmpty(settings.Public.ModelChannel.DefaultTextModel, settings.Public.ModelChannel.DefaultModel))
+	modelName := canvasAssistantModel(settings, input.Model)
 	if modelName == "" {
-		return "", "", safeMessageError{message: "管理员尚未配置默认文本模型"}
+		return "", "", safeMessageError{message: "管理员尚未配置默认对话模型"}
 	}
 	credits, err := ModelCost(modelName)
 	if err != nil {
@@ -439,9 +441,9 @@ func requestCanvasAgentPlan(ctx context.Context, userID string, input CanvasAgen
 		return canvasAgentPlanPayload{}, "", CanvasAgentUsage{}, err
 	}
 	settings = normalizeSettings(settings)
-	modelName := strings.TrimSpace(firstNonEmpty(settings.Public.ModelChannel.DefaultTextModel, settings.Public.ModelChannel.DefaultModel))
+	modelName := canvasAssistantModel(settings, input.Model)
 	if modelName == "" {
-		return canvasAgentPlanPayload{}, "", CanvasAgentUsage{}, safeMessageError{message: "管理员尚未配置默认文本模型"}
+		return canvasAgentPlanPayload{}, "", CanvasAgentUsage{}, safeMessageError{message: "管理员尚未配置默认对话模型"}
 	}
 	routes, err := SelectModelChannelRoutes(modelName)
 	if err != nil {
@@ -526,6 +528,16 @@ func requestCanvasAgentPlan(ctx context.Context, userID string, input CanvasAgen
 		return canvasAgentPlanPayload{}, "", CanvasAgentUsage{}, err
 	}
 	return plan, modelName, usage, nil
+}
+
+func canvasAssistantModel(settings model.Settings, requested string) string {
+	requested = strings.TrimSpace(requested)
+	for _, item := range settings.Public.ModelChannel.TextModels {
+		if item == requested {
+			return requested
+		}
+	}
+	return strings.TrimSpace(firstNonEmpty(settings.Public.ModelChannel.DefaultTextModel, settings.Public.ModelChannel.DefaultModel))
 }
 
 func canvasAgentOpenAIMessages(input CanvasAgentPlanInput, messages []CanvasAssistantMessage) []map[string]string {

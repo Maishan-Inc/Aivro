@@ -13,10 +13,15 @@ export type AiConfig = {
     imageModel: string;
     videoModel: string;
     textModel: string;
+    model3DModel: string;
     videoSeconds: string;
     vquality: string;
     systemPrompt: string;
     models: string[];
+    imageModels: string[];
+    videoModels: string[];
+    textModels: string[];
+    model3DModels: string[];
     quality: string;
     size: string;
     count: string;
@@ -27,10 +32,15 @@ export const defaultConfig: AiConfig = {
     imageModel: "gpt-image-2",
     videoModel: "grok-imagine-video",
     textModel: "gpt-5.5",
+    model3DModel: "hunyuan3d",
     videoSeconds: "6",
     vquality: "720",
     systemPrompt: "",
     models: [],
+    imageModels: [],
+    videoModels: [],
+    textModels: [],
+    model3DModels: [],
     quality: "auto",
     size: "1:1",
     count: "1",
@@ -48,17 +58,27 @@ type ConfigStore = {
 
 function resolveEffectiveConfig(config: AiConfig, modelChannel: AdminPublicSettings["modelChannel"] | null) {
     const models = modelChannel?.availableModels || [];
+    const imageModels = scopedModels(modelChannel?.imageModels, models);
+    const videoModels = scopedModels(modelChannel?.videoModels, models);
+    const textModels = scopedModels(modelChannel?.textModels, models);
+    const model3DModels = scopedModels(modelChannel?.model3DModels, models);
     const fallbackModel = defaultAllowedModel(models, modelChannel?.defaultModel);
-    const fallbackImageModel = defaultAllowedModel(models, modelChannel?.defaultImageModel) || fallbackModel;
-    const fallbackVideoModel = defaultAllowedModel(models, modelChannel?.defaultVideoModel) || fallbackModel;
-    const fallbackTextModel = defaultAllowedModel(models, modelChannel?.defaultTextModel) || fallbackModel;
+    const fallbackImageModel = defaultAllowedModel(imageModels, modelChannel?.defaultImageModel) || defaultAllowedModel(imageModels) || fallbackModel;
+    const fallbackVideoModel = defaultAllowedModel(videoModels, modelChannel?.defaultVideoModel) || defaultAllowedModel(videoModels) || fallbackModel;
+    const fallbackTextModel = defaultAllowedModel(textModels, modelChannel?.defaultTextModel) || defaultAllowedModel(textModels) || fallbackModel;
+    const fallbackModel3D = defaultAllowedModel(model3DModels, modelChannel?.defaultModel3D) || defaultAllowedModel(model3DModels) || fallbackModel;
     return {
         ...config,
         models,
+        imageModels,
+        videoModels,
+        textModels,
+        model3DModels,
         model: models.includes(config.model) ? config.model : fallbackModel,
-        imageModel: models.includes(config.imageModel) ? config.imageModel : fallbackImageModel,
-        videoModel: models.includes(config.videoModel) ? config.videoModel : fallbackVideoModel,
-        textModel: models.includes(config.textModel) ? config.textModel : fallbackTextModel,
+        imageModel: imageModels.includes(config.imageModel) ? config.imageModel : fallbackImageModel,
+        videoModel: videoModels.includes(config.videoModel) ? config.videoModel : fallbackVideoModel,
+        textModel: textModels.includes(config.textModel) ? config.textModel : fallbackTextModel,
+        model3DModel: model3DModels.includes(config.model3DModel) ? config.model3DModel : fallbackModel3D,
         systemPrompt: modelChannel?.systemPrompt || "",
     };
 }
@@ -71,6 +91,12 @@ function defaultAllowedModel(models: string[], model?: string) {
     return model && models.includes(model) ? model : models[0] || "";
 }
 
+function scopedModels(models: string[] | undefined, availableModels: string[]) {
+    const available = new Set(availableModels);
+    const result = Array.from(new Set((models || []).filter((model) => available.has(model))));
+    return result.length ? result : availableModels;
+}
+
 function normalizeStoredConfig(value: Partial<AiConfig> = {}): AiConfig {
     return {
         ...defaultConfig,
@@ -78,10 +104,15 @@ function normalizeStoredConfig(value: Partial<AiConfig> = {}): AiConfig {
         imageModel: value.imageModel || value.model || defaultConfig.imageModel,
         videoModel: value.videoModel || defaultConfig.videoModel,
         textModel: value.textModel || value.model || defaultConfig.textModel,
+        model3DModel: value.model3DModel || defaultConfig.model3DModel,
         videoSeconds: value.videoSeconds || defaultConfig.videoSeconds,
         vquality: value.vquality || defaultConfig.vquality,
         systemPrompt: "",
         models: [],
+        imageModels: [],
+        videoModels: [],
+        textModels: [],
+        model3DModels: [],
         quality: value.quality || defaultConfig.quality,
         size: value.size || defaultConfig.size,
         count: value.count || defaultConfig.count,

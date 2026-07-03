@@ -8,6 +8,8 @@ import { useAssetStore } from "@/stores/use-asset-store";
 import { requestModel3DGeneration, type Model3DGenerationInput, type Model3DGenerationResult } from "@/services/api/model-3d";
 import { saveGenerationHistory, deleteGenerationHistory, fetchGenerationHistories, type GenerationHistory } from "@/services/api/generation-history";
 import { uploadImage } from "@/services/image-storage";
+import { ModelPicker } from "@/components/model-picker";
+import { useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
 import { formatBytes, formatDuration, readImageMeta } from "@/lib/image-utils";
 import { nanoid } from "nanoid";
 
@@ -52,6 +54,10 @@ export default function Model3DPage() {
     const { message } = App.useApp();
     const { token } = useUserStore();
     const { addAsset } = useAssetStore();
+    const effectiveConfig = useEffectiveConfig();
+    const updateConfig = useConfigStore((state) => state.updateConfig);
+    const isAiConfigReady = useConfigStore((state) => state.isAiConfigReady);
+    const model = effectiveConfig.model3DModel || effectiveConfig.model;
 
     const [mode, setMode] = useState<"image" | "multi_image" | "text">("image");
     const [prompt, setPrompt] = useState("");
@@ -101,11 +107,15 @@ export default function Model3DPage() {
             Modal.error({ title: "提示", content: "请输入文字描述" });
             return;
         }
+        if (!isAiConfigReady(effectiveConfig, model)) {
+            Modal.error({ title: "提示", content: "管理员尚未配置可用3D模型" });
+            return;
+        }
 
         setGenerating(true);
         try {
             const input: Model3DGenerationInput = {
-                model: "hunyuan3d",
+                model,
                 mode,
                 prompt,
                 images: images.map((img) => ({ name: img.name, type: img.type, url: img.url, storageKey: img.storageKey })),
@@ -212,6 +222,11 @@ export default function Model3DPage() {
                         </div>
 
                         <div className="mt-6 space-y-5">
+                            <div>
+                                <span className="mb-2 block text-base font-semibold">模型</span>
+                                <ModelPicker config={effectiveConfig} models={effectiveConfig.model3DModels} value={model} onChange={(value) => updateConfig("model3DModel", value)} fullWidth onMissingConfig={() => message.warning("管理员尚未配置可用3D模型")} />
+                            </div>
+
                             <div>
                                 <span className="mb-2 block text-base font-semibold">生成方式</span>
                                 <Segmented

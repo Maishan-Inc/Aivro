@@ -12,17 +12,18 @@ type ModelPickerProps = {
     config: AiConfig;
     value?: string;
     onChange: (model: string) => void;
+    models?: string[];
     className?: string;
     fullWidth?: boolean;
     placeholder?: string;
     onMissingConfig?: () => void;
 };
 
-export function ModelPicker({ config, value, onChange, className, fullWidth = false, placeholder = "选择模型", onMissingConfig }: ModelPickerProps) {
+export function ModelPicker({ config, value, onChange, models, className, fullWidth = false, placeholder = "选择模型", onMissingConfig }: ModelPickerProps) {
     const { locale } = useI18n();
     const pickerId = useId();
     const [open, setOpen] = useState(false);
-    const options = useMemo(() => Array.from(new Set(config.models.filter(Boolean))), [config.models]);
+    const options = useMemo(() => Array.from(new Set((models || config.models).filter(Boolean))), [config.models, models]);
     const current = value || "";
 
     useEffect(() => {

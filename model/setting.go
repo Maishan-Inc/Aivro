@@ -57,11 +57,16 @@ type ModelCost struct {
 // PublicModelChannelSetting 公开模型渠道配置。
 type PublicModelChannelSetting struct {
 	AvailableModels   []string    `json:"availableModels"`
+	ImageModels       []string    `json:"imageModels"`
+	VideoModels       []string    `json:"videoModels"`
+	TextModels        []string    `json:"textModels"`
+	Model3DModels     []string    `json:"model3DModels"`
 	ModelCosts        []ModelCost `json:"modelCosts"`
 	DefaultModel      string      `json:"defaultModel"`
 	DefaultImageModel string      `json:"defaultImageModel"`
 	DefaultVideoModel string      `json:"defaultVideoModel"`
 	DefaultTextModel  string      `json:"defaultTextModel"`
+	DefaultModel3D    string      `json:"defaultModel3D"`
 	SystemPrompt      string      `json:"systemPrompt"`
 }
 
