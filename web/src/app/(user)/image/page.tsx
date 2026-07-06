@@ -731,6 +731,25 @@ function LogPanel({
 }
 
 function LogCard({ log, selected, active, onSelectedChange, onClick, onDoubleClick }: { log: GenerationLog; selected: boolean; active: boolean; onSelectedChange: (checked: boolean) => void; onClick: () => void; onDoubleClick: () => void }) {
+    const clickTimerRef = useRef<number | null>(null);
+    useEffect(() => () => {
+        if (clickTimerRef.current) window.clearTimeout(clickTimerRef.current);
+    }, []);
+    const handleClick = () => {
+        if (clickTimerRef.current) window.clearTimeout(clickTimerRef.current);
+        clickTimerRef.current = window.setTimeout(() => {
+            clickTimerRef.current = null;
+            onClick();
+        }, 220);
+    };
+    const handleDoubleClick = () => {
+        if (clickTimerRef.current) {
+            window.clearTimeout(clickTimerRef.current);
+            clickTimerRef.current = null;
+        }
+        onDoubleClick();
+    };
+
     if (log.status === "生成中") {
         return (
             <div className="flex h-28 w-full items-center justify-center rounded-lg border border-dashed border-stone-300 bg-background p-2 text-stone-900 dark:border-stone-700 dark:text-stone-100">
@@ -743,8 +762,8 @@ function LogCard({ log, selected, active, onSelectedChange, onClick, onDoubleCli
         <button
             type="button"
             className={`block w-full rounded-lg border p-2 text-left transition ${active ? "border-stone-900 bg-blue-50 dark:border-stone-100 dark:bg-blue-950/20" : "border-stone-200 bg-background hover:bg-stone-50 dark:border-stone-800 dark:hover:bg-stone-900"}`}
-            onClick={onClick}
-            onDoubleClick={onDoubleClick}
+            onClick={handleClick}
+            onDoubleClick={handleDoubleClick}
         >
             <div className="grid grid-cols-[minmax(128px,1fr)_auto] gap-2">
                 <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-2">

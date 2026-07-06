@@ -543,8 +543,27 @@ function LogPanel({
 }
 
 function LogCard({ log, selected, active, onSelectedChange, onClick, onDoubleClick }: { log: GenerationLog; selected: boolean; active: boolean; onSelectedChange: (checked: boolean) => void; onClick: () => void; onDoubleClick: () => void }) {
+    const clickTimerRef = useRef<number | null>(null);
+    useEffect(() => () => {
+        if (clickTimerRef.current) window.clearTimeout(clickTimerRef.current);
+    }, []);
+    const handleClick = () => {
+        if (clickTimerRef.current) window.clearTimeout(clickTimerRef.current);
+        clickTimerRef.current = window.setTimeout(() => {
+            clickTimerRef.current = null;
+            onClick();
+        }, 220);
+    };
+    const handleDoubleClick = () => {
+        if (clickTimerRef.current) {
+            window.clearTimeout(clickTimerRef.current);
+            clickTimerRef.current = null;
+        }
+        onDoubleClick();
+    };
+
     return (
-        <button type="button" className={`block w-full rounded-lg border p-2 text-left transition ${active ? "border-stone-900 bg-blue-50 dark:border-stone-100 dark:bg-blue-950/20" : "border-stone-200 bg-background hover:bg-stone-50 dark:border-stone-800 dark:hover:bg-stone-900"}`} onClick={onClick} onDoubleClick={onDoubleClick}>
+        <button type="button" className={`block w-full rounded-lg border p-2 text-left transition ${active ? "border-stone-900 bg-blue-50 dark:border-stone-100 dark:bg-blue-950/20" : "border-stone-200 bg-background hover:bg-stone-50 dark:border-stone-800 dark:hover:bg-stone-900"}`} onClick={handleClick} onDoubleClick={handleDoubleClick}>
             <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-2">
                 <Checkbox className="mt-0.5" checked={selected} onClick={(event) => event.stopPropagation()} onChange={(event) => onSelectedChange(event.target.checked)} />
                 <div className="min-w-0">
