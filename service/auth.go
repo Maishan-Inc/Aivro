@@ -839,6 +839,20 @@ func ListCreditLogs(q model.Query) (model.CreditLogList, error) {
 	return model.CreditLogList{Items: logs, Total: int(total)}, nil
 }
 
+func ListUserCreditLogs(user model.AuthUser, q model.Query) (model.CreditLogList, error) {
+	logs, total, err := repository.ListUserCreditLogs(user.ID, q)
+	if err != nil {
+		return model.CreditLogList{}, err
+	}
+	for i := range logs {
+		logs[i].IP = ""
+		logs[i].Country = ""
+		logs[i].Extra = ""
+		logs[i].User = nil
+	}
+	return model.CreditLogList{Items: logs, Total: int(total)}, nil
+}
+
 func ListAuditLogs(q model.Query) (model.AuditLogList, error) {
 	logs, total, err := repository.ListAuditLogs(q)
 	if err != nil {

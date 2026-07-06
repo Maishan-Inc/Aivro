@@ -9,6 +9,7 @@ import { saveAs } from "file-saver";
 import { AivroDrawableLoader } from "@/components/aivro-drawable-loader";
 import { ImageSettingsPanel } from "@/components/image-settings-panel";
 import { ModelPicker } from "@/components/model-picker";
+import { GenerationHistoryDetailModal } from "@/components/generation-history-detail-modal";
 import { PromptSelectDialog } from "@/components/prompts/prompt-select-dialog";
 import { AssetPickerModal, type InsertAssetPayload } from "@/app/(user)/canvas/components/asset-picker-modal";
 import { useI18n } from "@/hooks/use-i18n";
@@ -66,6 +67,7 @@ type GenerationLog = {
     status: "生成中" | "成功" | "失败";
     images: GeneratedImage[];
     thumbnails: string[];
+    history?: GenerationHistory;
 };
 
 type GenerationLogConfig = Pick<AiConfig, "model" | "imageModel" | "quality" | "size" | "count">;
@@ -97,6 +99,7 @@ export default function ImagePage() {
     const [elapsedMs, setElapsedMs] = useState(0);
     const [selectedLogIds, setSelectedLogIds] = useState<string[]>([]);
     const [previewLog, setPreviewLog] = useState<GenerationLog | null>(null);
+    const [detailHistory, setDetailHistory] = useState<GenerationHistory | null>(null);
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
     const model = effectiveConfig.imageModel || effectiveConfig.model;
@@ -376,6 +379,7 @@ export default function ImagePage() {
                         onCreateSession={createSession}
                         onDeleteSelected={() => setDeleteConfirmOpen(true)}
                         onPreviewLog={(log) => void previewGenerationLog(log)}
+                        onOpenDetail={(log) => log.history && setDetailHistory(log.history)}
                     />
                 </aside>
 
@@ -532,6 +536,7 @@ export default function ImagePage() {
                     onCreateSession={createSession}
                     onDeleteSelected={() => setDeleteConfirmOpen(true)}
                     onPreviewLog={(log) => void previewGenerationLog(log)}
+                    onOpenDetail={(log) => log.history && setDetailHistory(log.history)}
                 />
             </Drawer>
             <Drawer title={locale === "en-US" ? "Settings" : "参数"} placement="bottom" height="82vh" open={settingsOpen} onClose={() => setSettingsOpen(false)}>
@@ -544,6 +549,7 @@ export default function ImagePage() {
             <Modal title="删除生成记录" open={deleteConfirmOpen} onCancel={() => setDeleteConfirmOpen(false)} onOk={deleteSelectedLogs} okText="删除" okButtonProps={{ danger: true }} cancelText="取消">
                 确定删除选中的 {selectedLogIds.length} 条生成记录吗？
             </Modal>
+            <GenerationHistoryDetailModal open={Boolean(detailHistory)} history={detailHistory} onClose={() => setDetailHistory(null)} />
         </div>
     );
 }
@@ -671,6 +677,7 @@ function LogPanel({
     onCreateSession,
     onDeleteSelected,
     onPreviewLog,
+    onOpenDetail,
 }: {
     logs: GenerationLog[];
     selectedLogIds: string[];
@@ -679,6 +686,7 @@ function LogPanel({
     onCreateSession: () => void;
     onDeleteSelected: () => void;
     onPreviewLog: (log: GenerationLog) => void;
+    onOpenDetail: (log: GenerationLog) => void;
 }) {
     const selectableLogs = logs.filter((log) => log.status !== "生成中");
     const allSelected = Boolean(selectableLogs.length) && selectedLogIds.length === selectableLogs.length;
@@ -713,6 +721,7 @@ function LogPanel({
                         active={activeLogId === log.id}
                         onSelectedChange={(checked) => onSelectedLogIdsChange(checked ? [...selectedLogIds, log.id] : selectedLogIds.filter((id) => id !== log.id))}
                         onClick={() => onPreviewLog(log)}
+                        onDoubleClick={() => onOpenDetail(log)}
                     />
                 ))}
                 {!logs.length ? <div className="flex min-h-48 items-center justify-center rounded-lg border border-dashed border-stone-300 text-center text-sm text-stone-500 dark:border-stone-700">暂无生成记录</div> : null}
@@ -721,7 +730,7 @@ function LogPanel({
     );
 }
 
-function LogCard({ log, selected, active, onSelectedChange, onClick }: { log: GenerationLog; selected: boolean; active: boolean; onSelectedChange: (checked: boolean) => void; onClick: () => void }) {
+function LogCard({ log, selected, active, onSelectedChange, onClick, onDoubleClick }: { log: GenerationLog; selected: boolean; active: boolean; onSelectedChange: (checked: boolean) => void; onClick: () => void; onDoubleClick: () => void }) {
     if (log.status === "生成中") {
         return (
             <div className="flex h-28 w-full items-center justify-center rounded-lg border border-dashed border-stone-300 bg-background p-2 text-stone-900 dark:border-stone-700 dark:text-stone-100">
@@ -735,12 +744,14 @@ function LogCard({ log, selected, active, onSelectedChange, onClick }: { log: Ge
             type="button"
             className={`block w-full rounded-lg border p-2 text-left transition ${active ? "border-stone-900 bg-blue-50 dark:border-stone-100 dark:bg-blue-950/20" : "border-stone-200 bg-background hover:bg-stone-50 dark:border-stone-800 dark:hover:bg-stone-900"}`}
             onClick={onClick}
+            onDoubleClick={onDoubleClick}
         >
             <div className="grid grid-cols-[minmax(128px,1fr)_auto] gap-2">
                 <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-2">
                     <Checkbox className="mt-0.5" checked={selected} onClick={(event) => event.stopPropagation()} onChange={(event) => onSelectedChange(event.target.checked)} />
                     <div className="min-w-0">
                         <div className="truncate text-sm font-semibold leading-5">{log.title}</div>
+                        <div className="mt-1 line-clamp-2 whitespace-pre-wrap break-words text-xs leading-4 text-stone-500 dark:text-stone-400">{log.prompt || "无提示词"}</div>
                         {log.thumbnails?.length ? (
                             <div className="mt-2 grid grid-cols-4 gap-1.5">
                                 {log.thumbnails.slice(0, 4).map((image, index) => (
@@ -817,6 +828,7 @@ function historyToImageLog(history: GenerationHistory): GenerationLog {
         status: history.status || "成功",
         images,
         thumbnails: images.map((image) => image.dataUrl),
+        history,
     };
 }
 

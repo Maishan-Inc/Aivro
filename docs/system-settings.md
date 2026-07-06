@@ -93,7 +93,7 @@
 | `defaultModel` | string | 兼容字段，保存当前通用默认模型 |
 | `defaultImageModel` | string | 默认图片模型，从 `imageModels` 中选择 |
 | `defaultVideoModel` | string | 默认视频模型，从 `videoModels` 中选择 |
-| `defaultTextModel` | string | 默认对话模型，从 `textModels` 中选择 |
+| `defaultTextModel` | string | 默认文本模型，从 `textModels` 中选择 |
 | `defaultModel3D` | string | 默认 3D 模型，从 `model3DModels` 中选择 |
 | `systemPrompt` | string | 系统提示词 |
 

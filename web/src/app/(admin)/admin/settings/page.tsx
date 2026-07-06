@@ -799,8 +799,8 @@ export default function AdminSettingsPage() {
                                                         </Form.Item>
                                                     </Col>
                                                     <Col xs={24} md={6}>
-                                                        <Form.Item name={["public", "modelChannel", "textModels"]} label="选择对话模型">
-                                                            <Select mode="multiple" placeholder="选择对话服务可用模型" options={publicModels.map((item) => ({ label: <ModelTag model={item} color={channelColorByModel[item]} />, value: item }))} />
+                                                        <Form.Item name={["public", "modelChannel", "textModels"]} label="选择文本模型">
+                                                            <Select mode="multiple" placeholder="选择文本服务可用模型" options={publicModels.map((item) => ({ label: <ModelTag model={item} color={channelColorByModel[item]} />, value: item }))} />
                                                         </Form.Item>
                                                     </Col>
                                                     <Col xs={24} md={6}>
@@ -819,7 +819,7 @@ export default function AdminSettingsPage() {
                                                         </Form.Item>
                                                     </Col>
                                                     <Col xs={24} md={6}>
-                                                        <Form.Item name={["public", "modelChannel", "defaultTextModel"]} label="默认对话模型">
+                                                        <Form.Item name={["public", "modelChannel", "defaultTextModel"]} label="默认文本模型">
                                                             <Select showSearch allowClear options={scopedModelOptions(textModels, publicModels).map((item) => ({ label: <ModelTag model={item} color={channelColorByModel[item]} />, value: item }))} />
                                                         </Form.Item>
                                                     </Col>
@@ -843,7 +843,7 @@ export default function AdminSettingsPage() {
                                         children: (
                                             <Card size="small" extra={sectionSaveButton()}>
                                                 <Typography.Text type="secondary">
-                                                    计费项只跟随“开放给前台的模型”。需要新增或移除计费模型，请先在上方系统可用模型中调整。
+                                                    计费项只显示前台开放模型。需要新增或移除计费模型，请先在上方系统可用模型中调整。
                                                 </Typography.Text>
                                                 <Table
                                                     rowKey={(item) => item.modelId || item.model}

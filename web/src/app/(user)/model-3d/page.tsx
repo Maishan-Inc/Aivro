@@ -7,6 +7,7 @@ import { useUserStore } from "@/stores/use-user-store";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { requestModel3DGeneration, type Model3DGenerationInput, type Model3DGenerationResult } from "@/services/api/model-3d";
 import { saveGenerationHistory, deleteGenerationHistory, fetchGenerationHistories, type GenerationHistory } from "@/services/api/generation-history";
+import { GenerationHistoryDetailModal } from "@/components/generation-history-detail-modal";
 import { uploadImage } from "@/services/image-storage";
 import { ModelPicker } from "@/components/model-picker";
 import { useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
@@ -75,6 +76,7 @@ export default function Model3DPage() {
     const [historyOpen, setHistoryOpen] = useState(false);
     const [histories, setHistories] = useState<GenerationHistory[]>([]);
     const [loadingHistory, setLoadingHistory] = useState(false);
+    const [detailHistory, setDetailHistory] = useState<GenerationHistory | null>(null);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -152,6 +154,7 @@ export default function Model3DPage() {
                     error: "",
                     durationMs: result.durationMs,
                 });
+                await handleLoadHistory();
             }
         } catch (err) {
             Modal.error({ title: "生成失败", content: err instanceof Error ? err.message : "生成失败，请重试" });
@@ -207,7 +210,7 @@ export default function Model3DPage() {
         <div className="flex h-full flex-col overflow-hidden bg-stone-50 text-stone-900 dark:bg-stone-950 dark:text-stone-100">
             <main className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-y-auto p-3 lg:grid-cols-[300px_minmax(0,1fr)] lg:overflow-hidden xl:grid-cols-[320px_minmax(0,1fr)]">
                 <aside className="thin-scrollbar hidden min-h-0 overflow-y-auto rounded-lg border border-stone-200 bg-card p-4 shadow-sm dark:border-stone-800 lg:block">
-                    <HistoryPanel histories={histories} loading={loadingHistory} token={token} onRefresh={handleLoadHistory} />
+                    <HistoryPanel histories={histories} loading={loadingHistory} token={token} onRefresh={handleLoadHistory} onOpenDetail={setDetailHistory} />
                 </aside>
 
                 <section className="grid gap-3 lg:min-h-0 lg:overflow-hidden xl:grid-cols-[420px_minmax(0,1fr)]">
@@ -394,13 +397,14 @@ export default function Model3DPage() {
             />
 
             <Drawer title="生成历史" placement="bottom" size="large" open={historyOpen} onClose={() => setHistoryOpen(false)}>
-                <HistoryPanel histories={histories} loading={loadingHistory} token={token} onRefresh={handleLoadHistory} />
+                <HistoryPanel histories={histories} loading={loadingHistory} token={token} onRefresh={handleLoadHistory} onOpenDetail={setDetailHistory} />
             </Drawer>
+            <GenerationHistoryDetailModal open={Boolean(detailHistory)} history={detailHistory} onClose={() => setDetailHistory(null)} />
         </div>
     );
 }
 
-function HistoryPanel({ histories, loading, token, onRefresh }: { histories: GenerationHistory[]; loading: boolean; token: string; onRefresh: () => void }) {
+function HistoryPanel({ histories, loading, token, onRefresh, onOpenDetail }: { histories: GenerationHistory[]; loading: boolean; token: string; onRefresh: () => void; onOpenDetail: (history: GenerationHistory) => void }) {
     return (
         <>
             <div className="mb-3 flex items-center justify-between gap-3">
@@ -419,8 +423,9 @@ function HistoryPanel({ histories, loading, token, onRefresh }: { histories: Gen
             ) : histories.length ? (
                 <div className="space-y-3">
                     {histories.map((history) => (
-                        <div key={history.id} className="rounded-lg border border-stone-200 bg-background p-3 dark:border-stone-800">
+                        <div key={history.id} className="cursor-pointer rounded-lg border border-stone-200 bg-background p-3 transition hover:bg-stone-50 dark:border-stone-800 dark:hover:bg-stone-900" onDoubleClick={() => onOpenDetail(history)}>
                             <div className="truncate text-sm font-semibold">{history.title}</div>
+                            <div className="mt-1 line-clamp-2 whitespace-pre-wrap break-words text-xs leading-4 text-stone-500 dark:text-stone-400">{history.prompt || "无提示词"}</div>
                             <div className="mt-1 text-xs text-stone-500 dark:text-stone-400">{new Date(history.createdAt).toLocaleString()}</div>
                             <div className="mt-3 flex gap-2">
                                 <Button size="small" icon={<Download className="size-3.5" />} onClick={() => history.media[0] && window.open(history.media[0].url, "_blank")}>

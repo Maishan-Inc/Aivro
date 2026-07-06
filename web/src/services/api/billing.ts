@@ -1,4 +1,4 @@
-import { apiGet, apiPost } from "@/services/api/request";
+import { apiGet, apiPost, compactApiParams } from "@/services/api/request";
 
 export type PlanTranslation = {
     name: string;
@@ -24,6 +24,25 @@ export type Plan = {
     recommended: boolean;
     sort: number;
     translations?: Record<string, PlanTranslation> | null;
+};
+
+export type CreditLog = {
+    id: string;
+    userId: string;
+    category: string;
+    type: "admin_adjust" | "ai_consume" | "ai_refund";
+    model: string;
+    path: string;
+    amount: number;
+    balance: number;
+    relatedId: string;
+    remark: string;
+    createdAt: string;
+};
+
+export type CreditLogList = {
+    items: CreditLog[];
+    total: number;
 };
 
 // resolvePlanLocale returns a plan with its display and entitlement fields
@@ -58,4 +77,8 @@ export async function fetchKycStatus(token: string) {
 
 export async function createKycSession(token: string) {
     return apiPost<{ url: string; status: string }>("/api/v1/kyc/session", {}, token);
+}
+
+export async function fetchCreditLogs(token: string, query: { keyword?: string; category?: string; type?: string; startTime?: string; endTime?: string; page?: number; pageSize?: number } = {}) {
+    return apiGet<CreditLogList>("/api/v1/credit-logs", compactApiParams(query), token);
 }

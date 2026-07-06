@@ -82,6 +82,7 @@ func New() *gin.Engine {
 	v1.DELETE("/generation-histories/:id", func(c *gin.Context) {
 		handler.DeleteGenerationHistory(c.Writer, c.Request, c.Param("id"))
 	})
+	v1.GET("/credit-logs", gin.WrapF(handler.CreditLogs))
 	v1.GET("/preferences", gin.WrapF(handler.UserPreference))
 	v1.POST("/preferences", gin.WrapF(handler.SaveUserPreference))
 	v1.POST("/profile", gin.WrapF(handler.CompleteProfile))
