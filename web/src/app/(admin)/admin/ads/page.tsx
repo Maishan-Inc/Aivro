@@ -96,7 +96,7 @@ export default function AdminAdsPage() {
     };
 
     return (
-        <main style={{ padding: 24 }}>
+        <main className="p-3 sm:p-4 lg:p-6">
             <Flex vertical gap={16}>
                 <Card variant="borderless">
                     <Flex justify="space-between" align="center" gap={16} wrap>

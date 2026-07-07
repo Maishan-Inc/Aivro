@@ -42,7 +42,7 @@ export default function AdminDatabasePage() {
     }, [loadStatus]);
 
     return (
-        <main style={{ padding: 24 }}>
+        <main className="p-3 sm:p-4 lg:p-6">
             <Flex vertical gap={16}>
                 <Card variant="borderless">
                     <Flex justify="space-between" align="center" gap={16} wrap>
@@ -130,6 +130,7 @@ export default function AdminDatabasePage() {
                         loading={isLoading}
                         dataSource={status?.logs || []}
                         pagination={{ pageSize: 10 }}
+                        scroll={{ x: 760 }}
                         columns={[
                             {
                                 title: "执行时间",

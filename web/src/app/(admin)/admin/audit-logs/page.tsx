@@ -1,8 +1,8 @@
 "use client";
 
-import { ReloadOutlined, SearchOutlined } from "@ant-design/icons";
+import { FilterOutlined, ReloadOutlined, SearchOutlined } from "@ant-design/icons";
 import { ProTable, type ProColumns } from "@ant-design/pro-components";
-import { Avatar, Button, Card, Col, DatePicker, Flex, Form, Input, Row, Select, Space, Tag, Typography } from "antd";
+import { Avatar, Button, Card, Col, DatePicker, Drawer, Flex, Form, Grid, Input, Row, Select, Space, Tag, Typography } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
 import { useState } from "react";
 
@@ -44,11 +44,57 @@ const auditCategoryOptions = [
 
 export default function AdminAuditLogsPage() {
     const { logs, keyword, category, startTime, endTime, page, pageSize, total, isLoading, searchLogs, changePage, changePageSize, resetFilters, refreshLogs } = useAdminAuditLogs();
+    const screens = Grid.useBreakpoint();
+    const isCompact = !screens.lg;
     const [keywordText, setKeywordText] = useState(keyword);
     const [categoryValue, setCategoryValue] = useState(category);
     const [rangeValue, setRangeValue] = useState<[Dayjs, Dayjs] | null>(startTime && endTime ? [dayjs(startTime), dayjs(endTime)] : null);
+    const [filtersOpen, setFiltersOpen] = useState(false);
 
-    const applySearch = () => searchLogs(keywordText.trim(), categoryValue, rangeValue?.[0]?.toISOString() || "", rangeValue?.[1]?.toISOString() || "");
+    const applySearch = () => {
+        searchLogs(keywordText.trim(), categoryValue, rangeValue?.[0]?.toISOString() || "", rangeValue?.[1]?.toISOString() || "");
+        setFiltersOpen(false);
+    };
+
+    const resetAndClose = () => {
+        setKeywordText("");
+        setCategoryValue("");
+        setRangeValue(null);
+        resetFilters();
+        setFiltersOpen(false);
+    };
+
+    const filterForm = (compact = false) => (
+        <Form layout="vertical">
+            <Row gutter={16} align="bottom">
+                <Col span={compact ? 24 : undefined} flex={compact ? undefined : "360px"}>
+                    <Form.Item label="关键词">
+                        <Input.Search value={keywordText} placeholder="搜索分类、动作、操作者、目标、备注、IP 或国家" allowClear enterButton={<SearchOutlined />} onSearch={applySearch} onChange={(event) => setKeywordText(event.target.value)} />
+                    </Form.Item>
+                </Col>
+                <Col span={compact ? 24 : undefined} flex={compact ? undefined : "180px"}>
+                    <Form.Item label="分类">
+                        <Select value={categoryValue} options={auditCategoryOptions} onChange={(value) => setCategoryValue(value)} />
+                    </Form.Item>
+                </Col>
+                <Col span={compact ? 24 : undefined} flex={compact ? undefined : "360px"}>
+                    <Form.Item label="时间范围">
+                        <DatePicker.RangePicker value={rangeValue} className="w-full" showTime={{ format: "HH:mm:ss" }} format="YYYY-MM-DD HH:mm:ss" allowClear onChange={(value) => setRangeValue(value as [Dayjs, Dayjs] | null)} />
+                    </Form.Item>
+                </Col>
+                <Col span={compact ? 24 : undefined} flex={compact ? undefined : "none"}>
+                    <Form.Item>
+                        <Space wrap>
+                            <Button onClick={resetAndClose}>重置</Button>
+                            <Button type="primary" icon={<ReloadOutlined />} onClick={applySearch}>
+                                查询
+                            </Button>
+                        </Space>
+                    </Form.Item>
+                </Col>
+            </Row>
+        </Form>
+    );
 
     const columns: ProColumns<AdminAuditLog>[] = [
         {
@@ -61,6 +107,7 @@ export default function AdminAuditLogsPage() {
             title: "动作",
             dataIndex: "action",
             width: 140,
+            responsive: ["lg"],
             render: (_, item) => <Tag color="blue">{auditActionLabels[item.action] || item.action || "-"}</Tag>,
         },
         {
@@ -73,18 +120,21 @@ export default function AdminAuditLogsPage() {
             title: "目标",
             dataIndex: "target",
             width: 240,
+            responsive: ["lg"],
             render: (_, item) => (item.targetType === "user" ? <LogUserCell user={item.target} fallback="用户" /> : <Typography.Text type="secondary">{[item.targetType, item.targetId].filter(Boolean).join(" / ") || "-"}</Typography.Text>),
         },
         {
             title: "备注",
             dataIndex: "remark",
             ellipsis: true,
+            responsive: ["lg"],
             render: (_, item) => <Typography.Text type="secondary">{item.remark || "-"}</Typography.Text>,
         },
         {
             title: "IP/国家",
             dataIndex: "ip",
             width: 180,
+            responsive: ["lg"],
             render: (_, item) => <Typography.Text type="secondary">{[item.ip, item.country].filter(Boolean).join(" / ") || "-"}</Typography.Text>,
         },
         {
@@ -96,54 +146,23 @@ export default function AdminAuditLogsPage() {
     ];
 
     return (
-        <main style={{ padding: 24 }}>
+        <main className="p-3 sm:p-4 lg:p-6">
             <Flex vertical gap={16}>
-                <Card variant="borderless">
-                    <Form layout="vertical">
-                        <Row gutter={16} align="bottom">
-                            <Col flex="360px">
-                                <Form.Item label="关键词">
-                                    <Input.Search value={keywordText} placeholder="搜索分类、动作、操作者、目标、备注、IP 或国家" allowClear enterButton={<SearchOutlined />} onSearch={applySearch} onChange={(event) => setKeywordText(event.target.value)} />
-                                </Form.Item>
-                            </Col>
-                            <Col flex="180px">
-                                <Form.Item label="分类">
-                                    <Select value={categoryValue} options={auditCategoryOptions} onChange={(value) => setCategoryValue(value)} />
-                                </Form.Item>
-                            </Col>
-                            <Col flex="360px">
-                                <Form.Item label="时间范围">
-                                    <DatePicker.RangePicker
-                                        value={rangeValue}
-                                        className="w-full"
-                                        showTime={{ format: "HH:mm:ss" }}
-                                        format="YYYY-MM-DD HH:mm:ss"
-                                        allowClear
-                                        onChange={(value) => setRangeValue(value as [Dayjs, Dayjs] | null)}
-                                    />
-                                </Form.Item>
-                            </Col>
-                            <Col flex="none">
-                                <Form.Item>
-                                    <Space>
-                                        <Button
-                                            onClick={() => {
-                                                setKeywordText("");
-                                                setCategoryValue("");
-                                                setRangeValue(null);
-                                                resetFilters();
-                                            }}
-                                        >
-                                            重置
-                                        </Button>
-                                        <Button type="primary" icon={<ReloadOutlined />} onClick={applySearch}>
-                                            查询
-                                        </Button>
-                                    </Space>
-                                </Form.Item>
-                            </Col>
-                        </Row>
-                    </Form>
+                <Card className="lg:hidden" variant="borderless">
+                    <Flex align="center" justify="space-between" gap={12}>
+                        <Space wrap>
+                            <Typography.Text strong>筛选</Typography.Text>
+                            {keyword ? <Tag>{keyword}</Tag> : null}
+                            {category ? <Tag>{category}</Tag> : <Tag>全部审计</Tag>}
+                            {startTime && endTime ? <Tag>已选时间</Tag> : null}
+                        </Space>
+                        <Button icon={<FilterOutlined />} onClick={() => setFiltersOpen(true)}>
+                            筛选
+                        </Button>
+                    </Flex>
+                </Card>
+                <Card className="hidden lg:block" variant="borderless">
+                    {filterForm()}
                 </Card>
                 <ProTable<AdminAuditLog>
                     rowKey="id"
@@ -153,7 +172,7 @@ export default function AdminAuditLogsPage() {
                     search={false}
                     defaultSize="middle"
                     tableLayout="fixed"
-                    scroll={{ x: 1320 }}
+                    scroll={isCompact ? { x: 620 } : { x: 1320 }}
                     cardProps={{ variant: "borderless" }}
                     headerTitle={
                         <Space>
@@ -166,13 +185,17 @@ export default function AdminAuditLogsPage() {
                         current: page,
                         pageSize,
                         total,
-                        showSizeChanger: true,
+                        simple: isCompact,
+                        showSizeChanger: !isCompact,
                         pageSizeOptions: [10, 20, 50, 100],
                         showTotal: (value) => `共 ${value} 条`,
                         onChange: (nextPage, nextPageSize) => (nextPageSize !== pageSize ? changePageSize(nextPageSize) : changePage(nextPage)),
                     }}
                 />
             </Flex>
+            <Drawer title="筛选日志审计" placement="bottom" height="74vh" open={filtersOpen} onClose={() => setFiltersOpen(false)} destroyOnHidden>
+                {filterForm(true)}
+            </Drawer>
         </main>
     );
 }

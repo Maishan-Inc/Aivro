@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { App, Button, Input, Modal, Select, Segmented, Spin, Tag } from "antd";
-import { BookOpen, Layers3, Link2, Plus, Search, Send, Sparkles, UploadCloud, UserRound } from "lucide-react";
+import { App, Button, Drawer, Input, Modal, Select, Segmented, Spin, Tag } from "antd";
+import { BarChart3, BookOpen, Layers3, Link2, Plus, Search, Send, Sparkles, UploadCloud, UserRound } from "lucide-react";
 
 import {
     createWorkflow,
@@ -69,6 +69,7 @@ export function WorkflowLibraryView({ initialTab = "workflows", lockTab = false,
     const [publishTitle, setPublishTitle] = useState("");
     const [publishLocale, setPublishLocale] = useState<"zh-CN" | "en-US">("zh-CN");
     const [publishTags, setPublishTags] = useState<string[]>([]);
+    const [statsOpen, setStatsOpen] = useState(false);
 
     useEffect(() => {
         if (!isReady) return;
@@ -255,6 +256,18 @@ export function WorkflowLibraryView({ initialTab = "workflows", lockTab = false,
             onDelete={deleteProjects}
         />
     );
+    const renderMetrics = () => (
+        <>
+            <HeaderMetric label="剩余创建次数" value={user?.workflowCreateCredits ?? 0} />
+            <HeaderMetric label="工作流" value={projects.length} />
+            <HeaderMetric label="节点" value={workflowStats.nodes} />
+            <HeaderMetric label="连线" value={workflowStats.connections} />
+            <HeaderMetric label="会话" value={workflowStats.sessions} />
+            <HeaderMetric label="自动更新" value={workflowStats.linked} />
+            <HeaderMetric label="独立副本" value={workflowStats.detached} />
+            <HeaderMetric label="最近更新" value={workflowStats.latest ? formatWorkflowTime(workflowStats.latest) : "-"} wide />
+        </>
+    );
 
     return (
         <main className={`${lockTab ? "flex" : "grid grid-rows-[1fr_auto] lg:grid-cols-[184px_minmax(0,1fr)] lg:grid-rows-1"} h-full min-h-0 overflow-hidden bg-stone-50 text-stone-900 dark:bg-stone-950 dark:text-stone-100`}>
@@ -272,15 +285,11 @@ export function WorkflowLibraryView({ initialTab = "workflows", lockTab = false,
                 <header className={`${embedded ? "rounded-t-lg border" : "border-b"} border-stone-200 bg-background px-4 lg:h-24 lg:overflow-x-auto lg:px-6 dark:border-stone-800`}>
                     <div className="flex min-w-0 flex-wrap items-center gap-2 py-2 lg:h-full lg:min-w-max lg:flex-nowrap lg:py-0">
                         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 lg:flex-none lg:flex-nowrap">{controlBar}</div>
-                        <div className="flex w-full min-w-0 gap-2 overflow-x-auto lg:ml-auto lg:w-auto lg:min-w-max lg:overflow-visible">
-                            <HeaderMetric label="剩余创建次数" value={user?.workflowCreateCredits ?? 0} />
-                            <HeaderMetric label="工作流" value={projects.length} />
-                            <HeaderMetric label="节点" value={workflowStats.nodes} />
-                            <HeaderMetric label="连线" value={workflowStats.connections} />
-                            <HeaderMetric label="会话" value={workflowStats.sessions} />
-                            <HeaderMetric label="自动更新" value={workflowStats.linked} />
-                            <HeaderMetric label="独立副本" value={workflowStats.detached} />
-                            <HeaderMetric label="最近更新" value={workflowStats.latest ? formatWorkflowTime(workflowStats.latest) : "-"} wide />
+                        <Button className="lg:hidden" icon={<BarChart3 className="size-4" />} onClick={() => setStatsOpen(true)}>
+                            统计
+                        </Button>
+                        <div className="hidden w-full min-w-0 gap-2 overflow-x-auto lg:ml-auto lg:flex lg:w-auto lg:min-w-max lg:overflow-visible">
+                            {renderMetrics()}
                         </div>
                     </div>
                 </header>
@@ -365,6 +374,9 @@ export function WorkflowLibraryView({ initialTab = "workflows", lockTab = false,
                     </label>
                 </div>
             </Modal>
+            <Drawer title="工作流统计" placement="bottom" height="48vh" open={statsOpen} onClose={() => setStatsOpen(false)} destroyOnHidden>
+                <div className="grid grid-cols-2 gap-2 text-xs text-stone-500 sm:grid-cols-4 dark:text-stone-400">{renderMetrics()}</div>
+            </Drawer>
         </main>
     );
 }

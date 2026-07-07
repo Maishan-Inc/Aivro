@@ -112,7 +112,7 @@ export default function AdminPlansPage() {
     };
 
     return (
-        <div className="p-6">
+        <div className="p-3 sm:p-4 lg:p-6">
             <PlanGrid plans={plans} onEdit={openEditor} onCreate={() => openEditor(blankPlan())} />
             <PlanEditorModal open={!!editing} editing={editing} form={form} saving={saving} onCancel={closeEditor} onSubmit={submit} />
         </div>
@@ -241,33 +241,33 @@ function PlanEditorModal({
 
 function PlanBaseFields() {
     return (
-        <div className="grid grid-cols-2 gap-x-4">
-            <Form.Item name="name" label="套餐名称" className="col-span-1">
+        <div className="grid grid-cols-1 gap-x-4 md:grid-cols-2">
+            <Form.Item name="name" label="套餐名称" className="md:col-span-1">
                 <Input placeholder="GO / Plus / Pro / Max" />
             </Form.Item>
-            <Form.Item name="code" label="套餐代码" className="col-span-1">
+            <Form.Item name="code" label="套餐代码" className="md:col-span-1">
                 <Segmented options={["go", "plus", "pro", "max"]} block />
             </Form.Item>
-            <Form.Item name="description" label="描述" className="col-span-2">
+            <Form.Item name="description" label="描述" className="md:col-span-2">
                 <Input.TextArea rows={2} placeholder="适合 AI 创作的灵活额度。" />
             </Form.Item>
-            <PlanFeatureFields name="features" label="卡片功能点" className="col-span-2" />
-            <Form.Item name="priceCents" label="价格（分）" className="col-span-1">
+            <PlanFeatureFields name="features" label="卡片功能点" className="md:col-span-2" />
+            <Form.Item name="priceCents" label="价格（分）" className="md:col-span-1">
                 <InputNumber min={0} className="w-full" />
             </Form.Item>
-            <Form.Item name="currency" label="币种" className="col-span-1">
+            <Form.Item name="currency" label="币种" className="md:col-span-1">
                 <Input placeholder="USD" />
             </Form.Item>
-            <Form.Item name="credits" label="算力点额度" className="col-span-1">
+            <Form.Item name="credits" label="算力点额度" className="md:col-span-1">
                 <InputNumber min={0} className="w-full" />
             </Form.Item>
-            <Form.Item name="workflowCreateCredits" label="工作流创建次数" className="col-span-1">
+            <Form.Item name="workflowCreateCredits" label="工作流创建次数" className="md:col-span-1">
                 <InputNumber min={0} className="w-full" />
             </Form.Item>
-            <Form.Item name="sort" label="排序" className="col-span-1">
+            <Form.Item name="sort" label="排序" className="md:col-span-1">
                 <InputNumber className="w-full" />
             </Form.Item>
-            <div className="col-span-1 flex items-end gap-6 pb-6">
+            <div className="flex items-end gap-6 pb-6 md:col-span-1">
                 <Form.Item name="enabled" label="启用" valuePropName="checked" className="mb-0">
                     <Switch />
                 </Form.Item>
@@ -283,24 +283,24 @@ function PlanTranslationFields({ locale }: { locale: Locale }) {
     return (
         <div>
             <p className="mb-4 text-xs leading-5 text-stone-500 dark:text-stone-400">该语言下的独立设置；留空的字段会沿用基础设置。算力点和次数仅在大于 0 时覆盖。</p>
-            <div className="grid grid-cols-2 gap-x-4">
-                <Form.Item name={["translations", locale, "name"]} label="套餐名称" className="col-span-1">
+            <div className="grid grid-cols-1 gap-x-4 md:grid-cols-2">
+                <Form.Item name={["translations", locale, "name"]} label="套餐名称" className="md:col-span-1">
                     <Input placeholder="沿用基础设置" />
                 </Form.Item>
-                <Form.Item name={["translations", locale, "currency"]} label="币种" className="col-span-1">
+                <Form.Item name={["translations", locale, "currency"]} label="币种" className="md:col-span-1">
                     <Input placeholder="沿用基础设置" />
                 </Form.Item>
-                <Form.Item name={["translations", locale, "description"]} label="描述" className="col-span-2">
+                <Form.Item name={["translations", locale, "description"]} label="描述" className="md:col-span-2">
                     <Input.TextArea rows={2} placeholder="沿用基础设置" />
                 </Form.Item>
-                <PlanFeatureFields name={["translations", locale, "features"]} label="卡片功能点" className="col-span-2" />
-                <Form.Item name={["translations", locale, "priceCents"]} label="价格（分）" className="col-span-1">
+                <PlanFeatureFields name={["translations", locale, "features"]} label="卡片功能点" className="md:col-span-2" />
+                <Form.Item name={["translations", locale, "priceCents"]} label="价格（分）" className="md:col-span-1">
                     <InputNumber min={0} className="w-full" placeholder="沿用基础设置" />
                 </Form.Item>
-                <Form.Item name={["translations", locale, "credits"]} label="算力点额度" className="col-span-1">
+                <Form.Item name={["translations", locale, "credits"]} label="算力点额度" className="md:col-span-1">
                     <InputNumber min={0} className="w-full" placeholder="沿用基础设置" />
                 </Form.Item>
-                <Form.Item name={["translations", locale, "workflowCreateCredits"]} label="工作流创建次数" className="col-span-2">
+                <Form.Item name={["translations", locale, "workflowCreateCredits"]} label="工作流创建次数" className="md:col-span-2">
                     <InputNumber min={0} className="w-full" placeholder="沿用基础设置" />
                 </Form.Item>
             </div>

@@ -1,8 +1,8 @@
 "use client";
 
-import { DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from "@ant-design/icons";
+import { DeleteOutlined, EditOutlined, FilterOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from "@ant-design/icons";
 import { ProTable, type ProColumns } from "@ant-design/pro-components";
-import { Avatar, Button, Card, Col, Flex, Form, Input, InputNumber, Modal, Row, Select, Space, Tag, Tooltip, Typography } from "antd";
+import { Avatar, Button, Card, Col, Drawer, Flex, Form, Grid, Input, InputNumber, Modal, Row, Select, Space, Tag, Tooltip, Typography } from "antd";
 import dayjs from "dayjs";
 import { useEffect, useState } from "react";
 
@@ -33,8 +33,11 @@ const profileCompletedOptions = [
 
 export default function AdminUsersPage() {
     const { users, keyword, page, pageSize, total, isLoading, searchUsers, changePage, changePageSize, resetFilters, refreshUsers, saveUser: saveAdminUser, adjustCredits, adjustWorkflowCreateCredits, deleteUser } = useAdminUsers();
+    const screens = Grid.useBreakpoint();
+    const isCompact = !screens.lg;
     const [form] = Form.useForm<UserFormValues>();
     const [keywordText, setKeywordText] = useState(keyword);
+    const [filtersOpen, setFiltersOpen] = useState(false);
     const [editingUser, setEditingUser] = useState<Partial<AdminUser> | null>(null);
     const [deletingUser, setDeletingUser] = useState<AdminUser | null>(null);
 
@@ -64,6 +67,39 @@ export default function AdminUsersPage() {
         const saved = await adjustWorkflowCreateCredits(editingUser.id, form.getFieldValue("workflowCreateCredits") || 0);
         setEditingUser(saved);
     };
+
+    const searchAndClose = () => {
+        searchUsers(keywordText);
+        setFiltersOpen(false);
+    };
+
+    const resetAndClose = () => {
+        setKeywordText("");
+        resetFilters();
+        setFiltersOpen(false);
+    };
+
+    const filterForm = (compact = false) => (
+        <Form layout="vertical">
+            <Row gutter={16} align="bottom">
+                <Col span={compact ? 24 : undefined} flex={compact ? undefined : "360px"}>
+                    <Form.Item label="关键词">
+                        <Input.Search value={keywordText} placeholder="搜索用户名、昵称、邮箱或第三方 ID" allowClear enterButton={<SearchOutlined />} onSearch={searchAndClose} onChange={(event) => setKeywordText(event.target.value)} />
+                    </Form.Item>
+                </Col>
+                <Col span={compact ? 24 : undefined} flex={compact ? undefined : "none"}>
+                    <Form.Item>
+                        <Space wrap>
+                            <Button onClick={resetAndClose}>重置</Button>
+                            <Button type="primary" icon={<ReloadOutlined />} onClick={searchAndClose}>
+                                查询
+                            </Button>
+                        </Space>
+                    </Form.Item>
+                </Col>
+            </Row>
+        </Form>
+    );
 
     const columns: ProColumns<AdminUser>[] = [
         {
@@ -100,30 +136,35 @@ export default function AdminUsersPage() {
             title: "类型",
             dataIndex: "accountType",
             width: 90,
+            responsive: ["lg"],
             render: (_, item) => <Tag>{item.accountType === "company" ? "公司" : "个人"}</Tag>,
         },
         {
             title: "资料",
             dataIndex: "profileCompleted",
             width: 90,
+            responsive: ["lg"],
             render: (_, item) => <Tag color={item.profileCompleted ? "green" : "orange"}>{item.profileCompleted ? "已完成" : "未完成"}</Tag>,
         },
         {
             title: "算力点",
             dataIndex: "credits",
             width: 100,
+            responsive: ["lg"],
             render: (_, item) => <Typography.Text>{item.credits}</Typography.Text>,
         },
         {
             title: "工作流次数",
             dataIndex: "workflowCreateCredits",
             width: 120,
+            responsive: ["lg"],
             render: (_, item) => <Typography.Text>{item.workflowCreateCredits}</Typography.Text>,
         },
         {
             title: "登录来源",
             dataIndex: "authProvider",
             width: 180,
+            responsive: ["lg"],
             render: (_, item) => (
                 <Space direction="vertical" size={0}>
                     <Tag>{item.authProvider || "password"}</Tag>
@@ -137,6 +178,7 @@ export default function AdminUsersPage() {
             title: "最近登录",
             dataIndex: "lastLoginAt",
             width: 180,
+            responsive: ["lg"],
             render: (_, item) => <Typography.Text type="secondary">{item.lastLoginAt ? dayjs(item.lastLoginAt).format("YYYY-MM-DD HH:mm:ss") : "-"}</Typography.Text>,
         },
         {
@@ -158,42 +200,21 @@ export default function AdminUsersPage() {
     ];
 
     return (
-        <main style={{ padding: 24 }}>
+        <main className="p-3 sm:p-4 lg:p-6">
             <Flex vertical gap={16}>
-                <Card variant="borderless">
-                    <Form layout="vertical">
-                        <Row gutter={16} align="bottom">
-                            <Col flex="360px">
-                                <Form.Item label="关键词">
-                                    <Input.Search
-                                        value={keywordText}
-                                        placeholder="搜索用户名、昵称、邮箱或第三方 ID"
-                                        allowClear
-                                        enterButton={<SearchOutlined />}
-                                        onSearch={() => searchUsers(keywordText)}
-                                        onChange={(event) => setKeywordText(event.target.value)}
-                                    />
-                                </Form.Item>
-                            </Col>
-                            <Col flex="none">
-                                <Form.Item>
-                                    <Space>
-                                        <Button
-                                            onClick={() => {
-                                                setKeywordText("");
-                                                resetFilters();
-                                            }}
-                                        >
-                                            重置
-                                        </Button>
-                                        <Button type="primary" icon={<ReloadOutlined />} onClick={() => searchUsers(keywordText)}>
-                                            查询
-                                        </Button>
-                                    </Space>
-                                </Form.Item>
-                            </Col>
-                        </Row>
-                    </Form>
+                <Card className="lg:hidden" variant="borderless">
+                    <Flex align="center" justify="space-between" gap={12}>
+                        <Space>
+                            <Typography.Text strong>筛选</Typography.Text>
+                            {keyword ? <Tag>{keyword}</Tag> : <Tag>全部用户</Tag>}
+                        </Space>
+                        <Button icon={<FilterOutlined />} onClick={() => setFiltersOpen(true)}>
+                            筛选
+                        </Button>
+                    </Flex>
+                </Card>
+                <Card className="hidden lg:block" variant="borderless">
+                    {filterForm()}
                 </Card>
                 <ProTable<AdminUser>
                     rowKey="id"
@@ -203,6 +224,7 @@ export default function AdminUsersPage() {
                     search={false}
                     defaultSize="middle"
                     tableLayout="fixed"
+                    scroll={isCompact ? { x: 560 } : undefined}
                     cardProps={{ variant: "borderless" }}
                     headerTitle={
                         <Space>
@@ -220,15 +242,19 @@ export default function AdminUsersPage() {
                         current: page,
                         pageSize,
                         total,
-                        showSizeChanger: true,
+                        simple: isCompact,
+                        showSizeChanger: !isCompact,
                         pageSizeOptions: [10, 20, 50, 100],
                         showTotal: (value) => `共 ${value} 人`,
                         onChange: (nextPage, nextPageSize) => (nextPageSize !== pageSize ? changePageSize(nextPageSize) : changePage(nextPage)),
                     }}
                 />
             </Flex>
+            <Drawer title="筛选用户" placement="bottom" height="62vh" open={filtersOpen} onClose={() => setFiltersOpen(false)} destroyOnHidden>
+                {filterForm(true)}
+            </Drawer>
 
-            <Modal title={editingUser?.id ? "编辑用户" : "新增用户"} open={Boolean(editingUser)} width={920} onCancel={() => setEditingUser(null)} onOk={() => void saveUser()} okText="保存资料" cancelText="取消" destroyOnHidden>
+            <Modal title={editingUser?.id ? "编辑用户" : "新增用户"} open={Boolean(editingUser)} width="min(920px, calc(100vw - 24px))" onCancel={() => setEditingUser(null)} onOk={() => void saveUser()} okText="保存资料" cancelText="取消" destroyOnHidden>
                 <Form form={form} layout="vertical" requiredMark={false}>
                     <Card size="small" style={{ marginBottom: 16 }}>
                         <Flex align="flex-start" justify="space-between" gap={16}>

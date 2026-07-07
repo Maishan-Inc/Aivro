@@ -58,7 +58,7 @@ export default function ConsoleWalletPage() {
                         </div>
                         <Tag className="m-0" icon={<History className="size-3.5" />}>后续接入明细</Tag>
                     </div>
-                    <Table<WalletLog> columns={columns} dataSource={[]} rowKey="id" pagination={false} locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无扣费记录" /> }} />
+                    <Table<WalletLog> columns={columns} dataSource={[]} rowKey="id" pagination={false} scroll={{ x: 620 }} locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无扣费记录" /> }} />
                 </section>
             </div>
         </div>

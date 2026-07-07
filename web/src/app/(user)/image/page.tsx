@@ -1,9 +1,9 @@
 "use client";
 
-import { BookOpen, CheckSquare, ClipboardPaste, Download, FolderPlus, History, ImagePlus, PenLine, Plus, SlidersHorizontal, Sparkles, Trash2, Upload } from "lucide-react";
+import { BookOpen, CheckSquare, ClipboardPaste, Download, FileText, FolderPlus, History, ImagePlus, PenLine, Plus, SlidersHorizontal, Sparkles, Trash2, Upload } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { App, Button, Checkbox, Drawer, Empty, Image, Input, Modal, Tag, Typography } from "antd";
+import { App, Button, Checkbox, Drawer, Dropdown, Empty, Image, Input, Modal, Tag, Typography } from "antd";
 import { saveAs } from "file-saver";
 
 import { AivroDrawableLoader } from "@/components/aivro-drawable-loader";
@@ -721,7 +721,7 @@ function LogPanel({
                         active={activeLogId === log.id}
                         onSelectedChange={(checked) => onSelectedLogIdsChange(checked ? [...selectedLogIds, log.id] : selectedLogIds.filter((id) => id !== log.id))}
                         onClick={() => onPreviewLog(log)}
-                        onDoubleClick={() => onOpenDetail(log)}
+                        onOpenDetail={() => onOpenDetail(log)}
                     />
                 ))}
                 {!logs.length ? <div className="flex min-h-48 items-center justify-center rounded-lg border border-dashed border-stone-300 text-center text-sm text-stone-500 dark:border-stone-700">暂无生成记录</div> : null}
@@ -730,24 +730,12 @@ function LogPanel({
     );
 }
 
-function LogCard({ log, selected, active, onSelectedChange, onClick, onDoubleClick }: { log: GenerationLog; selected: boolean; active: boolean; onSelectedChange: (checked: boolean) => void; onClick: () => void; onDoubleClick: () => void }) {
-    const clickTimerRef = useRef<number | null>(null);
-    useEffect(() => () => {
-        if (clickTimerRef.current) window.clearTimeout(clickTimerRef.current);
-    }, []);
-    const handleClick = () => {
-        if (clickTimerRef.current) window.clearTimeout(clickTimerRef.current);
-        clickTimerRef.current = window.setTimeout(() => {
-            clickTimerRef.current = null;
-            onClick();
-        }, 220);
-    };
-    const handleDoubleClick = () => {
-        if (clickTimerRef.current) {
-            window.clearTimeout(clickTimerRef.current);
-            clickTimerRef.current = null;
-        }
-        onDoubleClick();
+function LogCard({ log, selected, active, onSelectedChange, onClick, onOpenDetail }: { log: GenerationLog; selected: boolean; active: boolean; onSelectedChange: (checked: boolean) => void; onClick: () => void; onOpenDetail: () => void }) {
+    const detailMenu = {
+        items: [{ key: "detail", disabled: !log.history, icon: <FileText className="size-4" />, label: "详情" }],
+        onClick: ({ key }: { key: string }) => {
+            if (key === "detail") onOpenDetail();
+        },
     };
 
     if (log.status === "生成中") {
@@ -759,50 +747,47 @@ function LogCard({ log, selected, active, onSelectedChange, onClick, onDoubleCli
     }
 
     return (
-        <button
-            type="button"
-            className={`block w-full rounded-lg border p-2 text-left transition ${active ? "border-stone-900 bg-blue-50 dark:border-stone-100 dark:bg-blue-950/20" : "border-stone-200 bg-background hover:bg-stone-50 dark:border-stone-800 dark:hover:bg-stone-900"}`}
-            onClick={handleClick}
-            onDoubleClick={handleDoubleClick}
-        >
-            <div className="grid grid-cols-[minmax(128px,1fr)_auto] gap-2">
-                <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-2">
-                    <Checkbox className="mt-0.5" checked={selected} onClick={(event) => event.stopPropagation()} onChange={(event) => onSelectedChange(event.target.checked)} />
-                    <div className="min-w-0">
-                        <div className="truncate text-sm font-semibold leading-5">{log.title}</div>
-                        <div className="mt-1 line-clamp-2 whitespace-pre-wrap break-words text-xs leading-4 text-stone-500 dark:text-stone-400">{log.prompt || "无提示词"}</div>
-                        {log.thumbnails?.length ? (
-                            <div className="mt-2 grid grid-cols-4 gap-1.5">
-                                {log.thumbnails.slice(0, 4).map((image, index) => (
-                                    <img key={`${log.id}-${index}`} src={image} alt="" className="aspect-square min-w-0 rounded-md object-cover" />
-                                ))}
-                            </div>
-                        ) : null}
+        <Dropdown trigger={["contextMenu"]} menu={detailMenu}>
+            <button type="button" className={`block w-full rounded-lg border p-2 text-left transition ${active ? "border-stone-900 bg-blue-50 dark:border-stone-100 dark:bg-blue-950/20" : "border-stone-200 bg-background hover:bg-stone-50 dark:border-stone-800 dark:hover:bg-stone-900"}`} onClick={onClick}>
+                <div className="grid grid-cols-[minmax(128px,1fr)_auto] gap-2">
+                    <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-2">
+                        <Checkbox className="mt-0.5" checked={selected} onClick={(event) => event.stopPropagation()} onChange={(event) => onSelectedChange(event.target.checked)} />
+                        <div className="min-w-0">
+                            <div className="truncate text-sm font-semibold leading-5">{log.title}</div>
+                            <div className="mt-1 line-clamp-2 whitespace-pre-wrap break-words text-xs leading-4 text-stone-500 dark:text-stone-400">{log.prompt || "无提示词"}</div>
+                            {log.thumbnails?.length ? (
+                                <div className="mt-2 grid grid-cols-4 gap-1.5">
+                                    {log.thumbnails.slice(0, 4).map((image, index) => (
+                                        <img key={`${log.id}-${index}`} src={image} alt="" className="aspect-square min-w-0 rounded-md object-cover" />
+                                    ))}
+                                </div>
+                            ) : null}
+                        </div>
                     </div>
-                </div>
-                <div className="grid justify-items-end gap-2">
-                    <div className="flex gap-1">
-                        <Tag className="m-0 flex h-6 items-center rounded-md px-1.5 text-xs leading-none" color="blue">
-                            成功 {log.successCount ?? log.imageCount}
-                        </Tag>
-                        {log.failCount ? (
-                            <Tag className="m-0 flex h-6 items-center rounded-md px-1.5 text-xs leading-none" color="red">
-                                失败 {log.failCount}
+                    <div className="grid justify-items-end gap-2">
+                        <div className="flex gap-1">
+                            <Tag className="m-0 flex h-6 items-center rounded-md px-1.5 text-xs leading-none" color="blue">
+                                成功 {log.successCount ?? log.imageCount}
                             </Tag>
-                        ) : null}
-                    </div>
-                    <div className="flex flex-wrap justify-end gap-1">
-                        <Tag className="m-0 flex h-6 items-center rounded-md px-1.5 text-xs leading-none">{log.imageCount} 张</Tag>
-                        <Tag className="m-0 flex h-6 items-center rounded-md px-1.5 text-xs leading-none" color="green">
-                            {formatDuration(log.durationMs)}
-                        </Tag>
-                    </div>
-                    <div className="flex justify-end">
-                        <Tag className="m-0 flex h-6 items-center rounded-md px-1.5 text-xs leading-none">{log.time}</Tag>
+                            {log.failCount ? (
+                                <Tag className="m-0 flex h-6 items-center rounded-md px-1.5 text-xs leading-none" color="red">
+                                    失败 {log.failCount}
+                                </Tag>
+                            ) : null}
+                        </div>
+                        <div className="flex flex-wrap justify-end gap-1">
+                            <Tag className="m-0 flex h-6 items-center rounded-md px-1.5 text-xs leading-none">{log.imageCount} 张</Tag>
+                            <Tag className="m-0 flex h-6 items-center rounded-md px-1.5 text-xs leading-none" color="green">
+                                {formatDuration(log.durationMs)}
+                            </Tag>
+                        </div>
+                        <div className="flex justify-end">
+                            <Tag className="m-0 flex h-6 items-center rounded-md px-1.5 text-xs leading-none">{log.time}</Tag>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </button>
+            </button>
+        </Dropdown>
     );
 }
 

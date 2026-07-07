@@ -1,8 +1,8 @@
 "use client";
 
-import { CopyOutlined, DeleteOutlined, EditOutlined, ExportOutlined, EyeOutlined, PlusOutlined, ReloadOutlined, SearchOutlined, SyncOutlined } from "@ant-design/icons";
+import { CopyOutlined, DeleteOutlined, EditOutlined, ExportOutlined, EyeOutlined, FilterOutlined, PlusOutlined, ReloadOutlined, SearchOutlined, SyncOutlined } from "@ant-design/icons";
 import { ProTable, type ProColumns } from "@ant-design/pro-components";
-import { Button, Card, Col, Flex, Form, Image, Input, Modal, Row, Select, Space, Switch, Table, Tag, Tooltip, Typography } from "antd";
+import { Button, Card, Col, Drawer, Flex, Form, Grid, Image, Input, Modal, Row, Select, Space, Switch, Table, Tag, Tooltip, Typography } from "antd";
 import { useEffect, useState } from "react";
 
 import { useCopyText } from "@/hooks/use-copy-text";
@@ -40,8 +40,11 @@ export default function AdminPromptsPage() {
         deletePrompts,
     } = useAdminPrompts();
     const copyText = useCopyText();
+    const screens = Grid.useBreakpoint();
+    const isCompact = !screens.lg;
     const [form] = Form.useForm<Partial<Prompt> & { tagText?: string }>();
     const [keywordText, setKeywordText] = useState(keyword);
+    const [filtersOpen, setFiltersOpen] = useState(false);
     const [editingPrompt, setEditingPrompt] = useState<Partial<Prompt> | null>(null);
     const [detailPrompt, setDetailPrompt] = useState<Prompt | null>(null);
     const [deletingPrompt, setDeletingPrompt] = useState<Prompt | null>(null);
@@ -80,6 +83,49 @@ export default function AdminPromptsPage() {
         setIsBatchDeleteOpen(false);
     };
 
+    const searchAndClose = () => {
+        searchPrompts(keywordText);
+        setFiltersOpen(false);
+    };
+
+    const resetAndClose = () => {
+        setKeywordText("");
+        resetFilters();
+        setFiltersOpen(false);
+    };
+
+    const filterForm = (compact = false) => (
+        <Form layout="vertical">
+            <Row gutter={16} align="bottom">
+                <Col span={compact ? 24 : undefined} flex={compact ? undefined : "360px"}>
+                    <Form.Item label="关键词">
+                        <Input.Search value={keywordText} placeholder="搜索标题或提示词" allowClear enterButton={<SearchOutlined />} onSearch={searchAndClose} onChange={(event) => setKeywordText(event.target.value)} />
+                    </Form.Item>
+                </Col>
+                <Col span={compact ? 24 : undefined} flex={compact ? undefined : "220px"}>
+                    <Form.Item label="分组">
+                        <Select value={category} onChange={changeCategory} options={categoryOptions} />
+                    </Form.Item>
+                </Col>
+                <Col span={compact ? 24 : undefined} flex={compact ? undefined : "220px"}>
+                    <Form.Item label="标签">
+                        <Select mode="multiple" allowClear maxTagCount="responsive" value={tag} onChange={changeTag} options={tagOptions} placeholder="全部标签" />
+                    </Form.Item>
+                </Col>
+                <Col span={compact ? 24 : undefined} flex={compact ? undefined : "none"}>
+                    <Form.Item>
+                        <Space wrap>
+                            <Button onClick={resetAndClose}>重置</Button>
+                            <Button type="primary" icon={<ReloadOutlined />} onClick={searchAndClose}>
+                                查询
+                            </Button>
+                        </Space>
+                    </Form.Item>
+                </Col>
+            </Row>
+        </Form>
+    );
+
     const columns: ProColumns<Prompt>[] = [
         {
             title: "封面",
@@ -101,12 +147,14 @@ export default function AdminPromptsPage() {
             title: "分类",
             dataIndex: "category",
             width: 150,
+            responsive: ["lg"],
             render: (_, item) => <Typography.Text type="secondary">{categoryName(item.category)}</Typography.Text>,
         },
         {
             title: "标签",
             dataIndex: "tags",
             width: 180,
+            responsive: ["lg"],
             render: (_, item) => (
                 <Space size={[4, 4]} wrap>
                     {(item.tags || []).slice(0, 3).map((tag) => (
@@ -137,45 +185,23 @@ export default function AdminPromptsPage() {
     ];
 
     return (
-        <main style={{ padding: 24 }}>
+        <main className="p-3 sm:p-4 lg:p-6">
             <Flex vertical gap={16}>
-                <Card variant="borderless">
-                    <Form layout="vertical">
-                        <Row gutter={16} align="bottom">
-                            <Col flex="360px">
-                                <Form.Item label="关键词">
-                                    <Input.Search value={keywordText} placeholder="搜索标题或提示词" allowClear enterButton={<SearchOutlined />} onSearch={() => searchPrompts(keywordText)} onChange={(event) => setKeywordText(event.target.value)} />
-                                </Form.Item>
-                            </Col>
-                            <Col flex="220px">
-                                <Form.Item label="分组">
-                                    <Select value={category} onChange={changeCategory} options={categoryOptions} />
-                                </Form.Item>
-                            </Col>
-                            <Col flex="220px">
-                                <Form.Item label="标签">
-                                    <Select mode="multiple" allowClear maxTagCount="responsive" value={tag} onChange={changeTag} options={tagOptions} placeholder="全部标签" />
-                                </Form.Item>
-                            </Col>
-                            <Col flex="none">
-                                <Form.Item>
-                                    <Space>
-                                        <Button
-                                            onClick={() => {
-                                                setKeywordText("");
-                                                resetFilters();
-                                            }}
-                                        >
-                                            重置
-                                        </Button>
-                                        <Button type="primary" icon={<ReloadOutlined />} onClick={() => searchPrompts(keywordText)}>
-                                            查询
-                                        </Button>
-                                    </Space>
-                                </Form.Item>
-                            </Col>
-                        </Row>
-                    </Form>
+                <Card className="lg:hidden" variant="borderless">
+                    <Flex align="center" justify="space-between" gap={12}>
+                        <Space wrap>
+                            <Typography.Text strong>筛选</Typography.Text>
+                            {keyword ? <Tag>{keyword}</Tag> : null}
+                            {category ? <Tag>{categoryName(category)}</Tag> : <Tag>全部提示词</Tag>}
+                            {tag.length ? <Tag>{tag.length} 个标签</Tag> : null}
+                        </Space>
+                        <Button icon={<FilterOutlined />} onClick={() => setFiltersOpen(true)}>
+                            筛选
+                        </Button>
+                    </Flex>
+                </Card>
+                <Card className="hidden lg:block" variant="borderless">
+                    {filterForm()}
                 </Card>
                 <Card variant="borderless">
                     <Flex align="center" justify="space-between" gap={16} wrap>
@@ -211,6 +237,7 @@ export default function AdminPromptsPage() {
                     search={false}
                     defaultSize="middle"
                     tableLayout="fixed"
+                    scroll={isCompact ? { x: 560 } : undefined}
                     cardProps={{ variant: "borderless" }}
                     headerTitle={
                         <Space>
@@ -235,15 +262,19 @@ export default function AdminPromptsPage() {
                         current: page,
                         pageSize,
                         total,
-                        showSizeChanger: true,
+                        simple: isCompact,
+                        showSizeChanger: !isCompact,
                         pageSizeOptions: [10, 20, 50, 100],
                         showTotal: (value) => `共 ${value} 条`,
                         onChange: (nextPage, nextPageSize) => (nextPageSize !== pageSize ? changePageSize(nextPageSize) : changePage(nextPage)),
                     }}
                 />
             </Flex>
+            <Drawer title="筛选提示词" placement="bottom" height="70vh" open={filtersOpen} onClose={() => setFiltersOpen(false)} destroyOnHidden>
+                {filterForm(true)}
+            </Drawer>
 
-            <Modal title={editingPrompt?.id ? "编辑提示词" : "新增提示词"} open={Boolean(editingPrompt)} width={720} onCancel={() => setEditingPrompt(null)} onOk={() => void savePrompt()} okText="保存" cancelText="取消" destroyOnHidden>
+            <Modal title={editingPrompt?.id ? "编辑提示词" : "新增提示词"} open={Boolean(editingPrompt)} width="min(720px, calc(100vw - 24px))" onCancel={() => setEditingPrompt(null)} onOk={() => void savePrompt()} okText="保存" cancelText="取消" destroyOnHidden>
                 <Form form={form} layout="vertical" requiredMark={false}>
                     <Form.Item name="title" label="标题" rules={[{ required: true, message: "请输入标题" }]}>
                         <Input />
@@ -263,7 +294,7 @@ export default function AdminPromptsPage() {
                 </Form>
             </Modal>
 
-            <Modal title="提示词详情" open={Boolean(detailPrompt)} width={760} onCancel={() => setDetailPrompt(null)} footer={<Button onClick={() => setDetailPrompt(null)}>关闭</Button>}>
+            <Modal title="提示词详情" open={Boolean(detailPrompt)} width="min(760px, calc(100vw - 24px))" onCancel={() => setDetailPrompt(null)} footer={<Button onClick={() => setDetailPrompt(null)}>关闭</Button>}>
                 {detailPrompt ? (
                     <Flex vertical gap={14}>
                         <Flex gap={14} align="start">
@@ -316,6 +347,7 @@ export default function AdminPromptsPage() {
                     rowKey="category"
                     dataSource={categories.filter((item) => item.remote)}
                     pagination={false}
+                    scroll={{ x: 520 }}
                     columns={[
                         {
                             title: "远程源",

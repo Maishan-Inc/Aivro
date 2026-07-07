@@ -1,8 +1,8 @@
 "use client";
 
-import { ReloadOutlined, SearchOutlined } from "@ant-design/icons";
+import { FilterOutlined, ReloadOutlined, SearchOutlined } from "@ant-design/icons";
 import { ProTable, type ProColumns } from "@ant-design/pro-components";
-import { Avatar, Button, Card, Col, DatePicker, Flex, Form, Input, Row, Select, Space, Tag, Typography } from "antd";
+import { Avatar, Button, Card, Col, DatePicker, Drawer, Flex, Form, Grid, Input, Row, Select, Space, Tag, Typography } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
 import { useState } from "react";
 
@@ -33,11 +33,57 @@ const requestLogCategoryOptions = [
 
 export default function AdminRequestLogsPage() {
     const { logs, keyword, category, startTime, endTime, page, pageSize, total, isLoading, searchLogs, changePage, changePageSize, resetFilters, refreshLogs } = useAdminRequestLogs();
+    const screens = Grid.useBreakpoint();
+    const isCompact = !screens.lg;
     const [keywordText, setKeywordText] = useState(keyword);
     const [categoryValue, setCategoryValue] = useState(category);
     const [rangeValue, setRangeValue] = useState<[Dayjs, Dayjs] | null>(startTime && endTime ? [dayjs(startTime), dayjs(endTime)] : null);
+    const [filtersOpen, setFiltersOpen] = useState(false);
 
-    const applySearch = () => searchLogs(keywordText.trim(), categoryValue, rangeValue?.[0]?.toISOString() || "", rangeValue?.[1]?.toISOString() || "");
+    const applySearch = () => {
+        searchLogs(keywordText.trim(), categoryValue, rangeValue?.[0]?.toISOString() || "", rangeValue?.[1]?.toISOString() || "");
+        setFiltersOpen(false);
+    };
+
+    const resetAndClose = () => {
+        setKeywordText("");
+        setCategoryValue("");
+        setRangeValue(null);
+        resetFilters();
+        setFiltersOpen(false);
+    };
+
+    const filterForm = (compact = false) => (
+        <Form layout="vertical">
+            <Row gutter={16} align="bottom">
+                <Col span={compact ? 24 : undefined} flex={compact ? undefined : "360px"}>
+                    <Form.Item label="关键词">
+                        <Input.Search value={keywordText} placeholder="搜索用户、模型、路径、备注、IP 或国家" allowClear enterButton={<SearchOutlined />} onSearch={applySearch} onChange={(event) => setKeywordText(event.target.value)} />
+                    </Form.Item>
+                </Col>
+                <Col span={compact ? 24 : undefined} flex={compact ? undefined : "180px"}>
+                    <Form.Item label="分类">
+                        <Select value={categoryValue} options={requestLogCategoryOptions} onChange={(value) => setCategoryValue(value)} />
+                    </Form.Item>
+                </Col>
+                <Col span={compact ? 24 : undefined} flex={compact ? undefined : "360px"}>
+                    <Form.Item label="时间范围">
+                        <DatePicker.RangePicker value={rangeValue} className="w-full" showTime={{ format: "HH:mm:ss" }} format="YYYY-MM-DD HH:mm:ss" allowClear onChange={(value) => setRangeValue(value as [Dayjs, Dayjs] | null)} />
+                    </Form.Item>
+                </Col>
+                <Col span={compact ? 24 : undefined} flex={compact ? undefined : "none"}>
+                    <Form.Item>
+                        <Space wrap>
+                            <Button onClick={resetAndClose}>重置</Button>
+                            <Button type="primary" icon={<ReloadOutlined />} onClick={applySearch}>
+                                查询
+                            </Button>
+                        </Space>
+                    </Form.Item>
+                </Col>
+            </Row>
+        </Form>
+    );
 
     const columns: ProColumns<AdminCreditLog>[] = [
         {
@@ -50,6 +96,7 @@ export default function AdminRequestLogsPage() {
             title: "类型",
             dataIndex: "type",
             width: 120,
+            responsive: ["lg"],
             render: (_, item) => <Tag color="blue">{requestLogTypeLabels[item.type] || item.type || "-"}</Tag>,
         },
         {
@@ -62,12 +109,14 @@ export default function AdminRequestLogsPage() {
             title: "模型",
             dataIndex: "model",
             width: 180,
+            responsive: ["lg"],
             render: (_, item) => <Typography.Text ellipsis>{item.model || "-"}</Typography.Text>,
         },
         {
             title: "路径",
             dataIndex: "path",
             width: 180,
+            responsive: ["lg"],
             render: (_, item) => <Typography.Text code copyable={Boolean(item.path)} ellipsis>{item.path || "-"}</Typography.Text>,
         },
         {
@@ -80,17 +129,20 @@ export default function AdminRequestLogsPage() {
             title: "余额",
             dataIndex: "balance",
             width: 100,
+            responsive: ["lg"],
         },
         {
             title: "备注",
             dataIndex: "remark",
             ellipsis: true,
+            responsive: ["lg"],
             render: (_, item) => <Typography.Text type="secondary">{item.remark || "-"}</Typography.Text>,
         },
         {
             title: "IP/国家",
             dataIndex: "ip",
             width: 180,
+            responsive: ["lg"],
             render: (_, item) => <Typography.Text type="secondary">{[item.ip, item.country].filter(Boolean).join(" / ") || "-"}</Typography.Text>,
         },
         {
@@ -102,61 +154,23 @@ export default function AdminRequestLogsPage() {
     ];
 
     return (
-        <main style={{ padding: 24 }}>
+        <main className="p-3 sm:p-4 lg:p-6">
             <Flex vertical gap={16}>
-                <Card variant="borderless">
-                    <Form layout="vertical">
-                        <Row gutter={16} align="bottom">
-                            <Col flex="360px">
-                                <Form.Item label="关键词">
-                                    <Input.Search
-                                        value={keywordText}
-                                        placeholder="搜索用户、模型、路径、备注、IP 或国家"
-                                        allowClear
-                                        enterButton={<SearchOutlined />}
-                                        onSearch={applySearch}
-                                        onChange={(event) => setKeywordText(event.target.value)}
-                                    />
-                                </Form.Item>
-                            </Col>
-                            <Col flex="180px">
-                                <Form.Item label="分类">
-                                    <Select value={categoryValue} options={requestLogCategoryOptions} onChange={(value) => setCategoryValue(value)} />
-                                </Form.Item>
-                            </Col>
-                            <Col flex="360px">
-                                <Form.Item label="时间范围">
-                                    <DatePicker.RangePicker
-                                        value={rangeValue}
-                                        className="w-full"
-                                        showTime={{ format: "HH:mm:ss" }}
-                                        format="YYYY-MM-DD HH:mm:ss"
-                                        allowClear
-                                        onChange={(value) => setRangeValue(value as [Dayjs, Dayjs] | null)}
-                                    />
-                                </Form.Item>
-                            </Col>
-                            <Col flex="none">
-                                <Form.Item>
-                                    <Space>
-                                        <Button
-                                            onClick={() => {
-                                                setKeywordText("");
-                                                setCategoryValue("");
-                                                setRangeValue(null);
-                                                resetFilters();
-                                            }}
-                                        >
-                                            重置
-                                        </Button>
-                                        <Button type="primary" icon={<ReloadOutlined />} onClick={applySearch}>
-                                            查询
-                                        </Button>
-                                    </Space>
-                                </Form.Item>
-                            </Col>
-                        </Row>
-                    </Form>
+                <Card className="lg:hidden" variant="borderless">
+                    <Flex align="center" justify="space-between" gap={12}>
+                        <Space wrap>
+                            <Typography.Text strong>筛选</Typography.Text>
+                            {keyword ? <Tag>{keyword}</Tag> : null}
+                            {category ? <Tag>{category}</Tag> : <Tag>全部请求</Tag>}
+                            {startTime && endTime ? <Tag>已选时间</Tag> : null}
+                        </Space>
+                        <Button icon={<FilterOutlined />} onClick={() => setFiltersOpen(true)}>
+                            筛选
+                        </Button>
+                    </Flex>
+                </Card>
+                <Card className="hidden lg:block" variant="borderless">
+                    {filterForm()}
                 </Card>
                 <ProTable<AdminCreditLog>
                     rowKey="id"
@@ -166,7 +180,7 @@ export default function AdminRequestLogsPage() {
                     search={false}
                     defaultSize="middle"
                     tableLayout="fixed"
-                    scroll={{ x: 1540 }}
+                    scroll={isCompact ? { x: 640 } : { x: 1540 }}
                     cardProps={{ variant: "borderless" }}
                     headerTitle={
                         <Space>
@@ -179,13 +193,17 @@ export default function AdminRequestLogsPage() {
                         current: page,
                         pageSize,
                         total,
-                        showSizeChanger: true,
+                        simple: isCompact,
+                        showSizeChanger: !isCompact,
                         pageSizeOptions: [10, 20, 50, 100],
                         showTotal: (value) => `共 ${value} 条`,
                         onChange: (nextPage, nextPageSize) => (nextPageSize !== pageSize ? changePageSize(nextPageSize) : changePage(nextPage)),
                     }}
                 />
             </Flex>
+            <Drawer title="筛选请求日志" placement="bottom" height="74vh" open={filtersOpen} onClose={() => setFiltersOpen(false)} destroyOnHidden>
+                {filterForm(true)}
+            </Drawer>
         </main>
     );
 }

@@ -1,8 +1,8 @@
 "use client";
 
-import { StopOutlined, ReloadOutlined, SearchOutlined } from "@ant-design/icons";
+import { FilterOutlined, StopOutlined, ReloadOutlined, SearchOutlined } from "@ant-design/icons";
 import { ProTable, type ProColumns } from "@ant-design/pro-components";
-import { App, Button, Card, Col, Flex, Form, Input, Modal, Row, Select, Space, Tag, Tooltip, Typography } from "antd";
+import { App, Button, Card, Col, Drawer, Flex, Form, Grid, Input, Modal, Row, Select, Space, Tag, Tooltip, Typography } from "antd";
 import { useEffect, useState } from "react";
 
 import { banAdminCommunityWorkflow, fetchAdminCommunityWorkflows } from "@/services/api/admin";
@@ -17,6 +17,8 @@ const statusOptions = [
 
 export default function AdminWorkflowCommunityPage() {
     const { message } = App.useApp();
+    const screens = Grid.useBreakpoint();
+    const isCompact = !screens.lg;
     const token = useUserStore((state) => state.token);
     const [items, setItems] = useState<WorkflowCommunityPost[]>([]);
     const [keyword, setKeyword] = useState("");
@@ -28,6 +30,7 @@ export default function AdminWorkflowCommunityPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [banning, setBanning] = useState<WorkflowCommunityPost | null>(null);
     const [banReason, setBanReason] = useState("");
+    const [filtersOpen, setFiltersOpen] = useState(false);
 
     const loadItems = async () => {
         if (!token) return;
@@ -64,6 +67,49 @@ export default function AdminWorkflowCommunityPage() {
         }
     };
 
+    const searchAndClose = () => {
+        const nextKeyword = keywordText;
+        setPage(1);
+        setKeyword(nextKeyword);
+        setFiltersOpen(false);
+        if (nextKeyword === keyword) void loadItems();
+    };
+
+    const resetAndClose = () => {
+        setKeywordText("");
+        setKeyword("");
+        setStatus("");
+        setPage(1);
+        setFiltersOpen(false);
+    };
+
+    const filterForm = (compact = false) => (
+        <Form layout="vertical">
+            <Row gutter={16} align="bottom">
+                <Col span={compact ? 24 : undefined} flex={compact ? undefined : "360px"}>
+                    <Form.Item label="关键词">
+                        <Input.Search value={keywordText} placeholder="搜索作品、来源或用户 ID" allowClear enterButton={<SearchOutlined />} onSearch={searchAndClose} onChange={(event) => setKeywordText(event.target.value)} />
+                    </Form.Item>
+                </Col>
+                <Col span={compact ? 24 : undefined} flex={compact ? undefined : "180px"}>
+                    <Form.Item label="状态">
+                        <Select value={status} options={statusOptions} onChange={(value) => { setPage(1); setStatus(value); }} />
+                    </Form.Item>
+                </Col>
+                <Col span={compact ? 24 : undefined} flex={compact ? undefined : "none"}>
+                    <Form.Item>
+                        <Space wrap>
+                            <Button onClick={resetAndClose}>重置</Button>
+                            <Button type="primary" icon={<ReloadOutlined />} onClick={searchAndClose}>
+                                查询
+                            </Button>
+                        </Space>
+                    </Form.Item>
+                </Col>
+            </Row>
+        </Form>
+    );
+
     const columns: ProColumns<WorkflowCommunityPost>[] = [
         {
             title: "作品",
@@ -86,12 +132,14 @@ export default function AdminWorkflowCommunityPage() {
             title: "语言",
             dataIndex: "locale",
             width: 96,
+            responsive: ["lg"],
             render: (_, item) => <Tag color={item.locale === "en-US" ? "cyan" : "blue"}>{item.locale === "en-US" ? "English" : "中文"}</Tag>,
         },
         {
             title: "标签",
             dataIndex: "tags",
             width: 200,
+            responsive: ["lg"],
             render: (_, item) => (
                 <Space size={[4, 4]} wrap>
                     {(item.tags || []).slice(0, 4).map((tag) => <Tag key={tag}>{tag}</Tag>)}
@@ -102,11 +150,13 @@ export default function AdminWorkflowCommunityPage() {
             title: "用户",
             dataIndex: "userId",
             width: 180,
+            responsive: ["lg"],
             render: (_, item) => <Typography.Text copyable ellipsis>{item.userId}</Typography.Text>,
         },
         {
             title: "封禁原因",
             dataIndex: "banReason",
+            responsive: ["lg"],
             render: (_, item) => <Typography.Text type="secondary" ellipsis>{item.banReason || "-"}</Typography.Text>,
         },
         {
@@ -123,31 +173,22 @@ export default function AdminWorkflowCommunityPage() {
     ];
 
     return (
-        <main style={{ padding: 24 }}>
+        <main className="p-3 sm:p-4 lg:p-6">
             <Flex vertical gap={16}>
-                <Card variant="borderless">
-                    <Form layout="vertical">
-                        <Row gutter={16} align="bottom">
-                            <Col flex="360px">
-                                <Form.Item label="关键词">
-                                    <Input.Search value={keywordText} placeholder="搜索作品、来源或用户 ID" allowClear enterButton={<SearchOutlined />} onSearch={() => { setPage(1); setKeyword(keywordText); }} onChange={(event) => setKeywordText(event.target.value)} />
-                                </Form.Item>
-                            </Col>
-                            <Col flex="180px">
-                                <Form.Item label="状态">
-                                    <Select value={status} options={statusOptions} onChange={(value) => { setPage(1); setStatus(value); }} />
-                                </Form.Item>
-                            </Col>
-                            <Col flex="none">
-                                <Form.Item>
-                                    <Space>
-                                        <Button onClick={() => { setKeywordText(""); setKeyword(""); setStatus(""); setPage(1); }}>重置</Button>
-                                        <Button type="primary" icon={<ReloadOutlined />} onClick={() => void loadItems()}>查询</Button>
-                                    </Space>
-                                </Form.Item>
-                            </Col>
-                        </Row>
-                    </Form>
+                <Card className="lg:hidden" variant="borderless">
+                    <Flex align="center" justify="space-between" gap={12}>
+                        <Space wrap>
+                            <Typography.Text strong>筛选</Typography.Text>
+                            {keyword ? <Tag>{keyword}</Tag> : null}
+                            {status ? <Tag>{status === "banned" ? "已封禁" : "公开中"}</Tag> : <Tag>全部作品</Tag>}
+                        </Space>
+                        <Button icon={<FilterOutlined />} onClick={() => setFiltersOpen(true)}>
+                            筛选
+                        </Button>
+                    </Flex>
+                </Card>
+                <Card className="hidden lg:block" variant="borderless">
+                    {filterForm()}
                 </Card>
                 <ProTable<WorkflowCommunityPost>
                     rowKey="id"
@@ -157,6 +198,7 @@ export default function AdminWorkflowCommunityPage() {
                     search={false}
                     defaultSize="middle"
                     tableLayout="fixed"
+                    scroll={isCompact ? { x: 520 } : undefined}
                     cardProps={{ variant: "borderless" }}
                     headerTitle={<Space><Typography.Text strong>社区工作流</Typography.Text><Tag>{total} 条</Tag></Space>}
                     options={{ density: true, setting: true, reload: () => void loadItems() }}
@@ -164,7 +206,8 @@ export default function AdminWorkflowCommunityPage() {
                         current: page,
                         pageSize,
                         total,
-                        showSizeChanger: true,
+                        simple: isCompact,
+                        showSizeChanger: !isCompact,
                         pageSizeOptions: [10, 20, 50, 100],
                         showTotal: (value) => `共 ${value} 条`,
                         onChange: (nextPage, nextPageSize) => {
@@ -178,6 +221,9 @@ export default function AdminWorkflowCommunityPage() {
                     }}
                 />
             </Flex>
+            <Drawer title="筛选社区工作流" placement="bottom" height="62vh" open={filtersOpen} onClose={() => setFiltersOpen(false)} destroyOnHidden>
+                {filterForm(true)}
+            </Drawer>
             <Modal title="封禁社区工作流" open={Boolean(banning)} onCancel={() => setBanning(null)} onOk={() => void banItem()} okText="封禁" okButtonProps={{ danger: true }} cancelText="取消">
                 <Typography.Paragraph type="secondary">封禁后该作品不会在社区工作流展示，作者在“我的作品”中可看到封禁原因，7 天后自动移除。</Typography.Paragraph>
                 <Input.TextArea rows={4} value={banReason} onChange={(event) => setBanReason(event.target.value)} placeholder="请输入封禁原因" />

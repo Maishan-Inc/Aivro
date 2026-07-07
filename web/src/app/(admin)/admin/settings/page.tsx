@@ -701,7 +701,7 @@ export default function AdminSettingsPage() {
     }
 
     return (
-        <main style={{ padding: 24 }}>
+        <main className="p-3 sm:p-4 lg:p-6">
             <Flex vertical gap={16}>
                 <Card variant="borderless">
                     <Flex justify="space-between" align="center" gap={16} wrap>
@@ -725,7 +725,7 @@ export default function AdminSettingsPage() {
                                 ]}
                             />
                         )}
-                        <Space>
+                        <Space wrap>
                             <Typography.Text type={saveHint.includes("失败") ? "danger" : "secondary"}>
                                 {isSaving ? <LoadingOutlined /> : saveHint === "已保存" ? <CheckCircleOutlined /> : null} {saveHint}
                             </Typography.Text>
@@ -754,7 +754,7 @@ export default function AdminSettingsPage() {
                             <Typography.Text type="secondary">{activeTab === "model" ? "配置模型渠道、开放模型、默认模型和算力点消耗" : activeTab === "mail" ? "SMTP 验证码和邮件模板" : activeTab === "cloudStorage" ? t("cloud.description") : activeTab === "billingKyc" ? "配置 Stripe 私有密钥和 Didit KYC 奖励" : activeTab === "pages" ? "配置前台隐私政策和服务条款内容" : activeTab === "runtime" ? "配置站点域名、可信来源和登录有效期" : "OAuth、MetaMask 和自定义登录入口"}</Typography.Text>
                         )}
                         {activeMode === "json" ? (
-                            <Space>
+                            <Space wrap>
                                 {jsonError ? (
                                     <Tag color="error">{jsonError}</Tag>
                                 ) : (
@@ -850,6 +850,7 @@ export default function AdminSettingsPage() {
                                                     pagination={false}
                                                     size="small"
                                                     dataSource={billingModelCosts}
+                                                    scroll={{ x: 620 }}
                                                     style={{ marginTop: 8 }}
                                                     columns={[
                                                         { title: "模型", dataIndex: "model", render: (value) => <ModelTag model={value} color={channelColorByModel[value]} /> },
@@ -911,6 +912,7 @@ export default function AdminSettingsPage() {
                                                     rowKey="_rowKey"
                                                     pagination={false}
                                                     dataSource={channelTableData}
+                                                    scroll={{ x: 860 }}
                                                     columns={[
                                                         {
                                                             title: "名称",
@@ -1530,7 +1532,7 @@ export default function AdminSettingsPage() {
                 <Drawer
                     title={editingChannelIndex === null ? "新增渠道" : "编辑渠道"}
                     open={isChannelDrawerOpen}
-                    width={760}
+                    width="min(760px, 100vw)"
                     onClose={closeChannelDrawer}
                     extra={
                         <Space>
@@ -1544,27 +1546,27 @@ export default function AdminSettingsPage() {
                 >
                     <Form form={channelForm} layout="vertical" requiredMark={false} initialValues={emptyChannel}>
                         <Row gutter={16}>
-                            <Col span={12}>
+                            <Col xs={24} md={12}>
                                 <Form.Item name="name" label="渠道名称" rules={[{ required: true, message: "请输入渠道名称" }]}>
                                     <Input />
                                 </Form.Item>
                             </Col>
-                            <Col span={12}>
+                            <Col xs={24} md={12}>
                                 <Form.Item name="protocol" label="协议">
                                     <Select options={[{ label: "OpenAI", value: "openai" }]} />
                                 </Form.Item>
                             </Col>
-                            <Col span={12}>
+                            <Col xs={24} md={12}>
                                 <Form.Item name="color" label="渠道颜色">
                                     <Input type="color" />
                                 </Form.Item>
                             </Col>
-                            <Col span={12}>
+                            <Col xs={24} md={12}>
                                 <Form.Item name="weight" label="权重">
                                     <InputNumber min={1} step={1} className="!w-full" />
                                 </Form.Item>
                             </Col>
-                            <Col span={12}>
+                            <Col xs={24} md={12}>
                                 <Form.Item name="enabled" label="启用" valuePropName="checked">
                                     <Switch />
                                 </Form.Item>
@@ -1592,21 +1594,21 @@ export default function AdminSettingsPage() {
                                                     </Space>
                                                 </Flex>
                                                 {fields.map((field) => (
-                                                    <Row gutter={8} key={field.key} align="middle">
+                                                    <Row gutter={[8, 8]} key={field.key} align="middle">
                                                         <Form.Item {...field} name={[field.name, "id"]} hidden>
                                                             <Input />
                                                         </Form.Item>
-                                                        <Col span={8}>
+                                                        <Col xs={24} md={8}>
                                                             <Form.Item {...field} name={[field.name, "name"]} rules={[{ required: true, message: "请输入前台模型名" }]} style={{ marginBottom: 0 }}>
                                                                 <Input placeholder="前台模型名" />
                                                             </Form.Item>
                                                         </Col>
-                                                        <Col span={8}>
+                                                        <Col xs={24} md={8}>
                                                             <Form.Item {...field} name={[field.name, "upstreamName"]} rules={[{ required: true, message: "请输入上游模型名" }]} style={{ marginBottom: 0 }}>
                                                                 <Input placeholder="上游模型名" />
                                                             </Form.Item>
                                                         </Col>
-                                                        <Col span={6}>
+                                                        <Col xs={20} md={6}>
                                                             <Form.Item {...field} name={[field.name, "capability"]} style={{ marginBottom: 0 }}>
                                                                 <Select
                                                                     options={[
@@ -1618,7 +1620,7 @@ export default function AdminSettingsPage() {
                                                                 />
                                                             </Form.Item>
                                                         </Col>
-                                                        <Col span={2}>
+                                                        <Col xs={4} md={2}>
                                                             <Button danger type="text" icon={<DeleteOutlined />} onClick={() => remove(field.name)} />
                                                         </Col>
                                                     </Row>
@@ -1646,7 +1648,7 @@ export default function AdminSettingsPage() {
                         </Space>
                     }
                     open={isModelSelectorOpen}
-                    width={960}
+                    width="min(960px, calc(100vw - 24px))"
                     onCancel={closeChannelModelSelector}
                     footer={
                         <Space>
@@ -1692,7 +1694,7 @@ export default function AdminSettingsPage() {
                         </Flex>
                         <div style={{ maxHeight: 420, overflowY: "auto", borderTop: "1px solid var(--ant-color-border-secondary)", paddingTop: 12 }}>
                             {activeModelSelectModels.length ? (
-                                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", columnGap: 24, rowGap: 12 }}>
+                                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", columnGap: 24, rowGap: 12 }}>
                                     {activeModelSelectModels.map((model) => (
                                         <Checkbox key={model} checked={modelSelectSelected.includes(model)} onChange={(event) => toggleSelectedModel(model, event.target.checked)}>
                                             <Typography.Text style={{ wordBreak: "break-all" }}>{model}</Typography.Text>
@@ -1714,7 +1716,7 @@ export default function AdminSettingsPage() {
                         </Space>
                     }
                     open={testChannelIndex !== null}
-                    width={920}
+                    width="min(920px, calc(100vw - 24px))"
                     onCancel={closeTestDialog}
                     footer={
                         <Space>
@@ -1732,7 +1734,7 @@ export default function AdminSettingsPage() {
                         <Table
                             rowKey="model"
                             pagination={false}
-                            scroll={{ y: 420 }}
+                            scroll={{ x: 620, y: 420 }}
                             dataSource={testModels.map((model) => ({ model }))}
                             rowSelection={{
                                 selectedRowKeys: selectedTestModels,
@@ -1836,7 +1838,7 @@ function MailTemplateEditorModal({ form, name, onClose, onSave }: { form: any; n
         <Modal
             title={title}
             open={!!name}
-            width={1120}
+            width="min(1120px, calc(100vw - 24px))"
             onCancel={onClose}
             footer={
                 <Space>
@@ -1930,7 +1932,7 @@ function OAuthProviderEditorModal({ form, state, snapshot, currentOrigin, onClos
         <Modal
             title={title}
             open={!!state}
-            width={980}
+            width="min(980px, calc(100vw - 24px))"
             onCancel={cancel}
             footer={
                 <Flex justify="space-between" gap={12}>

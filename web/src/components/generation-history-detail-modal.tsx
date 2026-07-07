@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { App, Descriptions, Empty, Modal, Table, Tag, Typography } from "antd";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { App, Empty, Modal, Tag, Typography } from "antd";
 
 import { fetchCreditLogs, type CreditLog } from "@/services/api/billing";
 import type { GenerationHistory, GenerationHistoryMedia } from "@/services/api/generation-history";
@@ -35,31 +35,40 @@ export function GenerationHistoryDetailModal({ open, history, onClose }: Generat
     }, [history, message, open, token]);
 
     return (
-        <Modal title="详细任务" open={open} onCancel={onClose} footer={null} width={820}>
+        <Modal title="详细任务" open={open} onCancel={onClose} footer={null} centered width={720} styles={{ body: { height: "min(672px, calc(100vh - 150px))", overflowY: "auto", paddingRight: 4 } }}>
             {history ? (
-                <div className="space-y-5">
-                    <Descriptions size="small" bordered column={{ xs: 1, sm: 2 }}>
-                        <Descriptions.Item label="调用模型">{history.model || history.config?.model || "未记录"}</Descriptions.Item>
-                        <Descriptions.Item label="任务状态">
-                            <Tag className="m-0" color={history.status === "成功" ? "blue" : "red"}>
-                                {history.status || "成功"}
-                            </Tag>
-                        </Descriptions.Item>
-                        <Descriptions.Item label="生成时间">{formatDate(history.createdAt)}</Descriptions.Item>
-                        <Descriptions.Item label="任务耗时">{history.durationMs ? formatDuration(history.durationMs) : "未记录"}</Descriptions.Item>
-                        <Descriptions.Item label="尺寸">{historySize(history)}</Descriptions.Item>
-                        <Descriptions.Item label="服务器删除">{formatDeleteRemaining(expiresAt)}</Descriptions.Item>
-                    </Descriptions>
+                <div className="space-y-4 pr-2">
+                    <section className="rounded-lg border border-stone-200 bg-background p-3 dark:border-stone-800">
+                        <div className="mb-2 text-sm font-semibold">任务信息</div>
+                        <div className="divide-y divide-stone-100 dark:divide-stone-800">
+                            <DetailRow label="调用模型" value={history.model || history.config?.model || "未记录"} />
+                            <DetailRow
+                                label="任务状态"
+                                value={
+                                    <Tag className="m-0" color={history.status === "成功" ? "blue" : "red"}>
+                                        {history.status || "成功"}
+                                    </Tag>
+                                }
+                            />
+                            <DetailRow label="生成时间" value={formatDate(history.createdAt)} />
+                            <DetailRow label="任务耗时" value={history.durationMs ? formatDuration(history.durationMs) : "未记录"} />
+                            <DetailRow label="尺寸" value={historySize(history)} />
+                            <DetailRow label="服务器删除" value={formatDeleteRemaining(expiresAt)} />
+                        </div>
+                    </section>
 
-                    <section>
+                    <section className="rounded-lg border border-stone-200 bg-background p-3 dark:border-stone-800">
                         <div className="mb-2 text-sm font-semibold">提示词</div>
-                        <Typography.Paragraph copyable className="!mb-0 whitespace-pre-wrap rounded-lg border border-stone-200 bg-stone-50 p-3 text-sm dark:border-stone-800 dark:bg-stone-900">
+                        <Typography.Paragraph copyable className="!mb-0 whitespace-pre-wrap break-words rounded-md bg-stone-50 p-3 text-sm leading-6 dark:bg-stone-900">
                             {history.prompt || "无提示词"}
                         </Typography.Paragraph>
                     </section>
 
-                    <section>
-                        <div className="mb-2 text-sm font-semibold">媒体信息</div>
+                    <section className="rounded-lg border border-stone-200 bg-background p-3 dark:border-stone-800">
+                        <div className="mb-2 flex items-center justify-between gap-3">
+                            <div className="text-sm font-semibold">媒体信息</div>
+                            <Tag className="m-0">{history.media.length}</Tag>
+                        </div>
                         {history.media.length ? (
                             <div className="grid gap-2">
                                 {history.media.map((item) => (
@@ -71,26 +80,22 @@ export function GenerationHistoryDetailModal({ open, history, onClose }: Generat
                         )}
                     </section>
 
-                    <section>
+                    <section className="rounded-lg border border-stone-200 bg-background p-3 dark:border-stone-800">
                         <div className="mb-2 flex items-center justify-between gap-3">
                             <div className="text-sm font-semibold">扣费记录</div>
                             <Tag className="m-0">{creditLogs.length}</Tag>
                         </div>
-                        <Table<CreditLog>
-                            size="small"
-                            rowKey="id"
-                            loading={loadingCreditLogs}
-                            dataSource={creditLogs}
-                            pagination={false}
-                            locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="未找到关联扣费记录" /> }}
-                            columns={[
-                                { title: "时间", dataIndex: "createdAt", render: (value: string) => formatDate(value) },
-                                { title: "类型", dataIndex: "type", width: 96, render: (value: CreditLog["type"]) => creditLogTypeLabel(value) },
-                                { title: "模型", dataIndex: "model", ellipsis: true },
-                                { title: "变动", dataIndex: "amount", width: 96, render: (value: number) => <span className={value < 0 ? "text-red-600" : value > 0 ? "text-green-600" : ""}>{formatCreditAmount(value)}</span> },
-                                { title: "剩余金额", dataIndex: "balance", width: 110, render: (value: number) => value.toLocaleString() },
-                            ]}
-                        />
+                        {loadingCreditLogs ? (
+                            <div className="rounded-md bg-stone-50 px-3 py-6 text-center text-sm text-stone-500 dark:bg-stone-900 dark:text-stone-400">读取扣费记录中...</div>
+                        ) : creditLogs.length ? (
+                            <div className="grid gap-2">
+                                {creditLogs.map((item) => (
+                                    <CreditLogRow key={item.id} item={item} />
+                                ))}
+                            </div>
+                        ) : (
+                            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="未找到关联扣费记录" />
+                        )}
                     </section>
                 </div>
             ) : null}
@@ -98,15 +103,36 @@ export function GenerationHistoryDetailModal({ open, history, onClose }: Generat
     );
 }
 
+function DetailRow({ label, value }: { label: string; value: ReactNode }) {
+    return (
+        <div className="grid grid-cols-[92px_minmax(0,1fr)] gap-3 py-2 text-sm leading-6">
+            <div className="text-stone-500 dark:text-stone-400">{label}</div>
+            <div className="min-w-0 break-words text-stone-900 dark:text-stone-100">{value}</div>
+        </div>
+    );
+}
+
 function MediaRow({ item }: { item: GenerationHistoryMedia }) {
     const dimensions = item.width && item.height ? `${item.width}x${item.height}` : "无尺寸";
     return (
-        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-stone-200 bg-background px-3 py-2 text-xs text-stone-500 dark:border-stone-800 dark:text-stone-400">
-            <Tag className="m-0">{item.fileType}</Tag>
-            <span>{dimensions}</span>
-            <span>{formatBytes(item.size || 0)}</span>
-            <span>{item.contentType || "未知类型"}</span>
-            <span>删除时间：{formatDate(item.expiresAt)}</span>
+        <div className="rounded-md bg-stone-50 px-3 py-2 text-sm leading-6 dark:bg-stone-900">
+            <DetailRow label="文件类型" value={<Tag className="m-0">{item.fileType}</Tag>} />
+            <DetailRow label="尺寸" value={dimensions} />
+            <DetailRow label="大小" value={formatBytes(item.size || 0)} />
+            <DetailRow label="内容类型" value={item.contentType || "未知类型"} />
+            <DetailRow label="删除时间" value={formatDate(item.expiresAt)} />
+        </div>
+    );
+}
+
+function CreditLogRow({ item }: { item: CreditLog }) {
+    return (
+        <div className="rounded-md bg-stone-50 px-3 py-2 text-sm leading-6 dark:bg-stone-900">
+            <DetailRow label="时间" value={formatDate(item.createdAt)} />
+            <DetailRow label="类型" value={creditLogTypeLabel(item.type)} />
+            <DetailRow label="模型" value={item.model || "未记录"} />
+            <DetailRow label="变动" value={<span className={item.amount < 0 ? "text-red-600" : item.amount > 0 ? "text-green-600" : ""}>{formatCreditAmount(item.amount)}</span>} />
+            <DetailRow label="剩余金额" value={item.balance.toLocaleString()} />
         </div>
     );
 }

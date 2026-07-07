@@ -1,8 +1,8 @@
 "use client";
 
-import { CopyOutlined, DeleteOutlined, EditOutlined, EyeOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from "@ant-design/icons";
+import { CopyOutlined, DeleteOutlined, EditOutlined, EyeOutlined, FilterOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from "@ant-design/icons";
 import { ProTable, type ProColumns } from "@ant-design/pro-components";
-import { Button, Card, Col, Flex, Form, Image, Input, Modal, Row, Select, Space, Tag, Tooltip, Typography } from "antd";
+import { Button, Card, Col, Drawer, Flex, Form, Grid, Image, Input, Modal, Row, Select, Space, Tag, Tooltip, Typography } from "antd";
 import { useEffect, useState } from "react";
 
 import { useCopyText } from "@/hooks/use-copy-text";
@@ -22,8 +22,11 @@ const editTypeOptions = typeOptions.slice(1);
 export default function AdminAssetsPage() {
     const { assets, tags, keyword, kind, tag, page, pageSize, total, isLoading, searchAssets, changeKind, changeTag, changePage, changePageSize, resetFilters, refreshAssets, saveAsset: saveAdminAsset, deleteAsset } = useAdminAssets();
     const copyText = useCopyText();
+    const screens = Grid.useBreakpoint();
+    const isCompact = !screens.lg;
     const [form] = Form.useForm<AssetFormValues>();
     const [keywordText, setKeywordText] = useState(keyword);
+    const [filtersOpen, setFiltersOpen] = useState(false);
     const [editingAsset, setEditingAsset] = useState<Partial<AdminAsset> | null>(null);
     const [detailAsset, setDetailAsset] = useState<AdminAsset | null>(null);
     const [deletingAsset, setDeletingAsset] = useState<AdminAsset | null>(null);
@@ -52,6 +55,49 @@ export default function AdminAssetsPage() {
         setEditingAsset(null);
     };
 
+    const searchAndClose = () => {
+        searchAssets(keywordText);
+        setFiltersOpen(false);
+    };
+
+    const resetAndClose = () => {
+        setKeywordText("");
+        resetFilters();
+        setFiltersOpen(false);
+    };
+
+    const filterForm = (compact = false) => (
+        <Form layout="vertical">
+            <Row gutter={16} align="bottom">
+                <Col span={compact ? 24 : undefined} flex={compact ? undefined : "360px"}>
+                    <Form.Item label="关键词">
+                        <Input.Search value={keywordText} placeholder="搜索标题、内容或标签" allowClear enterButton={<SearchOutlined />} onSearch={searchAndClose} onChange={(event) => setKeywordText(event.target.value)} />
+                    </Form.Item>
+                </Col>
+                <Col span={compact ? 24 : undefined} flex={compact ? undefined : "180px"}>
+                    <Form.Item label="类型">
+                        <Select value={kind} onChange={changeKind} options={typeOptions} />
+                    </Form.Item>
+                </Col>
+                <Col span={compact ? 24 : undefined} flex={compact ? undefined : "220px"}>
+                    <Form.Item label="标签">
+                        <Select mode="multiple" allowClear maxTagCount="responsive" value={tag} onChange={changeTag} options={tagOptions} placeholder="全部标签" />
+                    </Form.Item>
+                </Col>
+                <Col span={compact ? 24 : undefined} flex={compact ? undefined : "none"}>
+                    <Form.Item>
+                        <Space wrap>
+                            <Button onClick={resetAndClose}>重置</Button>
+                            <Button type="primary" icon={<ReloadOutlined />} onClick={searchAndClose}>
+                                查询
+                            </Button>
+                        </Space>
+                    </Form.Item>
+                </Col>
+            </Row>
+        </Form>
+    );
+
     const columns: ProColumns<AdminAsset>[] = [
         {
             title: "封面",
@@ -79,6 +125,7 @@ export default function AdminAssetsPage() {
             title: "标签",
             dataIndex: "tags",
             width: 180,
+            responsive: ["lg"],
             render: (_, item) => (
                 <Space size={[4, 4]} wrap>
                     {(item.tags || []).slice(0, 3).map((tag) => (
@@ -91,6 +138,7 @@ export default function AdminAssetsPage() {
             title: "分类",
             dataIndex: "category",
             width: 120,
+            responsive: ["lg"],
             render: (_, item) => <Typography.Text type="secondary">{item.category || "未标注"}</Typography.Text>,
         },
         {
@@ -115,45 +163,23 @@ export default function AdminAssetsPage() {
     ];
 
     return (
-        <main style={{ padding: 24 }}>
+        <main className="p-3 sm:p-4 lg:p-6">
             <Flex vertical gap={16}>
-                <Card variant="borderless">
-                    <Form layout="vertical">
-                        <Row gutter={16} align="bottom">
-                            <Col flex="360px">
-                                <Form.Item label="关键词">
-                                    <Input.Search value={keywordText} placeholder="搜索标题、内容或标签" allowClear enterButton={<SearchOutlined />} onSearch={() => searchAssets(keywordText)} onChange={(event) => setKeywordText(event.target.value)} />
-                                </Form.Item>
-                            </Col>
-                            <Col flex="180px">
-                                <Form.Item label="类型">
-                                    <Select value={kind} onChange={changeKind} options={typeOptions} />
-                                </Form.Item>
-                            </Col>
-                            <Col flex="220px">
-                                <Form.Item label="标签">
-                                    <Select mode="multiple" allowClear maxTagCount="responsive" value={tag} onChange={changeTag} options={tagOptions} placeholder="全部标签" />
-                                </Form.Item>
-                            </Col>
-                            <Col flex="none">
-                                <Form.Item>
-                                    <Space>
-                                        <Button
-                                            onClick={() => {
-                                                setKeywordText("");
-                                                resetFilters();
-                                            }}
-                                        >
-                                            重置
-                                        </Button>
-                                        <Button type="primary" icon={<ReloadOutlined />} onClick={() => searchAssets(keywordText)}>
-                                            查询
-                                        </Button>
-                                    </Space>
-                                </Form.Item>
-                            </Col>
-                        </Row>
-                    </Form>
+                <Card className="lg:hidden" variant="borderless">
+                    <Flex align="center" justify="space-between" gap={12}>
+                        <Space wrap>
+                            <Typography.Text strong>筛选</Typography.Text>
+                            {keyword ? <Tag>{keyword}</Tag> : null}
+                            {kind ? <Tag>{kind === "image" ? "图片" : "文本"}</Tag> : <Tag>全部素材</Tag>}
+                            {tag.length ? <Tag>{tag.length} 个标签</Tag> : null}
+                        </Space>
+                        <Button icon={<FilterOutlined />} onClick={() => setFiltersOpen(true)}>
+                            筛选
+                        </Button>
+                    </Flex>
+                </Card>
+                <Card className="hidden lg:block" variant="borderless">
+                    {filterForm()}
                 </Card>
                 <ProTable<AdminAsset>
                     rowKey="id"
@@ -163,6 +189,7 @@ export default function AdminAssetsPage() {
                     search={false}
                     defaultSize="middle"
                     tableLayout="fixed"
+                    scroll={isCompact ? { x: 560 } : undefined}
                     cardProps={{ variant: "borderless" }}
                     headerTitle={
                         <Space>
@@ -180,15 +207,19 @@ export default function AdminAssetsPage() {
                         current: page,
                         pageSize,
                         total,
-                        showSizeChanger: true,
+                        simple: isCompact,
+                        showSizeChanger: !isCompact,
                         pageSizeOptions: [10, 20, 50, 100],
                         showTotal: (value) => `共 ${value} 条`,
                         onChange: (nextPage, nextPageSize) => (nextPageSize !== pageSize ? changePageSize(nextPageSize) : changePage(nextPage)),
                     }}
                 />
             </Flex>
+            <Drawer title="筛选素材" placement="bottom" height="70vh" open={filtersOpen} onClose={() => setFiltersOpen(false)} destroyOnHidden>
+                {filterForm(true)}
+            </Drawer>
 
-            <Modal title={editingAsset?.id ? "编辑素材" : "新增素材"} open={Boolean(editingAsset)} width={760} onCancel={() => setEditingAsset(null)} onOk={() => void saveAsset()} okText="保存" cancelText="取消" destroyOnHidden>
+            <Modal title={editingAsset?.id ? "编辑素材" : "新增素材"} open={Boolean(editingAsset)} width="min(760px, calc(100vw - 24px))" onCancel={() => setEditingAsset(null)} onOk={() => void saveAsset()} okText="保存" cancelText="取消" destroyOnHidden>
                 <Form form={form} layout="vertical" requiredMark={false}>
                     <Form.Item name="type" label="类型" rules={[{ required: true, message: "请选择类型" }]}>
                         <Select options={editTypeOptions} />
@@ -220,7 +251,7 @@ export default function AdminAssetsPage() {
                 </Form>
             </Modal>
 
-            <Modal title="素材详情" open={Boolean(detailAsset)} width={760} onCancel={() => setDetailAsset(null)} footer={<Button onClick={() => setDetailAsset(null)}>关闭</Button>}>
+            <Modal title="素材详情" open={Boolean(detailAsset)} width="min(760px, calc(100vw - 24px))" onCancel={() => setDetailAsset(null)} footer={<Button onClick={() => setDetailAsset(null)}>关闭</Button>}>
                 {detailAsset ? (
                     <Flex vertical gap={14}>
                         <Flex gap={14} align="start">
