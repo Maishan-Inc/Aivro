@@ -71,7 +71,7 @@ func VerifyCaptcha(r *http.Request, token string) error {
 	if ip := requestIP(r); ip != "" && ip != "未知" {
 		values.Set("remoteip", ip)
 	}
-	resp, err := http.PostForm(captchaVerifyURL(captcha.Provider), values)
+	resp, err := publicHTTPClient().PostForm(captchaVerifyURL(captcha.Provider), values)
 	if err != nil {
 		return err
 	}

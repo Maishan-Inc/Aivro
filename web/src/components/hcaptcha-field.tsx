@@ -58,11 +58,17 @@ export function HCaptchaField({ siteKey, resetKey, onVerify, onError, onReady }:
             script.async = true;
             script.defer = true;
             script.addEventListener("load", render, { once: true });
-            script.addEventListener("error", () => onError("hCaptcha 脚本加载失败，请检查网络或域名配置"), { once: true });
+            script.addEventListener("error", () => {
+                script.remove();
+                onError("hCaptcha 脚本加载失败，请检查网络或域名配置");
+            }, { once: true });
             document.head.appendChild(script);
         }
         const timer = window.setTimeout(() => {
-            if (!canceled && !rendered) onError("hCaptcha 加载超时，请重试");
+            if (!canceled && !rendered) {
+                document.getElementById(hCaptchaScriptId)?.remove();
+                onError("hCaptcha 加载超时，请重试");
+            }
         }, 10000);
         return () => {
             canceled = true;
@@ -73,5 +79,5 @@ export function HCaptchaField({ siteKey, resetKey, onVerify, onError, onReady }:
     }, [onError, onVerify, onReady, resetKey, siteKey]);
 
     if (!siteKey) return null;
-    return <div ref={containerRef} className="min-h-[78px]" />;
+    return <div ref={containerRef} className="h-[78px] w-[303px]" />;
 }

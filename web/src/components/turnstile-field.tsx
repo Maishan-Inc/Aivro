@@ -58,11 +58,17 @@ export function TurnstileField({ siteKey, resetKey, onVerify, onError, onReady }
             script.async = true;
             script.defer = true;
             script.addEventListener("load", render, { once: true });
-            script.addEventListener("error", () => onError("人机验证脚本加载失败，请检查网络或域名配置"), { once: true });
+            script.addEventListener("error", () => {
+                script.remove();
+                onError("人机验证脚本加载失败，请检查网络或域名配置");
+            }, { once: true });
             document.head.appendChild(script);
         }
         const timer = window.setTimeout(() => {
-            if (!canceled && !rendered) onError("人机验证加载超时，请重试");
+            if (!canceled && !rendered) {
+                document.getElementById(turnstileScriptId)?.remove();
+                onError("人机验证加载超时，请重试");
+            }
         }, 10000);
         return () => {
             canceled = true;
@@ -73,5 +79,5 @@ export function TurnstileField({ siteKey, resetKey, onVerify, onError, onReady }
     }, [onError, onVerify, onReady, resetKey, siteKey]);
 
     if (!siteKey) return null;
-    return <div ref={containerRef} className="min-h-[65px]" />;
+    return <div ref={containerRef} className="h-[65px] w-[300px]" />;
 }

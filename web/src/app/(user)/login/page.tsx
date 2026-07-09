@@ -57,7 +57,7 @@ function LoginContent() {
     const captcha = authSettings?.captcha?.enabled ? authSettings.captcha : authSettings?.turnstileSiteKey ? { enabled: true, provider: "turnstile" as const, siteKey: authSettings.turnstileSiteKey } : undefined;
     const allowRegister = authSettings?.allowRegister !== false;
     const { overlay, runWithOverlay } = useAuthLoadingOverlay();
-    const { verify: verifyCaptcha, challenge: captchaChallenge } = useCaptchaChallenge(captcha);
+    const { verify: verifyCaptcha, reset: resetCaptcha, field: captchaField } = useCaptchaChallenge(captcha, { mode: "inline" });
     const [mode, setMode] = useState<"login" | "register">("login");
     const [registerStep, setRegisterStep] = useState<RegisterStep>("credential");
     const [sendingCode, setSendingCode] = useState(false);
@@ -111,15 +111,17 @@ function LoginContent() {
                 const email = values.email || "";
                 const captchaToken = await verifyCaptcha();
                 const user = await runWithOverlay("正在注册", () =>
-                    register({
-                        username: values.username || "",
-                        password: values.password,
-                        email,
-                        code: values.code,
-                        accountType: values.accountType || "personal",
-                        displayName: values.displayName,
-                        captchaToken,
-                    }),
+                    runWithCaptchaReset(resetCaptcha, () =>
+                        register({
+                            username: values.username || "",
+                            password: values.password,
+                            email,
+                            code: values.code,
+                            accountType: values.accountType || "personal",
+                            displayName: values.displayName,
+                            captchaToken,
+                        }),
+                    ),
                 );
                 message.success("注册成功");
                 router.replace(user.profileCompleted ? redirect : localizedPath(`/profile/setup?redirect=${encodeURIComponent(redirect)}`));
@@ -127,7 +129,7 @@ function LoginContent() {
                 return;
             }
             const captchaToken = await verifyCaptcha();
-            const user = await runWithOverlay("正在登录", () => login({ username: values.username, password: values.password, captchaToken }));
+            const user = await runWithOverlay("正在登录", () => runWithCaptchaReset(resetCaptcha, () => login({ username: values.username, password: values.password, captchaToken })));
             message.success("登录成功");
             router.replace(user.profileCompleted ? redirect : localizedPath(`/profile/setup?redirect=${encodeURIComponent(redirect)}`));
             router.refresh();
@@ -159,7 +161,7 @@ function LoginContent() {
         try {
             // 始终在发送验证码之前完成人机验证，拦截未通过验证的请求。
             const captchaToken = await verifyCaptcha();
-            await sendRegisterEmailCode(email, captchaToken);
+            await runWithCaptchaReset(resetCaptcha, () => sendRegisterEmailCode(email, captchaToken));
             setCodeSeconds(60);
             message.success("验证码已发送");
             return true;
@@ -178,6 +180,7 @@ function LoginContent() {
             return;
         }
         try {
+            const captchaToken = await verifyCaptcha();
             const accounts = (await ethereum.request({ method: "eth_requestAccounts" })) as string[];
             const walletAddress = accounts?.[0];
             if (!walletAddress) {
@@ -188,8 +191,7 @@ function LoginContent() {
             const signMessage = challenge.message;
             const signature = (await ethereum.request({ method: "personal_sign", params: [signMessage, walletAddress] })) as string;
             try {
-                const captchaToken = await verifyCaptcha();
-                const session = await runWithOverlay(locale === "en-US" ? "Signing in" : "正在登录", () => loginWithMetaMask({ walletAddress, message: signMessage, signature, email: "", code: "", captchaToken }));
+                const session = await runWithOverlay(locale === "en-US" ? "Signing in" : "正在登录", () => runWithCaptchaReset(resetCaptcha, () => loginWithMetaMask({ walletAddress, message: signMessage, signature, email: "", code: "", captchaToken })));
                 const user = await fetchCurrentUser(session.token);
                 setSession(COOKIE_SESSION_TOKEN, user);
                 message.success(locale === "en-US" ? "Signed in" : "登录成功");
@@ -233,6 +235,7 @@ function LoginContent() {
                         </div>
                     </AivroReveal>
                     <Space orientation="vertical" size={14} style={{ width: "100%" }}>
+                        {captchaField}
                         <Button className="!mt-1 !h-14 !rounded-xl !border-0 !bg-stone-200 !text-lg !font-medium !text-stone-950 hover:!bg-white disabled:!bg-stone-500" block type="primary" htmlType="submit" loading={isLoading || sendingCode} disabled={!publicSettings}>
                             {isLoading || sendingCode ? (locale === "en-US" ? "Processing" : "处理中") : registerButtonText(mode, registerStep, locale)}
                         </Button>
@@ -250,7 +253,6 @@ function LoginContent() {
                     </Space>
                 </Form>
             </AivroReveal>
-            {captchaChallenge}
             {overlay}
         </main>
     );
@@ -383,6 +385,14 @@ function registerButtonText(mode: "login" | "register", step: RegisterStep, loca
     if (step === "credential") return locale === "en-US" ? "Register" : "注册";
     if (step === "code") return locale === "en-US" ? "Next" : "下一步";
     return locale === "en-US" ? "Complete" : "完成";
+}
+
+async function runWithCaptchaReset<T>(resetCaptcha: () => void, action: () => Promise<T>) {
+    try {
+        return await action();
+    } finally {
+        resetCaptcha();
+    }
 }
 
 function safeRedirect(value: string) {

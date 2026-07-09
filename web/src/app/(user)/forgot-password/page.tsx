@@ -31,7 +31,7 @@ export default function ForgotPasswordPage() {
     const publicSettings = useConfigStore((state) => state.publicSettings);
     const captcha = publicSettings?.auth?.captcha?.enabled ? publicSettings.auth.captcha : publicSettings?.auth?.turnstileSiteKey ? { enabled: true, provider: "turnstile" as const, siteKey: publicSettings.auth.turnstileSiteKey } : undefined;
     const { overlay, runWithOverlay } = useAuthLoadingOverlay();
-    const { verify: verifyCaptcha, challenge: captchaChallenge } = useCaptchaChallenge(captcha);
+    const { verify: verifyCaptcha, reset: resetCaptcha, field: captchaField } = useCaptchaChallenge(captcha, { mode: "inline" });
 
     const requestCode = async () => {
         const email = form.getFieldValue("email");
@@ -46,7 +46,7 @@ export default function ForgotPasswordPage() {
         setSendingCode(true);
         try {
             const captchaToken = await verifyCaptcha();
-            await sendEmailCode(email, "reset", captchaToken);
+            await runWithCaptchaReset(resetCaptcha, () => sendEmailCode(email, "reset", captchaToken));
             message.success("验证码已发送");
         } catch (error) {
             message.error(error instanceof Error ? error.message : "发送失败");
@@ -67,7 +67,7 @@ export default function ForgotPasswordPage() {
         setSubmitting(true);
         try {
             const captchaToken = await verifyCaptcha();
-            await runWithOverlay("正在重置密码", () => resetPassword({ email: values.email, code: values.code, password: values.password, captchaToken }));
+            await runWithOverlay("正在重置密码", () => runWithCaptchaReset(resetCaptcha, () => resetPassword({ email: values.email, code: values.code, password: values.password, captchaToken })));
             message.success("密码已重置");
             router.replace(localizedPath("/login"));
         } catch (error) {
@@ -105,6 +105,7 @@ export default function ForgotPasswordPage() {
                         <Input.Password prefix={<LockOutlined />} autoComplete="new-password" />
                     </Form.Item>
                     <Space orientation="vertical" size={12} style={{ width: "100%" }}>
+                        {captchaField}
                         <Button block type="primary" htmlType="submit" loading={submitting} disabled={!publicSettings}>
                             {submitting ? (locale === "en-US" ? "Processing" : "处理中") : locale === "en-US" ? "Reset password" : "重置密码"}
                         </Button>
@@ -114,8 +115,15 @@ export default function ForgotPasswordPage() {
                     </Space>
                 </Form>
             </section>
-            {captchaChallenge}
             {overlay}
         </main>
     );
+}
+
+async function runWithCaptchaReset<T>(resetCaptcha: () => void, action: () => Promise<T>) {
+    try {
+        return await action();
+    } finally {
+        resetCaptcha();
+    }
 }
