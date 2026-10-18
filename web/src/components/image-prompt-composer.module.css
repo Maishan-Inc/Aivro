@@ -1,14 +1,15 @@
 .composer { width: 100%; min-width: 0; border: 1px solid var(--border); border-radius: 28px; padding: 10px 12px; text-align: left; color: var(--foreground); background: color-mix(in srgb, var(--background) 94%, transparent); box-shadow: 0 8px 36px #00000008; transition: border-color .2s, background .2s; }
 .composer:focus-within, .composer[data-dragging="true"] { border-color: var(--ring); }
 .composer[data-dragging="true"] { background: var(--muted); }
-.inputRow { display: flex; align-items: flex-end; gap: 10px; max-height: 50svh; overflow-y: auto; }
-.inputRow :global(textarea.ant-input) { min-width: 0; flex: 1; padding: 8px 10px; font-size: 15px; line-height: 24px; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; overflow-x: hidden; background: transparent; }
+.inputRow { display: flex; align-items: flex-end; gap: 10px; min-width: 0; }
+.inputRow > :global(.ant-input-textarea) { flex: 1; min-width: 0; }
+.inputRow :global(textarea.ant-input) { width: 100%; min-width: 0; flex: 1; padding: 8px 10px; font-size: 15px; line-height: 24px; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; overflow-x: hidden; background: transparent; }
 .send:global(.ant-btn) { flex: none !important; width: 40px !important; min-width: 40px !important; max-width: 40px !important; height: 40px !important; aspect-ratio: 1; margin-right: -4px; padding: 0 !important; border-radius: 50% !important; }
 .controls { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows .25s ease, opacity .2s ease; }
 .controls > div { min-height: 0; overflow: hidden; }
 .composer[data-expanded="true"] .controls { grid-template-rows: 1fr; opacity: 1; }
-.toolbar { display: flex; align-items: center; flex-wrap: nowrap; gap: 4px; padding-top: 8px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; }
-.toolbar > * { flex-shrink: 0; }
+.toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; min-width: 0; padding-top: 8px; }
+.toolbar > * { flex-shrink: 0; max-width: 100%; }
 .toolbar :global(.ant-btn) { font-size: 12px; }
 .toolbar :global(.canvas-composer-model-picker) { min-width: 100px; max-width: 190px; border: 0; box-shadow: none; font-size: 12px; }
 .references { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 10px 10px; }

@@ -25,6 +25,7 @@ import { useUserStore } from "@/stores/use-user-store";
 import { useHomeScroll } from "./use-home-scroll";
 import { HomeModels } from "./home-models";
 import { HomePlans } from "./home-plans";
+import { HomeNetwork } from "./home-network";
 import styles from "./home.module.css";
 
 const scenes = [
@@ -107,6 +108,7 @@ export function HomeClientPage() {
 
             <HomeModels />
             <HomePlans />
+            <HomeNetwork />
 
             <div id="platform" className={styles.platformHeading}>
                 <span className={styles.eyebrow}>一个想法，更多表达。</span>

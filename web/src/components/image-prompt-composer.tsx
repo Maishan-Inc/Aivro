@@ -61,7 +61,7 @@ export function ImagePromptComposer({ onSubmit, running = false }: { onSubmit: (
                 <button type="button" disabled={running} aria-label="移除参考图" onClick={() => setReferences((value) => value.filter((item) => item.id !== image.id))}><X size={12} /></button>
             </div>)}</div> : null}
             <div className={styles.inputRow}>
-                <Input.TextArea value={prompt} onChange={(event) => setPrompt(event.target.value)} variant="borderless" autoSize={{ minRows: 1 }} disabled={running} aria-label="生图提示词" placeholder="描述你想创作的画面，也可以添加参考图..." onKeyDown={(event) => {
+                <Input.TextArea value={prompt} onChange={(event) => setPrompt(event.target.value)} variant="borderless" autoSize={{ minRows: 1 }} wrap="soft" disabled={running} aria-label="生图提示词" placeholder="描述你想创作的画面，也可以添加参考图..." onKeyDown={(event) => {
                     if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
                         event.preventDefault();
                         if (prompt.trim() && !running && !reading) onSubmit();
@@ -72,7 +72,7 @@ export function ImagePromptComposer({ onSubmit, running = false }: { onSubmit: (
                 }} />
                 <Button className={styles.send} type="primary" shape="circle" icon={<ArrowUp size={20} />} loading={running || reading} disabled={!prompt.trim() || running || reading} onClick={onSubmit} aria-label="开始生成" title={reading ? "正在读取参考图" : "开始生成"} />
             </div>
-            <div className={styles.controls}><div><div className={styles.toolbar} data-native-scroll inert={!expanded}>
+            <div className={styles.controls}><div><div className={styles.toolbar} inert={!expanded}>
                 <Dropdown trigger={["click"]} placement="bottomLeft" disabled={running || reading} menu={{ items: [
                     { key: "upload", icon: <Upload size={15} />, label: "添加参考图" },
                     { key: "clipboard", icon: <ClipboardPaste size={15} />, label: "读取剪切板图片" },
