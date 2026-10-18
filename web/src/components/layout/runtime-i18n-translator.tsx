@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 
 import type { Locale } from "@/i18n/messages";
-import { createTranslator, runtimeTranslations } from "@/i18n/runtime-translations";
+import { translate } from "@/i18n/runtime-translations";
 import { useEffectiveLocale } from "@/hooks/use-effective-locale";
 
 const sourceText = new WeakMap<Text, string>();
@@ -14,7 +14,6 @@ const translatableAttrs = ["placeholder", "title", "aria-label", "alt"];
 const textSkipSelector = "script,style,textarea,input,pre,code,kbd,samp,[contenteditable='true'],[data-i18n-skip]";
 const attrSkipSelector = "script,style,pre,code,kbd,samp,[data-i18n-skip]";
 const hasChinese = /[\u3400-\u9fff]/;
-const translate = createTranslator(runtimeTranslations);
 
 export function RuntimeI18nTranslator() {
     const locale: Locale = useEffectiveLocale();

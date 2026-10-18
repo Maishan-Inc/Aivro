@@ -1,5 +1,7 @@
 # 待测试
 
+- 运行时翻译构建修复待测：翻译组件直接复用 `runtime-translations` 已导出的 `translate`，修复误导入 `createTranslator` 导致浏览器和 SSR 构建同时失败。重新运行 CI，并确认语言切换后页面文本、placeholder、title、aria-label 和 alt 正常翻译。本轮已检查 `docs/todo.md`，无需新增独立待办；按项目约定未运行构建、测试或语法检查。
+
 ## 系统漏洞与 BUG 修复待验证
 
 本轮仅完成代码修改与阅读复核，按项目约定未运行语法检查、编译、构建或测试。以下均需人工验证：
