@@ -1,6 +1,7 @@
 "use client";
 
 import { StudioEmptyState } from "@/components/studio-empty-state";
+import { StudioHistorySidebar } from "@/components/studio-history-sidebar";
 import studio from "@/components/studio-layout.module.css";
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -344,9 +345,9 @@ export default function Model3DPage() {
                         <p className={studio.composerHint}><span>Enter 生成 · Shift + Enter 换行</span><span>预计消耗 {estimatedEnergy} 电量</span></p>
                     </div>
                 </section>
-                <aside className={studio.history}>
+                <StudioHistorySidebar items={histories.map((item) => ({ id: item.id, title: item.title, prompt: item.prompt, preview: item.references[0]?.url }))} onSelect={(id) => { const item = histories.find((history) => history.id === id); if (item) setDetailHistory(item); }}>
                     <HistoryPanel histories={histories} loading={loadingHistory} token={token} onRefresh={handleLoadHistory} onOpenDetail={setDetailHistory} />
-                </aside>
+                </StudioHistorySidebar>
             </main>
 
             <input
@@ -364,7 +365,7 @@ export default function Model3DPage() {
             <Drawer title="生成记录" placement="right" size={340} open={historyOpen} onClose={() => setHistoryOpen(false)}>
                 <HistoryPanel histories={histories} loading={loadingHistory} token={token} onRefresh={handleLoadHistory} onOpenDetail={setDetailHistory} />
             </Drawer>
-            <Modal title="模型生成参数" open={settingsOpen} onCancel={() => setSettingsOpen(false)} footer={<Button type="primary" onClick={() => setSettingsOpen(false)}>完成</Button>} width={500}>
+            <Modal centered title="模型生成参数" open={settingsOpen} onCancel={() => setSettingsOpen(false)} footer={<Button type="primary" onClick={() => setSettingsOpen(false)}>完成</Button>} width={500}>
                 <div className="grid grid-cols-2 gap-5 py-4">
                     <label className="space-y-2"><span className="block text-sm">纹理</span><Select className="w-full" value={textureEnabled ? "on" : "off"} onChange={(value) => setTextureEnabled(value === "on")} options={[{ value: "on", label: "生成纹理" }, { value: "off", label: "关闭纹理" }]} /></label>
                     <label className="space-y-2"><span className="block text-sm">PBR 材质</span><Select className="w-full" value={pbrEnabled ? "on" : "off"} onChange={(value) => setPbrEnabled(value === "on")} options={[{ value: "on", label: "开启 PBR" }, { value: "off", label: "关闭 PBR" }]} /></label>

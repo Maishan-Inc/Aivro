@@ -82,7 +82,7 @@ export function useHomeScroll(paused: boolean) {
                 if (!target) return;
                 event.preventDefault();
                 anchorTween?.kill();
-                anchorTween = gsap.to(root, { scrollTo: { y: href === "#top" ? 0 : target, offsetY: 24, autoKill: true }, duration: .85, ease: "power2.inOut" });
+                anchorTween = gsap.to(root, { scrollTo: { y: href === "#top" ? 0 : target, offsetY: 88, autoKill: true }, duration: .85, ease: "power2.inOut" });
                 window.history.replaceState(window.history.state, "", href);
             };
             const stopSnap = () => snapRef.current?.getTween(true)?.kill();

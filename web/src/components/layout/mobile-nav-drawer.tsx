@@ -21,8 +21,9 @@ export function MobileNavDrawer({ open, activeToolSlug, onClose }: MobileNavDraw
     const user = useUserStore((state) => state.user);
 
     return (
-        <Drawer title={t("nav.title")} placement="left" size={280} open={open} onClose={onClose} className="lg:hidden">
+        <Drawer title={t("nav.title")} placement="left" size={280} open={open} onClose={onClose}>
             <div className="space-y-1">
+                {[{ href: "/#platform", label: "创作平台" }, { href: "/#showcase", label: "灵感探索" }, { href: "/pricing", label: "套餐" }, { href: "/#faq", label: "常见问题" }].map((item) => <Link key={item.href} href={withLocalePath(item.href, locale)} onClick={onClose} className="block rounded-lg px-3 py-3 text-base hover:bg-muted">{item.label}</Link>)}
                 {user ? (
                     <Link href={withLocalePath("/console", locale)} onClick={onClose} className="flex items-center gap-3 rounded-lg px-3 py-3 text-base font-medium text-stone-900 transition hover:bg-stone-100 dark:text-stone-100 dark:hover:bg-stone-800">
                         <LayoutDashboard className="size-5" />
@@ -50,6 +51,7 @@ export function MobileNavDrawer({ open, activeToolSlug, onClose }: MobileNavDraw
                         </Link>
                     );
                 })}
+                <Link href={withLocalePath("/console/community", locale)} onClick={onClose} className="block rounded-lg px-3 py-3 text-base hover:bg-muted">社区工作流</Link>
             </div>
         </Drawer>
     );

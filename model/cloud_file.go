@@ -15,6 +15,7 @@ const (
 	CloudFilePurposeTemp       CloudFilePurpose = "temp"
 	CloudFilePurposeWorkflow   CloudFilePurpose = "workflow"
 	CloudFilePurposeGeneration CloudFilePurpose = "generation"
+	CloudFilePurposeAvatar     CloudFilePurpose = "avatar"
 )
 
 // CloudFile 记录已转存到 R2/S3 或服务器本地的用户文件。

@@ -60,10 +60,11 @@ function LoginContent() {
     const captcha = authSettings?.captcha?.enabled ? authSettings.captcha : authSettings?.turnstileSiteKey ? { enabled: true, provider: "turnstile" as const, siteKey: authSettings.turnstileSiteKey } : undefined;
     const allowRegister = authSettings?.allowRegister !== false;
     const { overlay, runWithOverlay } = useAuthLoadingOverlay();
-    const { verify: verifyCaptcha, reset: resetCaptcha, field: captchaField } = useCaptchaChallenge(captcha, { mode: "inline" });
+    const { verify: verifyCaptcha, reset: resetCaptcha, challenge: captchaChallenge } = useCaptchaChallenge(captcha);
     const [mode, setMode] = useState<"login" | "register">("login");
     const [registerStep, setRegisterStep] = useState<RegisterStep>("credential");
     const [sendingCode, setSendingCode] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
     const [codeSeconds, setCodeSeconds] = useState(0);
     const [metaMaskAvailable, setMetaMaskAvailable] = useState(true);
     const redirect = safeRedirect(searchParams.get("redirect") || localizedPath("/canvas"));
@@ -97,6 +98,8 @@ function LoginContent() {
     }, [codeSeconds]);
 
     const submit = async (values: LoginFormValues) => {
+        if (submitting) return;
+        setSubmitting(true);
         try {
             if (!publicSettings) {
                 message.warning("认证配置加载中，请稍后再试");
@@ -138,6 +141,8 @@ function LoginContent() {
             router.refresh();
         } catch (error) {
             message.error(error instanceof Error ? error.message : mode === "register" ? "注册失败" : "登录失败");
+        } finally {
+            setSubmitting(false);
         }
     };
 
@@ -220,29 +225,21 @@ function LoginContent() {
                         <span className="block size-10 bg-foreground" style={{ mask: "url(/logo.svg) center / contain no-repeat", WebkitMask: "url(/logo.svg) center / contain no-repeat" }} aria-hidden="true" />
                         <span className="text-4xl font-semibold leading-none tracking-normal text-foreground">Aivro</span>
                     </div>
-                    <Form.Item className="!mb-7">
-                        <Segmented
-                            block
-                            value={mode}
-                            onChange={(value) => {
-                                setMode(value as "login" | "register");
-                                setRegisterStep("credential");
-                                setCodeSeconds(0);
-                                form.resetFields();
-                            }}
-                            options={allowRegister ? [{ label: locale === "en-US" ? "Sign in" : "登录", value: "login" }, { label: locale === "en-US" ? "Register" : "注册", value: "register" }] : [{ label: locale === "en-US" ? "Sign in" : "登录", value: "login" }]}
-                        />
-                    </Form.Item>
                     <AivroReveal key={`${mode}-${registerStep}`}>
                         <div data-aivro-reveal className="aivro-auth-fields">
                             {mode === "register" ? <RegisterFields step={registerStep} locale={locale} sendingCode={sendingCode} codeSeconds={codeSeconds} publicReady={Boolean(publicSettings)} onResend={() => void requestRegisterCode(form.getFieldValue("email"))} /> : <LoginFields locale={locale} />}
                         </div>
                     </AivroReveal>
                     <Space orientation="vertical" size={14} style={{ width: "100%" }}>
-                        {captchaField}
-                        <Button className="!mt-1 !h-11 !rounded-md !text-sm !font-medium" block type="primary" htmlType="submit" loading={isLoading || sendingCode} disabled={!publicSettings}>
+                        <Button className="!mt-1 !h-11 !rounded-md !text-sm !font-medium" block type="primary" htmlType="submit" loading={isLoading || sendingCode || submitting} disabled={!publicSettings}>
                             {isLoading || sendingCode ? (locale === "en-US" ? "Processing" : "处理中") : registerButtonText(mode, registerStep, locale)}
                         </Button>
+                        <div className="flex items-center justify-between px-1 text-sm">
+                            {mode === "login" ? <>
+                                <a href={localizedPath("/forgot-password")} className="text-muted-foreground hover:text-foreground">找回密码</a>
+                                {allowRegister ? <button type="button" className="font-medium text-foreground" onClick={() => { setMode("register"); setRegisterStep("credential"); form.resetFields(); }}>注册 Aivro 账户</button> : null}
+                            </> : <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => { setMode("login"); setRegisterStep("credential"); form.resetFields(); }}>返回登录</button>}
+                        </div>
                         <p className="m-0 px-1 text-center text-xs leading-6 text-muted-foreground">
                             {mode === "register" ? (locale === "en-US" ? "Registering" : "注册") : locale === "en-US" ? "Signing in to" : "登录"} Aivro，{locale === "en-US" ? "means you agree to our" : "即代表你同意我们的"}{" "}
                             <a href={localizedPath("/privacy")} className="font-medium text-foreground underline underline-offset-4">
@@ -253,10 +250,11 @@ function LoginContent() {
                                 {locale === "en-US" ? "Terms of Service" : "服务条款"}
                             </a>
                         </p>
-                        {mode === "login" ? <LoginActions locale={locale} localizedPath={localizedPath} redirect={redirect} authSettings={authSettings} linuxDoEnabled={linuxDoEnabled} providers={thirdPartyProviders} metaMaskAvailable={metaMaskAvailable} onMetaMask={connectMetaMask} /> : null}
+                        {mode === "login" ? <LoginActions locale={locale} redirect={redirect} authSettings={authSettings} linuxDoEnabled={linuxDoEnabled} providers={thirdPartyProviders} metaMaskAvailable={metaMaskAvailable} onMetaMask={connectMetaMask} /> : null}
                     </Space>
                 </Form>
             </AivroReveal>
+            {captchaChallenge}
             {overlay}
         </main>
     );
@@ -346,12 +344,9 @@ function RegisterSteps({ active, locale }: { active: RegisterStep; locale: strin
     );
 }
 
-function LoginActions({ locale, localizedPath, redirect, authSettings, linuxDoEnabled, providers, metaMaskAvailable, onMetaMask }: { locale: string; localizedPath: (path: string) => string; redirect: string; authSettings?: { metamask?: AdminPublicAuthProvider }; linuxDoEnabled: boolean; providers: AdminPublicAuthProvider[]; metaMaskAvailable: boolean; onMetaMask: () => void }) {
+function LoginActions({ locale, redirect, authSettings, linuxDoEnabled, providers, metaMaskAvailable, onMetaMask }: { locale: string; redirect: string; authSettings?: { metamask?: AdminPublicAuthProvider }; linuxDoEnabled: boolean; providers: AdminPublicAuthProvider[]; metaMaskAvailable: boolean; onMetaMask: () => void }) {
     return (
         <div className="w-full">
-            <Button block type="link" href={localizedPath("/forgot-password")}>
-                {locale === "en-US" ? "Forgot password" : "找回密码"}
-            </Button>
             {authSettings?.metamask?.enabled || providers.length ? (
                 <div className="mt-5">
                     <div className="grid gap-3">

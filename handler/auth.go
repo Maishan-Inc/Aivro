@@ -17,6 +17,11 @@ type loginRequest struct {
 	TurnstileToken string `json:"turnstileToken"`
 }
 
+func CaptchaSession(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
+	OK(w, service.CaptchaSessionFromRequest(r))
+}
+
 type registerRequest struct {
 	Username       string                `json:"username"`
 	Password       string                `json:"password"`
@@ -65,7 +70,6 @@ type completeProfileRequest struct {
 	Username    string                `json:"username"`
 	AccountType model.UserAccountType `json:"accountType"`
 	DisplayName string                `json:"displayName"`
-	AvatarURL   string                `json:"avatarUrl"`
 }
 
 type saveUserRequest struct {
@@ -344,7 +348,7 @@ func CompleteProfile(w http.ResponseWriter, r *http.Request) {
 	}
 	var request completeProfileRequest
 	_ = json.NewDecoder(r.Body).Decode(&request)
-	result, err := service.CompleteUserProfile(user, request.Username, request.AccountType, request.DisplayName, request.AvatarURL)
+	result, err := service.CompleteUserProfile(user, request.Username, request.AccountType, request.DisplayName)
 	if err != nil {
 		FailError(w, err)
 		return

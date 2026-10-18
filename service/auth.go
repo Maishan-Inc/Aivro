@@ -198,7 +198,7 @@ func Register(username string, password string, email string, code string, profi
 	return newSession(user)
 }
 
-func CompleteUserProfile(user model.AuthUser, username string, accountType model.UserAccountType, name string, avatarURL string) (model.AuthUser, error) {
+func CompleteUserProfile(user model.AuthUser, username string, accountType model.UserAccountType, name string) (model.AuthUser, error) {
 	saved, ok, err := repository.GetUserByID(user.ID)
 	if err != nil || !ok {
 		if err != nil {
@@ -225,9 +225,6 @@ func CompleteUserProfile(user model.AuthUser, username string, accountType model
 	profile := normalizeRegisterProfile(RegisterProfileInput{AccountType: accountType, Name: name}, saved.Username)
 	saved.AccountType = profile.AccountType
 	saved.DisplayName = profile.Name
-	if avatarURL = strings.TrimSpace(avatarURL); avatarURL != "" {
-		saved.AvatarURL = avatarURL
-	}
 	saved.UpdatedAt = now()
 	saved, err = repository.SaveUser(saved)
 	if err != nil {

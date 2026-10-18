@@ -16,6 +16,11 @@ import (
 const turnstileVerifyURL = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
 const hCaptchaVerifyURL = "https://api.hcaptcha.com/siteverify"
 
+func CaptchaSessionFromRequest(r *http.Request) map[string]string {
+	meta := RequestLogMetaFromRequest(r)
+	return map[string]string{"sessionId": newID("verify"), "clientIP": meta.IP, "country": meta.Country}
+}
+
 type captchaVerifyResponse struct {
 	Success bool `json:"success"`
 }

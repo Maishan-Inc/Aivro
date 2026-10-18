@@ -67,27 +67,34 @@ func SubmitAITask(ctx context.Context, user model.AuthUser, body []byte, content
 	}
 	requestCount := ReadAIRequestCount(body, contentType)
 	credits *= requestCount
+	if err := ConsumeUserCreditsWithMeta(user.ID, modelName, credits, path, meta); err != nil {
+		return model.GenerationTaskSubmitResult{}, nil, err
+	}
+
+	refund := func() {
+		if err := RefundUserCreditsWithMeta(user.ID, modelName, credits, path, meta); err != nil {
+			log.Printf("generation task refund failed: user=%s model=%s credits=%d err=%v", user.ID, modelName, credits, err)
+		}
+	}
 
 	requestFile, err := StoreTaskPayload(ctx, user, "request-"+newID("file")+".bin", body, contentType, path)
 	if err != nil {
+		refund()
 		return model.GenerationTaskSubmitResult{}, nil, err
 	}
 	queueMu.Lock()
 	if *queue.Enabled {
 		if count, err := repository.CountQueuedUserTasks(user.ID); err != nil {
 			queueMu.Unlock()
+			refund()
 			_ = deleteTaskPayload(requestFile.File.ID)
 			return model.GenerationTaskSubmitResult{}, nil, err
 		} else if int(count) >= queue.MaxQueuedPerUser {
 			queueMu.Unlock()
+			refund()
 			_ = deleteTaskPayload(requestFile.File.ID)
 			return model.GenerationTaskSubmitResult{}, nil, safeMessageError{message: "排队任务过多，请稍后再试"}
 		}
-	}
-	if err := ConsumeUserCreditsWithMeta(user.ID, modelName, credits, path, meta); err != nil {
-		queueMu.Unlock()
-		_ = deleteTaskPayload(requestFile.File.ID)
-		return model.GenerationTaskSubmitResult{}, nil, err
 	}
 	now := time.Now().Format(time.RFC3339)
 	task := model.GenerationTask{
@@ -107,7 +114,7 @@ func SubmitAITask(ctx context.Context, user model.AuthUser, body []byte, content
 	canRun, err := canDispatchModel(modelName, queue)
 	if err != nil {
 		queueMu.Unlock()
-		_ = RefundUserCredits(user.ID, modelName, credits, path)
+		refund()
 		_ = deleteTaskPayload(requestFile.File.ID)
 		return model.GenerationTaskSubmitResult{}, nil, err
 	}
@@ -117,7 +124,7 @@ func SubmitAITask(ctx context.Context, user model.AuthUser, body []byte, content
 		saved, err := repository.SaveGenerationTask(task)
 		queueMu.Unlock()
 		if err != nil {
-			_ = RefundUserCredits(user.ID, modelName, credits, path)
+			refund()
 			_ = deleteTaskPayload(requestFile.File.ID)
 			return model.GenerationTaskSubmitResult{}, nil, err
 		}
@@ -130,14 +137,14 @@ func SubmitAITask(ctx context.Context, user model.AuthUser, body []byte, content
 	position, err := nextQueuePosition(modelName)
 	if err != nil {
 		queueMu.Unlock()
-		_ = RefundUserCredits(user.ID, modelName, credits, path)
+		refund()
 		_ = deleteTaskPayload(requestFile.File.ID)
 		return model.GenerationTaskSubmitResult{}, nil, err
 	}
 	task.QueuePosition = position
 	if _, err := repository.SaveGenerationTask(task); err != nil {
 		queueMu.Unlock()
-		_ = RefundUserCredits(user.ID, modelName, credits, path)
+		refund()
 		_ = deleteTaskPayload(requestFile.File.ID)
 		return model.GenerationTaskSubmitResult{}, nil, err
 	}

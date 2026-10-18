@@ -48,7 +48,7 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
             <aside className={cn("hidden shrink-0 flex-col border-r border-border bg-sidebar transition-[width] duration-200 lg:flex", collapsed ? "w-[72px]" : "w-[224px]")}>
                 <Link href={localizedPath("/")} aria-label="Aivro 首页" className={cn("flex h-16 shrink-0 items-center gap-2.5 border-b border-border px-5", collapsed && "justify-center px-0")}>
                     <span className="size-7 shrink-0 bg-foreground" style={{ mask: "url(/logo.svg) center / contain no-repeat" }} />
-                    {!collapsed ? <span className="text-xl font-semibold tracking-[-0.06em]">Aivro<span className="ml-2 text-[9px] font-normal tracking-[0.16em] text-muted-foreground">STUDIO</span></span> : null}
+                    {!collapsed ? <span className="whitespace-nowrap text-lg font-semibold tracking-[-0.04em]">Aivro Studio</span> : null}
                 </Link>
                 <ConsoleNavigation collapsed={collapsed} />
                 <div className="flex h-14 shrink-0 items-center justify-between border-t border-border px-5">

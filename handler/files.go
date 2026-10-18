@@ -8,6 +8,32 @@ import (
 	"github.com/basketikun/aivro/service"
 )
 
+func UploadAvatar(w http.ResponseWriter, r *http.Request) {
+	user, ok := service.UserFromContext(r.Context())
+	if !ok {
+		Fail(w, "未登录或权限不足")
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 6<<20)
+	if err := r.ParseMultipartForm(6 << 20); err != nil {
+		Fail(w, "请选择头像图片，文件不能超过 5MB")
+		return
+	}
+	defer r.MultipartForm.RemoveAll()
+	file, _, err := r.FormFile("file")
+	if err != nil {
+		Fail(w, "请选择头像图片")
+		return
+	}
+	defer file.Close()
+	result, err := service.UploadUserAvatar(r.Context(), user, file)
+	if err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, result)
+}
+
 func UploadFile(w http.ResponseWriter, r *http.Request) {
 	user, ok := service.UserFromContext(r.Context())
 	if !ok {

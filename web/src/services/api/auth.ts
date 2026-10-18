@@ -1,4 +1,6 @@
 import { apiGet, apiPost } from "@/services/api/request";
+import { authHeader } from "@/services/api/request";
+import axios from "axios";
 import { COOKIE_SESSION_TOKEN } from "@/services/api/request";
 
 export const AUTH_TOKEN_KEY = "aivro-auth-token-v1";
@@ -58,6 +60,12 @@ export async function fetchCurrentUser(token?: string) {
     return apiGet<AuthUser>("/api/auth/me", undefined, token);
 }
 
+export type CaptchaSession = { sessionId: string; clientIP: string; country: string };
+
+export function fetchCaptchaSession() {
+    return apiGet<CaptchaSession>("/api/auth/captcha-session");
+}
+
 export async function sendEmailCode(email: string, purpose: EmailCodePurpose, captchaToken?: string) {
     return apiPost<boolean>("/api/auth/email-code", { email, purpose, captchaToken });
 }
@@ -78,6 +86,14 @@ export async function logout() {
     return apiPost<boolean>("/api/auth/logout", {});
 }
 
-export async function completeProfile(token: string, payload: { username?: string; accountType: "personal" | "company"; displayName: string; avatarUrl?: string }) {
+export async function completeProfile(token: string, payload: { username?: string; accountType: "personal" | "company"; displayName: string }) {
     return apiPost<AuthUser>("/api/v1/profile", payload, token);
+}
+
+export async function uploadAvatar(token: string, file: File) {
+    const body = new FormData();
+    body.set("file", file);
+    const response = await axios.post<{ code: number; data: AuthUser; msg: string }>("/api/v1/profile/avatar", body, { headers: authHeader(token), withCredentials: true });
+    if (response.data.code !== 0) throw new Error(response.data.msg || "头像上传失败");
+    return response.data.data;
 }

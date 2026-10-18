@@ -132,7 +132,7 @@ func (storage *CloudStorageService) UploadObject(ctx context.Context, request Cl
 		ContentType: request.ContentType,
 		Size:        size,
 		Source:      request.Source,
-		ExpiresAt:   firstNonEmpty(request.ExpiresAt, cloudExpiresAt(storage.setting, request.FileType)),
+		ExpiresAt:   objectExpiresAt(request, storage.setting),
 		CreatedAt:   now(),
 		UpdatedAt:   now(),
 	}
@@ -193,13 +193,20 @@ func StoreUserFileReader(ctx context.Context, user model.AuthUser, filename stri
 	return storedFileResult(result.File, 0, 0), nil
 }
 
+func objectExpiresAt(request CloudObjectUpload, setting model.CloudStorageSetting) string {
+	if request.Purpose == model.CloudFilePurposeAvatar {
+		return ""
+	}
+	return firstNonEmpty(request.ExpiresAt, cloudExpiresAt(setting, request.FileType))
+}
+
 func storeObject(ctx context.Context, request CloudObjectUpload) (CloudObjectResult, error) {
 	setting, enabled, err := CloudStorageEnabled()
 	if err != nil {
 		return CloudObjectResult{}, err
 	}
 	if !enabled || setting.StorageMode == storageModeLocalOnly {
-		if request.ExpiresAt == "" {
+		if request.ExpiresAt == "" && request.Purpose != model.CloudFilePurposeAvatar {
 			request.ExpiresAt = cloudExpiresAt(setting, request.FileType)
 		}
 		return storeLocalObject(request)
@@ -209,7 +216,7 @@ func storeObject(ctx context.Context, request CloudObjectUpload) (CloudObjectRes
 		if err != nil {
 			if setting.StorageMode == storageModeS3WithFallback {
 				log.Printf("cloud storage unavailable, fallback to local: %v", err)
-				if request.ExpiresAt == "" {
+				if request.ExpiresAt == "" && request.Purpose != model.CloudFilePurposeAvatar {
 					request.ExpiresAt = cloudExpiresAt(setting, request.FileType)
 				}
 				return storeLocalObject(request)
@@ -219,7 +226,7 @@ func storeObject(ctx context.Context, request CloudObjectUpload) (CloudObjectRes
 		result, err := storage.UploadObject(ctx, request)
 		if err != nil && setting.StorageMode == storageModeS3WithFallback {
 			log.Printf("cloud storage upload failed, fallback to local: %v", err)
-			if request.ExpiresAt == "" {
+			if request.ExpiresAt == "" && request.Purpose != model.CloudFilePurposeAvatar {
 				request.ExpiresAt = cloudExpiresAt(setting, request.FileType)
 			}
 			return storeLocalObject(request)

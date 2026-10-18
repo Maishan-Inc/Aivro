@@ -2,6 +2,7 @@
 
 import { StudioEmptyState } from "@/components/studio-empty-state";
 import { StudioGenerationSettings } from "@/components/studio-generation-settings";
+import { StudioHistorySidebar } from "@/components/studio-history-sidebar";
 import studio from "@/components/studio-layout.module.css";
 
 import { ArrowUp, BookOpen, CheckSquare, ClipboardPaste, Download, FileText, FolderPlus, History, LoaderCircle, Plus, Trash2, Upload, X } from "lucide-react";
@@ -356,9 +357,9 @@ export default function VideoPage() {
                         <p className={studio.composerHint}>Enter 生成 · Shift + Enter 换行 · 最多 7 张参考图</p>
                     </div>
                 </section>
-                <aside className={studio.history}>
+                <StudioHistorySidebar items={logs.map((log) => ({ id: log.id, title: log.title, prompt: log.prompt, preview: log.references[0]?.dataUrl, video: log.video?.url }))} onSelect={(id) => { const log = logs.find((item) => item.id === id); if (log) previewGenerationLog(log); }}>
                     <LogPanel logs={logs} selectedLogIds={selectedLogIds} activeLogId={previewLog?.id} onSelectedLogIdsChange={setSelectedLogIds} onCreateSession={createSession} onDeleteSelected={() => setDeleteConfirmOpen(true)} onPreviewLog={previewGenerationLog} onOpenDetail={(log) => log.history && setDetailHistory(log.history)} />
-                </aside>
+                </StudioHistorySidebar>
             </main>
             <input
                 ref={fileInputRef}

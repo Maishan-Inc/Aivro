@@ -435,7 +435,7 @@ MetaMask 私有配置字段：
 | `username` | string | 用户名，用于路径模板中的 `{username}` |
 | `provider` | string | 服务商：`r2`、`s3`、`local` |
 | `file_type` | string | 文件类型：`image`、`video`、`model3d`、`task` |
-| `purpose` | string | 用途：`temp`、`workflow`、`generation` |
+| `purpose` | string | 用途：`temp`、`workflow`、`generation`、`avatar` |
 | `workflow_id` | string | 关联工作流 ID，用于删除工作流时同步删除文件 |
 | `history_id` | string | 关联生成历史 ID，用于删除历史时同步删除文件 |
 | `bucket` | string | Bucket 名称 |
@@ -445,12 +445,14 @@ MetaMask 私有配置字段：
 | `content_type` | string | 文件 MIME 类型 |
 | `size` | number | 文件字节数 |
 | `source` | string | 来源接口，例如 `/images/generations`、`/videos/:id/content` |
-| `expires_at` | string | 到期时间。生成历史和临时文件按图片、视频、3D 模型各自配置计算，工作流文件为空表示跟随工作流长期保留 |
+| `expires_at` | string | 到期时间。生成历史和临时文件按图片、视频、3D 模型各自配置计算；工作流文件和头像文件为空，表示长期保留 |
 | `deleted_at` | string | 对象删除成功后的标记时间，未删除为空 |
 | `created_at` | string | 创建时间 |
 | `updated_at` | string | 更新时间 |
 
 用户上传入口只接受安全白名单内的图片、视频或 3D 模型 MIME 类型，单文件最大 50MB。队列请求和响应使用内部 `task` 类型对象，不开放给用户直接上传。文件内容读取时会校验所属用户或访问 token，不能通过猜测文件 ID 读取其他用户文件。自动清理任务只处理 `expires_at <= now` 且 `deleted_at` 为空的记录；删除对象成功后写入 `deleted_at`，删除失败只记录后端日志，不影响其他请求。
+
+头像通过独立的 `/api/v1/profile/avatar` 接口上传，标记为 `purpose=avatar`。前端裁剪为 512 × 512 PNG，后端限制 5MB，验证图片尺寸并重新解码、编码为 PNG 后保存；`users.avatar_url` 更新为该文件的受控访问地址。
 
 ### generation_tasks
 

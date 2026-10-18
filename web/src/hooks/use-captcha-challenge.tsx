@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Modal, Spin } from "antd";
 
 import { HCaptchaField } from "@/components/hcaptcha-field";
 import { TurnstileField } from "@/components/turnstile-field";
 import type { AdminPublicCaptchaSettings } from "@/services/api/admin";
+import { fetchCaptchaSession, type CaptchaSession } from "@/services/api/auth";
 
 type ChallengeState = {
     open: boolean;
@@ -38,6 +40,11 @@ export function useCaptchaChallenge(captcha?: AdminPublicCaptchaSettings, option
         setState((value) => ({ open: false, resetKey: value.resetKey + 1 }));
     }, [provider, siteKey]);
 
+    useEffect(() => () => {
+        resolverRef.current?.reject(new Error("人机验证已取消"));
+        resolverRef.current = null;
+    }, []);
+
     const verify = useCallback(() => {
         if (!siteKey) return Promise.resolve("");
         if (mode === "inline") {
@@ -45,6 +52,7 @@ export function useCaptchaChallenge(captcha?: AdminPublicCaptchaSettings, option
             return Promise.reject(new Error("请先完成人机验证"));
         }
         resolverRef.current?.reject(new Error("人机验证已重新开始"));
+        setError("");
         setState((value) => ({ open: true, resetKey: value.resetKey + 1 }));
         return new Promise<string>((resolve, reject) => {
             resolverRef.current = { resolve, reject };
@@ -63,7 +71,10 @@ export function useCaptchaChallenge(captcha?: AdminPublicCaptchaSettings, option
     const onError = useCallback((message: string) => {
         setToken("");
         setError(message);
-        resolverRef.current?.reject(new Error(message));
+    }, []);
+
+    const cancel = useCallback(() => {
+        resolverRef.current?.reject(new Error("人机验证已取消"));
         resolverRef.current = null;
         setState((value) => ({ ...value, open: false }));
     }, []);
@@ -73,27 +84,44 @@ export function useCaptchaChallenge(captcha?: AdminPublicCaptchaSettings, option
         reset,
         field: siteKey ? <CaptchaInlineField provider={provider} siteKey={siteKey} resetKey={state.resetKey} error={error} onVerify={onVerify} onError={onError} onReset={reset} /> : null,
         challenge: mode === "modal" ? (
-            <CaptchaChallenge open={state.open} provider={provider} siteKey={siteKey} resetKey={state.resetKey} onVerify={onVerify} onError={onError} />
+            <CaptchaChallenge open={state.open} provider={provider} siteKey={siteKey} resetKey={state.resetKey} error={error} onVerify={onVerify} onError={onError} onCancel={cancel} onRetry={() => { setError(""); setState((value) => ({ ...value, resetKey: value.resetKey + 1 })); }} />
         ) : null,
     };
 }
 
-function CaptchaChallenge({ open, provider, siteKey, resetKey, onVerify, onError }: { open: boolean; provider: "turnstile" | "hcaptcha"; siteKey?: string; resetKey: number; onVerify: (token: string) => void; onError: (message: string) => void }) {
+function CaptchaChallenge({ open, provider, siteKey, resetKey, error, onVerify, onError, onCancel, onRetry }: { open: boolean; provider: "turnstile" | "hcaptcha"; siteKey?: string; resetKey: number; error: string; onVerify: (token: string) => void; onError: (message: string) => void; onCancel: () => void; onRetry: () => void }) {
     const [ready, setReady] = useState(false);
+    const [session, setSession] = useState<CaptchaSession | null>(null);
     const handleReady = useCallback(() => setReady(true), []);
 
-    // 每次打开或重新挑战时先隐藏外框，等控件渲染完成后再和验证码一起显示。
     useEffect(() => {
         setReady(false);
     }, [open, resetKey]);
 
+    useEffect(() => {
+        if (!open) return;
+        let active = true;
+        setSession(null);
+        void fetchCaptchaSession().then((value) => { if (active) setSession(value); }).catch(() => undefined);
+        return () => { active = false; };
+    }, [open]);
+
+    const code = session?.country.toUpperCase() || "";
+    const country = /^[A-Z]{2}$/.test(code) && code !== "XX" ? new Intl.DisplayNames("zh-CN", { type: "region" }).of(code) : "未知";
+
     if (!open || !siteKey) return null;
     return (
-        <div className="fixed inset-0 z-[2100] grid place-items-center px-6 pointer-events-none">
-            <div className={`rounded-2xl border border-dashed border-stone-400 bg-background/95 p-5 shadow-xl transition-opacity duration-200 dark:border-stone-600 ${ready ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"}`}>
+        <Modal centered open={open} zIndex={2100} title="人机验证" onCancel={onCancel} footer={null} width={460} destroyOnHidden>
+            <p className="mb-4 text-center text-sm leading-6 text-muted-foreground">请完成验证后继续，帮助我们保障账户安全。</p>
+            <div className="mb-5 grid gap-1 break-all text-center text-[11px] leading-5 text-muted-foreground"><span>会话编号：{session?.sessionId || "—"}</span><div className="flex flex-wrap justify-center gap-x-4"><span>国家/地区：{country}</span><span>IP：{session?.clientIP || "—"}</span></div></div>
+            <div className="relative flex min-h-24 items-center justify-center">
+                {!ready && !error ? <Spin className="absolute" /> : null}
+                <div className={`origin-center max-[360px]:scale-90 ${ready ? "opacity-100" : "opacity-0"}`}>
                 {provider === "hcaptcha" ? <HCaptchaField siteKey={siteKey} resetKey={resetKey} onVerify={onVerify} onError={onError} onReady={handleReady} /> : <TurnstileField siteKey={siteKey} resetKey={resetKey} onVerify={onVerify} onError={onError} onReady={handleReady} />}
+                </div>
             </div>
-        </div>
+            {error ? <div className="mt-3 text-center text-sm text-red-500"><p>{error}</p><button type="button" onClick={onRetry} className="mt-2 underline underline-offset-4">重新验证</button></div> : null}
+        </Modal>
     );
 }
 

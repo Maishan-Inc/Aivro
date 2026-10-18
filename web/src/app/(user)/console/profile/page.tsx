@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { Avatar, App, Button, Form, Input, Segmented } from "antd";
-import { Save, UserRound } from "lucide-react";
+import { Save } from "lucide-react";
+import { AvatarUpload } from "@/components/avatar-upload";
 
 import { ConsoleKycCard } from "@/components/console-kyc-card";
 import { COOKIE_SESSION_TOKEN, completeProfile, type AuthUser } from "@/services/api/auth";
@@ -12,7 +13,6 @@ import { useUserStore } from "@/stores/use-user-store";
 type ProfileValues = {
     displayName: string;
     accountType: "personal" | "company";
-    avatarUrl: string;
 };
 
 type KycStatus = Awaited<ReturnType<typeof fetchKycStatus>>;
@@ -26,12 +26,12 @@ export default function ConsoleProfilePage() {
     const [saving, setSaving] = useState(false);
     const [kyc, setKyc] = useState<KycStatus | null>(null);
     const [kycLoading, setKycLoading] = useState(false);
-    const avatarUrl = Form.useWatch("avatarUrl", form) || user?.avatarUrl || "";
+    const avatarUrl = user?.avatarUrl || "";
     const userName = user?.displayName || user?.username || "";
 
     useEffect(() => {
-        form.setFieldsValue({ displayName: user?.displayName || "", accountType: user?.accountType || "personal", avatarUrl: user?.avatarUrl || "" });
-    }, [form, user]);
+        form.setFieldsValue({ displayName: user?.displayName || "", accountType: user?.accountType || "personal" });
+    }, [form, user?.displayName, user?.accountType]);
 
     useEffect(() => {
         if (!token) return;
@@ -82,12 +82,10 @@ export default function ConsoleProfilePage() {
                             <div className="min-w-0">
                                 <h2 className="truncate text-lg font-semibold">{userName || "Aivro User"}</h2>
                                 <p className="mt-1 truncate text-sm text-stone-500 dark:text-stone-400">@{user?.username}</p>
+                                <div className="mt-2"><AvatarUpload /></div>
                             </div>
                         </div>
                         <Form<ProfileValues> form={form} layout="vertical" requiredMark={false} onFinish={saveProfile}>
-                            <Form.Item name="avatarUrl" label="头像 URL">
-                                <Input prefix={<UserRound className="size-4 text-stone-400" />} placeholder="填写图片 URL 修改头像" />
-                            </Form.Item>
                             <Form.Item name="displayName" label="公开名称" extra="展示在个人资料、工作流卡片和分享页面中。" rules={[{ required: true, message: "请输入公开名称" }]}>
                                 <Input placeholder="输入公开名称" />
                             </Form.Item>

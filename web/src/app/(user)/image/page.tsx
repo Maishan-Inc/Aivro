@@ -1,19 +1,21 @@
 "use client";
 
 import { StudioEmptyState } from "@/components/studio-empty-state";
-import { StudioGenerationSettings } from "@/components/studio-generation-settings";
+import { ImagePromptComposer } from "@/components/image-prompt-composer";
+import { StudioHistorySidebar } from "@/components/studio-history-sidebar";
+import { useImageComposerStore, type ImageComposerDraft } from "@/stores/use-image-composer-store";
+import localforage from "localforage";
+import { useLocalizedPath } from "@/hooks/use-localized-path";
 import studio from "@/components/studio-layout.module.css";
 
-import { ArrowUp, BookOpen, CheckSquare, ClipboardPaste, Download, FileText, FolderPlus, History, PenLine, Plus, Trash2, Upload, X } from "lucide-react";
+import { CheckSquare, Download, FileText, FolderPlus, History, PenLine, Plus, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
-import { App, Button, Checkbox, Drawer, Dropdown, Image, Input, Modal, Tag, Typography } from "antd";
+import { useRouter, useSearchParams } from "next/navigation";
+import { App, Button, Checkbox, Drawer, Dropdown, Image, Modal, Tag, Typography } from "antd";
 import { saveAs } from "file-saver";
 
 import { AivroDrawableLoader } from "@/components/aivro-drawable-loader";
 import { GenerationHistoryDetailModal } from "@/components/generation-history-detail-modal";
-import { PromptSelectDialog } from "@/components/prompts/prompt-select-dialog";
-import { AssetPickerModal, type InsertAssetPayload } from "@/app/(user)/canvas/components/asset-picker-modal";
 import { useI18n } from "@/hooks/use-i18n";
 import { useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
 import { nanoid } from "nanoid";
@@ -76,21 +78,25 @@ export default function ImagePage() {
     const { message } = App.useApp();
     const searchParams = useSearchParams();
     const { locale } = useI18n();
-    const fileInputRef = useRef<HTMLInputElement>(null);
-    const config = useConfigStore((state) => state.config);
+    const router = useRouter();
+    const localizedPath = useLocalizedPath();
+    const autoStarted = useRef(false);
+    const submittingRef = useRef(false);
+    const [draftLoaded, setDraftLoaded] = useState("");
+    const [draftConfig, setDraftConfig] = useState<GenerationLogConfig | null>(null);
+    const publicReady = useConfigStore((state) => Boolean(state.publicSettings));
     const effectiveConfig = useEffectiveConfig();
     const isAiConfigReady = useConfigStore((state) => state.isAiConfigReady);
     const addAsset = useAssetStore((state) => state.addAsset);
     const token = useUserStore((state) => state.token);
-    const [prompt, setPrompt] = useState("");
-    const [references, setReferences] = useState<ReferenceImage[]>([]);
+    const userReady = useUserStore((state) => state.isReady);
+    const profileCompleted = useUserStore((state) => state.user?.profileCompleted === true);
+    const { prompt, references, setPrompt, setReferences } = useImageComposerStore();
     const [results, setResults] = useState<GenerationResult[]>([]);
     const [logs, setLogs] = useState<GenerationLog[]>([]);
     const [pendingLog, setPendingLog] = useState<GenerationLog | null>(null);
     const [running, setRunning] = useState(false);
     const [logsOpen, setLogsOpen] = useState(false);
-    const [promptDialogOpen, setPromptDialogOpen] = useState(false);
-    const [assetPickerOpen, setAssetPickerOpen] = useState(false);
     const [startedAt, setStartedAt] = useState(0);
     const [elapsedMs, setElapsedMs] = useState(0);
     const [selectedLogIds, setSelectedLogIds] = useState<string[]>([]);
@@ -99,8 +105,6 @@ export default function ImagePage() {
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
     const model = effectiveConfig.imageModel || effectiveConfig.model;
-    const canGenerate = Boolean(prompt.trim());
-    const generationCount = Math.max(1, Math.min(10, Number(config.count) || 1));
     const visibleLogs = pendingLog ? [pendingLog, ...logs] : logs;
 
     useEffect(() => {
@@ -118,56 +122,55 @@ export default function ImagePage() {
         if (urlPrompt) setPrompt(urlPrompt);
     }, [searchParams]);
 
-    const addReferences = async (files?: FileList | File[] | null) => {
-        const imageFiles = Array.from(files || []).filter((file) => file.type.startsWith("image/"));
-        const nextReferences = await Promise.all(
-            imageFiles.map(async (file) => {
-                const image = await uploadImage(file);
-                return { id: nanoid(), name: file.name, type: image.mimeType, dataUrl: image.url, storageKey: image.storageKey };
-            }),
-        );
-        setReferences((value) => [...value, ...nextReferences]);
-    };
+    useEffect(() => {
+        const draft = searchParams.get("draft");
+        if (!draft) return;
+        let active = true;
+        void localforage.getItem<ImageComposerDraft>(`image-draft-${draft}`).then((value) => {
+            if (!active || !value) return;
+            setPrompt(value.prompt);
+            setReferences(value.references);
+            setDraftConfig(value.config);
+            setDraftLoaded(draft);
+        }).catch(() => message.error("无法读取创作草稿"));
+        return () => { active = false; };
+    }, [searchParams, setPrompt, setReferences, message]);
 
-    const addReferencesFromClipboard = async () => {
-        try {
-            const items = await navigator.clipboard.read();
-            const blobs = await Promise.all(items.flatMap((item) => item.types.filter((type) => type.startsWith("image/")).map((type) => item.getType(type))));
-            if (!blobs.length) {
-                message.error("剪切板里没有可读取的图片");
-                return;
-            }
-            const nextReferences = await Promise.all(
-                blobs.map(async (blob, index) => {
-                    const image = await uploadImage(blob);
-                    return { id: nanoid(), name: `clipboard-${index + 1}.png`, type: image.mimeType, dataUrl: image.url, storageKey: image.storageKey };
-                }),
-            );
-            setReferences((value) => [...value, ...nextReferences]);
-            message.success(`已读取 ${nextReferences.length} 张参考图`);
-        } catch {
-            message.error("剪切板里没有可读取的图片");
-        }
-    };
-
-    const generate = async () => {
+    const generate = async (selectedConfig?: GenerationLogConfig) => {
+        if (running || submittingRef.current) return;
+        const generationConfig = { ...effectiveConfig, ...selectedConfig };
+        const generationModel = generationConfig.imageModel || generationConfig.model;
+        const generationCount = Math.max(1, Math.min(10, Number(generationConfig.count) || 1));
         const text = prompt.trim();
         if (!text) {
             message.error("请输入生图提示词");
             return;
         }
-        if (!isAiConfigReady(effectiveConfig, model)) {
+        if (!isAiConfigReady(generationConfig, generationModel)) {
             message.warning("管理员尚未配置可用模型");
             return;
         }
 
-        const snapshot = buildRequestSnapshot();
-        if (!snapshot) return;
+        submittingRef.current = true;
+        if (!token || !profileCompleted) {
+            const draft = nanoid();
+            try {
+                await localforage.setItem(`image-draft-${draft}`, { prompt, references, config: { model: generationConfig.model, imageModel: generationConfig.imageModel, quality: generationConfig.quality, size: generationConfig.size, count: generationConfig.count } });
+                const destination = localizedPath(`/image?draft=${draft}`);
+                router.push(localizedPath(`/${token ? "profile/setup" : "login"}?redirect=${encodeURIComponent(destination)}`));
+            } catch {
+                message.error("无法保存创作草稿");
+            } finally {
+                submittingRef.current = false;
+            }
+            return;
+        }
+        const snapshot = { text, config: { ...generationConfig, model: generationModel, count: "1" }, references: [...references] };
 
         setElapsedMs(0);
         setRunning(true);
         setPreviewLog(null);
-        setPendingLog(buildPendingLog({ prompt: text, model, config: { ...snapshot.config, count: String(generationCount) }, references: snapshot.references, imageCount: generationCount }));
+        setPendingLog(buildPendingLog({ prompt: text, model: generationModel, config: { ...snapshot.config, count: String(generationCount) }, references: snapshot.references, imageCount: generationCount }));
         const aspectRatio = imagePreviewAspectRatio(snapshot.config.size);
         setResults(Array.from({ length: generationCount }, () => ({ id: nanoid(), status: "pending", aspectRatio })));
         const batchStartedAt = performance.now();
@@ -191,7 +194,7 @@ export default function ImagePage() {
             await saveLog(
                 buildLog({
                     prompt: text,
-                    model,
+                    model: generationModel,
                     config: { ...snapshot.config, count: String(generationCount) },
                     references: snapshot.references,
                     durationMs: performance.now() - batchStartedAt,
@@ -207,6 +210,7 @@ export default function ImagePage() {
         } finally {
             setPendingLog(null);
             setRunning(false);
+            submittingRef.current = false;
         }
     };
 
@@ -245,18 +249,6 @@ export default function ImagePage() {
         message.success("已加入我的素材");
     };
 
-    const insertPickedAsset = async (payload: InsertAssetPayload) => {
-        if (payload.kind === "text") {
-            setPrompt(payload.content);
-        } else if (payload.kind === "image") {
-            const stored = await uploadImage(payload.dataUrl);
-            setReferences((value) => [...value, { id: nanoid(), name: payload.title, type: stored.mimeType, dataUrl: stored.url, storageKey: stored.storageKey }]);
-        } else {
-            message.warning("生图工作台暂不支持插入视频素材");
-        }
-        setAssetPickerOpen(false);
-    };
-
     const createSession = () => {
         setPrompt("");
         setReferences([]);
@@ -288,6 +280,11 @@ export default function ImagePage() {
             message.warning("生成结果未转存到云端，无法同步生成记录");
             return;
         }
+        const storedReferences = await Promise.all(log.references.map(async (item) => {
+            if (item.storageKey?.startsWith("cloud:")) return item;
+            const image = await uploadImage(item.dataUrl);
+            return { ...item, dataUrl: image.url, storageKey: image.storageKey, type: image.mimeType };
+        }));
         await saveGenerationHistory(token, {
             type: "image",
             title: log.title,
@@ -300,7 +297,7 @@ export default function ImagePage() {
                 size: log.config.size || "",
                 count: log.config.count || "",
             },
-            references: log.references.map((item) => ({ name: item.name, type: item.type, url: item.dataUrl, storageKey: item.storageKey || "" })),
+            references: storedReferences.map((item) => ({ name: item.name, type: item.type, url: item.dataUrl, storageKey: item.storageKey || "" })),
             media,
             status: log.status === "生成中" ? "失败" : log.status,
             error: "",
@@ -322,19 +319,6 @@ export default function ImagePage() {
         setPreviewLog(log);
         setLogsOpen(false);
         setResults(log.images.map((image) => ({ id: image.id, status: "success", image })));
-    };
-
-    const buildRequestSnapshot = () => {
-        const text = prompt.trim();
-        if (!text) {
-            message.error("请输入生图提示词");
-            return null;
-        }
-        if (!isAiConfigReady(effectiveConfig, model)) {
-            message.warning("管理员尚未配置可用模型");
-            return null;
-        }
-        return { text, config: { ...effectiveConfig, model, count: "1" }, references: [...references] };
     };
 
     const runGenerationSlot = async (index: number, snapshot: { text: string; config: AiConfig; references: ReferenceImage[] }): Promise<GeneratedImage> => {
@@ -362,6 +346,17 @@ export default function ImagePage() {
             throw error;
         }
     };
+
+    useEffect(() => {
+        if (!draftLoaded || !draftConfig || autoStarted.current || !token || !userReady || !profileCompleted || !publicReady) return;
+        autoStarted.current = true;
+        void localforage.removeItem(`image-draft-${draftLoaded}`).then(() => {
+            setDraftLoaded("");
+            window.history.replaceState(null, "", localizedPath("/image"));
+            useConfigStore.getState().setConfig(draftConfig, false);
+            void generate(draftConfig);
+        }).catch(() => message.error("无法提交创作草稿，请手动发送"));
+    }, [draftLoaded, draftConfig, token, userReady, profileCompleted, publicReady]);
 
     return (
         <div className={studio.studio}>
@@ -403,44 +398,11 @@ export default function ImagePage() {
                         )}
                     </div>
                     <div className={studio.form}>
-                        <div className={studio.composer}>
-                            {references.length ? <div className={studio.references}>
-                                {references.map((item) => <div key={item.id} className={studio.reference}>
-                                    <img src={item.dataUrl} alt={item.name} />
-                                    <button type="button" onClick={() => setReferences((value) => value.filter((ref) => ref.id !== item.id))} aria-label="移除参考图"><X size={13} /></button>
-                                </div>)}
-                            </div> : null}
-                            <Input.TextArea value={prompt} onChange={(event) => setPrompt(event.target.value)} variant="borderless" autoSize={{ minRows: 3, maxRows: 8 }} aria-label="生图提示词" placeholder="描述你想创作的画面，也可以添加参考图…" onKeyDown={(event) => {
-                                if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
-                                    event.preventDefault();
-                                    if (canGenerate && !running) void generate();
-                                }
-                            }} onPaste={(event) => {
-                                const files = Array.from(event.clipboardData.files).filter((file) => file.type.startsWith("image/"));
-                                if (files.length) { event.preventDefault(); void addReferences(files); }
-                            }} />
-                            <div className={studio.toolbar}>
-                                <Dropdown trigger={["click"]} placement="topLeft" menu={{ items: [
-                                    { key: "upload", icon: <Upload size={15} />, label: "上传参考图" },
-                                    { key: "clipboard", icon: <ClipboardPaste size={15} />, label: "读取剪切板图片" },
-                                    { key: "assets", icon: <FolderPlus size={15} />, label: "我的素材" },
-                                    { key: "prompts", icon: <BookOpen size={15} />, label: "提示词库" },
-                                ], onClick: ({ key }) => {
-                                    if (key === "upload") fileInputRef.current?.click();
-                                    if (key === "clipboard") void addReferencesFromClipboard();
-                                    if (key === "assets") setAssetPickerOpen(true);
-                                    if (key === "prompts") setPromptDialogOpen(true);
-                                } }}>
-                                    <Button type="text" shape="circle" icon={<Plus size={19} />} aria-label="添加参考图或选择灵感" />
-                                </Dropdown>
-                                <StudioGenerationSettings kind="image" />
-                                <Button className={studio.send} type="primary" shape="circle" icon={<ArrowUp size={20} />} loading={running} disabled={!canGenerate || running} onClick={() => void generate()} aria-label="开始生成" title="开始生成" />
-                            </div>
-                        </div>
-                        <p className={studio.composerHint}>Enter 生成 · Shift + Enter 换行 · 支持粘贴参考图</p>
+                        <ImagePromptComposer onSubmit={() => void generate()} running={running} />
+                        <p className={studio.composerHint}>Enter 生成 · Shift + Enter 换行 · 参考图发送时提交</p>
                     </div>
                 </section>
-                <aside className={studio.history}>
+                <StudioHistorySidebar items={visibleLogs.map((log) => ({ id: log.id, title: log.title, prompt: log.prompt, preview: log.thumbnails[0] }))} onSelect={(id) => { const log = visibleLogs.find((item) => item.id === id); if (log) void previewGenerationLog(log); }}>
                     <LogPanel
                         logs={visibleLogs}
                         selectedLogIds={selectedLogIds}
@@ -451,19 +413,8 @@ export default function ImagePage() {
                         onPreviewLog={(log) => void previewGenerationLog(log)}
                         onOpenDetail={(log) => log.history && setDetailHistory(log.history)}
                     />
-                </aside>
+                </StudioHistorySidebar>
             </main>
-            <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                className="hidden"
-                onChange={(event) => {
-                    void addReferences(event.target.files);
-                    event.target.value = "";
-                }}
-            />
             <Drawer title={locale === "en-US" ? "History" : "生成记录"} placement="right" size={340} open={logsOpen} onClose={() => setLogsOpen(false)}>
                 <LogPanel
                     logs={visibleLogs}
@@ -477,9 +428,7 @@ export default function ImagePage() {
                 />
             </Drawer>
 
-            <PromptSelectDialog open={promptDialogOpen} onOpenChange={setPromptDialogOpen} onSelect={setPrompt} />
-            <AssetPickerModal open={assetPickerOpen} defaultTab="my-assets" onInsert={(payload) => void insertPickedAsset(payload)} onClose={() => setAssetPickerOpen(false)} />
-            <Modal title="删除生成记录" open={deleteConfirmOpen} onCancel={() => setDeleteConfirmOpen(false)} onOk={deleteSelectedLogs} okText="删除" okButtonProps={{ danger: true }} cancelText="取消">
+            <Modal centered title="删除生成记录" open={deleteConfirmOpen} onCancel={() => setDeleteConfirmOpen(false)} onOk={deleteSelectedLogs} okText="删除" okButtonProps={{ danger: true }} cancelText="取消">
                 确定删除选中的 {selectedLogIds.length} 条生成记录吗？
             </Modal>
             <GenerationHistoryDetailModal open={Boolean(detailHistory)} history={detailHistory} onClose={() => setDetailHistory(null)} />
