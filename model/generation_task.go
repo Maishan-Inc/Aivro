@@ -29,10 +29,22 @@ type GenerationTask struct {
 	ResponseFileID string               `json:"responseFileId" gorm:"index"`
 	Error          string               `json:"error"`
 	StartedAt      string               `json:"startedAt" gorm:"index"`
+	WorkerID       string               `json:"-" gorm:"index"`
+	LeaseExpiresAt string               `json:"-" gorm:"index"`
 	FinishedAt     string               `json:"finishedAt" gorm:"index"`
 	CanceledAt     string               `json:"canceledAt"`
 	CreatedAt      string               `json:"createdAt" gorm:"index"`
 	UpdatedAt      string               `json:"updatedAt"`
+}
+
+type VideoTask struct {
+	ID             string `json:"id" gorm:"primaryKey"`
+	UserID         string `json:"userId" gorm:"index"`
+	ProviderID     string `json:"-"`
+	Model          string `json:"model"`
+	ChannelBaseURL string `json:"-"`
+	ChannelKeyHash string `json:"-"`
+	CreatedAt      string `json:"createdAt"`
 }
 
 // GenerationTaskView 是前端轮询使用的轻量任务视图。

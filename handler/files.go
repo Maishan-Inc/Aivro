@@ -1,12 +1,36 @@
 package handler
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 
 	"github.com/basketikun/aivro/model"
 	"github.com/basketikun/aivro/service"
 )
+
+func RetainAssetFiles(w http.ResponseWriter, r *http.Request, id string) {
+	user, _ := service.UserFromContext(r.Context())
+	var input struct { FileIDs []string `json:"fileIds"` }
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		Fail(w, "素材文件参数无效")
+		return
+	}
+	if err := service.RetainAssetFiles(user.ID, id, input.FileIDs); err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, true)
+}
+
+func ReleaseAssetFiles(w http.ResponseWriter, r *http.Request, id string) {
+	user, _ := service.UserFromContext(r.Context())
+	if err := service.ReleaseAssetFiles(user.ID, id); err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, true)
+}
 
 func UploadAvatar(w http.ResponseWriter, r *http.Request) {
 	user, ok := service.UserFromContext(r.Context())
@@ -79,7 +103,7 @@ func UploadFile(w http.ResponseWriter, r *http.Request) {
 
 func FileContent(w http.ResponseWriter, r *http.Request, id string) {
 	user, _ := service.UserFromContext(r.Context())
-	file, content, err := service.GetFileContent(user, id, r.URL.Query().Get("accessToken"))
+	file, content, err := service.GetFileContent(r.Context(), user, id, r.URL.Query().Get("accessToken"))
 	if err != nil {
 		FailError(w, err)
 		return

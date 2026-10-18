@@ -5,6 +5,7 @@ import { App, Empty, Modal, Tag, Typography } from "antd";
 
 import { fetchCreditLogs, type CreditLog } from "@/services/api/billing";
 import type { GenerationHistory, GenerationHistoryMedia } from "@/services/api/generation-history";
+import { formatDateTime, formatNumber } from "@/lib/datetime";
 import { formatBytes, formatDuration } from "@/lib/image-utils";
 import { useUserStore } from "@/stores/use-user-store";
 
@@ -132,7 +133,7 @@ function CreditLogRow({ item }: { item: CreditLog }) {
             <DetailRow label="类型" value={creditLogTypeLabel(item.type)} />
             <DetailRow label="模型" value={item.model || "未记录"} />
             <DetailRow label="变动" value={<span className={item.amount < 0 ? "text-red-600" : item.amount > 0 ? "text-green-600" : ""}>{formatCreditAmount(item.amount)}</span>} />
-            <DetailRow label="剩余金额" value={item.balance.toLocaleString()} />
+            <DetailRow label="剩余金额" value={formatNumber(item.balance)} />
         </div>
     );
 }
@@ -177,7 +178,7 @@ function formatDeleteRemaining(expiresAt: string) {
 function formatDate(value: string) {
     const time = Date.parse(value);
     if (!Number.isFinite(time)) return value || "未记录";
-    return new Date(time).toLocaleString("zh-CN", { hour12: false });
+    return formatDateTime(time);
 }
 
 function creditLogTypeLabel(type: CreditLog["type"]) {
@@ -187,6 +188,6 @@ function creditLogTypeLabel(type: CreditLog["type"]) {
 }
 
 function formatCreditAmount(value: number) {
-    if (value > 0) return `+${value.toLocaleString()}`;
-    return value.toLocaleString();
+    if (value > 0) return `+${formatNumber(value)}`;
+    return formatNumber(value);
 }

@@ -118,7 +118,7 @@ func UpdateGenerationTaskStatus(id string, status model.GenerationTaskStatus, fi
 	return db.Model(&model.GenerationTask{}).Where("id = ?", id).Updates(fields).Error
 }
 
-func MarkQueuedTaskExecuting(id string, startedAt string) (bool, error) {
+func MarkQueuedTaskExecuting(id string, startedAt string, workerID string, leaseExpiresAt string) (bool, error) {
 	db, err := DB()
 	if err != nil {
 		return false, err
@@ -128,33 +128,36 @@ func MarkQueuedTaskExecuting(id string, startedAt string) (bool, error) {
 		"queue_position": 0,
 		"started_at":     startedAt,
 		"updated_at":     startedAt,
+		"worker_id": workerID,
+		"lease_expires_at": leaseExpiresAt,
 	})
 	return tx.RowsAffected > 0, tx.Error
 }
 
-func MarkExecutingTasksFailed(message string) ([]model.GenerationTask, error) {
+func FinishGenerationTask(task model.GenerationTask, status model.GenerationTaskStatus, fields map[string]any, refund *model.CreditLog) (bool, error) {
 	db, err := DB()
-	if err != nil {
-		return nil, err
-	}
+	if err != nil { return false, err }
+	changed := false
+	err = db.Transaction(func(tx *gorm.DB) error {
+		fields["status"], fields["updated_at"] = status, time.Now().Format(time.RFC3339)
+		result := tx.Model(&model.GenerationTask{}).Where("id = ? AND status = ? AND worker_id = ?", task.ID, task.Status, task.WorkerID).Updates(fields)
+		if result.Error != nil || result.RowsAffected == 0 { return result.Error }
+		changed = true
+		if refund == nil || refund.Amount <= 0 { return nil }
+		if err := tx.Model(&model.User{}).Where("id = ?", task.UserID).Updates(map[string]any{"credits": gorm.Expr("credits + ?", refund.Amount), "updated_at": refund.CreatedAt}).Error; err != nil { return err }
+		var user model.User
+		if err := tx.Where("id = ?", task.UserID).First(&user).Error; err != nil { return err }
+		refund.Balance = user.Credits
+		return tx.Create(refund).Error
+	})
+	return changed, err
+}
+
+func ListExpiredExecutingTasks(now string) ([]model.GenerationTask, error) {
+	db, err := DB()
+	if err != nil { return nil, err }
 	items := []model.GenerationTask{}
-	if err := db.Where("status = ?", model.GenerationTaskExecuting).Find(&items).Error; err != nil {
-		return nil, err
-	}
-	if len(items) == 0 {
-		return items, nil
-	}
-	now := time.Now().Format(time.RFC3339)
-	ids := make([]string, 0, len(items))
-	for _, item := range items {
-		ids = append(ids, item.ID)
-	}
-	err = db.Model(&model.GenerationTask{}).Where("id IN ?", ids).Updates(map[string]any{
-		"status":      model.GenerationTaskFailed,
-		"error":       message,
-		"finished_at": now,
-		"updated_at":  now,
-	}).Error
+	err = db.Where("status = ? AND lease_expires_at != ? AND lease_expires_at <= ?", model.GenerationTaskExecuting, "", now).Limit(100).Find(&items).Error
 	return items, err
 }
 

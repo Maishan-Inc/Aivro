@@ -15,6 +15,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -26,6 +27,7 @@ import (
 	"github.com/basketikun/aivro/config"
 	"github.com/basketikun/aivro/model"
 	"github.com/basketikun/aivro/repository"
+	"gorm.io/gorm"
 )
 
 const (
@@ -43,8 +45,6 @@ type CloudObjectUpload struct {
 	User        model.AuthUser
 	FileType    model.CloudFileType
 	Purpose     model.CloudFilePurpose
-	WorkflowID  string
-	HistoryID   string
 	Filename    string
 	ContentType string
 	Source      string
@@ -123,8 +123,6 @@ func (storage *CloudStorageService) UploadObject(ctx context.Context, request Cl
 		Provider:    storage.setting.Provider,
 		FileType:    request.FileType,
 		Purpose:     firstPurpose(request.Purpose),
-		WorkflowID:  request.WorkflowID,
-		HistoryID:   request.HistoryID,
 		Bucket:      storage.setting.Bucket,
 		ObjectKey:   objectKey,
 		PublicURL:   "",
@@ -264,8 +262,6 @@ func storeLocalObject(request CloudObjectUpload) (CloudObjectResult, error) {
 		Provider:    "local",
 		FileType:    request.FileType,
 		Purpose:     firstPurpose(request.Purpose),
-		WorkflowID:  request.WorkflowID,
-		HistoryID:   request.HistoryID,
 		ObjectKey:   objectKey,
 		AccessToken: mustRandomToken(24),
 		ContentType: request.ContentType,
@@ -283,7 +279,7 @@ func storeLocalObject(request CloudObjectUpload) (CloudObjectResult, error) {
 	return CloudObjectResult{File: saved, PublicURL: saved.PublicURL}, nil
 }
 
-func GetFileContent(user model.AuthUser, id string, accessToken string) (model.CloudFile, io.ReadCloser, error) {
+func GetFileContent(ctx context.Context, user model.AuthUser, id string, accessToken string) (model.CloudFile, io.ReadCloser, error) {
 	file, ok, err := repository.GetCloudFile(strings.TrimSpace(id))
 	if err != nil || !ok {
 		if err != nil {
@@ -293,11 +289,17 @@ func GetFileContent(user model.AuthUser, id string, accessToken string) (model.C
 	}
 	if file.AccessToken == "" || accessToken != file.AccessToken {
 		if user.ID == "" || user.ID != file.UserID {
-			return file, nil, safeMessageError{message: "无权访问文件"}
+			allowed, err := repository.HasCloudFileReference(file.ID, user.ID, now())
+			if err != nil || user.ID == "" || !allowed {
+				return file, nil, safeMessageError{message: "无权访问文件"}
+			}
 		}
 	}
 	if file.ExpiresAt != "" && file.ExpiresAt <= now() {
-		return file, nil, safeMessageError{message: "文件已过期"}
+		retained, err := repository.HasCloudFileReference(file.ID, "", now())
+		if err != nil || !retained {
+			return file, nil, safeMessageError{message: "文件已过期"}
+		}
 	}
 	if file.Provider == "local" {
 		reader, err := os.Open(filepath.Join(config.Cfg.LocalFileDir, filepath.FromSlash(file.ObjectKey)))
@@ -311,15 +313,47 @@ func GetFileContent(user model.AuthUser, id string, accessToken string) (model.C
 	if err != nil {
 		return file, nil, err
 	}
-	result, err := storage.client.GetObject(context.Background(), &s3.GetObjectInput{Bucket: aws.String(firstNonEmpty(file.Bucket, settings.Bucket)), Key: aws.String(file.ObjectKey)})
+	result, err := storage.client.GetObject(ctx, &s3.GetObjectInput{Bucket: aws.String(firstNonEmpty(file.Bucket, settings.Bucket)), Key: aws.String(file.ObjectKey)})
 	if err != nil {
 		return file, nil, err
 	}
 	return file, result.Body, nil
 }
 
-func BindCloudFiles(userID string, ids []string, purpose model.CloudFilePurpose, workflowID string, historyID string, expiresAt string) error {
-	return repository.UpdateCloudFilesPurpose(uniqueStrings(ids), userID, purpose, workflowID, historyID, expiresAt)
+func retainCloudFiles(userID string, kind string, ownerID string, ids []string, expiresAt string) error {
+	db, err := repository.DB()
+	if err != nil {
+		return err
+	}
+	ids = uniqueStrings(ids)
+	sort.Strings(ids)
+	return db.Transaction(func(tx *gorm.DB) error {
+		for _, id := range ids {
+			allowed, err := repository.CanReferenceCloudFileTx(tx, userID, id, now())
+			if err != nil {
+				return err
+			}
+			if !allowed {
+				return safeMessageError{message: "文件不存在、已过期或无权限访问"}
+			}
+		}
+		return repository.SetCloudFileReferencesTx(tx, userID, kind, ownerID, ids, expiresAt)
+	})
+}
+
+func RetainAssetFiles(userID string, assetID string, ids []string) error {
+	if len(assetID) == 0 || len(assetID) > 100 || len(ids) > 100 {
+		return safeMessageError{message: "素材文件参数无效"}
+	}
+	return retainCloudFiles(userID, "asset", assetID, ids, "")
+}
+
+func ReleaseAssetFiles(userID string, assetID string) error {
+	files, err := repository.ReleaseCloudFileReferences(userID, "asset", assetID)
+	if err != nil {
+		return err
+	}
+	return DeleteCloudFiles(files)
 }
 
 func DeleteCloudFiles(files []model.CloudFile) error {
@@ -331,10 +365,15 @@ func DeleteCloudFiles(files []model.CloudFile) error {
 		if file.DeletedAt != "" {
 			continue
 		}
-		if err := deleteStoredFile(file, settings); err != nil {
+		claimed, err := repository.ClaimCloudFileDeletion(file.ID, now())
+		if err != nil {
 			return err
 		}
-		if err := repository.MarkCloudFileDeleted(file.ID, now()); err != nil {
+		if !claimed {
+			continue
+		}
+		if err := deleteStoredFile(file, settings); err != nil {
+			_ = repository.MarkCloudFileDeleted(file.ID, "")
 			return err
 		}
 	}
@@ -342,7 +381,7 @@ func DeleteCloudFiles(files []model.CloudFile) error {
 }
 
 func DeleteWorkflowCloudFiles(userID string, workflowID string) error {
-	files, err := repository.ListCloudFilesByWorkflow(userID, workflowID)
+	files, err := repository.ReleaseCloudFileReferences(userID, "workflow", workflowID)
 	if err != nil {
 		return err
 	}
@@ -350,7 +389,7 @@ func DeleteWorkflowCloudFiles(userID string, workflowID string) error {
 }
 
 func DeleteHistoryCloudFiles(userID string, historyID string) error {
-	files, err := repository.ListCloudFilesByHistory(userID, historyID)
+	files, err := repository.ReleaseCloudFileReferences(userID, "generation", historyID)
 	if err != nil {
 		return err
 	}
@@ -572,16 +611,7 @@ func CleanupExpiredCloudFiles() error {
 	if err != nil || len(items) == 0 {
 		return err
 	}
-	for _, item := range items {
-		if err := deleteStoredFile(item, settings); err != nil {
-			log.Printf("cloud file delete failed: id=%s key=%s err=%v", item.ID, item.ObjectKey, err)
-			continue
-		}
-		if err := repository.MarkCloudFileDeleted(item.ID, now()); err != nil {
-			log.Printf("cloud file mark deleted failed: id=%s err=%v", item.ID, err)
-		}
-	}
-	return nil
+	return DeleteCloudFiles(items)
 }
 
 func normalizeCloudStorageSetting(setting model.CloudStorageSetting) model.CloudStorageSetting {

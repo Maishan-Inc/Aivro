@@ -17,6 +17,10 @@ type UserStore = {
     register: (payload: AuthPayload) => Promise<AuthUser>;
 };
 
+let sessionVersion = 0;
+let hydrationVersion = 0;
+let pendingLogout: Promise<unknown> = Promise.resolve();
+
 export const useUserStore = create<UserStore>()(
     persist(
         (set, get) => ({
@@ -24,44 +28,62 @@ export const useUserStore = create<UserStore>()(
             user: null,
             isReady: false,
             isLoading: false,
-            setSession: (_token, user) => set({ token: COOKIE_SESSION_TOKEN, user, isReady: true }),
+            setSession: (_token, user) => {
+                sessionVersion++;
+                set({ token: COOKIE_SESSION_TOKEN, user, isReady: true, isLoading: false });
+            },
             clearSession: () => {
-                void logout().catch(() => undefined);
-                set({ token: "", user: null, isReady: true });
+                sessionVersion++;
+                pendingLogout = logout().catch(() => undefined);
+                set({ token: "", user: null, isReady: true, isLoading: false });
             },
             hydrateUser: async () => {
+                const version = sessionVersion;
+                const hydration = ++hydrationVersion;
                 const token = get().token;
                 set({ isLoading: true });
                 try {
+                    await pendingLogout;
+                    if (version !== sessionVersion || hydration !== hydrationVersion) return;
                     const user = await fetchCurrentUser(token || undefined);
+                    if (version !== sessionVersion || hydration !== hydrationVersion) return;
                     if (user.role === "guest") {
                         set({ token: "", user: null, isReady: true, isLoading: false });
                         return;
                     }
                     set({ token: COOKIE_SESSION_TOKEN, user, isReady: true, isLoading: false });
                 } catch {
+                    if (version !== sessionVersion || hydration !== hydrationVersion) return;
                     set({ token: "", user: null, isReady: true, isLoading: false });
                 }
             },
             login: async (payload) => {
+                const version = ++sessionVersion;
                 set({ isLoading: true });
                 try {
+                    await pendingLogout;
+                    if (version !== sessionVersion) throw new Error("登录状态已变化，请重试");
                     const session = await login(payload);
+                    if (version !== sessionVersion) throw new Error("登录状态已变化，请重试");
                     set({ token: COOKIE_SESSION_TOKEN, user: session.user, isReady: true, isLoading: false });
                     return session.user;
                 } catch (error) {
-                    set({ isLoading: false });
+                    if (version === sessionVersion) set({ isLoading: false });
                     throw error;
                 }
             },
             register: async (payload) => {
+                const version = ++sessionVersion;
                 set({ isLoading: true });
                 try {
+                    await pendingLogout;
+                    if (version !== sessionVersion) throw new Error("登录状态已变化，请重试");
                     const session = await register(payload);
+                    if (version !== sessionVersion) throw new Error("登录状态已变化，请重试");
                     set({ token: COOKIE_SESSION_TOKEN, user: session.user, isReady: true, isLoading: false });
                     return session.user;
                 } catch (error) {
-                    set({ isLoading: false });
+                    if (version === sessionVersion) set({ isLoading: false });
                     throw error;
                 }
             },

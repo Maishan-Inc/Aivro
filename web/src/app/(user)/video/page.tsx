@@ -17,6 +17,7 @@ import { GenerationHistoryDetailModal } from "@/components/generation-history-de
 import { AivroDrawableLoader } from "@/components/aivro-drawable-loader";
 import { PromptSelectDialog } from "@/components/prompts/prompt-select-dialog";
 import { normalizeVideoResolutionValue, normalizeVideoSizeValue } from "@/components/video-settings-panel";
+import { formatDateTime } from "@/lib/datetime";
 import { formatBytes, formatDuration } from "@/lib/image-utils";
 import { uploadMediaFile } from "@/services/file-storage";
 import { deleteGenerationHistory, fetchGenerationHistories, saveGenerationHistory, type GenerationHistory, type GenerationHistoryMedia } from "@/services/api/generation-history";
@@ -200,17 +201,21 @@ export default function VideoPage() {
         saveAs(video.url, "video.mp4");
     };
 
-    const saveResultToAssets = (video: GeneratedVideo) => {
-        addAsset({
-            kind: "video",
-            title: "生成视频",
-            coverUrl: "",
-            tags: [],
-            source: "视频创作台",
-            data: { url: video.url, storageKey: video.storageKey, width: video.width, height: video.height, bytes: video.bytes, mimeType: video.mimeType },
-            metadata: { source: "video-page", prompt },
-        });
-        message.success("已加入我的素材");
+    const saveResultToAssets = async (video: GeneratedVideo) => {
+        try {
+            await addAsset({
+                kind: "video",
+                title: "生成视频",
+                coverUrl: "",
+                tags: [],
+                source: "视频创作台",
+                data: { url: video.url, storageKey: video.storageKey, width: video.width, height: video.height, bytes: video.bytes, mimeType: video.mimeType },
+                metadata: { source: "video-page", prompt },
+            });
+            message.success("已加入我的素材");
+        } catch (error) {
+            message.error(error instanceof Error ? error.message : "素材操作失败，请重试");
+        }
     };
 
     const insertPickedAsset = async (payload: InsertAssetPayload) => {
@@ -562,7 +567,7 @@ function historyToVideoLog(history: GenerationHistory): GenerationLog {
         createdAt: Date.parse(history.createdAt) || Date.now(),
         title: history.title || history.model || "未命名",
         prompt: history.prompt || "",
-        time: new Date(history.createdAt).toLocaleString("zh-CN", { hour12: false }),
+        time: formatDateTime(history.createdAt),
         model: history.model || config.videoModel || "",
         config,
         references: (history.references || []).map((item, index) => ({ id: `${history.id}-ref-${index}`, name: item.name, type: item.type, dataUrl: item.url, storageKey: item.storageKey })),
@@ -616,7 +621,7 @@ function buildLog({ prompt, model, config, references, durationMs, status, video
         createdAt: Date.now(),
         title: prompt.slice(0, 12) || "未命名",
         prompt,
-        time: new Date().toLocaleString("zh-CN", { hour12: false }),
+        time: formatDateTime(Date.now()),
         model,
         config: logConfig,
         references,

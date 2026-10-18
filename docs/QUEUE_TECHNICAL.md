@@ -100,7 +100,7 @@ WHERE model = ?
 **Concurrency safety**:
 - Single process: `sync.Mutex` protects scheduler
 - Optimistic locking: `UPDATE ... WHERE status = 'queued'` prevents double-dispatch
-- Crash recovery: On startup, mark all `executing` tasks as `failed` and refund credits
+- Crash recovery: At startup and every 30 seconds, recover only expired execution leases. Requests have a 5-minute context deadline and a 6-minute lease. Compare status and worker ID when finishing; terminal transition, refund and ledger insertion commit in one transaction.
 
 ### Credits Management
 

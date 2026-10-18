@@ -14,6 +14,7 @@ import { CanvasImageSettingsPopover } from "./canvas-image-settings-popover";
 import { CanvasVideoSettingsPopover } from "./canvas-video-settings-popover";
 import type { NodeGenerationInput } from "./canvas-node-generation";
 import type { CanvasGenerationMode, CanvasNodeData, CanvasNodeMetadata } from "../types";
+import { formatNumber } from "@/lib/datetime";
 
 type CanvasConfigNodePanelProps = {
     node: CanvasNodeData;
@@ -136,7 +137,7 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, inputs, o
                 <span className="inline-flex items-center gap-1.5">
                     <span className="inline-flex items-center gap-1">
                         <CreditSymbol />
-                        {credits.toLocaleString()}
+                        {formatNumber(credits)}
                     </span>
                     {isRunning ? <LoaderCircle className="size-4 animate-spin" /> : <Play className="size-4" />}
                     <span>开始生成</span>

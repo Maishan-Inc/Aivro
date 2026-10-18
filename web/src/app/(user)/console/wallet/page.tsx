@@ -8,6 +8,7 @@ import { CreditCard, History, Plus, WalletCards } from "lucide-react";
 import { CreditSymbol } from "@/constant/credits";
 import { useLocalizedPath } from "@/hooks/use-localized-path";
 import { useUserStore } from "@/stores/use-user-store";
+import { formatNumber } from "@/lib/datetime";
 
 type WalletLog = {
     id: string;
@@ -45,8 +46,8 @@ export default function ConsoleWalletPage() {
                 </section>
 
                 <section className="grid gap-4 md:grid-cols-3">
-                    <WalletMetric icon={<CreditSymbol />} label="当前余额" value={(user?.credits ?? 0).toLocaleString()} helper="可用于图片、视频、3D 与 AI 请求扣费" />
-                    <WalletMetric icon={<CreditCard className="size-5" />} label="工作流创建次数" value={(user?.workflowCreateCredits ?? 0).toLocaleString()} helper="新建云端工作流会消耗次数" />
+                    <WalletMetric icon={<CreditSymbol />} label="当前余额" value={formatNumber(user?.credits ?? 0)} helper="可用于图片、视频、3D 与 AI 请求扣费" />
+                    <WalletMetric icon={<CreditCard className="size-5" />} label="工作流创建次数" value={formatNumber(user?.workflowCreateCredits ?? 0)} helper="新建云端工作流会消耗次数" />
                     <WalletMetric icon={<WalletCards className="size-5" />} label="当前套餐" value="Free" helper="套餐状态后续接入账单接口后展示" />
                 </section>
 

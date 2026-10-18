@@ -8,7 +8,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 
 import { COOKIE_SESSION_TOKEN, completeProfile } from "@/services/api/auth";
-import { useI18n } from "@/hooks/use-i18n";
 import { useLocalizedPath } from "@/hooks/use-localized-path";
 import { useUserStore } from "@/stores/use-user-store";
 
@@ -33,7 +32,6 @@ function ProfileSetupContent() {
     const token = useUserStore((state) => state.token);
     const user = useUserStore((state) => state.user);
     const setSession = useUserStore((state) => state.setSession);
-    const { locale } = useI18n();
     const localizedPath = useLocalizedPath();
     const [saving, setSaving] = useState(false);
     const redirect = safeRedirect(search.get("redirect") || localizedPath("/canvas"));
@@ -51,11 +49,11 @@ function ProfileSetupContent() {
         try {
             const nextUser = await completeProfile(token, values);
             setSession(token || COOKIE_SESSION_TOKEN, nextUser);
-            message.success(locale === "en-US" ? "Profile completed" : "资料已完成");
+            message.success("资料已完成");
             router.replace(redirect);
             router.refresh();
         } catch (error) {
-            message.error(error instanceof Error ? error.message : locale === "en-US" ? "Save failed" : "保存失败");
+            message.error(error instanceof Error ? error.message : "保存失败");
         } finally {
             setSaving(false);
         }
@@ -66,29 +64,29 @@ function ProfileSetupContent() {
             <FlowBackground />
             <section className="relative z-10 m-auto w-full max-w-[420px]">
                 <div className="mb-7 text-center">
-                    <h1 className="text-3xl font-semibold tracking-normal text-stone-950 dark:text-stone-100">{locale === "en-US" ? "Complete profile" : "完善账户信息"}</h1>
-                    <p className="mt-3 text-base leading-7 text-stone-500 dark:text-stone-400">{locale === "en-US" ? "Confirm the route name, choose account type, and enter the public name." : "确认路由名称，选择账户类型并填写公开名称。"}</p>
+                    <h1 className="text-3xl font-semibold tracking-normal text-stone-950 dark:text-stone-100">完善账户信息</h1>
+                    <p className="mt-3 text-base leading-7 text-stone-500 dark:text-stone-400">确认路由名称，选择账户类型并填写公开名称。</p>
                 </div>
                 <Form<ProfileValues> layout="vertical" size="large" requiredMark={false} initialValues={{ username: user?.username || "", accountType: "personal", displayName: user?.displayName || "" }} onFinish={submit}>
                     <Form.Item
                         name="username"
-                        label={locale === "en-US" ? "Route name" : "路由名称"}
-                        extra={locale === "en-US" ? "Used in public URLs. Only lowercase letters and numbers. It cannot be changed yet." : "用于系统中的公开路由，仅支持小写字母和数字，当前系统暂不支持修改。"}
+                        label="路由名称"
+                        extra="用于系统中的公开路由，仅支持小写字母和数字，当前系统暂不支持修改。"
                         rules={[
-                            { required: true, message: locale === "en-US" ? "Enter a route name" : "请输入路由名称" },
-                            { pattern: /^[a-z0-9]{3,24}$/, message: locale === "en-US" ? "Use 3-24 lowercase letters or numbers" : "请输入 3-24 位小写字母或数字" },
+                            { required: true, message: "请输入路由名称" },
+                            { pattern: /^[a-z0-9]{3,24}$/, message: "请输入 3-24 位小写字母或数字" },
                         ]}
                     >
                         <Input prefix={<UserOutlined />} autoComplete="username" />
                     </Form.Item>
                     <Form.Item name="accountType">
-                        <Segmented block options={[{ label: locale === "en-US" ? "Personal" : "个人", value: "personal" }, { label: locale === "en-US" ? "Company" : "公司", value: "company" }]} />
+                        <Segmented block options={[{ label: "个人", value: "personal" }, { label: "公司", value: "company" }]} />
                     </Form.Item>
-                    <Form.Item name="displayName" label={locale === "en-US" ? "Public name" : "公开名称"} extra={locale === "en-US" ? "Shown on your profile, workflow cards, and shared pages." : "展示在个人资料、工作流卡片和分享页面中。"} rules={[{ required: true, message: locale === "en-US" ? "Enter a public name" : "请输入公开名称" }]}>
+                    <Form.Item name="displayName" label="公开名称" extra="展示在个人资料、工作流卡片和分享页面中。" rules={[{ required: true, message: "请输入公开名称" }]}>
                         <Input prefix={<UserOutlined />} autoComplete="name" />
                     </Form.Item>
                     <Button block type="primary" htmlType="submit" loading={saving}>
-                        {locale === "en-US" ? "Complete" : "完成"}
+                        完成
                     </Button>
                 </Form>
             </section>

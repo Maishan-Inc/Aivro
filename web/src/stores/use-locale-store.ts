@@ -3,6 +3,7 @@
 import { create } from "zustand";
 
 import type { Locale } from "@/i18n/messages";
+import { defaultLocale, localeFromLanguageTag } from "@/i18n/routing";
 import { saveUserPreference } from "@/services/api/preferences";
 import { useUserStore } from "@/stores/use-user-store";
 
@@ -12,13 +13,16 @@ type LocaleStore = {
 };
 
 function detectLocale(): Locale {
-    if (typeof window === "undefined") return "zh-CN";
+    if (typeof window === "undefined") return defaultLocale;
     try {
         const languages = navigator.languages?.length ? navigator.languages : [navigator.language];
-        const language = languages.find(Boolean)?.toLowerCase() || "";
-        return language.startsWith("zh") ? "zh-CN" : "en-US";
+        for (const language of languages) {
+            const locale = language ? localeFromLanguageTag(language) : undefined;
+            if (locale) return locale;
+        }
+        return defaultLocale;
     } catch {
-        return "zh-CN";
+        return defaultLocale;
     }
 }
 

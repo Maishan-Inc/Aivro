@@ -56,6 +56,17 @@ func ListPublicPrompts(q model.Query) (model.PromptList, error) {
 		result.Items = applyPromptImageProxy(result.Items, true)
 	}
 	publicPromptCache.Lock()
+	for cachedKey, item := range publicPromptCache.items {
+		if !now.Before(item.ExpiresAt) {
+			delete(publicPromptCache.items, cachedKey)
+		}
+	}
+	if len(publicPromptCache.items) >= 128 {
+		for cachedKey := range publicPromptCache.items {
+			delete(publicPromptCache.items, cachedKey)
+			break
+		}
+	}
 	publicPromptCache.items[key] = publicPromptCacheItem{Value: result, ExpiresAt: now.Add(publicPromptCacheTTL)}
 	publicPromptCache.Unlock()
 	return result, nil

@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { isIP } from "node:net";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -9,14 +10,12 @@ type RouteContext = {
 
 function proxyHeaders(request: NextRequest) {
     const headers = new Headers(request.headers);
-    for (const key of ["host", "content-length", "connection", "forwarded", "x-forwarded-for", "x-forwarded-host", "x-forwarded-proto", "x-real-ip"]) {
+    const trustedHeader = process.env.TRUSTED_CLIENT_IP_HEADER?.toLowerCase();
+    const clientIP = trustedHeader ? request.headers.get(trustedHeader)?.trim() : "";
+    for (const key of ["host", "content-length", "connection", "forwarded", "x-forwarded-for", "x-forwarded-host", "x-forwarded-proto", "x-real-ip", "cf-connecting-ip", "true-client-ip", "x-client-ip", "x-cluster-client-ip", "x-aivro-client-ip", "cf-ipcountry", "x-vercel-ip-country", "cloudfront-viewer-country", "cf-region", "x-vercel-ip-country-region", "x-region"]) {
         headers.delete(key);
     }
-    const clientIP = (request as NextRequest & { ip?: string }).ip?.trim();
-    if (clientIP) {
-        headers.set("x-forwarded-for", clientIP);
-        headers.set("x-real-ip", clientIP);
-    }
+    if (clientIP && isIP(clientIP)) headers.set("x-aivro-client-ip", clientIP);
     headers.set("x-forwarded-host", request.nextUrl.host);
     headers.set("x-forwarded-proto", request.nextUrl.protocol.replace(":", ""));
     return headers;

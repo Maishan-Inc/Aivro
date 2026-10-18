@@ -12,6 +12,7 @@ import { useLocalizedPath } from "@/hooks/use-localized-path";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { useUserStore } from "@/stores/use-user-store";
+import { formatNumber } from "@/lib/datetime";
 
 type UserStatusActionsProps = {
     variant?: "default" | "canvas";
@@ -51,7 +52,7 @@ export function UserStatusActions({ variant = "default", onOpenShortcuts, accoun
                 <Tooltip title="当前算力点余额" placement="bottom">
                     <div className="flex h-8 shrink-0 items-center gap-1.5 px-1.5 text-xs font-medium tabular-nums opacity-75 transition hover:opacity-100" style={{ color: canvasTheme.node.text }}>
                         <CreditSymbol className="text-sm leading-none" />
-                        <span>{credits.toLocaleString()}</span>
+                        <span>{formatNumber(credits)}</span>
                     </div>
                 </Tooltip>
             ) : null}

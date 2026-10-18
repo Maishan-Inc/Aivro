@@ -1,6 +1,7 @@
 package service
 
 import (
+	"sort"
 	"strings"
 
 	"github.com/basketikun/aivro/model"
@@ -62,15 +63,10 @@ func SaveGenerationHistory(user model.AuthUser, input GenerationHistoryInput) (m
 		CreatedAt:  now(),
 		UpdatedAt:  now(),
 	}
-	saved, err := repository.SaveGenerationHistory(item)
-	if err != nil {
-		return saved, err
-	}
-	ids := generationHistoryFileIDs(saved.Media, saved.References)
-	if err := BindCloudFiles(user.ID, ids, model.CloudFilePurposeGeneration, "", saved.ID, saved.ExpiresAt); err != nil {
-		return saved, err
-	}
-	return saved, nil
+	for i := range item.Media { item.Media[i].ExpiresAt = item.ExpiresAt }
+	ids := generationHistoryFileIDs(item.Media, item.References)
+	sort.Strings(ids)
+	return repository.SaveGenerationHistory(item, ids)
 }
 
 func historyCloudFileType(historyType model.GenerationHistoryType) model.CloudFileType {
@@ -103,16 +99,20 @@ func pruneEmptyGenerationHistories(list model.GenerationHistoryList) (model.Gene
 	deleteIDs := []string{}
 	for _, item := range list.Items {
 		media, _, err := normalizeGenerationHistoryMedia(item.UserID, item.Media)
-		if err != nil || len(media) == 0 {
+		if err != nil {
+			return list, err
+		}
+		if len(media) == 0 {
 			deleteIDs = append(deleteIDs, item.ID)
-			_ = DeleteHistoryCloudFiles(item.UserID, item.ID)
+			if err := DeleteHistoryCloudFiles(item.UserID, item.ID); err != nil { return list, err }
 			continue
 		}
+		for i := range media { media[i].ExpiresAt = item.ExpiresAt }
 		item.Media = media
 		result = append(result, item)
 	}
 	if len(deleteIDs) > 0 {
-		_ = repository.DeleteGenerationHistories(deleteIDs)
+		if err := repository.DeleteGenerationHistories(deleteIDs); err != nil { return list, err }
 	}
 	list.Items = result
 	list.Total -= len(deleteIDs)
@@ -152,8 +152,11 @@ func normalizeGenerationHistoryMedia(userID string, media []model.GenerationHist
 			id = strings.TrimPrefix(item.StorageKey, "cloud:")
 		}
 		file, ok := fileByID[id]
-		if !ok || file.ExpiresAt == "" || file.ExpiresAt <= currentTime {
-			continue
+		if !ok { continue }
+		if file.ExpiresAt != "" && file.ExpiresAt <= currentTime {
+			retained, err := repository.HasCloudFileReference(file.ID, "", currentTime)
+			if err != nil { return nil, "", err }
+			if !retained { continue }
 		}
 		item.CloudFileID = file.ID
 		item.StorageKey = "cloud:" + file.ID
@@ -162,7 +165,7 @@ func normalizeGenerationHistoryMedia(userID string, media []model.GenerationHist
 		item.ContentType = file.ContentType
 		item.Size = file.Size
 		item.ExpiresAt = file.ExpiresAt
-		if expiresAt == "" || file.ExpiresAt < expiresAt {
+		if file.ExpiresAt > currentTime && (expiresAt == "" || file.ExpiresAt < expiresAt) {
 			expiresAt = file.ExpiresAt
 		}
 		result = append(result, item)

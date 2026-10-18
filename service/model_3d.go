@@ -70,8 +70,13 @@ type Model3DGeneratedAsset struct {
 }
 
 func CreateModel3DGeneration(ctx context.Context, user model.AuthUser, input Model3DGenerationInput, meta RequestLogMeta) (Model3DGenerationResult, error) {
+	ctx, cancel := context.WithTimeout(ctx, AIRequestTimeout)
+	defer cancel()
 	input = normalizeModel3DInput(input)
 	if err := validateModel3DInput(input); err != nil {
+		return Model3DGenerationResult{}, err
+	}
+	if err := ValidateModelRequest(input.Model, model3DPath); err != nil {
 		return Model3DGenerationResult{}, err
 	}
 	started := time.Now()
@@ -112,9 +117,7 @@ func Model3DCredits(input Model3DGenerationInput) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	if base <= 0 {
-		base = 30
-	}
+	if base == 0 { return 0, nil }
 	qualityMultiplier := 1.0
 	switch input.MeshQuality {
 	case "high":
@@ -130,7 +133,9 @@ func Model3DCredits(input Model3DGenerationInput) (int, error) {
 		materialMultiplier += 0.3
 	}
 	faceMultiplier := 1.0 + float64(maxInt(0, input.TargetFaceCount-500000))/1000000.0
-	credits := int(float64(base*input.Quantity) * qualityMultiplier * materialMultiplier * faceMultiplier)
+	value := float64(base) * float64(input.Quantity) * qualityMultiplier * materialMultiplier * faceMultiplier
+	if value >= float64(int(^uint(0)>>1)) { return 0, safeMessageError{message: "模型计费配置无效"} }
+	credits := int(value)
 	if credits < 1 {
 		credits = 1
 	}
@@ -186,8 +191,7 @@ func validateModel3DInput(input Model3DGenerationInput) error {
 func requestHunyuanModel3D(ctx context.Context, user model.AuthUser, input Model3DGenerationInput, credits int) (Model3DGenerationResult, error) {
 	route, err := SelectModelChannelRoute(input.Model)
 	if err != nil || strings.TrimSpace(route.Channel.BaseURL) == "" {
-		log.Printf("model3d channel unavailable, returning preview placeholder: model=%s err=%v", input.Model, err)
-		return mockModel3DResult(input, credits), nil
+		return Model3DGenerationResult{}, SafeAIError("没有可用的 3D 模型渠道")
 	}
 	upstreamInput := input
 	upstreamInput.Model = route.UpstreamModel
@@ -200,7 +204,7 @@ func requestHunyuanModel3D(ctx context.Context, user model.AuthUser, input Model
 	if strings.TrimSpace(route.Channel.APIKey) != "" {
 		request.Header.Set("Authorization", "Bearer "+route.Channel.APIKey)
 	}
-	response, err := http.DefaultClient.Do(request)
+	response, err := AIHTTPClient.Do(request)
 	if err != nil {
 		return Model3DGenerationResult{}, SafeAIError("腾讯混元 3D 生成请求失败")
 	}
@@ -237,7 +241,7 @@ func normalizeModel3DProviderResponse(ctx context.Context, user model.AuthUser, 
 		result.Results = []Model3DGeneratedAsset{asset}
 	}
 	if len(result.Results) == 0 {
-		result = mockModel3DResult(input, 0)
+		return Model3DGenerationResult{}, SafeAIError("上游未返回可下载的 3D 模型，请稍后重试")
 	}
 	return result, nil
 }
@@ -311,15 +315,6 @@ func StoreModel3DReaderToCloud(ctx context.Context, user model.AuthUser, filenam
 		return StoredFileResult{}, err
 	}
 	return storedFileResult(result.File, 0, 0), nil
-}
-
-func mockModel3DResult(input Model3DGenerationInput, credits int) Model3DGenerationResult {
-	faces := input.TargetFaceCount
-	if faces <= 0 {
-		faces = 500000
-	}
-	vertices := maxInt(1, int(float64(faces)*0.56))
-	return Model3DGenerationResult{ID: newID("model3d"), Status: "completed", ProviderTaskID: "preview-placeholder", Results: []Model3DGeneratedAsset{{ID: "preview-placeholder", Vertices: vertices, Faces: faces, MimeType: "model/gltf-binary"}}}
 }
 
 func model3DConfig(input Model3DGenerationInput, result Model3DGenerationResult) map[string]string {

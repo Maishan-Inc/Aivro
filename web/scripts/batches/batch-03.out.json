@@ -1,0 +1,722 @@
+{
+  "个画布，里面的节点和连线也会一起移除。": {
+    "en": "canvases. Their nodes and connections will also be removed.",
+    "ja": "件のキャンバス。中のノードと接続も一緒に削除されます。",
+    "ko": "개의 캔버스. 안에 있는 노드와 연결도 함께 제거됩니다.",
+    "fr": "canevas. Leurs nœuds et connexions seront également supprimés."
+  },
+  "个人": {
+    "en": "Personal",
+    "ja": "個人",
+    "ko": "개인",
+    "fr": "Personnel"
+  },
+  "个人中心": {
+    "en": "Profile",
+    "ja": "プロフィール",
+    "ko": "프로필",
+    "fr": "Profil"
+  },
+  "个人资料已保存": {
+    "en": "Profile saved",
+    "ja": "プロフィールを保存しました",
+    "ko": "프로필을 저장했습니다",
+    "fr": "Profil enregistré"
+  },
+  "各工作台的模型选择器会展示当前站点开放的模型。图片、视频、文本和 3D 的可用模型分别配置，实际能力、参数和消耗以所选模型及页面提示为准。": {
+    "en": "Each studio lists its enabled models. Features, parameters and costs depend on the selected model and the information shown in the studio.",
+    "ja": "各スタジオのモデル選択には、現在このサイトで公開されているモデルが表示されます。画像・動画・テキスト・3D の利用可能なモデルはそれぞれ個別に設定されており、実際の機能・パラメータ・消費量は選択したモデルとページ上の案内に準じます。",
+    "ko": "각 스튜디오의 모델 선택기에는 현재 사이트에서 사용 가능한 모델이 표시됩니다. 이미지, 비디오, 텍스트, 3D의 사용 가능한 모델은 각각 따로 설정되며, 실제 기능과 파라미터, 소모량은 선택한 모델과 페이지 안내를 기준으로 합니다.",
+    "fr": "Le sélecteur de modèles de chaque studio affiche les modèles disponibles sur le site. Les modèles disponibles pour l'image, la vidéo, le texte et la 3D sont configurés séparément ; les capacités, paramètres et coûts réels dépendent du modèle choisi et des indications affichées dans la page."
+  },
+  "各有所长，": {
+    "en": "Each with a purpose.",
+    "ja": "それぞれの得意分野。",
+    "ko": "각기 다른 강점.",
+    "fr": "Chacun ses atouts."
+  },
+  "给素材起一个容易检索的名字": {
+    "en": "Give the asset a searchable name",
+    "ja": "素材に検索しやすい名前を付けてください",
+    "ko": "검색하기 쉬운 이름을 입력하세요",
+    "fr": "Donnez à l'asset un nom facile à retrouver"
+  },
+  "更多参数": {
+    "en": "More parameters",
+    "ja": "その他のパラメータ",
+    "ko": "추가 파라미터",
+    "fr": "Plus de paramètres"
+  },
+  "更新分享": {
+    "en": "Update share",
+    "ja": "共有を更新",
+    "ko": "공유 업데이트",
+    "fr": "Mettre à jour le partage"
+  },
+  "更新节点": {
+    "en": "Update node",
+    "ja": "ノードを更新",
+    "ko": "노드 업데이트",
+    "fr": "Mettre à jour le nœud"
+  },
+  "更新于": {
+    "en": "Updated at",
+    "ja": "更新日時",
+    "ko": "최근 업데이트",
+    "fr": "Mis à jour le"
+  },
+  "工作空间": {
+    "en": "Workspace",
+    "ja": "ワークスペース",
+    "ko": "워크스페이스",
+    "fr": "Espace de travail"
+  },
+  "工作空间 / 我的素材": {
+    "en": "Workspace / My Assets",
+    "ja": "ワークスペース / マイ素材",
+    "ko": "워크스페이스 / 내 에셋",
+    "fr": "Espace de travail / Mes assets"
+  },
+  "工作空间导航": {
+    "en": "Workspace navigation",
+    "ja": "ワークスペースのナビゲーション",
+    "ko": "워크스페이스 탐색",
+    "fr": "Navigation de l'espace de travail"
+  },
+  "工作流": {
+    "en": "Workflow",
+    "ja": "ワークフロー",
+    "ko": "워크플로",
+    "fr": "Workflow"
+  },
+  "工作流不存在或无权限访问": {
+    "en": "Workflow not found or access denied",
+    "ja": "ワークフローが存在しないか、アクセス権限がありません",
+    "ko": "워크플로가 없거나 접근 권한이 없습니다",
+    "fr": "Workflow introuvable ou accès refusé"
+  },
+  "工作流创建次数": {
+    "en": "Workflow creations",
+    "ja": "ワークフロー作成回数",
+    "ko": "워크플로 생성 횟수",
+    "fr": "Créations de workflows"
+  },
+  "工作流创建次数不足": {
+    "en": "Not enough workflow creation quota",
+    "ja": "ワークフロー作成回数が不足しています",
+    "ko": "워크플로 생성 횟수가 부족합니다",
+    "fr": "Quota de création de workflows insuffisant"
+  },
+  "工作流分享 - Aivro": {
+    "en": "Workflow share - Aivro",
+    "ja": "ワークフロー共有 - Aivro",
+    "ko": "워크플로 공유 - Aivro",
+    "fr": "Partage de workflow - Aivro"
+  },
+  "工作流和独立工作台有什么区别？": {
+    "en": "How do workflows and studios differ?",
+    "ja": "ワークフローと独立したスタジオはどう違いますか？",
+    "ko": "워크플로와 독립 스튜디오는 어떻게 다른가요?",
+    "fr": "Quelle différence entre les workflows et les studios indépendants ?"
+  },
+  "工作流名称不匹配": {
+    "en": "Workflow name does not match",
+    "ja": "ワークフロー名が一致しません",
+    "ko": "워크플로 이름이 일치하지 않습니다",
+    "fr": "Le nom du workflow ne correspond pas"
+  },
+  "工作流名称仅限小写字母与数字": {
+    "en": "Workflow names can only use lowercase letters and numbers",
+    "ja": "ワークフロー名は英小文字と数字のみ使用できます",
+    "ko": "워크플로 이름은 영문 소문자와 숫자만 사용할 수 있습니다",
+    "fr": "Les noms de workflow ne peuvent contenir que des minuscules et des chiffres"
+  },
+  "工作流名称仅限小写字母与数字。当前系统暂不支持随意修改公开 URL 名称。": {
+    "en": "Workflow names can only use lowercase letters and numbers. Public URL names cannot be freely changed yet.",
+    "ja": "ワークフロー名は英小文字と数字のみ使用できます。現在、公開 URL の名前は自由に変更できません。",
+    "ko": "워크플로 이름은 영문 소문자와 숫자만 사용할 수 있습니다. 현재 공개 URL 이름은 자유롭게 변경할 수 없습니다.",
+    "fr": "Les noms de workflow ne peuvent contenir que des minuscules et des chiffres. Les noms d'URL publique ne peuvent pas encore être modifiés librement."
+  },
+  "工作流统计": {
+    "en": "Workflow stats",
+    "ja": "ワークフロー統計",
+    "ko": "워크플로 통계",
+    "fr": "Statistiques des workflows"
+  },
+  "工作流信息": {
+    "en": "Workflow info",
+    "ja": "ワークフロー情報",
+    "ko": "워크플로 정보",
+    "fr": "Infos du workflow"
+  },
+  "公开名称": {
+    "en": "Public name",
+    "ja": "公開名",
+    "ko": "공개 이름",
+    "fr": "Nom public"
+  },
+  "公司": {
+    "en": "Company",
+    "ja": "会社",
+    "ko": "회사",
+    "fr": "Entreprise"
+  },
+  "功能性 Cookie": {
+    "en": "Functional cookies",
+    "ja": "機能性 Cookie",
+    "ko": "기능 쿠키",
+    "fr": "Cookies fonctionnels"
+  },
+  "购买 Aivro 套餐，获取算力点和云端工作流创建次数，支持图片、视频、画布和 AI 创作。": {
+    "en": "Buy an Aivro plan to get credits and cloud workflow creation quota for image, video, canvas, and AI creation.",
+    "ja": "Aivro のプランを購入するとクレジットとクラウドワークフローの作成回数を取得でき、画像・動画・キャンバス・AI 創作に活用できます。",
+    "ko": "Aivro 플랜을 구매하면 크레딧과 클라우드 워크플로 생성 횟수를 받아 이미지, 비디오, 캔버스, AI 창작에 활용할 수 있습니다.",
+    "fr": "Achetez une offre Aivro pour obtenir des crédits et du quota de création de workflows cloud, pour l'image, la vidéo, le canevas et la création IA."
+  },
+  "购买套餐": {
+    "en": "Buy plan",
+    "ja": "プランを購入",
+    "ko": "플랜 구매",
+    "fr": "Acheter une offre"
+  },
+  "购买套餐需要先登录，登录后将跳转回套餐页。": {
+    "en": "Please sign in to purchase this plan. You'll return to the plans page after signing in.",
+    "ja": "プランを購入するにはログインが必要です。ログイン後、プランページに戻ります。",
+    "ko": "플랜을 구매하려면 먼저 로그인해야 합니다. 로그인하면 플랜 페이지로 이동합니다.",
+    "fr": "Connectez-vous pour acheter une offre. Vous serez redirigé vers la page des offres après la connexion."
+  },
+  "关闭": {
+    "en": "Close",
+    "ja": "閉じる",
+    "ko": "닫기",
+    "fr": "Fermer"
+  },
+  "关闭 PBR": {
+    "en": "Disable PBR",
+    "ja": "PBR をオフ",
+    "ko": "PBR 끄기",
+    "fr": "Désactiver PBR"
+  },
+  "关闭套餐页": {
+    "en": "Close plans page",
+    "ja": "プランページを閉じる",
+    "ko": "플랜 페이지 닫기",
+    "fr": "Fermer la page des offres"
+  },
+  "关闭纹理": {
+    "en": "Disable textures",
+    "ja": "テクスチャをオフ",
+    "ko": "텍스처 끄기",
+    "fr": "Désactiver les textures"
+  },
+  "关闭小地图": {
+    "en": "Close minimap",
+    "ja": "ミニマップを閉じる",
+    "ko": "미니맵 닫기",
+    "fr": "Fermer la mini-carte"
+  },
+  "关于": {
+    "en": "About",
+    "ja": "情報",
+    "ko": "정보",
+    "fr": "À propos"
+  },
+  "管理 Aivro 中保存的文本、图片和视频素材，支持导入、导出和云端文件引用。": {
+    "en": "Manage saved text, image, and video assets in Aivro, with import, export, and cloud file references.",
+    "ja": "Aivro に保存したテキスト・画像・動画の素材を管理できます。インポート、エクスポート、クラウドファイルの参照に対応しています。",
+    "ko": "Aivro에 저장된 텍스트, 이미지, 비디오 에셋을 관리하고 가져오기, 내보내기, 클라우드 파일 참조를 지원합니다.",
+    "fr": "Gérez les assets texte, image et vidéo enregistrés dans Aivro, avec import, export et références de fichiers cloud."
+  },
+  "管理工作流、余额、身份认证和个人资料，创作工具仍保持原页面体验。": {
+    "en": "Manage workflows, balance, identity verification, and profile. Creation tools keep their original page experience.",
+    "ja": "ワークフロー、残高、本人確認、プロフィールを管理できます。制作ツールはこれまでどおりの画面で利用できます。",
+    "ko": "워크플로, 잔액, 본인 인증, 프로필을 관리할 수 있으며 창작 도구는 기존 페이지 환경을 그대로 유지합니다.",
+    "fr": "Gérez vos workflows, votre solde, votre vérification d'identité et votre profil. Les outils de création conservent leur interface d'origine."
+  },
+  "管理后台": {
+    "en": "Admin",
+    "ja": "管理画面",
+    "ko": "관리자",
+    "fr": "Administration"
+  },
+  "管理你的工作流分享，继续传递创作灵感。": {
+    "en": "Manage your shared workflows and keep inspiration flowing.",
+    "ja": "共有中のワークフローを管理して、創作のひらめきを伝え続けましょう。",
+    "ko": "공유 중인 워크플로를 관리하고 창작 영감을 계속 나눠 보세요.",
+    "fr": "Gérez vos workflows partagés et continuez à transmettre l'inspiration."
+  },
+  "管理同意偏好设置": {
+    "en": "Manage consent preferences",
+    "ja": "同意の設定を管理",
+    "ko": "동의 설정 관리",
+    "fr": "Gérer les préférences de consentement"
+  },
+  "管理头像、账户资料、KYC 身份验证，后续更多功能会继续放在这里。": {
+    "en": "Manage avatar, account profile, and KYC verification. More account features will be added here.",
+    "ja": "アバター、アカウント情報、KYC 本人確認を管理できます。今後さらに多くの機能をここに追加していきます。",
+    "ko": "아바타, 계정 정보, KYC 본인 인증을 관리할 수 있으며 앞으로 더 많은 기능이 이곳에 추가됩니다.",
+    "fr": "Gérez votre avatar, les informations de votre compte et la vérification KYC. D'autres fonctionnalités seront ajoutées ici."
+  },
+  "管理员尚未配置可用3D模型": {
+    "en": "No available 3D model is configured",
+    "ja": "管理者が利用可能な 3D モデルを設定していません",
+    "ko": "관리자가 사용 가능한 3D 모델을 설정하지 않았습니다",
+    "fr": "Aucun modèle 3D disponible n'est configuré par l'administrateur"
+  },
+  "管理员尚未配置可用模型": {
+    "en": "No available model is configured",
+    "ja": "管理者が利用可能なモデルを設定していません",
+    "ko": "관리자가 사용 가능한 모델을 설정하지 않았습니다",
+    "fr": "Aucun modèle disponible n'est configuré par l'administrateur"
+  },
+  "管理员尚未配置可用模型，或配置仍在加载": {
+    "en": "No available model is configured, or the configuration is still loading",
+    "ja": "管理者が利用可能なモデルを設定していないか、設定を読み込み中です",
+    "ko": "관리자가 사용 가능한 모델을 설정하지 않았거나 설정을 불러오는 중입니다",
+    "fr": "Aucun modèle disponible n'est configuré, ou la configuration est encore en cours de chargement"
+  },
+  "管理员未开启": {
+    "en": "Disabled by administrator",
+    "ja": "管理者が有効化していません",
+    "ko": "관리자가 활성화하지 않았습니다",
+    "fr": "Désactivé par l'administrateur"
+  },
+  "光的建筑": {
+    "en": "Architecture of light",
+    "ja": "光の建築",
+    "ko": "빛의 건축",
+    "fr": "Architecture de lumière"
+  },
+  "广角": {
+    "en": "wide-angle",
+    "ja": "広角",
+    "ko": "광각",
+    "fr": "grand-angle"
+  },
+  "广角镜头": {
+    "en": "Wide-angle lens",
+    "ja": "広角レンズ",
+    "ko": "광각 렌즈",
+    "fr": "Objectif grand-angle"
+  },
+  "规划": {
+    "en": "Plan",
+    "ja": "計画",
+    "ko": "계획",
+    "fr": "Plan"
+  },
+  "贵组织需要更多功能？为团队探索更合适的创作方案。": {
+    "en": "Need more for your organization? Explore a creative setup that better fits your team.",
+    "ja": "組織でもっと多くの機能が必要ですか？チームに合った制作プランを探しましょう。",
+    "ko": "조직에 더 많은 기능이 필요하신가요? 팀에 더 잘 맞는 창작 방안을 살펴보세요.",
+    "fr": "Besoin de plus de fonctionnalités pour votre organisation ? Découvrez une solution de création mieux adaptée à votre équipe."
+  },
+  "滚轮": {
+    "en": "Mouse wheel",
+    "ja": "マウスホイール",
+    "ko": "마우스 휠",
+    "fr": "Molette de la souris"
+  },
+  "国家/地区：": {
+    "en": "Country/region:",
+    "ja": "国/地域：",
+    "ko": "국가/지역:",
+    "fr": "Pays/région :"
+  },
+  "还没有分享副本": {
+    "en": "No shared copies yet",
+    "ja": "共有されたコピーはまだありません",
+    "ko": "아직 공유된 사본이 없습니다",
+    "fr": "Aucune copie partagée pour le moment"
+  },
+  "还没有上传作品": {
+    "en": "No uploaded works yet",
+    "ja": "アップロードされた作品はまだありません",
+    "ko": "아직 업로드한 작품이 없습니다",
+    "fr": "Aucune œuvre importée pour le moment"
+  },
+  "还没有云端工作流": {
+    "en": "No cloud workflows",
+    "ja": "クラウドワークフローはまだありません",
+    "ko": "아직 클라우드 워크플로가 없습니다",
+    "fr": "Aucun workflow cloud pour le moment"
+  },
+  "还想了解。": {
+    "en": "you might wonder.",
+    "ja": "さらに知りたいこと。",
+    "ko": "더 알고 싶은 내용.",
+    "fr": "que vous pourriez vouloir connaître."
+  },
+  "海报": {
+    "en": "Poster",
+    "ja": "ポスター",
+    "ko": "포스터",
+    "fr": "Affiche"
+  },
+  "海浪与海岸相遇，蓝绿色海水，柔和光线，长曝光质感，极简自然摄影，宁静而有力量。": {
+    "en": "Waves meeting the coast, turquoise water, soft light, long-exposure texture, minimalist nature photography, calm and powerful.",
+    "ja": "海岸に寄せる波、青緑色の海水、柔らかな光、長露出の質感、ミニマルな自然写真、静けさと力強さ。",
+    "ko": "해안과 만나는 파도, 청록색 바닷물, 부드러운 빛, 장노출 질감, 미니멀한 자연 사진, 고요하면서도 힘 있는 분위기.",
+    "fr": "Des vagues qui rejoignent la côte, une eau bleu-vert, une lumière douce, un rendu de pose longue, photographie nature minimaliste, calme et puissante."
+  },
+  "好作品，从好灵感开始。": {
+    "en": "Great work starts with inspiration.",
+    "ja": "良い作品は、良いひらめきから生まれます。",
+    "ko": "좋은 작품은 좋은 영감에서 시작됩니다.",
+    "fr": "Une belle œuvre commence par une bonne inspiration."
+  },
+  "耗时：": {
+    "en": "Duration:",
+    "ja": "所要時間：",
+    "ko": "소요 시간:",
+    "fr": "Durée :"
+  },
+  "和": {
+    "en": "and",
+    "ja": "および",
+    "ko": "및",
+    "fr": "et"
+  },
+  "横屏": {
+    "en": "Landscape",
+    "ja": "横向き",
+    "ko": "가로형",
+    "fr": "Paysage"
+  },
+  "后续接入明细": {
+    "en": "Details coming later",
+    "ja": "詳細は今後追加予定",
+    "ko": "세부 내역은 추후 제공",
+    "fr": "Détails à venir"
+  },
+  "画布视频": {
+    "en": "Canvas video",
+    "ja": "キャンバス動画",
+    "ko": "캔버스 비디오",
+    "fr": "Vidéo du canevas"
+  },
+  "画布图片": {
+    "en": "Canvas image",
+    "ja": "キャンバス画像",
+    "ko": "캔버스 이미지",
+    "fr": "Image du canevas"
+  },
+  "画布外观": {
+    "en": "Canvas appearance",
+    "ja": "キャンバスの外観",
+    "ko": "캔버스 모양",
+    "fr": "Apparence du canevas"
+  },
+  "画布文本": {
+    "en": "Canvas text",
+    "ja": "キャンバステキスト",
+    "ko": "캔버스 텍스트",
+    "fr": "Texte du canevas"
+  },
+  "画布助手": {
+    "en": "Canvas assistant",
+    "ja": "キャンバスアシスタント",
+    "ko": "캔버스 어시스턴트",
+    "fr": "Assistant du canevas"
+  },
+  "画面，始于你的想象。": {
+    "en": "Every image starts with imagination.",
+    "ja": "画面は、あなたの想像から始まる。",
+    "ko": "화면은 당신의 상상에서 시작됩니다.",
+    "fr": "L'image commence par votre imagination."
+  },
+  "换一个关键词或等待更多公开作品。": {
+    "en": "Try another keyword or wait for more public works.",
+    "ja": "別のキーワードを試すか、公開作品が増えるのをお待ちください。",
+    "ko": "다른 키워드를 입력하거나 공개 작품이 더 올라올 때까지 기다려 주세요.",
+    "fr": "Essayez un autre mot-clé ou attendez davantage d'œuvres publiques."
+  },
+  "换一个关键词或筛选条件继续查找。": {
+    "en": "Try another keyword or filter.",
+    "ja": "別のキーワードや絞り込み条件で検索してください。",
+    "ko": "다른 키워드나 필터 조건으로 다시 찾아보세요.",
+    "fr": "Essayez un autre mot-clé ou un autre filtre."
+  },
+  "回答": {
+    "en": "Answer",
+    "ja": "回答",
+    "ko": "답변",
+    "fr": "Réponse"
+  },
+  "回到顶部 ↑": {
+    "en": "Back to top ↑",
+    "ja": "トップへ戻る ↑",
+    "ko": "맨 위로 ↑",
+    "fr": "Retour en haut ↑"
+  },
+  "会话": {
+    "en": "Sessions",
+    "ja": "セッション",
+    "ko": "세션",
+    "fr": "Sessions"
+  },
+  "会话编号：": {
+    "en": "Session ID:",
+    "ja": "セッション ID：",
+    "ko": "세션 ID:",
+    "fr": "ID de session :"
+  },
+  "获取素材库失败": {
+    "en": "Failed to load the asset library",
+    "ja": "素材ライブラリの取得に失敗しました",
+    "ko": "에셋 라이브러리를 불러오지 못했습니다",
+    "fr": "Impossible de charger la bibliothèque d'assets"
+  },
+  "获取提示词失败": {
+    "en": "Failed to load prompts",
+    "ja": "プロンプトの取得に失敗しました",
+    "ko": "프롬프트를 불러오지 못했습니다",
+    "fr": "Impossible de charger les prompts"
+  },
+  "基于参考图重新生成同一主体的新视角，保持主体、颜色、材质和画面风格一致，不要只做透视变形。{0}。": {
+    "en": "Regenerate a new angle of the same subject from the reference image, keeping the subject, colors, materials, and overall style consistent. Do not just apply a perspective warp. {0}.",
+    "ja": "参照画像をもとに、同じ被写体の新しいアングルを生成します。被写体、色、質感、画面のスタイルを保ち、単なるパース変形にしないでください。{0}。",
+    "ko": "참조 이미지를 바탕으로 같은 피사체의 새로운 시점을 생성합니다. 피사체, 색상, 재질, 화면 스타일을 일관되게 유지하고 단순한 원근 변형만 적용하지 마세요. {0}.",
+    "fr": "Régénérez un nouvel angle du même sujet à partir de l'image de référence, en conservant le sujet, les couleurs, les matières et le style visuel. N'appliquez pas une simple déformation de perspective. {0}."
+  },
+  "即代表你同意我们的": {
+    "en": "means you agree to our",
+    "ja": "は、以下の内容に同意したものとみなされます。",
+    "ko": "는 다음 내용에 동의하는 것으로 간주됩니다.",
+    "fr": "signifie que vous acceptez notre"
+  },
+  "极简白色建筑，几何线条与负空间，柔和的自然光，低角度仰拍，建筑摄影，干净而安静的构图。": {
+    "en": "Minimalist white architecture, geometric lines and negative space, soft natural light, low-angle upward shot, architectural photography, clean and quiet composition.",
+    "ja": "ミニマルな白い建築、幾何学的なラインとネガティブスペース、柔らかな自然光、ローアングルからの見上げ、建築写真、クリーンで静かな構図。",
+    "ko": "미니멀한 화이트 건축물, 기하학적 선과 여백, 부드러운 자연광, 로우 앵글 올려보기, 건축 사진, 깔끔하고 고요한 구도.",
+    "fr": "Architecture blanche minimaliste, lignes géométriques et espaces négatifs, lumière naturelle douce, contre-plongée, photographie d'architecture, composition épurée et calme."
+  },
+  "记录": {
+    "en": "History",
+    "ja": "履歴",
+    "ko": "기록",
+    "fr": "Historique"
+  },
+  "继续": {
+    "en": "Continue",
+    "ja": "続行",
+    "ko": "계속",
+    "fr": "Continuer"
+  },
+  "继续编辑、重命名、删除和新建工作流。": {
+    "en": "Continue editing, renaming, deleting, and creating workflows.",
+    "ja": "ワークフローの編集、名前の変更、削除、新規作成を続けられます。",
+    "ko": "워크플로 편집, 이름 변경, 삭제, 새로 만들기를 계속할 수 있습니다.",
+    "fr": "Continuez à modifier, renommer, supprimer et créer des workflows."
+  },
+  "继续向下滚动加载更多": {
+    "en": "Scroll down to load more",
+    "ja": "下にスクロールしてさらに読み込む",
+    "ko": "아래로 스크롤하여 더 불러오기",
+    "fr": "Faites défiler vers le bas pour en charger plus"
+  },
+  "加入参考图": {
+    "en": "Use as reference",
+    "ja": "参照画像として使用",
+    "ko": "참조 이미지로 사용",
+    "fr": "Utiliser comme référence"
+  },
+  "加入失败": {
+    "en": "Failed to add",
+    "ja": "追加に失敗しました",
+    "ko": "추가하지 못했습니다",
+    "fr": "Échec de l'ajout"
+  },
+  "加入我的素材": {
+    "en": "Add to My Assets",
+    "ja": "マイ素材に追加",
+    "ko": "내 에셋에 추가",
+    "fr": "Ajouter à Mes assets"
+  },
+  "加载中...": {
+    "en": "Loading...",
+    "ja": "読み込み中...",
+    "ko": "불러오는 중...",
+    "fr": "Chargement..."
+  },
+  "减小字号": {
+    "en": "Decrease font size",
+    "ja": "文字サイズを小さく",
+    "ko": "글자 크기 줄이기",
+    "fr": "Réduire la taille du texte"
+  },
+  "剪切板里没有可读取的图片": {
+    "en": "No readable image in the clipboard",
+    "ja": "クリップボードに読み取れる画像がありません",
+    "ko": "클립보드에 읽을 수 있는 이미지가 없습니다",
+    "fr": "Aucune image lisible dans le presse-papiers"
+  },
+  "剪切板图片": {
+    "en": "Clipboard image",
+    "ja": "クリップボードの画像",
+    "ko": "클립보드 이미지",
+    "fr": "Image du presse-papiers"
+  },
+  "剪切板文本": {
+    "en": "Clipboard text",
+    "ja": "クリップボードのテキスト",
+    "ko": "클립보드 텍스트",
+    "fr": "Texte du presse-papiers"
+  },
+  "将删除": {
+    "en": "Will delete",
+    "ja": "削除対象：",
+    "ko": "삭제 예정:",
+    "fr": "Suppression de"
+  },
+  "角色设定": {
+    "en": "Character design",
+    "ja": "キャラクター設定",
+    "ko": "캐릭터 설정",
+    "fr": "Design de personnage"
+  },
+  "脚本、广告词、品牌文案": {
+    "en": "Scripts, ad copy, brand copy",
+    "ja": "台本、広告コピー、ブランドコピー",
+    "ko": "스크립트, 광고 문구, 브랜드 카피",
+    "fr": "Scripts, slogans publicitaires, textes de marque"
+  },
+  "接口不存在，请确认后端服务已启动": {
+    "en": "API endpoint not found. Make sure the backend service is running.",
+    "ja": "API が見つかりません。バックエンドサービスが起動しているか確認してください。",
+    "ko": "API를 찾을 수 없습니다. 백엔드 서비스가 실행 중인지 확인해 주세요.",
+    "fr": "Point d'accès API introuvable. Vérifiez que le service backend est démarré."
+  },
+  "接口返回异常，请稍后重试": {
+    "en": "Unexpected API response. Try again later.",
+    "ja": "API の応答が異常です。しばらくしてからもう一度お試しください。",
+    "ko": "API 응답이 비정상입니다. 잠시 후 다시 시도해 주세요.",
+    "fr": "Réponse API inattendue. Réessayez plus tard."
+  },
+  "接口连接失败，请确认后端服务已启动": {
+    "en": "API connection failed. Make sure the backend service is running.",
+    "ja": "API への接続に失敗しました。バックエンドサービスが起動しているか確認してください。",
+    "ko": "API 연결에 실패했습니다. 백엔드 서비스가 실행 중인지 확인해 주세요.",
+    "fr": "Échec de la connexion à l'API. Vérifiez que le service backend est démarré."
+  },
+  "接口没有返回视频任务": {
+    "en": "The API did not return a video task",
+    "ja": "API が動画タスクを返しませんでした",
+    "ko": "API가 비디오 작업을 반환하지 않았습니다",
+    "fr": "L'API n'a pas renvoyé de tâche vidéo"
+  },
+  "接口没有返回图片": {
+    "en": "The API did not return an image",
+    "ja": "API が画像を返しませんでした",
+    "ko": "API가 이미지를 반환하지 않았습니다",
+    "fr": "L'API n'a pas renvoyé d'image"
+  },
+  "节点": {
+    "en": "Node",
+    "ja": "ノード",
+    "ko": "노드",
+    "fr": "Nœud"
+  },
+  "节点内容不可编辑，生成和助手操作已禁用": {
+    "en": "Node content is read-only. Generation and assistant actions are disabled.",
+    "ja": "ノードの内容は編集できません。生成とアシスタントの操作は無効になっています。",
+    "ko": "노드 내용은 편집할 수 없으며 생성과 어시스턴트 작업이 비활성화되었습니다.",
+    "fr": "Le contenu du nœud n'est pas modifiable. La génération et les actions de l'assistant sont désactivées."
+  },
+  "节点信息": {
+    "en": "Node info",
+    "ja": "ノード情報",
+    "ko": "노드 정보",
+    "fr": "Infos du nœud"
+  },
+  "进入分享预览": {
+    "en": "Enter share preview",
+    "ja": "共有プレビューを開く",
+    "ko": "공유 미리보기 열기",
+    "fr": "Ouvrir l'aperçu du partage"
+  },
+  "进入工作空间": {
+    "en": "Open workspace",
+    "ja": "ワークスペースを開く",
+    "ko": "워크스페이스 열기",
+    "fr": "Ouvrir l'espace de travail"
+  },
+  "精确调整缩放": {
+    "en": "Adjust zoom precisely",
+    "ja": "ズームを細かく調整",
+    "ko": "확대/축소 정밀 조정",
+    "fr": "Ajuster le zoom avec précision"
+  },
+  "镜头、尺寸与时长": {
+    "en": "Camera, size and duration",
+    "ja": "カメラ、サイズ、長さ",
+    "ko": "카메라, 크기, 길이",
+    "fr": "Caméra, taille et durée"
+  },
+  "镜头缓缓掠过蓝绿色海面，海浪轻轻拍打海岸，日落的金色光线，流畅的电影镜头。": {
+    "en": "The camera glides slowly over the turquoise sea, waves gently lapping the shore, golden sunset light, smooth cinematic camera movement.",
+    "ja": "カメラが青緑色の海面をゆっくりと滑るように移動し、波が静かに岸を打つ、夕日の金色の光、滑らかなシネマティックなカメラワーク。",
+    "ko": "카메라가 청록색 바다 위를 천천히 지나가고, 파도가 잔잔하게 해안을 두드리며, 노을의 황금빛, 부드러운 시네마틱 카메라 무브.",
+    "fr": "La caméra glisse lentement au-dessus de la mer bleu-vert, les vagues viennent doucement frapper la côte, lumière dorée du coucher de soleil, mouvement de caméra cinématographique fluide."
+  },
+  "镜头距离": {
+    "en": "Camera distance",
+    "ja": "カメラ距離",
+    "ko": "카메라 거리",
+    "fr": "Distance de la caméra"
+  },
+  "就从这三步开始。": {
+    "en": "start with these three steps.",
+    "ja": "まずはこの 3 ステップから。",
+    "ko": "이 세 단계부터 시작하면 됩니다.",
+    "fr": "commencez par ces trois étapes."
+  },
+  "就去创造。": {
+    "en": "Then create it.",
+    "ja": "あとは創造するだけ。",
+    "ko": "이제 창작할 차례입니다.",
+    "fr": "il ne reste qu'à créer."
+  },
+  "开启 PBR": {
+    "en": "Enable PBR",
+    "ja": "PBR をオン",
+    "ko": "PBR 켜기",
+    "fr": "Activer PBR"
+  },
+  "开启我的创作": {
+    "en": "Start my creation",
+    "ja": "創作を始める",
+    "ko": "내 창작 시작하기",
+    "fr": "Démarrer ma création"
+  },
+  "开启自动更新": {
+    "en": "Enable auto update",
+    "ja": "自動更新を有効にする",
+    "ko": "자동 업데이트 사용",
+    "fr": "Activer la mise à jour automatique"
+  },
+  "开启自动更新后，原作者更新分享时，你的工作流内容会跟随更新并可能被覆盖。": {
+    "en": "After auto update is enabled, your workflow content will follow the original author's share updates and may be overwritten.",
+    "ja": "自動更新を有効にすると、原作者が共有を更新したときに、あなたのワークフローの内容も更新され、上書きされる場合があります。",
+    "ko": "자동 업데이트를 켜면 원작자가 공유를 업데이트할 때 내 워크플로 내용도 함께 업데이트되어 덮어써질 수 있습니다.",
+    "fr": "Une fois la mise à jour automatique activée, lorsque l'auteur original met à jour son partage, le contenu de votre workflow suit la mise à jour et peut être écrasé."
+  },
+  "开始": {
+    "en": "Start",
+    "ja": "開始",
+    "ko": "시작",
+    "fr": "Lancer"
+  },
+  "开始 KYC 认证": {
+    "en": "Start KYC verification",
+    "ja": "KYC 認証を開始",
+    "ko": "KYC 인증 시작",
+    "fr": "Démarrer la vérification KYC"
+  },
+  "开始生成": {
+    "en": "Generate",
+    "ja": "生成を開始",
+    "ko": "생성 시작",
+    "fr": "Générer"
+  }
+}

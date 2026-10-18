@@ -106,30 +106,34 @@ export default function AssetsPage() {
     };
 
     const saveAsset = async () => {
-        const values = await form.validateFields();
-        const base = {
-            title: values.title.trim(),
-            coverUrl: values.coverUrl?.trim() || (values.kind === "image" && imageDraft ? imageDraft.dataUrl : ""),
-            tags: values.tags || [],
-            source: values.source?.trim(),
-            note: values.note?.trim(),
-            metadata: editingAsset?.metadata || { source: "manual" },
-        };
+        try {
+            const values = await form.validateFields();
+            const base = {
+                title: values.title.trim(),
+                coverUrl: values.coverUrl?.trim() || (values.kind === "image" && imageDraft ? imageDraft.dataUrl : ""),
+                tags: values.tags || [],
+                source: values.source?.trim(),
+                note: values.note?.trim(),
+                metadata: editingAsset?.metadata || { source: "manual" },
+            };
 
-        if (values.kind === "text") {
-            const asset = { ...base, kind: "text" as const, data: { content: (values.content || "").trim() } };
-            editingAsset ? updateAsset(editingAsset.id, asset) : addAsset(asset);
-        } else {
-            if (!imageDraft) {
-                message.error("请选择图片文件");
-                return;
+            if (values.kind === "text") {
+                const asset = { ...base, kind: "text" as const, data: { content: (values.content || "").trim() } };
+                await (editingAsset ? updateAsset(editingAsset.id, asset) : addAsset(asset));
+            } else {
+                if (!imageDraft) {
+                    message.error("请选择图片文件");
+                    return;
+                }
+                const asset = { ...base, kind: "image" as const, data: imageDraft };
+                await (editingAsset ? updateAsset(editingAsset.id, asset) : addAsset(asset));
             }
-            const asset = { ...base, kind: "image" as const, data: imageDraft };
-            editingAsset ? updateAsset(editingAsset.id, asset) : addAsset(asset);
-        }
 
-        message.success(editingAsset ? "素材已更新" : "素材已保存");
-        setIsAssetOpen(false);
+            message.success(editingAsset ? "素材已更新" : "素材已保存");
+            setIsAssetOpen(false);
+        } catch (error) {
+            message.error(error instanceof Error ? error.message : "素材操作失败，请重试");
+        }
     };
 
     const readCoverFile = async (file?: File) => {
@@ -169,13 +173,13 @@ export default function AssetsPage() {
         if (!file) return;
         try {
             const importedAssets = await readAssetPackage(file);
-            importedAssets.forEach((asset) => {
+            for (const asset of importedAssets) {
                 const payload = { ...asset } as Record<string, unknown>;
                 delete payload.id;
                 delete payload.createdAt;
                 delete payload.updatedAt;
-                addAsset(payload as Parameters<typeof addAsset>[0]);
-            });
+                await addAsset(payload as Parameters<typeof addAsset>[0]);
+            }
             message.success(`已导入 ${importedAssets.length} 个素材`);
         } catch {
             message.error("导入失败，请选择有效的素材压缩包");
@@ -184,11 +188,15 @@ export default function AssetsPage() {
         }
     };
 
-    const confirmDelete = () => {
-        if (!deletingAsset) return;
-        removeAsset(deletingAsset.id);
-        message.success("素材已删除");
-        setDeletingAsset(null);
+    const confirmDelete = async () => {
+        try {
+            if (!deletingAsset) return;
+            await removeAsset(deletingAsset.id);
+            message.success("素材已删除");
+            setDeletingAsset(null);
+        } catch (error) {
+            message.error(error instanceof Error ? error.message : "素材操作失败，请重试");
+        }
     };
 
     return (

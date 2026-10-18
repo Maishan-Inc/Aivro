@@ -8,7 +8,7 @@ import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 
 import { UserStatusActions } from "@/components/layout/user-status-actions";
-import { localeLabels, type Locale } from "@/i18n/messages";
+import { adminLocaleOptions, localeLabels, type Locale } from "@/i18n/messages";
 import { adminLayoutStyle } from "@/lib/app-theme";
 import { useLocaleStore } from "@/stores/use-locale-store";
 import { useUserStore } from "@/stores/use-user-store";
@@ -39,12 +39,14 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     const isReady = useUserStore((state) => state.isReady);
     const hydrateUser = useUserStore((state) => state.hydrateUser);
     const logout = useUserStore((state) => state.clearSession);
-    const locale = useLocaleStore((state) => state.locale);
+    const activeLocale = useLocaleStore((state) => state.locale);
+    // The admin console only renders Chinese and English.
+    const locale: Locale = activeLocale === "en-US" ? "en-US" : "zh-CN";
     const setLocale = useLocaleStore((state) => state.setLocale);
     const settingsTab = pathname.startsWith("/admin/settings") ? searchParams.get("tab") : "";
     const activeKey = settingsTab === "model" ? "/admin/settings?tab=model" : settingsTab === "mail" ? "/admin/settings?tab=mail" : adminMenus.find((item) => pathname.startsWith(item.key))?.key || "";
     const pageTitle = settingsTab === "model" ? "模型配置" : settingsTab === "mail" ? "邮件设置" : pathname.startsWith("/admin/settings") ? "系统设置" : pathname.startsWith("/admin/database") ? "数据库配置" : pathname.startsWith("/admin/ads") ? "谷歌广告" : pathname.startsWith("/admin/workflow-community") ? "社区工作流" : pathname.startsWith("/admin/assets") ? "素材库管理" : pathname.startsWith("/admin/prompts") ? "提示词管理" : pathname.startsWith("/admin/plans") ? "套餐管理" : pathname.startsWith("/admin/audit-logs") ? "日志审计" : pathname.startsWith("/admin/request-logs") || pathname.startsWith("/admin/credit-logs") ? "请求日志" : "用户管理";
-    const languageItems = (Object.keys(localeLabels) as Locale[]).map((item) => ({ key: item, label: localeLabels[item] }));
+    const languageItems = adminLocaleOptions.map((item) => ({ key: item, label: localeLabels[item] }));
     const menuItems = useMemo(
         () =>
             adminMenus.map((item) => ({

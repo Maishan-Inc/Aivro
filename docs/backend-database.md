@@ -24,8 +24,10 @@
 - `assets`
 - `settings`
 - `cloud_files`
+- `cloud_file_references`
 - `generation_histories`
 - `generation_tasks`
+- `video_tasks`
 - `user_preferences`
 - `workflows`
 - `workflow_shares`
@@ -435,9 +437,7 @@ MetaMask 私有配置字段：
 | `username` | string | 用户名，用于路径模板中的 `{username}` |
 | `provider` | string | 服务商：`r2`、`s3`、`local` |
 | `file_type` | string | 文件类型：`image`、`video`、`model3d`、`task` |
-| `purpose` | string | 用途：`temp`、`workflow`、`generation`、`avatar` |
-| `workflow_id` | string | 关联工作流 ID，用于删除工作流时同步删除文件 |
-| `history_id` | string | 关联生成历史 ID，用于删除历史时同步删除文件 |
+| `purpose` | string | 上传用途标记：`temp`、`workflow`、`generation`、`avatar`、`asset`；实际保留关系由引用表管理 |
 | `bucket` | string | Bucket 名称 |
 | `object_key` | string | 云端对象 Key 或服务器本地相对路径 |
 | `public_url` | string | 前端展示、预览、下载使用的受控访问地址 |
@@ -445,14 +445,44 @@ MetaMask 私有配置字段：
 | `content_type` | string | 文件 MIME 类型 |
 | `size` | number | 文件字节数 |
 | `source` | string | 来源接口，例如 `/images/generations`、`/videos/:id/content` |
-| `expires_at` | string | 到期时间。生成历史和临时文件按图片、视频、3D 模型各自配置计算；工作流文件和头像文件为空，表示长期保留 |
-| `deleted_at` | string | 对象删除成功后的标记时间，未删除为空 |
+| `expires_at` | string | 临时文件到期时间；存在有效引用时继续保留，头像为空 |
+| `deleted_at` | string | 删除占用标记；标记后禁止新增引用，存储删除失败时恢复为空 |
 | `created_at` | string | 创建时间 |
 | `updated_at` | string | 更新时间 |
 
-用户上传入口只接受安全白名单内的图片、视频或 3D 模型 MIME 类型，单文件最大 50MB。队列请求和响应使用内部 `task` 类型对象，不开放给用户直接上传。文件内容读取时会校验所属用户或访问 token，不能通过猜测文件 ID 读取其他用户文件。自动清理任务只处理 `expires_at <= now` 且 `deleted_at` 为空的记录；删除对象成功后写入 `deleted_at`，删除失败只记录后端日志，不影响其他请求。
+用户上传入口只接受安全白名单内的图片、视频或 3D 模型 MIME 类型，单文件最大 50MB。队列请求和响应使用内部 `task` 类型对象，不开放给用户直接上传。文件内容读取时校验上传者、当前用户持有的有效引用或访问 token。自动清理只处理已到期且没有有效引用的文件；手动释放引用也只删除没有其他有效引用的对象。文件行加锁后先标记删除，再移除存储对象，删除失败恢复标记并返回错误。
 
 头像通过独立的 `/api/v1/profile/avatar` 接口上传，标记为 `purpose=avatar`。前端裁剪为 512 × 512 PNG，后端限制 5MB，验证图片尺寸并重新解码、编码为 PNG 后保存；`users.avatar_url` 更新为该文件的受控访问地址。
+
+### cloud_file_references
+
+文件保留与使用权限表。同一文件可同时用于工作流、副本、分享快照、社区快照、生成历史和本地素材；删除某一用途不会删除其他用途仍在使用的文件。
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `file_id` | string | 文件 ID，联合主键 |
+| `kind` | string | `workflow`、`share`、`community`、`generation`、`asset`，联合主键 |
+| `owner_id` | string | 对应用途记录 ID，联合主键 |
+| `user_id` | string | 持有引用的用户，联合主键、索引 |
+| `expires_at` | string | 引用到期时间；空表示长期保留，生成历史引用跟随历史到期 |
+
+保存快照、复制工作流和生成历史时，在事务内验证文件权限并创建引用。撤销分享、删除社区作品或源工作流时释放相应引用，其他用户已经创建的副本继续持有自己的引用。“我的素材”的列表仍保存在浏览器 localforage，按账号隔离；这里只记录文件保留关系，不是素材列表云同步。
+
+### video_tasks
+
+视频任务归属与原渠道映射表。客户端只能用本站任务 ID 查询自己的任务和下载视频。
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | 本站随机任务 ID，主键 |
+| `user_id` | string | 创建用户，索引 |
+| `provider_id` | string | 上游视频任务 ID，不作为客户端查询凭证 |
+| `model` | string | 公开模型名 |
+| `channel_base_url` | string | 创建时渠道地址 |
+| `channel_key_hash` | string | 创建时 API Key 的 SHA-256 指纹，不保存密钥副本 |
+| `created_at` | string | 创建时间 |
+
+查询使用原渠道地址与密钥指纹匹配；原渠道关闭或密钥更换后返回渠道不可用，不切换到其他渠道。
 
 ### generation_tasks
 
@@ -476,10 +506,14 @@ AI 生成队列表。任务表只保存状态和对象引用，原始请求体�
 | `response_file_id` | string | 响应体对象 `cloud_files.id` |
 | `error` | string | 失败原因 |
 | `started_at` | string | 开始执行时间 |
+| `worker_id` | string | 领取任务的进程 ID，不返回前端 |
+| `lease_expires_at` | string | 执行租约到期时间，不返回前端 |
 | `finished_at` | string | 完成时间 |
 | `canceled_at` | string | 取消时间 |
 | `created_at` | string | 创建时间 |
 | `updated_at` | string | 更新时间 |
+
+执行请求最多 5 分钟，租约为 6 分钟；启动及每 30 秒只恢复租约到期的任务。终态更新比较原状态与 worker ID，失败/撤销的退款和流水在同一事务内提交，重复处理不会重复退款。模型速率与排队容量的调度锁仍为进程内锁。
 
 队列旧任务清理会先删除 `request_file_id` 和 `response_file_id` 指向的文件对象，再删除任务行。
 
@@ -633,7 +667,7 @@ AI 生成队列表。任务表只保存状态和对象引用，原始请求体�
 
 ### plan_orders
 
-套餐订单表。Stripe Checkout 在后端创建，支付成功以 Stripe webhook 为准。
+套餐订单表。Stripe Checkout 在后端创建，只有签名有效、payment_status 为 paid 且金额、币种、用户、套餐与 session 匹配的 webhook 才发放权益。订单 pending → paid、余额增加及权益流水在同一事务内提交。
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
@@ -643,7 +677,7 @@ AI 生成队列表。任务表只保存状态和对象引用，原始请求体�
 | `status` | string | `pending`、`paid`、`failed`、`canceled` |
 | `amount_cents` | number | 订单金额 |
 | `currency` | string | 币种 |
-| `stripe_checkout_session_id` | string | Stripe Checkout Session ID |
+| `stripe_checkout_session_id` | nullable string | 唯一索引；创建 Checkout 前为 NULL，避免多个未创建成功的订单互相冲突 |
 | `stripe_payment_intent_id` | string | Stripe Payment Intent ID |
 | `paid_at` | string | 支付完成时间 |
 | `created_at` | string | 创建时间 |
@@ -684,13 +718,13 @@ KYC 认证记录表。当前服务商为 Didit。
 
 ### generation_histories
 
-用户图片、视频生成历史表。历史记录只保存已转存到 `cloud_files` 的参考图、图片或视频，默认保存 7 天；如果关联媒体不存在、已删除或已过期，列表接口会自动移除该历史记录。
+用户图片、视频、3D 生成历史表。历史记录保存已转存到 `cloud_files` 的媒体及参考图，并建立有期限的文件引用；期限按媒体有效期和存储配置计算。列表只移除确实没有可用媒体的记录，数据库读取失败不会触发删除。
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
 | `id` | string | 主键 |
 | `user_id` | string | 用户 ID |
-| `type` | string | 历史类型：`image`、`video` |
+| `type` | string | 历史类型：`image`、`video`、`model3d` |
 | `title` | string | 标题，默认取提示词前缀或模型名 |
 | `prompt` | text | 本次生成提示词 |
 | `model` | string | 本次使用模型 |
@@ -704,7 +738,7 @@ KYC 认证记录表。当前服务商为 Didit。
 | `created_at` | string | 创建时间 |
 | `updated_at` | string | 更新时间 |
 
-删除生成历史或历史到期清理时，会同步删除关联的生成媒体和参考图文件，R2/S3 与服务器本地存储使用同一套删除逻辑。
+删除生成历史或历史到期清理时，释放该历史的文件引用；素材、工作流或其他历史仍在引用的文件继续保留。R2/S3 与服务器本地存储使用同一套引用判断。
 
 ### user_preferences
 

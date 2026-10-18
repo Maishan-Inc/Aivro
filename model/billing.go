@@ -92,7 +92,7 @@ type PlanOrder struct {
 	Currency                string          `json:"currency"`
 	Credits                 int             `json:"credits"`
 	WorkflowCreateCredits   int             `json:"workflowCreateCredits"`
-	StripeCheckoutSessionID string          `json:"stripeCheckoutSessionId" gorm:"uniqueIndex"`
+	StripeCheckoutSessionID *string         `json:"stripeCheckoutSessionId" gorm:"uniqueIndex"`
 	StripePaymentIntentID   string          `json:"stripePaymentIntentId" gorm:"index"`
 	PaidAt                  string          `json:"paidAt"`
 	CreatedAt               string          `json:"createdAt"`

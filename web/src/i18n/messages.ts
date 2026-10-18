@@ -1,9 +1,15 @@
-export type Locale = "zh-CN" | "en-US";
+export type Locale = "zh-CN" | "en-US" | "ja-JP" | "ko-KR" | "fr-FR";
 
 export const localeLabels: Record<Locale, string> = {
-    "zh-CN": "中文",
+    "zh-CN": "简体中文",
     "en-US": "English",
+    "ja-JP": "日本語",
+    "ko-KR": "한국어",
+    "fr-FR": "Français",
 };
+
+// The admin console keeps its existing Chinese/English switch.
+export const adminLocaleOptions: Locale[] = ["zh-CN", "en-US"];
 
 export const messages = {
     "zh-CN": {
@@ -124,4 +130,6 @@ export const messages = {
         "cloud.test.error": "Cloud storage connection test failed",
         "cloud.saveHint": "Leave Secret Access Key blank to keep the saved value.",
     },
-} satisfies Record<Locale, Record<string, string>>;
+} satisfies Record<"zh-CN" | "en-US", Record<string, string>>;
+
+export type MessageKey = keyof (typeof messages)["zh-CN"];

@@ -18,6 +18,7 @@ import { ModelPicker } from "@/components/model-picker";
 import { useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
 import { formatBytes, formatDuration, readImageMeta } from "@/lib/image-utils";
 import { nanoid } from "nanoid";
+import { formatDateTime, formatNumber } from "@/lib/datetime";
 
 type ViewMode = "default" | "wireframe" | "white";
 
@@ -207,17 +208,21 @@ export default function Model3DPage() {
         setCurrentResult(null);
     };
 
-    const saveAsset = (asset: Model3DGenerationResult["results"][number]) => {
-        addAsset({
-            kind: "model3d",
-            title: prompt || "3D 模型",
-            coverUrl: asset.thumbnailUrl || "",
-            tags: [],
-            source: "3D 模型",
-            data: { url: asset.url, storageKey: asset.storageKey, bytes: asset.bytes, mimeType: asset.mimeType, thumbnailUrl: asset.thumbnailUrl, vertices: asset.vertices, faces: asset.faces },
-            metadata: { source: "model-3d-page", prompt, model: currentResult?.model },
-        });
-        message.success("已加入我的素材");
+    const saveAsset = async (asset: Model3DGenerationResult["results"][number]) => {
+        try {
+            await addAsset({
+                kind: "model3d",
+                title: prompt || "3D 模型",
+                coverUrl: asset.thumbnailUrl || "",
+                tags: [],
+                source: "3D 模型",
+                data: { url: asset.url, storageKey: asset.storageKey, bytes: asset.bytes, mimeType: asset.mimeType, thumbnailUrl: asset.thumbnailUrl, vertices: asset.vertices, faces: asset.faces },
+                metadata: { source: "model-3d-page", prompt, model: currentResult?.model },
+            });
+            message.success("已加入我的素材");
+        } catch (error) {
+            message.error(error instanceof Error ? error.message : "素材操作失败，请重试");
+        }
     };
 
     const canGenerate = mode === "text" ? Boolean(prompt.trim()) : images.length > 0;
@@ -260,7 +265,7 @@ export default function Model3DPage() {
                                 </div>
                                 {currentResult ? (
                                     <div className="space-y-1 text-xs text-stone-500 dark:text-stone-400">
-                                        <div>时间：{new Date(currentResult.createdAt).toLocaleString()}</div>
+                                        <div>时间：{formatDateTime(currentResult.createdAt)}</div>
                                         <div>模型：{currentResult.model}</div>
                                         <div>耗时：{formatDuration(currentResult.durationMs)}</div>
                                     </div>
@@ -285,8 +290,8 @@ export default function Model3DPage() {
                                                     <span className="text-stone-500 dark:text-stone-400">{formatBytes(asset.bytes)}</span>
                                                 </div>
                                                 <div className="mb-2 grid grid-cols-2 gap-2 text-xs text-stone-500 dark:text-stone-400">
-                                                    <span>顶点：{asset.vertices.toLocaleString()}</span>
-                                                    <span>网格面：{asset.faces.toLocaleString()}</span>
+                                                    <span>顶点：{formatNumber(asset.vertices)}</span>
+                                                    <span>网格面：{formatNumber(asset.faces)}</span>
                                                 </div>
                                                 <div className="flex flex-wrap gap-2">
                                                     <Button size="small" icon={<FolderPlus className="size-3.5" />} onClick={() => saveAsset(asset)}>
@@ -399,7 +404,7 @@ function HistoryPanel({ histories, loading, token, onRefresh, onOpenDetail }: { 
                         <div key={history.id} className="cursor-pointer rounded-lg border border-stone-200 bg-background p-3 transition hover:bg-stone-50 dark:border-stone-800 dark:hover:bg-stone-900" onDoubleClick={() => onOpenDetail(history)}>
                             <div className="truncate text-sm font-semibold">{history.title}</div>
                             <div className="mt-1 line-clamp-2 whitespace-pre-wrap break-words text-xs leading-4 text-stone-500 dark:text-stone-400">{history.prompt || "无提示词"}</div>
-                            <div className="mt-1 text-xs text-stone-500 dark:text-stone-400">{new Date(history.createdAt).toLocaleString()}</div>
+                            <div className="mt-1 text-xs text-stone-500 dark:text-stone-400">{formatDateTime(history.createdAt)}</div>
                             <div className="mt-3 flex gap-2">
                                 <Button size="small" icon={<Download className="size-3.5" />} onClick={() => history.media[0] && window.open(history.media[0].url, "_blank")}>
                                     下载

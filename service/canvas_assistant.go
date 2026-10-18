@@ -387,55 +387,17 @@ func requestCanvasAssistantAnswer(ctx context.Context, userID string, input Canv
 	if modelName == "" {
 		return "", "", safeMessageError{message: "管理员尚未配置默认对话模型"}
 	}
-	credits, err := ModelCost(modelName)
-	if err != nil {
-		return "", "", err
-	}
-	routes, err := SelectModelChannelRoutes(modelName)
-	if err != nil {
-		return "", "", safeMessageError{message: "管理员尚未配置可用文本模型渠道"}
-	}
-	if err := ConsumeUserCreditsWithMeta(userID, modelName, credits, "/canvas-assistant/chat", meta); err != nil {
-		return "", "", err
-	}
-	var lastStatus int
-	for _, route := range ModelChannelRouteAttempts(routes) {
-		body, _ := json.Marshal(map[string]any{
-			"model":    route.UpstreamModel,
-			"messages": canvasAssistantOpenAIMessages(messages),
-			"stream":   false,
-		})
-		request, err := http.NewRequestWithContext(ctx, http.MethodPost, BuildModelChannelURL(route.Channel, "/chat/completions"), bytes.NewReader(body))
-		if err != nil {
-			_ = RefundUserCreditsWithMeta(userID, modelName, credits, "/canvas-assistant/chat", meta)
-			return "", "", err
-		}
-		request.Header.Set("Authorization", "Bearer "+route.Channel.APIKey)
-		request.Header.Set("Content-Type", "application/json")
-		response, err := http.DefaultClient.Do(request)
-		if err != nil {
-			continue
-		}
-		responseBody, _ := io.ReadAll(io.LimitReader(response.Body, 4<<20))
-		_ = response.Body.Close()
-		if response.StatusCode >= http.StatusBadRequest {
-			lastStatus = response.StatusCode
-			continue
-		}
-		answer := parseCanvasAssistantAnswer(responseBody)
-		if strings.TrimSpace(answer) == "" {
-			continue
-		}
-		return answer, modelName, nil
-	}
-	_ = RefundUserCreditsWithMeta(userID, modelName, credits, "/canvas-assistant/chat", meta)
-	if lastStatus > 0 {
-		return "", "", safeMessageError{message: fmt.Sprintf("AI 接口请求失败：%d", lastStatus)}
-	}
-	return "", "", safeMessageError{message: "AI 接口请求失败"}
+	body, _ := json.Marshal(map[string]any{"model": modelName, "messages": canvasAssistantOpenAIMessages(messages), "stream": false})
+	response, err := RequestChatCompletion(ctx, userID, body, modelName, "/canvas-assistant/chat", meta, nil)
+	if err != nil { return "", "", err }
+	answer := parseCanvasAssistantAnswer(response)
+	if strings.TrimSpace(answer) == "" { return "", "", safeMessageError{message: "上游未返回对话内容"} }
+	return answer, modelName, nil
 }
 
 func requestCanvasAgentPlan(ctx context.Context, userID string, input CanvasAgentPlanInput, messages []CanvasAssistantMessage, meta RequestLogMeta) (canvasAgentPlanPayload, string, CanvasAgentUsage, error) {
+	ctx, cancel := context.WithTimeout(ctx, AIRequestTimeout)
+	defer cancel()
 	settings, err := repository.GetSettings()
 	if err != nil {
 		return canvasAgentPlanPayload{}, "", CanvasAgentUsage{}, err
@@ -445,6 +407,7 @@ func requestCanvasAgentPlan(ctx context.Context, userID string, input CanvasAgen
 	if modelName == "" {
 		return canvasAgentPlanPayload{}, "", CanvasAgentUsage{}, safeMessageError{message: "管理员尚未配置默认对话模型"}
 	}
+	if err := ValidateModelRequest(modelName, "/chat/completions"); err != nil { return canvasAgentPlanPayload{}, "", CanvasAgentUsage{}, err }
 	routes, err := SelectModelChannelRoutes(modelName)
 	if err != nil {
 		return canvasAgentPlanPayload{}, "", CanvasAgentUsage{}, safeMessageError{message: "管理员尚未配置可用文本模型渠道"}
@@ -491,7 +454,7 @@ func requestCanvasAgentPlan(ctx context.Context, userID string, input CanvasAgen
 		}
 		request.Header.Set("Authorization", "Bearer "+route.Channel.APIKey)
 		request.Header.Set("Content-Type", "application/json")
-		response, err := http.DefaultClient.Do(request)
+		response, err := AIHTTPClient.Do(request)
 		if err != nil {
 			continue
 		}
@@ -941,7 +904,9 @@ func canvasAgentCreditsForTokens(tokens int, unitCost int) int {
 	if tokens <= 0 || unitCost <= 0 {
 		return 0
 	}
-	credits := int(math.Ceil(float64(tokens) / 1000.0 * float64(unitCost)))
+	value := math.Ceil(float64(tokens) / 1000.0 * float64(unitCost))
+	if value >= float64(int(^uint(0)>>1)) { return int(^uint(0)>>1) }
+	credits := int(value)
 	if credits <= 0 {
 		return 1
 	}
@@ -949,6 +914,10 @@ func canvasAgentCreditsForTokens(tokens int, unitCost int) int {
 }
 
 func canvasAgentBillUsage(userID string, modelName string, billing model.ModelCost, reservedCredits int, usage canvasAgentResponseUsage, requestBody []byte, responseBody []byte, meta RequestLogMeta) (CanvasAgentUsage, error) {
+	return billAIUsage(userID, modelName, billing, reservedCredits, usage, requestBody, responseBody, meta, "/canvas-agent/plan")
+}
+
+func billAIUsage(userID string, modelName string, billing model.ModelCost, reservedCredits int, usage canvasAgentResponseUsage, requestBody []byte, responseBody []byte, meta RequestLogMeta, path string) (CanvasAgentUsage, error) {
 	result := CanvasAgentUsage{
 		InputTokens:  firstPositive(usage.InputTokens, usage.PromptTokens),
 		OutputTokens: firstPositive(usage.OutputTokens, usage.CompletionTokens),
@@ -966,15 +935,14 @@ func canvasAgentBillUsage(userID string, modelName string, billing model.ModelCo
 		return result, nil
 	}
 	result.Credits = canvasAgentCreditsForTokens(result.TotalTokens, billing.Credits)
+	if result.Estimated && result.Credits > reservedCredits { result.Credits = reservedCredits }
 	delta := result.Credits - reservedCredits
 	if delta > 0 {
-		if err := ConsumeUserCreditsWithMeta(userID, modelName, delta, "/canvas-agent/plan", meta); err != nil {
-			result.Credits = reservedCredits
-			result.Estimated = true
-			return result, nil
+		if err := ConsumeUserCreditsWithMeta(userID, modelName, delta, path, meta); err != nil {
+			return result, err
 		}
 	} else if delta < 0 {
-		if err := RefundUserCreditsWithMeta(userID, modelName, -delta, "/canvas-agent/plan", meta); err != nil {
+		if err := RefundUserCreditsWithMeta(userID, modelName, -delta, path, meta); err != nil {
 			return CanvasAgentUsage{}, err
 		}
 	}

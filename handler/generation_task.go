@@ -42,7 +42,7 @@ func GenerationTaskResult(w http.ResponseWriter, r *http.Request, id string) {
 		Fail(w, "未登录或权限不足")
 		return
 	}
-	result, err := service.GetGenerationTaskResult(user, id)
+	result, err := service.GetGenerationTaskResult(r.Context(), user, id)
 	if err != nil {
 		FailError(w, err)
 		return

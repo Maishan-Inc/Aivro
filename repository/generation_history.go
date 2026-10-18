@@ -2,14 +2,24 @@ package repository
 
 import (
 	"github.com/basketikun/aivro/model"
+	"gorm.io/gorm"
 )
 
-func SaveGenerationHistory(item model.GenerationHistory) (model.GenerationHistory, error) {
+func SaveGenerationHistory(item model.GenerationHistory, fileIDs []string) (model.GenerationHistory, error) {
 	db, err := DB()
 	if err != nil {
 		return item, err
 	}
-	return item, db.Save(&item).Error
+	err = db.Transaction(func(tx *gorm.DB) error {
+		for _, id := range fileIDs {
+			allowed, err := CanReferenceCloudFileTx(tx, item.UserID, id, item.CreatedAt)
+			if err != nil { return err }
+			if !allowed { return gorm.ErrRecordNotFound }
+		}
+		if err := tx.Create(&item).Error; err != nil { return err }
+		return SetCloudFileReferencesTx(tx, item.UserID, "generation", item.ID, fileIDs, item.ExpiresAt)
+	})
+	return item, err
 }
 
 func ListGenerationHistories(userID string, historyType model.GenerationHistoryType, query model.Query) (model.GenerationHistoryList, error) {

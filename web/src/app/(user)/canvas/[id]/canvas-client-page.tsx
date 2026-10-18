@@ -208,7 +208,7 @@ function InfiniteCanvasPage() {
     const historyRef = useRef<{ past: CanvasHistoryEntry[]; future: CanvasHistoryEntry[] }>({ past: [], future: [] });
     const lastHistoryRef = useRef<CanvasHistoryEntry | null>(null);
     const historyCommitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const viewportSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
     const applyingHistoryRef = useRef(false);
     const historyPausedRef = useRef(false);
     const didInitialCenterRef = useRef(false);
@@ -325,33 +325,44 @@ function InfiniteCanvasPage() {
     );
 
     useEffect(() => {
+        let canceled = false;
+        setProjectLoaded(false);
+        setCurrentProject(null);
+        setNodes([]);
+        setConnections([]);
+        setChatSessions([]);
+        setAgentPreview(null);
         if (!isUserReady) return;
         if (!token) {
             router.replace(`/login?redirect=/canvas/${projectId}`);
             return;
         }
-        setProjectLoaded(false);
         const restore = async () => {
             let project: CloudWorkflow;
             try {
                 project = await fetchWorkflow(token, projectId);
             } catch (error) {
+                if (canceled) return;
                 message.error(error instanceof Error ? error.message : "工作流不存在或无权限访问");
                 router.replace("/canvas");
                 return;
             }
+            if (canceled) return;
             void fetchWorkflowActiveShare(token, projectId)
                 .then((activeShare) => {
+                    if (canceled) return;
                     setShareUrl(normalizeShareUrl(activeShare.shareUrl || ""));
                     setSharePasswordEnabled(activeShare.share?.passwordEnabled === true);
                 })
                 .catch(() => {
+                    if (canceled) return;
                     setShareUrl("");
                     setSharePasswordEnabled(false);
                 });
+            const restoredNodes = await hydrateCanvasImages(resetInterruptedGeneration(project.nodes));
+            if (canceled) return;
             setCurrentProject(project);
             upsertProject(project);
-            const restoredNodes = await hydrateCanvasImages(resetInterruptedGeneration(project.nodes));
             setNodes(restoredNodes);
             setConnections(project.connections);
             setChatSessions([]);
@@ -374,7 +385,8 @@ function InfiniteCanvasPage() {
             setProjectLoaded(true);
         };
         void restore();
-    }, [isUserReady, message, projectId, router, token, upsertProject]);
+        return () => { canceled = true; };
+    }, [isUserReady, message, projectId, router, token, upsertProject, user?.id]);
 
     useEffect(() => {
         if (!projectLoaded || applyingHistoryRef.current || historyPausedRef.current || agentPreview) return;
@@ -404,42 +416,30 @@ function InfiniteCanvasPage() {
 
     useEffect(() => {
         if (!projectLoaded || historyPausedRef.current || agentPreview || !token || !currentProject) return;
+        let canceled = false;
         setSaveStatus("saving");
+        const snapshot = { title: currentProject.title, nodes, connections, chatSessions: [], activeChatId: null, backgroundMode, showImageInfo, viewport };
         const timer = setTimeout(() => {
-            updateWorkflow(token, projectId, { title: currentProject.title, nodes, connections, chatSessions: [], activeChatId: null, backgroundMode, showImageInfo, viewport: viewportRef.current })
-                .then((saved) => {
+            saveQueueRef.current = saveQueueRef.current.catch(() => undefined).then(async () => {
+                if (canceled) return;
+                try {
+                    const saved = await updateWorkflow(token, projectId, snapshot);
+                    if (canceled) return;
                     setCurrentProject(saved);
                     upsertProject(saved);
                     setSaveStatus("saved");
-                })
-                .catch(() => setSaveStatus("error"));
+                } catch {
+                    if (!canceled) setSaveStatus("error");
+                }
+            });
         }, 600);
-        return () => clearTimeout(timer);
-    }, [agentPreview, backgroundMode, connections, currentProject?.title, nodes, projectId, projectLoaded, showImageInfo, token, upsertProject]);
+        return () => { canceled = true; clearTimeout(timer); };
+    }, [agentPreview, backgroundMode, connections, currentProject?.title, nodes, projectId, projectLoaded, showImageInfo, token, upsertProject, user?.id, viewport]);
 
     useEffect(() => {
         if (!dialogNodeId) setNodeImageSettingsOpen(false);
     }, [dialogNodeId]);
 
-    useEffect(() => {
-        if (!projectLoaded) return;
-        if (viewportSaveTimerRef.current) clearTimeout(viewportSaveTimerRef.current);
-        viewportSaveTimerRef.current = setTimeout(() => {
-            if (token && currentProject) {
-                void updateWorkflow(token, projectId, { title: currentProject.title, nodes: nodesRef.current, connections: connectionsRef.current, chatSessions: [], activeChatId: null, backgroundMode, showImageInfo, viewport: viewportRef.current })
-                    .then((saved) => {
-                        setCurrentProject(saved);
-                        upsertProject(saved);
-                        setSaveStatus("saved");
-                    })
-                    .catch(() => setSaveStatus("error"));
-            }
-            viewportSaveTimerRef.current = null;
-        }, 500);
-        return () => {
-            if (viewportSaveTimerRef.current) clearTimeout(viewportSaveTimerRef.current);
-        };
-    }, [backgroundMode, currentProject, projectId, projectLoaded, showImageInfo, token, upsertProject, viewport]);
 
     useLayoutEffect(() => {
         nodesRef.current = nodes;
@@ -1487,38 +1487,42 @@ function InfiniteCanvasPage() {
 
     const saveNodeAsset = useCallback(
         async (node: CanvasNodeData) => {
-            if (node.type === CanvasNodeType.Text) {
-                const content = node.metadata?.content?.trim();
-                if (!content) return message.error("没有可保存的文本");
-                addAsset({ kind: "text", title: node.metadata?.prompt?.slice(0, 24) || "画布文本", coverUrl: "", tags: [], source: "Canvas", data: { content }, metadata: { source: "canvas", nodeId: node.id } });
+            try {
+                if (node.type === CanvasNodeType.Text) {
+                    const content = node.metadata?.content?.trim();
+                    if (!content) return message.error("没有可保存的文本");
+                    await addAsset({ kind: "text", title: node.metadata?.prompt?.slice(0, 24) || "画布文本", coverUrl: "", tags: [], source: "Canvas", data: { content }, metadata: { source: "canvas", nodeId: node.id } });
+                    message.success("已加入我的素材");
+                    return;
+                }
+                if (node.type === CanvasNodeType.Video) {
+                    if (!node.metadata?.content) return message.error("没有可保存的视频");
+                    await addAsset({ kind: "video", title: node.metadata?.prompt?.slice(0, 24) || "画布视频", coverUrl: "", tags: [], source: "Canvas", data: { url: node.metadata.content, storageKey: node.metadata.storageKey, width: node.width, height: node.height, bytes: node.metadata.bytes || 0, mimeType: node.metadata.mimeType || "video/mp4" }, metadata: { source: "canvas", nodeId: node.id, prompt: node.metadata?.prompt } });
+                    message.success("已加入我的素材");
+                    return;
+                }
+                if (!node.metadata?.content) return message.error("没有可保存的图片");
+                const dataUrl = node.metadata.storageKey && !isCloudStorageKey(node.metadata.storageKey) ? "" : node.metadata.content;
+                await addAsset({
+                    kind: "image",
+                    title: node.metadata?.prompt?.slice(0, 24) || "画布图片",
+                    coverUrl: node.metadata.content,
+                    tags: [],
+                    source: "Canvas",
+                    data: {
+                        dataUrl,
+                        storageKey: node.metadata.storageKey,
+                        width: node.metadata.naturalWidth || node.width,
+                        height: node.metadata.naturalHeight || node.height,
+                        bytes: node.metadata.bytes || getDataUrlByteSize(dataUrl),
+                        mimeType: node.metadata.mimeType || "image/png",
+                    },
+                    metadata: { source: "canvas", nodeId: node.id, prompt: node.metadata?.prompt },
+                });
                 message.success("已加入我的素材");
-                return;
+            } catch (error) {
+                message.error(error instanceof Error ? error.message : "保存素材失败");
             }
-            if (node.type === CanvasNodeType.Video) {
-                if (!node.metadata?.content) return message.error("没有可保存的视频");
-                addAsset({ kind: "video", title: node.metadata?.prompt?.slice(0, 24) || "画布视频", coverUrl: "", tags: [], source: "Canvas", data: { url: node.metadata.content, storageKey: node.metadata.storageKey, width: node.width, height: node.height, bytes: node.metadata.bytes || 0, mimeType: node.metadata.mimeType || "video/mp4" }, metadata: { source: "canvas", nodeId: node.id, prompt: node.metadata?.prompt } });
-                message.success("已加入我的素材");
-                return;
-            }
-            if (!node.metadata?.content) return message.error("没有可保存的图片");
-            const dataUrl = node.metadata.storageKey && !isCloudStorageKey(node.metadata.storageKey) ? "" : node.metadata.content;
-            addAsset({
-                kind: "image",
-                title: node.metadata?.prompt?.slice(0, 24) || "画布图片",
-                coverUrl: node.metadata.content,
-                tags: [],
-                source: "Canvas",
-                data: {
-                    dataUrl,
-                    storageKey: node.metadata.storageKey,
-                    width: node.metadata.naturalWidth || node.width,
-                    height: node.metadata.naturalHeight || node.height,
-                    bytes: node.metadata.bytes || getDataUrlByteSize(dataUrl),
-                    mimeType: node.metadata.mimeType || "image/png",
-                },
-                metadata: { source: "canvas", nodeId: node.id, prompt: node.metadata?.prompt },
-            });
-            message.success("已加入我的素材");
         },
         [addAsset, message],
     );
@@ -1732,7 +1736,7 @@ function InfiniteCanvasPage() {
             });
         }
         setTitleEditing(false);
-    }, [backgroundMode, connections, currentProject, nodes, projectId, showImageInfo, titleDraft, token, upsertProject, viewport]);
+    }, [backgroundMode, connections, currentProject, nodes, projectId, showImageInfo, titleDraft, token, upsertProject, user?.id, viewport]);
 
     const preventCanvasContextMenu = useCallback((event: ReactMouseEvent) => {
         if (agentPreview) {

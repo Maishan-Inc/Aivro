@@ -45,7 +45,6 @@ export default function LoginPage() {
 
 function LoginContent() {
     const { message } = App.useApp();
-    const { locale } = useI18n();
     const localizedPath = useLocalizedPath();
     const [form] = Form.useForm<LoginFormValues>();
     const router = useRouter();
@@ -199,10 +198,10 @@ function LoginContent() {
             const signMessage = challenge.message;
             const signature = (await ethereum.request({ method: "personal_sign", params: [signMessage, walletAddress] })) as string;
             try {
-                const session = await runWithOverlay(locale === "en-US" ? "Signing in" : "正在登录", () => runWithCaptchaReset(resetCaptcha, () => loginWithMetaMask({ walletAddress, message: signMessage, signature, email: "", code: "", captchaToken })));
+                const session = await runWithOverlay("正在登录", () => runWithCaptchaReset(resetCaptcha, () => loginWithMetaMask({ walletAddress, message: signMessage, signature, email: "", code: "", captchaToken })));
                 const user = await fetchCurrentUser(session.token);
                 setSession(COOKIE_SESSION_TOKEN, user);
-                message.success(locale === "en-US" ? "Signed in" : "登录成功");
+                message.success("登录成功");
                 router.replace(user.profileCompleted ? redirect : localizedPath(`/profile/setup?redirect=${encodeURIComponent(redirect)}`));
                 router.refresh();
             } catch (error) {
@@ -227,12 +226,12 @@ function LoginContent() {
                     </div>
                     <AivroReveal key={`${mode}-${registerStep}`}>
                         <div data-aivro-reveal className="aivro-auth-fields">
-                            {mode === "register" ? <RegisterFields step={registerStep} locale={locale} sendingCode={sendingCode} codeSeconds={codeSeconds} publicReady={Boolean(publicSettings)} onResend={() => void requestRegisterCode(form.getFieldValue("email"))} /> : <LoginFields locale={locale} />}
+                            {mode === "register" ? <RegisterFields step={registerStep} sendingCode={sendingCode} codeSeconds={codeSeconds} publicReady={Boolean(publicSettings)} onResend={() => void requestRegisterCode(form.getFieldValue("email"))} /> : <LoginFields />}
                         </div>
                     </AivroReveal>
                     <Space orientation="vertical" size={14} style={{ width: "100%" }}>
                         <Button className="!mt-1 !h-11 !rounded-md !text-sm !font-medium" block type="primary" htmlType="submit" loading={isLoading || sendingCode || submitting} disabled={!publicSettings}>
-                            {isLoading || sendingCode ? (locale === "en-US" ? "Processing" : "处理中") : registerButtonText(mode, registerStep, locale)}
+                            {isLoading || sendingCode ? "处理中" : registerButtonText(mode, registerStep)}
                         </Button>
                         <div className="flex items-center justify-between px-1 text-sm">
                             {mode === "login" ? <>
@@ -241,16 +240,16 @@ function LoginContent() {
                             </> : <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => { setMode("login"); setRegisterStep("credential"); form.resetFields(); }}>返回登录</button>}
                         </div>
                         <p className="m-0 px-1 text-center text-xs leading-6 text-muted-foreground">
-                            {mode === "register" ? (locale === "en-US" ? "Registering" : "注册") : locale === "en-US" ? "Signing in to" : "登录"} Aivro，{locale === "en-US" ? "means you agree to our" : "即代表你同意我们的"}{" "}
+                            {mode === "register" ? "注册" : "登录"} Aivro，即代表你同意我们的{" "}
                             <a href={localizedPath("/privacy")} className="font-medium text-foreground underline underline-offset-4">
-                                {locale === "en-US" ? "Privacy Policy" : "隐私政策"}
+                                隐私政策
                             </a>{" "}
-                            {locale === "en-US" ? "and" : "和"}{" "}
+                            和{" "}
                             <a href={localizedPath("/terms")} className="font-medium text-foreground underline underline-offset-4">
-                                {locale === "en-US" ? "Terms of Service" : "服务条款"}
+                                服务条款
                             </a>
                         </p>
-                        {mode === "login" ? <LoginActions locale={locale} redirect={redirect} authSettings={authSettings} linuxDoEnabled={linuxDoEnabled} providers={thirdPartyProviders} metaMaskAvailable={metaMaskAvailable} onMetaMask={connectMetaMask} /> : null}
+                        {mode === "login" ? <LoginActions redirect={redirect} authSettings={authSettings} linuxDoEnabled={linuxDoEnabled} providers={thirdPartyProviders} metaMaskAvailable={metaMaskAvailable} onMetaMask={connectMetaMask} /> : null}
                     </Space>
                 </Form>
             </AivroReveal>
@@ -260,42 +259,42 @@ function LoginContent() {
     );
 }
 
-function LoginFields({ locale }: { locale: string }) {
+function LoginFields() {
     return (
         <>
-            <Form.Item name="username" label={<span className="font-medium text-foreground">{locale === "en-US" ? "Email" : "邮箱"}</span>} rules={[{ required: true, message: "请输入邮箱" }]}>
+            <Form.Item name="username" label={<span className="font-medium text-foreground">邮箱</span>} rules={[{ required: true, message: "请输入邮箱" }]}>
                 <Input prefix={<MailOutlined />} autoComplete="email" />
             </Form.Item>
-            <Form.Item name="password" label={<span className="font-medium text-foreground">{locale === "en-US" ? "Password" : "密码"}</span>} rules={[{ required: true, message: "请输入密码" }]}>
+            <Form.Item name="password" label={<span className="font-medium text-foreground">密码</span>} rules={[{ required: true, message: "请输入密码" }]}>
                 <Input.Password prefix={<LockOutlined />} iconRender={() => <EyeInvisibleOutlined />} autoComplete="current-password" />
             </Form.Item>
         </>
     );
 }
 
-function RegisterFields({ step, locale, sendingCode, codeSeconds, publicReady, onResend }: { step: RegisterStep; locale: string; sendingCode: boolean; codeSeconds: number; publicReady: boolean; onResend: () => void }) {
+function RegisterFields({ step, sendingCode, codeSeconds, publicReady, onResend }: { step: RegisterStep; sendingCode: boolean; codeSeconds: number; publicReady: boolean; onResend: () => void }) {
     return (
         <>
-            <RegisterSteps active={step} locale={locale} />
+            <RegisterSteps active={step} />
             <div className="mt-8">
                 {step === "credential" ? (
                     <>
-                        <Form.Item name="email" label={<span className="font-medium text-foreground">{locale === "en-US" ? "Email" : "邮箱"}</span>} rules={[{ required: true, message: "请输入邮箱" }, { type: "email", message: "邮箱格式不正确" }]}>
+                        <Form.Item name="email" label={<span className="font-medium text-foreground">邮箱</span>} rules={[{ required: true, message: "请输入邮箱" }, { type: "email", message: "邮箱格式不正确" }]}>
                             <Input prefix={<MailOutlined />} autoComplete="email" />
                         </Form.Item>
-                        <Form.Item name="password" label={<span className="font-medium text-foreground">{locale === "en-US" ? "Password" : "密码"}</span>} rules={[{ required: true, message: "请输入密码" }]}>
+                        <Form.Item name="password" label={<span className="font-medium text-foreground">密码</span>} rules={[{ required: true, message: "请输入密码" }]}>
                             <Input.Password prefix={<LockOutlined />} iconRender={() => <EyeInvisibleOutlined />} autoComplete="new-password" />
                         </Form.Item>
                     </>
                 ) : null}
                 {step === "code" ? (
-                    <Form.Item label={<span className="font-medium text-foreground">{locale === "en-US" ? "Email code" : "邮箱验证码"}</span>}>
+                    <Form.Item label={<span className="font-medium text-foreground">邮箱验证码</span>}>
                         <Space.Compact style={{ width: "100%" }}>
                             <Form.Item name="code" noStyle rules={[{ required: true, message: "请输入验证码" }]}>
                                 <Input autoComplete="one-time-code" />
                             </Form.Item>
                             <Button disabled={sendingCode || !publicReady || codeSeconds > 0} onClick={onResend}>
-                                {codeSeconds > 0 ? `${codeSeconds}s` : locale === "en-US" ? "Resend" : "重新发送"}
+                                {codeSeconds > 0 ? `${codeSeconds}s` : "重新发送"}
                             </Button>
                         </Space.Compact>
                     </Form.Item>
@@ -304,19 +303,19 @@ function RegisterFields({ step, locale, sendingCode, codeSeconds, publicReady, o
                     <>
                         <Form.Item
                             name="username"
-                            label={<span className="font-medium text-foreground">{locale === "en-US" ? "Route name" : "路由名称"}</span>}
-                            extra={<span className="text-muted-foreground">{locale === "en-US" ? "Used in public URLs. Only lowercase letters and numbers. It cannot be changed later." : "用于系统中的公开路由，仅支持小写字母和数字，当前系统暂不支持修改。"}</span>}
+                            label={<span className="font-medium text-foreground">路由名称</span>}
+                            extra={<span className="text-muted-foreground">用于系统中的公开路由，仅支持小写字母和数字，当前系统暂不支持修改。</span>}
                             rules={[
-                                { required: true, message: locale === "en-US" ? "Enter a route name" : "请输入路由名称" },
-                                { pattern: /^[a-z0-9]{3,24}$/, message: locale === "en-US" ? "Use 3-24 lowercase letters or numbers" : "请输入 3-24 位小写字母或数字" },
+                                { required: true, message: "请输入路由名称" },
+                                { pattern: /^[a-z0-9]{3,24}$/, message: "请输入 3-24 位小写字母或数字" },
                             ]}
                         >
                             <Input prefix={<UserOutlined />} autoComplete="username" />
                         </Form.Item>
                         <Form.Item name="accountType" initialValue="personal">
-                            <Segmented block options={[{ label: locale === "en-US" ? "Personal" : "个人", value: "personal" }, { label: locale === "en-US" ? "Company" : "公司", value: "company" }]} />
+                            <Segmented block options={[{ label: "个人", value: "personal" }, { label: "公司", value: "company" }]} />
                         </Form.Item>
-                        <Form.Item name="displayName" label={<span className="font-medium text-foreground">{locale === "en-US" ? "Public name" : "公开名称"}</span>} extra={<span className="text-muted-foreground">{locale === "en-US" ? "Shown on your profile, workflow cards, and shared pages." : "展示在个人资料、工作流卡片和分享页面中。"}</span>} rules={[{ required: true, message: locale === "en-US" ? "Enter a public name" : "请输入公开名称" }]}>
+                        <Form.Item name="displayName" label={<span className="font-medium text-foreground">公开名称</span>} extra={<span className="text-muted-foreground">展示在个人资料、工作流卡片和分享页面中。</span>} rules={[{ required: true, message: "请输入公开名称" }]}>
                             <Input prefix={<UserOutlined />} autoComplete="name" />
                         </Form.Item>
                     </>
@@ -326,11 +325,11 @@ function RegisterFields({ step, locale, sendingCode, codeSeconds, publicReady, o
     );
 }
 
-function RegisterSteps({ active, locale }: { active: RegisterStep; locale: string }) {
+function RegisterSteps({ active }: { active: RegisterStep }) {
     const steps: Array<{ key: RegisterStep; label: string }> = [
-        { key: "credential", label: locale === "en-US" ? "Email" : "邮箱" },
-        { key: "code", label: locale === "en-US" ? "Code" : "验证码" },
-        { key: "profile", label: locale === "en-US" ? "Profile" : "资料" },
+        { key: "credential", label: "邮箱" },
+        { key: "code", label: "验证码" },
+        { key: "profile", label: "资料" },
     ];
     const activeIndex = steps.findIndex((item) => item.key === active);
     return (
@@ -344,27 +343,28 @@ function RegisterSteps({ active, locale }: { active: RegisterStep; locale: strin
     );
 }
 
-function LoginActions({ locale, redirect, authSettings, linuxDoEnabled, providers, metaMaskAvailable, onMetaMask }: { locale: string; redirect: string; authSettings?: { metamask?: AdminPublicAuthProvider }; linuxDoEnabled: boolean; providers: AdminPublicAuthProvider[]; metaMaskAvailable: boolean; onMetaMask: () => void }) {
+function LoginActions({ redirect, authSettings, linuxDoEnabled, providers, metaMaskAvailable, onMetaMask }: { redirect: string; authSettings?: { metamask?: AdminPublicAuthProvider }; linuxDoEnabled: boolean; providers: AdminPublicAuthProvider[]; metaMaskAvailable: boolean; onMetaMask: () => void }) {
+    const { tr } = useI18n();
     return (
         <div className="w-full">
             {authSettings?.metamask?.enabled || providers.length ? (
                 <div className="mt-5">
                     <div className="grid gap-3">
                         {authSettings?.metamask?.enabled ? (
-                            <Button className="h-11 justify-start" block disabled={!metaMaskAvailable} title={metaMaskAvailable ? undefined : locale === "en-US" ? "MetaMask is not installed" : "未检测到 MetaMask"} icon={<ProviderIcon src={authSettings.metamask.iconUrl || "/icons/metamask.svg"} />} onClick={() => void onMetaMask()}>
-                                {metaMaskAvailable ? `${locale === "en-US" ? "Sign in with" : "使用"} ${authSettings.metamask.name || "MetaMask"} ${locale === "en-US" ? "" : "登录"}` : locale === "en-US" ? "Install MetaMask to sign in" : "安装 MetaMask 后登录"}
+                            <Button className="h-11 justify-start" block disabled={!metaMaskAvailable} title={metaMaskAvailable ? undefined : tr("未检测到 MetaMask")} icon={<ProviderIcon src={authSettings.metamask.iconUrl || "/icons/metamask.svg"} />} onClick={() => void onMetaMask()}>
+                                {metaMaskAvailable ? tr(`使用 ${authSettings.metamask.name || "MetaMask"} 登录`) : tr("安装 MetaMask 后登录")}
                             </Button>
                         ) : null}
                         {providers.map((provider) =>
                             provider.id === "linux-do" ? (
                                 linuxDoEnabled ? (
                                     <Button className="h-11 justify-start" key={provider.id} block href={`/api/auth/linux-do/authorize?redirect=${encodeURIComponent(redirect)}`} icon={provider.iconUrl ? <ProviderIcon src={provider.iconUrl} /> : undefined}>
-                                        {locale === "en-US" ? "Sign in with" : "使用"} {provider.name} {locale === "en-US" ? "" : "登录"}
+                                        {tr(`使用 ${provider.name} 登录`)}
                                     </Button>
                                 ) : null
                             ) : (
                                 <Button className="h-11 justify-start" key={provider.id} block href={`/api/auth/oauth/${encodeURIComponent(provider.id)}/authorize?redirect=${encodeURIComponent(redirect)}`} icon={provider.iconUrl ? <ProviderIcon src={provider.iconUrl} /> : undefined}>
-                                    {locale === "en-US" ? "Sign in with" : "使用"} {provider.name} {locale === "en-US" ? "" : "登录"}
+                                    {tr(`使用 ${provider.name} 登录`)}
                                 </Button>
                             ),
                         )}
@@ -379,11 +379,11 @@ function ProviderIcon({ src }: { src: string }) {
     return <img src={src} alt="" width={20} height={20} className="shrink-0" />;
 }
 
-function registerButtonText(mode: "login" | "register", step: RegisterStep, locale: string) {
-    if (mode === "login") return locale === "en-US" ? "Sign in" : "登录";
-    if (step === "credential") return locale === "en-US" ? "Register" : "注册";
-    if (step === "code") return locale === "en-US" ? "Next" : "下一步";
-    return locale === "en-US" ? "Complete" : "完成";
+function registerButtonText(mode: "login" | "register", step: RegisterStep) {
+    if (mode === "login") return "登录";
+    if (step === "credential") return "注册";
+    if (step === "code") return "下一步";
+    return "完成";
 }
 
 async function runWithCaptchaReset<T>(resetCaptcha: () => void, action: () => Promise<T>) {

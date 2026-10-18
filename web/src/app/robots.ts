@@ -1,13 +1,16 @@
 import type { MetadataRoute } from "next";
 
+import { locales } from "@/i18n/routing";
 import { siteUrl } from "@/lib/seo";
+
+const privatePaths = ["/api/", "/admin/", "/assets/", "/canvas/", "/share/"];
 
 export default function robots(): MetadataRoute.Robots {
     return {
         rules: {
             userAgent: "*",
             allow: "/",
-            disallow: ["/api/", "/admin/", "/zh-CN/admin/", "/en-US/admin/", "/assets/", "/zh-CN/assets/", "/en-US/assets/", "/canvas/", "/zh-CN/canvas/", "/en-US/canvas/", "/share/", "/zh-CN/share/", "/en-US/share/"],
+            disallow: [...privatePaths, ...locales.flatMap((locale) => privatePaths.map((path) => `/${locale}${path}`))],
         },
         sitemap: `${siteUrl}/sitemap.xml`,
     };

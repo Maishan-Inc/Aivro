@@ -13,6 +13,7 @@ import { useI18n } from "@/hooks/use-i18n";
 import { useLocalizedPath } from "@/hooks/use-localized-path";
 import { stripLocalePath } from "@/i18n/routing";
 import { cn } from "@/lib/utils";
+import { formatNumber } from "@/lib/datetime";
 import { useUserStore } from "@/stores/use-user-store";
 
 const accountItems = [
@@ -65,7 +66,7 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
                         <span className="hidden text-muted-foreground sm:inline">工作空间</span><ChevronRight className="hidden size-3 text-muted-foreground sm:block" /><span className="truncate font-medium">{title}</span>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
-                        {user ? <Link href={localizedPath("/console/wallet")} className="mr-2 hidden text-xs tabular-nums text-muted-foreground sm:block">{(user.credits ?? 0).toLocaleString()} 算力点</Link> : null}
+                        {user ? <Link href={localizedPath("/console/wallet")} className="mr-2 hidden text-xs tabular-nums text-muted-foreground sm:block">{formatNumber(user.credits ?? 0)} 算力点</Link> : null}
                         <LocaleMenu /><UserStatusActions />
                     </div>
                 </header>

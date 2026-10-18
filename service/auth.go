@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"math/big"
 	"mime"
@@ -30,6 +29,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 )
 
 type TokenClaims struct {
@@ -127,7 +127,7 @@ func upgradeDefaultAdminPassword() error {
 	user.Password = hash
 	user.TokenVersion++
 	user.UpdatedAt = now()
-	_, err = repository.SaveUser(user)
+	_, err = repository.UpdateUser(user.ID, map[string]any{"password": hash, "token_version": gorm.Expr("token_version + 1"), "updated_at": now()})
 	return err
 }
 
@@ -226,7 +226,7 @@ func CompleteUserProfile(user model.AuthUser, username string, accountType model
 	saved.AccountType = profile.AccountType
 	saved.DisplayName = profile.Name
 	saved.UpdatedAt = now()
-	saved, err = repository.SaveUser(saved)
+	saved, err = repository.UpdateUser(saved.ID, map[string]any{"username": saved.Username, "profile_completed": saved.ProfileCompleted, "account_type": saved.AccountType, "display_name": saved.DisplayName, "updated_at": now()})
 	if err != nil {
 		return model.AuthUser{}, err
 	}
@@ -254,7 +254,7 @@ func Login(username string, password string) (model.AuthSession, error) {
 	normalizeUserDefaults(&user)
 	user.LastLoginAt = now()
 	user.UpdatedAt = now()
-	user, err = repository.SaveUser(user)
+	user, err = repository.UpdateUser(user.ID, map[string]any{"last_login_at": now(), "updated_at": now()})
 	if err != nil {
 		return model.AuthSession{}, err
 	}
@@ -341,7 +341,11 @@ func LoginWithLinuxDo(r *http.Request, code string, state string) (model.AuthSes
 	user.UpdatedAt = now()
 	extra, _ := json.Marshal(userExtra{LinuxDo: profile})
 	user.Extra = string(extra)
-	user, err = repository.SaveUser(user)
+	if ok {
+		user, err = repository.UpdateUser(user.ID, map[string]any{"display_name": user.DisplayName, "avatar_url": user.AvatarURL, "last_login_at": user.LastLoginAt, "updated_at": user.UpdatedAt, "extra": user.Extra})
+	} else {
+		user, err = repository.SaveUser(user)
+	}
 	if err != nil {
 		return model.AuthSession{}, redirect, err
 	}
@@ -400,9 +404,12 @@ func LoginWithOAuth(r *http.Request, provider string, code string, state string)
 		return model.AuthSession{}, redirect, err
 	}
 	if !ok && profile.Email != "" {
-		user, ok, err = repository.GetUserByEmail(profile.Email)
+		_, exists, err := repository.GetUserByEmail(profile.Email)
 		if err != nil {
 			return model.AuthSession{}, redirect, err
+		}
+		if exists {
+			return model.AuthSession{}, redirect, safeMessageError{message: "该邮箱已绑定账号，请使用原登录方式登录"}
 		}
 	}
 	if !ok {
@@ -445,7 +452,11 @@ func LoginWithOAuth(r *http.Request, provider string, code string, state string)
 	user.UpdatedAt = now()
 	extra, _ := json.Marshal(userExtra{OAuth: profile})
 	user.Extra = string(extra)
-	user, err = repository.SaveUser(user)
+	if ok {
+		user, err = repository.UpdateUser(user.ID, map[string]any{"display_name": user.DisplayName, "avatar_url": user.AvatarURL, "last_login_at": user.LastLoginAt, "updated_at": user.UpdatedAt, "extra": user.Extra})
+	} else {
+		user, err = repository.SaveUser(user)
+	}
 	if err != nil {
 		return model.AuthSession{}, redirect, err
 	}
@@ -548,7 +559,11 @@ func LoginWithMetaMask(walletAddress string, message string, signature string, e
 	}
 	user.LastLoginAt = now()
 	user.UpdatedAt = now()
-	user, err = repository.SaveUser(user)
+	if ok {
+		user, err = repository.UpdateUser(user.ID, map[string]any{"last_login_at": user.LastLoginAt, "updated_at": user.UpdatedAt})
+	} else {
+		user, err = repository.SaveUser(user)
+	}
 	if err != nil {
 		return model.AuthSession{}, err
 	}
@@ -678,40 +693,28 @@ func SaveUser(user model.User, password string) (model.User, error) {
 		return user, safeMessageError{message: "密码不能为空"}
 	}
 	user.UpdatedAt = now()
-	user, err := repository.SaveUser(user)
+	var err error
+	if isCreate {
+		user, err = repository.SaveUser(user)
+	} else {
+		fields := map[string]any{"username": user.Username, "email": user.Email, "display_name": user.DisplayName, "account_type": user.AccountType, "profile_completed": user.ProfileCompleted, "role": user.Role, "status": user.Status, "email_verified": user.EmailVerified, "linux_do_id": user.LinuxDoID, "github_id": user.GithubID, "google_id": user.GoogleID, "metamask_address": user.MetaMaskAddress, "auth_provider": user.AuthProvider, "updated_at": user.UpdatedAt}
+		if password != "" {
+			fields["password"] = user.Password
+			fields["token_version"] = gorm.Expr("token_version + 1")
+		}
+		user, err = repository.UpdateUser(user.ID, fields)
+	}
 	user.Password = ""
 	return user, err
 }
 
 func AdjustUserCredits(id string, credits int, operator model.AuthUser) (model.User, error) {
-	user, ok, err := repository.GetUserByID(id)
-	if err != nil || !ok {
-		if err != nil {
-			return user, err
-		}
-		return user, safeMessageError{message: "用户不存在"}
-	}
-	oldCredits := user.Credits
-	user.Credits = credits
-	user.UpdatedAt = now()
-	user, err = repository.SaveUser(user)
-	if err == nil && oldCredits != credits {
-		extra, _ := json.Marshal(map[string]string{
-			"operatorId":       operator.ID,
-			"operatorUsername": operator.Username,
-		})
-		_, err = repository.SaveCreditLog(model.CreditLog{
-			ID:        newID("credit"),
-			UserID:    user.ID,
-			Category:  creditLogCategory(model.CreditLogTypeAdminAdjust),
-			Type:      model.CreditLogTypeAdminAdjust,
-			Amount:    credits - oldCredits,
-			Balance:   credits,
-			Remark:    "后台手动调整",
-			Extra:     string(extra),
-			CreatedAt: now(),
-		})
-	}
+	if credits < 0 { return model.User{}, safeMessageError{message: "算力点不能为负数"} }
+	extra, _ := json.Marshal(map[string]string{"operatorId": operator.ID, "operatorUsername": operator.Username})
+	user, err := repository.SetUserCredits(id, credits, model.CreditLog{
+		ID: newID("credit"), UserID: id, Category: creditLogCategory(model.CreditLogTypeAdminAdjust),
+		Type: model.CreditLogTypeAdminAdjust, Remark: "后台手动调整", Extra: string(extra), CreatedAt: now(),
+	})
 	user.Password = ""
 	return user, err
 }
@@ -729,7 +732,7 @@ func AdjustUserWorkflowCreateCredits(id string, credits int) (model.User, error)
 	}
 	user.WorkflowCreateCredits = credits
 	user.UpdatedAt = now()
-	user, err = repository.SaveUser(user)
+	user, err = repository.UpdateUser(user.ID, map[string]any{"workflow_create_credits": credits, "updated_at": now()})
 	user.Password = ""
 	return user, err
 }
@@ -739,57 +742,8 @@ func ConsumeUserCredits(userID string, modelName string, credits int, path strin
 }
 
 func ConsumeUserCreditsWithMeta(userID string, modelName string, credits int, path string, meta RequestLogMeta) error {
-	meta = normalizeRequestLogMeta(meta)
-	if credits <= 0 {
-		user, ok, err := repository.GetUserByID(userID)
-		if err != nil {
-			return err
-		}
-		if !ok {
-			return safeMessageError{message: "用户不存在"}
-		}
-		extra, _ := json.Marshal(map[string]string{"model": modelName, "path": path, "ip": meta.IP, "country": meta.Country})
-		_, err = repository.SaveCreditLog(model.CreditLog{
-			ID:        newID("credit"),
-			UserID:    userID,
-			Category:  creditLogCategory(model.CreditLogTypeAIConsume),
-			Type:      model.CreditLogTypeAIConsume,
-			Model:     modelName,
-			Path:      path,
-			Amount:    0,
-			Balance:   user.Credits,
-			Remark:    "调用模型 " + modelName,
-			IP:        meta.IP,
-			Country:   meta.Country,
-			Extra:     string(extra),
-			CreatedAt: now(),
-		})
-		return err
-	}
-	user, ok, err := repository.ConsumeUserCredits(userID, credits, now())
-	if err != nil {
-		return err
-	}
-	if !ok {
-		return safeMessageError{message: "算力点不足"}
-	}
-	extra, _ := json.Marshal(map[string]string{"model": modelName, "path": path, "ip": meta.IP, "country": meta.Country})
-	_, err = repository.SaveCreditLog(model.CreditLog{
-		ID:        newID("credit"),
-		UserID:    userID,
-		Category:  creditLogCategory(model.CreditLogTypeAIConsume),
-		Type:      model.CreditLogTypeAIConsume,
-		Model:     modelName,
-		Path:      path,
-		Amount:    -credits,
-		Balance:   user.Credits,
-		Remark:    "调用模型 " + modelName,
-		IP:        meta.IP,
-		Country:   meta.Country,
-		Extra:     string(extra),
-		CreatedAt: now(),
-	})
-	return err
+	if credits < 0 { return safeMessageError{message: "模型计费配置无效"} }
+	return applyAICreditLog(userID, modelName, -credits, path, meta, model.CreditLogTypeAIConsume, "调用模型 "+modelName)
 }
 
 func RefundUserCredits(userID string, modelName string, credits int, path string) error {
@@ -797,34 +751,21 @@ func RefundUserCredits(userID string, modelName string, credits int, path string
 }
 
 func RefundUserCreditsWithMeta(userID string, modelName string, credits int, path string, meta RequestLogMeta) error {
-	if credits <= 0 {
-		return nil
-	}
-	user, ok, err := repository.RefundUserCredits(userID, credits, now())
-	if err != nil {
-		return err
-	}
-	if !ok {
-		return safeMessageError{message: "用户不存在"}
-	}
+	if credits <= 0 { return nil }
+	return applyAICreditLog(userID, modelName, credits, path, meta, model.CreditLogTypeAIRefund, "模型调用返还 "+modelName)
+}
+
+func applyAICreditLog(userID string, modelName string, amount int, path string, meta RequestLogMeta, logType model.CreditLogType, remark string) error {
 	meta = normalizeRequestLogMeta(meta)
 	extra, _ := json.Marshal(map[string]string{"model": modelName, "path": path, "ip": meta.IP, "country": meta.Country})
-	_, err = repository.SaveCreditLog(model.CreditLog{
-		ID:        newID("credit"),
-		UserID:    userID,
-		Category:  creditLogCategory(model.CreditLogTypeAIRefund),
-		Type:      model.CreditLogTypeAIRefund,
-		Model:     modelName,
-		Path:      path,
-		Amount:    credits,
-		Balance:   user.Credits,
-		Remark:    "模型调用失败返还 " + modelName,
-		IP:        meta.IP,
-		Country:   meta.Country,
-		Extra:     string(extra),
-		CreatedAt: now(),
+	changed, err := repository.ApplyCreditLog(model.CreditLog{
+		ID: newID("credit"), UserID: userID, Category: creditLogCategory(logType), Type: logType,
+		Model: modelName, Path: path, Amount: amount, Remark: remark,
+		IP: meta.IP, Country: meta.Country, Extra: string(extra), CreatedAt: now(),
 	})
-	return err
+	if err != nil { return err }
+	if !changed { return safeMessageError{message: "用户不存在或算力点不足"} }
+	return nil
 }
 
 func ListCreditLogs(q model.Query) (model.CreditLogList, error) {
@@ -1160,12 +1101,13 @@ func linuxDoProfile(token string, setting model.PrivateOAuthProviderSetting) (li
 }
 
 func doLinuxDoJSON(req *http.Request, payload any) error {
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := AIHTTPClient.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readLimited(resp.Body, 2<<20, "认证响应过大")
+	if err != nil { return err }
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return safeMessageError{message: "Linux.do 登录失败"}
 	}
@@ -1274,8 +1216,10 @@ func oauthProfile(token string, provider string, setting model.PrivateOAuthProvi
 		Email:     strings.ToLower(anyString(payload["email"])),
 		AvatarURL: firstNonEmpty(anyString(payload["avatar_url"]), anyString(payload["picture"]), anyString(payload["avatar"])),
 	}
-	if provider == "github" && profile.Email == "" {
+	if provider == "github" {
 		profile.Email = githubPrimaryEmail(token)
+	} else if verified, _ := payload["email_verified"].(bool); !verified {
+		profile.Email = ""
 	}
 	return profile, nil
 }
@@ -1287,28 +1231,32 @@ func githubPrimaryEmail(token string) string {
 	var payload []struct {
 		Email   string `json:"email"`
 		Primary bool   `json:"primary"`
+		Verified bool  `json:"verified"`
 	}
 	if err := doJSON(req, &payload, ""); err != nil {
 		return ""
 	}
 	for _, item := range payload {
-		if item.Primary && strings.TrimSpace(item.Email) != "" {
+		if item.Primary && item.Verified && strings.TrimSpace(item.Email) != "" {
 			return strings.ToLower(strings.TrimSpace(item.Email))
 		}
 	}
-	if len(payload) > 0 {
-		return strings.ToLower(strings.TrimSpace(payload[0].Email))
+	for _, item := range payload {
+		if item.Verified && strings.TrimSpace(item.Email) != "" {
+			return strings.ToLower(strings.TrimSpace(item.Email))
+		}
 	}
 	return ""
 }
 
 func doJSON(req *http.Request, payload any, fallback string) error {
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := AIHTTPClient.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readLimited(resp.Body, 2<<20, "认证响应过大")
+	if err != nil { return err }
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return safeMessageError{message: fallback}
 	}
@@ -1505,7 +1453,7 @@ func ResetPassword(email string, code string, password string) error {
 	user.Password = hash
 	user.TokenVersion++
 	user.UpdatedAt = now()
-	_, err = repository.SaveUser(user)
+	_, err = repository.UpdateUser(user.ID, map[string]any{"password": hash, "token_version": gorm.Expr("token_version + 1"), "updated_at": now()})
 	return err
 }
 
@@ -1842,18 +1790,23 @@ func requestIP(r *http.Request) string {
 		host = strings.TrimSpace(r.RemoteAddr)
 	}
 	if trustedForwardPeer(host) {
-		for _, key := range []string{"CF-Connecting-IP", "True-Client-IP", "X-Client-IP", "X-Cluster-Client-IP", "X-Forwarded-For", "X-Real-IP", "Forwarded"} {
-			if forwarded := forwardedIP(r.Header.Get(key)); forwarded != "" {
-				return forwarded
-			}
+		if ip := net.ParseIP(strings.TrimSpace(r.Header.Get("X-Aivro-Client-IP"))); ip != nil {
+			return ip.String()
 		}
+		return ""
 	}
 	return host
 }
 
 func trustedForwardPeer(host string) bool {
 	ip := net.ParseIP(strings.Trim(host, "[]"))
-	return ip != nil && (ip.IsLoopback() || ip.IsPrivate())
+	for _, value := range strings.Split(config.Cfg.TrustedProxyCIDRs, ",") {
+		_, subnet, err := net.ParseCIDR(strings.TrimSpace(value))
+		if err == nil && subnet.Contains(ip) {
+			return true
+		}
+	}
+	return false
 }
 
 func forwardedIP(value string) string {

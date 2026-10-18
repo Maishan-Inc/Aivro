@@ -16,7 +16,7 @@ import { saveAs } from "file-saver";
 
 import { AivroDrawableLoader } from "@/components/aivro-drawable-loader";
 import { GenerationHistoryDetailModal } from "@/components/generation-history-detail-modal";
-import { useI18n } from "@/hooks/use-i18n";
+import { formatDateTime } from "@/lib/datetime";
 import { useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
 import { nanoid } from "nanoid";
 import { formatBytes, formatDuration, getDataUrlByteSize, readImageMeta } from "@/lib/image-utils";
@@ -77,7 +77,6 @@ type GenerationLogConfig = Pick<AiConfig, "model" | "imageModel" | "quality" | "
 export default function ImagePage() {
     const { message } = App.useApp();
     const searchParams = useSearchParams();
-    const { locale } = useI18n();
     const router = useRouter();
     const localizedPath = useLocalizedPath();
     const autoStarted = useRef(false);
@@ -236,17 +235,21 @@ export default function ImagePage() {
     };
 
     const saveResultToAssets = async (image: GeneratedImage, index: number) => {
-        const stored = await storeGeneratedImage(image);
-        addAsset({
-            kind: "image",
-            title: `生成结果 ${index + 1}`,
-            coverUrl: stored.url,
-            tags: [],
-            source: "生图工作台",
-            data: { dataUrl: stored.url, storageKey: stored.storageKey, width: stored.width, height: stored.height, bytes: stored.bytes, mimeType: stored.mimeType },
-            metadata: { source: "image-page", prompt },
-        });
-        message.success("已加入我的素材");
+        try {
+            const stored = await storeGeneratedImage(image);
+            await addAsset({
+                kind: "image",
+                title: `生成结果 ${index + 1}`,
+                coverUrl: stored.url,
+                tags: [],
+                source: "生图工作台",
+                data: { dataUrl: stored.url, storageKey: stored.storageKey, width: stored.width, height: stored.height, bytes: stored.bytes, mimeType: stored.mimeType },
+                metadata: { source: "image-page", prompt },
+            });
+            message.success("已加入我的素材");
+        } catch (error) {
+            message.error(error instanceof Error ? error.message : "素材操作失败，请重试");
+        }
     };
 
     const createSession = () => {
@@ -372,9 +375,9 @@ export default function ImagePage() {
                     <div className={studio.results}>
                         <div className="mb-4 flex items-center justify-between gap-3">
                             <div>
-                                <h2 className="text-xl font-semibold">{locale === "en-US" ? "Results" : "生成结果"}</h2>
+                                <h2 className="text-xl font-semibold">生成结果</h2>
                             </div>
-                            {running ? <Tag className="m-0 px-2 py-1">{locale === "en-US" ? "Waiting" : "等待"} {formatDuration(elapsedMs)}</Tag> : null}
+                            {running ? <Tag className="m-0 px-2 py-1">等待 {formatDuration(elapsedMs)}</Tag> : null}
                         </div>
                         {results.length ? (
                             <div className={`grid gap-4 ${results.length > 1 ? "sm:grid-cols-2 2xl:grid-cols-3" : ""}`}>
@@ -415,7 +418,7 @@ export default function ImagePage() {
                     />
                 </StudioHistorySidebar>
             </main>
-            <Drawer title={locale === "en-US" ? "History" : "生成记录"} placement="right" size={340} open={logsOpen} onClose={() => setLogsOpen(false)}>
+            <Drawer title="生成记录" placement="right" size={340} open={logsOpen} onClose={() => setLogsOpen(false)}>
                 <LogPanel
                     logs={visibleLogs}
                     selectedLogIds={selectedLogIds}
@@ -684,7 +687,7 @@ function historyToImageLog(history: GenerationHistory): GenerationLog {
         createdAt: Date.parse(history.createdAt) || Date.now(),
         title: history.title || history.model || "未命名",
         prompt: history.prompt || history.title || "",
-        time: new Date(history.createdAt).toLocaleString("zh-CN", { hour12: false }),
+        time: formatDateTime(history.createdAt),
         model: history.model || config.imageModel || "",
         config,
         references: (history.references || []).map((item, index) => ({ id: `${history.id}-ref-${index}`, name: item.name, type: item.type, dataUrl: item.url, storageKey: item.storageKey })),
@@ -789,7 +792,7 @@ function buildLog({
         createdAt: Date.now(),
         title: prompt.slice(0, 12) || "未命名",
         prompt,
-        time: new Date().toLocaleString("zh-CN", { hour12: false }),
+        time: formatDateTime(Date.now()),
         model,
         config: logConfig,
         references,

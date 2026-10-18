@@ -430,6 +430,9 @@ func ModelBilling(modelName string) (model.ModelCost, error) {
 	}
 	settings = normalizeSettings(settings)
 	modelName = strings.TrimSpace(modelName)
+	if !containsModel(settings.Public.ModelChannel.AvailableModels, modelName) {
+		return model.ModelCost{}, safeMessageError{message: "该模型未开放"}
+	}
 	modelID := modelIDForName(settings.Private.Channels, modelName)
 	for _, item := range settings.Public.ModelChannel.ModelCosts {
 		if modelID != "" && item.ModelID == modelID {
@@ -440,7 +443,38 @@ func ModelBilling(modelName string) (model.ModelCost, error) {
 			return item, nil
 		}
 	}
-	return model.ModelCost{ModelID: modelID, Model: modelName, BillingType: "fixed"}, nil
+	return model.ModelCost{}, safeMessageError{message: "该模型尚未配置计费"}
+}
+
+func containsModel(models []string, name string) bool {
+	for _, item := range models {
+		if item == name {
+			return true
+		}
+	}
+	return false
+}
+
+func ValidateModelRequest(modelName string, path string) error {
+	settings, err := PublicSettings()
+	if err != nil {
+		return err
+	}
+	var models []string
+	switch path {
+	case "/images/generations", "/images/edits":
+		models = settings.ModelChannel.ImageModels
+	case "/videos":
+		models = settings.ModelChannel.VideoModels
+	case "/chat/completions":
+		models = settings.ModelChannel.TextModels
+	case "/model-3d/generations":
+		models = settings.ModelChannel.Model3DModels
+	}
+	if !containsModel(settings.ModelChannel.AvailableModels, modelName) || !containsModel(models, modelName) {
+		return safeMessageError{message: "该模型未开放此功能"}
+	}
+	return nil
 }
 
 func normalizePrivateSetting(setting model.PrivateSetting) model.PrivateSetting {
@@ -787,6 +821,9 @@ func SelectModelChannelRoutes(modelName string) ([]ModelChannelRoute, error) {
 	if err != nil {
 		return nil, err
 	}
+	if !containsModel(normalizeSettings(settings).Public.ModelChannel.AvailableModels, strings.TrimSpace(modelName)) {
+		return nil, safeMessageError{message: "该模型未开放"}
+	}
 	routes := modelChannelRoutesForModel(normalizePrivateSetting(settings.Private).Channels, modelName)
 	if len(routes) == 0 {
 		return nil, errors.New("没有可用模型渠道")
@@ -1038,10 +1075,9 @@ func normalizeModelCosts(items []model.ModelCost, availableModels []string, chan
 			continue
 		}
 		modelID := modelIDForName(channels, modelName)
-		item := byID[modelID]
-		if item.ModelID == "" {
-			item = byName[modelName]
-		}
+		item, configured := byID[modelID]
+		if !configured { item, configured = byName[modelName] }
+		if !configured { continue }
 		item.ModelID = modelID
 		item.Model = modelName
 		if item.BillingType != "token" {

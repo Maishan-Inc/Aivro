@@ -7,6 +7,7 @@ import { HCaptchaField } from "@/components/hcaptcha-field";
 import { TurnstileField } from "@/components/turnstile-field";
 import type { AdminPublicCaptchaSettings } from "@/services/api/admin";
 import { fetchCaptchaSession, type CaptchaSession } from "@/services/api/auth";
+import { useLocaleStore } from "@/stores/use-locale-store";
 
 type ChallengeState = {
     open: boolean;
@@ -107,7 +108,7 @@ function CaptchaChallenge({ open, provider, siteKey, resetKey, error, onVerify, 
     }, [open]);
 
     const code = session?.country.toUpperCase() || "";
-    const country = /^[A-Z]{2}$/.test(code) && code !== "XX" ? new Intl.DisplayNames("zh-CN", { type: "region" }).of(code) : "未知";
+    const country = /^[A-Z]{2}$/.test(code) && code !== "XX" ? new Intl.DisplayNames(useLocaleStore.getState().locale, { type: "region" }).of(code) : "未知";
 
     if (!open || !siteKey) return null;
     return (

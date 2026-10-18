@@ -7,6 +7,7 @@ import { Button, Dropdown, Input, Modal, Tag } from "antd";
 
 import type { CloudWorkflow } from "@/services/api/workflows";
 import { useLocalizedPath } from "@/hooks/use-localized-path";
+import { formatShortDateTime } from "@/lib/datetime";
 import { useCanvasUiStore } from "../stores/use-canvas-ui-store";
 import type { CanvasConnection, CanvasNodeData } from "../types";
 
@@ -219,5 +220,5 @@ function ProjectMetric({ icon, label, value, suffix }: { icon: ReactNode; label:
 }
 
 function formatProjectTime(value: string) {
-    return value ? new Date(value).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : "-";
+    return value ? formatShortDateTime(value) : "-";
 }

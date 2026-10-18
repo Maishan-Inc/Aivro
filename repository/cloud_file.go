@@ -40,7 +40,8 @@ func ListExpiredCloudFiles(now string, limit int) ([]model.CloudFile, error) {
 		limit = 100
 	}
 	var items []model.CloudFile
-	err = db.Where("expires_at != ? AND expires_at <= ? AND deleted_at = ?", "", now, "").Order("expires_at asc").Limit(limit).Find(&items).Error
+	refs := db.Model(&model.CloudFileReference{}).Select("file_id").Where("file_id = cloud_files.id AND (expires_at = ? OR expires_at > ?)", "", now)
+	err = db.Where("expires_at != ? AND expires_at <= ? AND deleted_at = ? AND NOT EXISTS (?)", "", now, "", refs).Order("expires_at asc").Limit(limit).Find(&items).Error
 	return items, err
 }
 
@@ -53,44 +54,6 @@ func MarkCloudFileDeleted(id string, deletedAt string) error {
 		"deleted_at": deletedAt,
 		"updated_at": deletedAt,
 	}).Error
-}
-
-func UpdateCloudFilesPurpose(ids []string, userID string, purpose model.CloudFilePurpose, workflowID string, historyID string, expiresAt string) error {
-	db, err := DB()
-	if err != nil {
-		return err
-	}
-	if len(ids) == 0 {
-		return nil
-	}
-	updates := map[string]any{
-		"purpose":     purpose,
-		"workflow_id": workflowID,
-		"history_id":  historyID,
-		"expires_at":  expiresAt,
-		"updated_at":  nowString(),
-	}
-	return db.Model(&model.CloudFile{}).Where("id IN ? AND user_id = ? AND deleted_at = ?", ids, userID, "").Updates(updates).Error
-}
-
-func ListCloudFilesByWorkflow(userID string, workflowID string) ([]model.CloudFile, error) {
-	db, err := DB()
-	if err != nil {
-		return nil, err
-	}
-	items := []model.CloudFile{}
-	err = db.Where("user_id = ? AND workflow_id = ? AND deleted_at = ?", userID, workflowID, "").Find(&items).Error
-	return items, err
-}
-
-func ListCloudFilesByHistory(userID string, historyID string) ([]model.CloudFile, error) {
-	db, err := DB()
-	if err != nil {
-		return nil, err
-	}
-	items := []model.CloudFile{}
-	err = db.Where("user_id = ? AND history_id = ? AND deleted_at = ?", userID, historyID, "").Find(&items).Error
-	return items, err
 }
 
 func nowString() string {

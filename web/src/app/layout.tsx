@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
 import { AntdRegistry } from "@ant-design/nextjs-registry";
-import { headers } from "next/headers";
 import { AppProviders } from "@/components/layout/app-providers";
-import type { Locale } from "@/i18n/messages";
-import { isLocale } from "@/i18n/routing";
+import { requestLocale } from "@/lib/page-metadata";
 import { buildMetadata, seoPages } from "@/lib/seo";
 import "antd/dist/reset.css";
 import "./globals.css";
@@ -35,7 +33,7 @@ export default async function RootLayout({
             <body
                 className="bg-background text-foreground antialiased"
                 style={{
-                    fontFamily: '"SF Pro Display","SF Pro Text","PingFang SC","Microsoft YaHei","Helvetica Neue",sans-serif',
+                    fontFamily: '"SF Pro Display","SF Pro Text","PingFang SC","Hiragino Sans","Yu Gothic UI","Malgun Gothic","Microsoft YaHei","Helvetica Neue",sans-serif',
                 }}
             >
                 <AntdRegistry>
@@ -44,10 +42,4 @@ export default async function RootLayout({
             </body>
         </html>
     );
-}
-
-async function requestLocale(): Promise<Locale> {
-    const headerStore = await headers();
-    const localeHeader = headerStore.get("x-aivro-locale") || "zh-CN";
-    return isLocale(localeHeader) ? localeHeader : "zh-CN";
 }

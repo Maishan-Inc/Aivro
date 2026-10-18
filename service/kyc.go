@@ -11,6 +11,7 @@ import (
 	"github.com/basketikun/aivro/model"
 	"github.com/basketikun/aivro/repository"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type KYCSessionResponse struct {
@@ -135,7 +136,7 @@ func HandleDiditWebhook(r *http.Request) error {
 		return err
 	}
 	kyc := normalizePrivateSetting(settings.Private).KYC
-	body, err := io.ReadAll(r.Body)
+	body, err := readLimited(r.Body, 1<<20, "回调内容过大")
 	if err != nil {
 		return err
 	}
@@ -158,10 +159,21 @@ func HandleDiditWebhook(r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	return db.Transaction(func(tx *gorm.DB) error {
-		item := model.KYCVerification{}
-		if err := tx.Where("provider_session_id = ?", sessionID).First(&item).Error; err != nil {
+	var existing model.KYCVerification
+	if err := db.Where("provider_session_id = ?", sessionID).First(&existing).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
 			return nil
+		}
+		return err
+	}
+	return db.Transaction(func(tx *gorm.DB) error {
+		// Serialize rewards for this user, including different verification sessions.
+		if err := tx.Model(&model.User{}).Where("id = ?", existing.UserID).Update("credits", gorm.Expr("credits")).Error; err != nil {
+			return err
+		}
+		item := model.KYCVerification{}
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", existing.ID).First(&item).Error; err != nil {
+			return err
 		}
 		item.Status = status
 		item.RawPayload = body
@@ -179,21 +191,18 @@ func HandleDiditWebhook(r *http.Request) error {
 func grantKYCRewardTx(tx *gorm.DB, userID string, sourceID string, setting model.KYCSetting) error {
 	if setting.RewardOnce {
 		var count int64
-		if err := tx.Model(&model.KYCVerification{}).Where("user_id = ? AND status = ? AND rewarded = ? AND id <> ?", userID, model.KYCStatusApproved, true, sourceID).Count(&count).Error; err != nil {
+		if err := tx.Model(&model.KYCVerification{}).Where("user_id = ? AND rewarded = ? AND id <> ?", userID, true, sourceID).Count(&count).Error; err != nil {
 			return err
 		}
 		if count > 0 {
 			return nil
 		}
 	}
-	user := model.User{}
-	if err := tx.Where("id = ?", userID).First(&user).Error; err != nil {
+	if err := tx.Model(&model.User{}).Where("id = ?", userID).Updates(map[string]any{"credits": gorm.Expr("credits + ?", setting.RewardCredits), "workflow_create_credits": gorm.Expr("workflow_create_credits + ?", setting.RewardWorkflowCreateCredits), "updated_at": now()}).Error; err != nil {
 		return err
 	}
-	user.Credits += setting.RewardCredits
-	user.WorkflowCreateCredits += setting.RewardWorkflowCreateCredits
-	user.UpdatedAt = now()
-	if err := tx.Save(&user).Error; err != nil {
+	user := model.User{}
+	if err := tx.Where("id = ?", userID).First(&user).Error; err != nil {
 		return err
 	}
 	return createEntitlementLogTx(tx, model.EntitlementLog{

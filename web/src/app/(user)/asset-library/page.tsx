@@ -50,7 +50,7 @@ export default function AssetLibraryPage() {
             if (asset.type === "image") {
                 const dataUrl = await remoteImageToDataUrl(asset.url);
                 const image = await uploadImage(dataUrl);
-                addAsset({
+                await addAsset({
                     kind: "image",
                     title: asset.title,
                     coverUrl: asset.coverUrl,
@@ -61,7 +61,7 @@ export default function AssetLibraryPage() {
                     metadata: { source: "asset-library", assetId: asset.id },
                 });
             } else {
-                addAsset({
+                await addAsset({
                     kind: "text",
                     title: asset.title,
                     coverUrl: asset.coverUrl,

@@ -9,6 +9,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
+	"sort"
 	"strings"
 	"time"
 
@@ -19,6 +21,7 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const noWorkflowCreditsMessage = "当前账号暂无工作流创建次数，请完成 KYC 认证或购买套餐获取更多创建次数。"
@@ -187,27 +190,18 @@ func CreateWorkflow(userID string, input SaveWorkflowInput) (model.Workflow, err
 
 func UpdateWorkflow(userID string, id string, input SaveWorkflowInput) (model.Workflow, error) {
 	db, err := repository.DB()
-	if err != nil {
-		return model.Workflow{}, err
-	}
+	if err != nil { return model.Workflow{}, err }
 	workflow, err := GetWorkflow(userID, id)
-	if err != nil {
-		return workflow, err
-	}
+	if err != nil { return workflow, err }
 	workflow = normalizeWorkflowInput(workflow, input)
-	if err := validateWorkflowCloudFilesTx(db, userID, workflow.Nodes, workflow.ChatSessions); err != nil {
-		return workflow, err
-	}
-	tx := db.Model(&model.Workflow{}).Where("id = ? AND user_id = ? AND deleted_at = ?", id, userID, "").Updates(workflowUpdateMap(workflow))
-	if tx.Error != nil {
-		return workflow, tx.Error
-	}
-	if tx.RowsAffected == 0 {
-		return workflow, safeMessageError{message: "工作流不存在或无权限访问"}
-	}
-	if err := bindWorkflowCloudFiles(userID, id, workflow.Nodes, workflow.ChatSessions); err != nil {
-		return workflow, err
-	}
+	err = db.Transaction(func(tx *gorm.DB) error {
+		if err := validateWorkflowCloudFilesTx(tx, userID, workflow.Nodes, workflow.ChatSessions); err != nil { return err }
+		result := tx.Model(&model.Workflow{}).Where("id = ? AND user_id = ? AND deleted_at = ?", id, userID, "").Updates(workflowUpdateMap(workflow))
+		if result.Error != nil { return result.Error }
+		if result.RowsAffected == 0 { return safeMessageError{message: "工作流不存在或无权限访问"} }
+		return bindWorkflowCloudFilesTx(tx, userID, id, workflow.Nodes, workflow.ChatSessions)
+	})
+	if err != nil { return workflow, err }
 	return GetWorkflow(userID, id)
 }
 
@@ -228,17 +222,29 @@ func DeleteWorkflowWithInput(userID string, id string, input DeleteWorkflowInput
 	if confirmName == "" || (confirmName != workflow.Slug && confirmName != workflow.Title) {
 		return safeMessageError{message: "请输入正确的工作流名称确认删除"}
 	}
-	tx := db.Model(&model.Workflow{}).Where("id = ? AND user_id = ? AND deleted_at = ?", id, userID, "").Updates(map[string]any{
-		"deleted_at": now(),
-		"updated_at": now(),
+	var files []model.CloudFile
+	err = db.Transaction(func(tx *gorm.DB) error {
+		result := tx.Model(&model.Workflow{}).Where("id = ? AND user_id = ? AND deleted_at = ?", id, userID, "").Updates(map[string]any{"deleted_at": now(), "updated_at": now()})
+		if result.Error != nil { return result.Error }
+		if result.RowsAffected == 0 { return safeMessageError{message: "工作流不存在或无权限访问"} }
+		var shares []model.WorkflowShare
+		if err := tx.Where("owner_id = ? AND source_workflow_id = ?", userID, id).Find(&shares).Error; err != nil { return err }
+		if err := tx.Model(&model.WorkflowShare{}).Where("owner_id = ? AND source_workflow_id = ?", userID, id).Updates(map[string]any{"status": model.WorkflowShareStatusRevoked, "updated_at": now()}).Error; err != nil { return err }
+		var posts []model.WorkflowCommunityPost
+		if err := tx.Where("user_id = ? AND source_workflow_id = ?", userID, id).Find(&posts).Error; err != nil { return err }
+		if err := tx.Model(&model.WorkflowCommunityPost{}).Where("user_id = ? AND source_workflow_id = ?", userID, id).Updates(map[string]any{"deleted_at": now(), "updated_at": now()}).Error; err != nil { return err }
+		scopes := [][2]string{{"workflow", id}}
+		for _, share := range shares { scopes = append(scopes, [2]string{"share", share.ID}) }
+		for _, post := range posts { scopes = append(scopes, [2]string{"community", post.ID}) }
+		for _, scope := range scopes {
+			items, err := repository.ReleaseCloudFileReferencesTx(tx, userID, scope[0], scope[1])
+			if err != nil { return err }
+			files = append(files, items...)
+		}
+		return nil
 	})
-	if tx.Error != nil {
-		return tx.Error
-	}
-	if tx.RowsAffected == 0 {
-		return safeMessageError{message: "工作流不存在或无权限访问"}
-	}
-	return DeleteWorkflowCloudFiles(userID, id)
+	if err != nil { return err }
+	return DeleteCloudFiles(files)
 }
 
 func ShareWorkflow(r *http.Request, userID string, workflowID string, input ShareWorkflowInput) (map[string]any, error) {
@@ -305,9 +311,17 @@ func ShareWorkflow(r *http.Request, userID string, workflowID string, input Shar
 	share.PasswordEnabled = input.PasswordEnabled
 	share.PasswordHash = passwordHash
 	share.UpdatedAt = now()
-	if err := db.Save(&share).Error; err != nil {
-		return nil, err
-	}
+	if err := db.Transaction(func(tx *gorm.DB) error {
+		if err := validateWorkflowCloudFilesTx(tx, userID, workflow.Nodes, workflow.ChatSessions); err != nil { return err }
+		var source model.Workflow
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND user_id = ? AND deleted_at = ?", workflow.ID, userID, "").First(&source).Error; err != nil { return err }
+		if found {
+			var current model.WorkflowShare
+			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND status = ? AND version = ?", share.ID, model.WorkflowShareStatusActive, share.Version-1).First(&current).Error; err != nil { return err }
+		}
+		if err := tx.Save(&share).Error; err != nil { return err }
+		return repository.SetCloudFileReferencesTx(tx, userID, "share", share.ID, mapKeys(collectCloudFileIDsFromChunks(workflow.Nodes, workflow.ChatSessions)), "")
+	}); err != nil { return nil, err }
 	if found {
 		if err := pushLinkedShareUpdates(db, share); err != nil {
 			return nil, err
@@ -364,8 +378,8 @@ func VerifyWorkflowShare(userID string, token string, password string) (map[stri
 		preview := sharePreviewForUser(share, false, userID, true)
 		return map[string]any{"preview": preview, "shareAccessToken": ""}, nil
 	}
-	if bcrypt.CompareHashAndPassword([]byte(share.PasswordHash), []byte(password)) != nil {
-		return nil, safeMessageError{message: "分享密码错误"}
+	if err := checkSharePassword(share, password); err != nil {
+		return nil, err
 	}
 	accessToken, err := newShareAccessToken(userID, share)
 	if err != nil {
@@ -394,8 +408,8 @@ func VerifyWorkflowShareByPath(userID string, username string, slug string, pass
 	if !share.PasswordEnabled {
 		return map[string]any{"preview": sharePreviewForUser(share, false, userID, true), "shareAccessToken": ""}, nil
 	}
-	if bcrypt.CompareHashAndPassword([]byte(share.PasswordHash), []byte(password)) != nil {
-		return nil, safeMessageError{message: "分享密码错误"}
+	if err := checkSharePassword(share, password); err != nil {
+		return nil, err
 	}
 	accessToken, err := newShareAccessToken(userID, share)
 	if err != nil {
@@ -417,8 +431,8 @@ func CopyWorkflowShare(userID string, token string, input CopyWorkflowShareInput
 		return model.Workflow{}, err
 	}
 	if share.PasswordEnabled && !validShareAccessToken(userID, share, input.ShareAccessToken) {
-		if bcrypt.CompareHashAndPassword([]byte(share.PasswordHash), []byte(input.Password)) != nil {
-			return model.Workflow{}, safeMessageError{message: "请先验证分享密码"}
+		if err := checkSharePassword(share, input.Password); err != nil {
+			return model.Workflow{}, err
 		}
 	}
 	source := model.Workflow{}
@@ -458,9 +472,11 @@ func CopyWorkflowShare(userID string, token string, input CopyWorkflowShareInput
 		if err != nil {
 			return err
 		}
+		if err := validateWorkflowCloudFilesTx(tx, share.OwnerID, source.Nodes, source.ChatSessions); err != nil { return err }
 		if err := tx.Create(&workflow).Error; err != nil {
 			return err
 		}
+		if err := bindWorkflowCloudFilesTx(tx, userID, workflow.ID, workflow.Nodes, workflow.ChatSessions); err != nil { return err }
 		copy := model.WorkflowShareCopy{
 			ID:               newID("share-copy"),
 			ShareID:          share.ID,
@@ -488,6 +504,16 @@ func CopyWorkflowShare(userID string, token string, input CopyWorkflowShareInput
 			CreatedAt:                  now(),
 		})
 	})
+}
+
+func checkSharePassword(share model.WorkflowShare, password string) error {
+	if err := hitRateBucket("share:"+share.ID, 10, time.Minute, 5*time.Minute); err != nil {
+		return err
+	}
+	if bcrypt.CompareHashAndPassword([]byte(share.PasswordHash), []byte(password)) != nil {
+		return safeMessageError{message: "分享密码错误"}
+	}
+	return nil
 }
 
 func CopyWorkflowShareByPath(userID string, username string, slug string, input CopyWorkflowShareInput) (model.Workflow, error) {
@@ -529,17 +555,17 @@ func RevokeWorkflowShare(userID string, token string) error {
 	if err != nil {
 		return err
 	}
-	tx := db.Model(&model.WorkflowShare{}).Where("token = ? AND owner_id = ? AND status = ?", token, userID, model.WorkflowShareStatusActive).Updates(map[string]any{
-		"status":     model.WorkflowShareStatusRevoked,
-		"updated_at": now(),
+	var files []model.CloudFile
+	err = db.Transaction(func(tx *gorm.DB) error {
+		var share model.WorkflowShare
+		if err := tx.Where("token = ? AND owner_id = ? AND status = ?", token, userID, model.WorkflowShareStatusActive).First(&share).Error; err != nil { return err }
+		if err := tx.Model(&share).Updates(map[string]any{"status": model.WorkflowShareStatusRevoked, "updated_at": now()}).Error; err != nil { return err }
+		var err error
+		files, err = repository.ReleaseCloudFileReferencesTx(tx, userID, "share", share.ID)
+		return err
 	})
-	if tx.Error != nil {
-		return tx.Error
-	}
-	if tx.RowsAffected == 0 {
-		return safeMessageError{message: "分享不存在或无权限操作"}
-	}
-	return nil
+	if err != nil { return err }
+	return DeleteCloudFiles(files)
 }
 
 func ListCommunityWorkflows(q model.Query) (model.WorkflowCommunityPostList, error) {
@@ -633,9 +659,17 @@ func PublishCommunityWorkflow(userID string, input PublishCommunityWorkflowInput
 	post.Snapshot = snapshot
 	post.SnapshotWorkflowAt = workflow.UpdatedAt
 	post.UpdatedAt = now()
-	if err := db.Save(&post).Error; err != nil {
-		return post, err
-	}
+	if err := db.Transaction(func(tx *gorm.DB) error {
+		if err := validateWorkflowCloudFilesTx(tx, userID, workflow.Nodes, workflow.ChatSessions); err != nil { return err }
+		var source model.Workflow
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND user_id = ? AND deleted_at = ?", workflow.ID, userID, "").First(&source).Error; err != nil { return err }
+		var current model.WorkflowCommunityPost
+		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", post.ID).First(&current).Error
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) { return err }
+		if err == nil && (current.DeletedAt != "" || current.Status == model.WorkflowCommunityStatusBanned) { return safeMessageError{message: "社区作品已删除或被封禁"} }
+		if err := tx.Save(&post).Error; err != nil { return err }
+		return repository.SetCloudFileReferencesTx(tx, userID, "community", post.ID, mapKeys(collectCloudFileIDsFromChunks(workflow.Nodes, workflow.ChatSessions)), "")
+	}); err != nil { return post, err }
 	return post, nil
 }
 
@@ -667,9 +701,17 @@ func SyncCommunityWorkflow(userID string, id string, input SyncCommunityWorkflow
 	post.Snapshot = snapshot
 	post.SnapshotWorkflowAt = workflow.UpdatedAt
 	post.UpdatedAt = now()
-	if err := db.Save(&post).Error; err != nil {
-		return post, err
-	}
+	if err := db.Transaction(func(tx *gorm.DB) error {
+		if err := validateWorkflowCloudFilesTx(tx, userID, workflow.Nodes, workflow.ChatSessions); err != nil { return err }
+		var source model.Workflow
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND user_id = ? AND deleted_at = ?", workflow.ID, userID, "").First(&source).Error; err != nil { return err }
+		var current model.WorkflowCommunityPost
+		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", post.ID).First(&current).Error
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) { return err }
+		if err == nil && (current.DeletedAt != "" || current.Status == model.WorkflowCommunityStatusBanned) { return safeMessageError{message: "社区作品已删除或被封禁"} }
+		if err := tx.Save(&post).Error; err != nil { return err }
+		return repository.SetCloudFileReferencesTx(tx, userID, "community", post.ID, mapKeys(collectCloudFileIDsFromChunks(workflow.Nodes, workflow.ChatSessions)), "")
+	}); err != nil { return post, err }
 	return post, nil
 }
 
@@ -678,14 +720,17 @@ func DeleteCommunityWorkflow(userID string, id string) error {
 	if err != nil {
 		return err
 	}
-	tx := db.Model(&model.WorkflowCommunityPost{}).Where("id = ? AND user_id = ? AND deleted_at = ?", id, userID, "").Updates(map[string]any{"deleted_at": now(), "updated_at": now()})
-	if tx.Error != nil {
-		return tx.Error
-	}
-	if tx.RowsAffected == 0 {
-		return safeMessageError{message: "社区作品不存在或无权限操作"}
-	}
-	return nil
+	var files []model.CloudFile
+	err = db.Transaction(func(tx *gorm.DB) error {
+		result := tx.Model(&model.WorkflowCommunityPost{}).Where("id = ? AND user_id = ? AND deleted_at = ?", id, userID, "").Updates(map[string]any{"deleted_at": now(), "updated_at": now()})
+		if result.Error != nil { return result.Error }
+		if result.RowsAffected == 0 { return safeMessageError{message: "社区作品不存在或无权限操作"} }
+		var err error
+		files, err = repository.ReleaseCloudFileReferencesTx(tx, userID, "community", id)
+		return err
+	})
+	if err != nil { return err }
+	return DeleteCloudFiles(files)
 }
 
 func GetCommunityWorkflowPreview(token string) (WorkflowCommunityPreview, error) {
@@ -906,38 +951,21 @@ func createEntitlementLogTx(tx *gorm.DB, log model.EntitlementLog) error {
 
 func validateWorkflowCloudFilesTx(tx *gorm.DB, userID string, chunks ...json.RawMessage) error {
 	ids := collectCloudFileIDsFromChunks(chunks...)
-	for id := range ids {
-		var total int64
-		if err := tx.Model(&model.CloudFile{}).Where("id = ? AND user_id = ?", id, userID).Count(&total).Error; err != nil {
+	for _, id := range mapKeys(ids) {
+		allowed, err := repository.CanReferenceCloudFileTx(tx, userID, id, now())
+		if err != nil {
 			return err
 		}
-		if total == 0 {
+		if !allowed {
 			return safeMessageError{message: "工作流引用了无权限访问的云端文件"}
 		}
 	}
 	return nil
 }
 
-func bindWorkflowCloudFiles(userID string, workflowID string, chunks ...json.RawMessage) error {
-	db, err := repository.DB()
-	if err != nil {
-		return err
-	}
-	return bindWorkflowCloudFilesTx(db, userID, workflowID, chunks...)
-}
-
 func bindWorkflowCloudFilesTx(tx *gorm.DB, userID string, workflowID string, chunks ...json.RawMessage) error {
 	ids := collectCloudFileIDsFromChunks(chunks...)
-	if len(ids) == 0 {
-		return nil
-	}
-	return tx.Model(&model.CloudFile{}).Where("id IN ? AND user_id = ? AND deleted_at = ?", mapKeys(ids), userID, "").Updates(map[string]any{
-		"purpose":     model.CloudFilePurposeWorkflow,
-		"workflow_id": workflowID,
-		"history_id":  "",
-		"expires_at":  "",
-		"updated_at":  now(),
-	}).Error
+	return repository.SetCloudFileReferencesTx(tx, userID, "workflow", workflowID, mapKeys(ids), "")
 }
 
 func collectCloudFileIDsFromChunks(chunks ...json.RawMessage) map[string]bool {
@@ -954,10 +982,16 @@ func collectCloudFileIDsFromChunks(chunks ...json.RawMessage) map[string]bool {
 
 func collectCloudFileIDs(value any, ids map[string]bool) {
 	switch typed := value.(type) {
+	case string:
+		parsed, err := url.Parse(typed)
+		if err == nil && strings.HasPrefix(parsed.Path, "/api/files/") && strings.HasSuffix(parsed.Path, "/content") {
+			id := strings.TrimSuffix(strings.TrimPrefix(parsed.Path, "/api/files/"), "/content")
+			if id != "" && !strings.Contains(id, "/") { ids[id] = true }
+		}
 	case map[string]any:
 		for key, item := range typed {
 			if (key == "cloudFileId" || key == "cloud_file_id") && fmt.Sprint(item) != "" {
-				ids[fmt.Sprint(item)] = true
+				ids[strings.TrimPrefix(fmt.Sprint(item), "cloud:")] = true
 			}
 			if key == "storageKey" {
 				text := fmt.Sprint(item)
@@ -981,6 +1015,7 @@ func mapKeys(items map[string]bool) []string {
 			result = append(result, key)
 		}
 	}
+	sort.Strings(result)
 	return result
 }
 
@@ -992,23 +1027,19 @@ func pushLinkedShareUpdates(db *gorm.DB, share model.WorkflowShare) error {
 		return err
 	}
 	for _, item := range copies {
-		if err := db.Model(&model.Workflow{}).Where("id = ? AND user_id = ? AND deleted_at = ?", item.WorkflowID, item.UserID, "").Updates(map[string]any{
-			"nodes":              source.Nodes,
-			"connections":        source.Connections,
-			"chat_sessions":      source.ChatSessions,
-			"active_chat_id":     source.ActiveChatID,
-			"background_mode":    source.BackgroundMode,
-			"show_image_info":    source.ShowImageInfo,
-			"viewport":           source.Viewport,
-			"source_version":     share.Version,
-			"source_share_id":    share.ID,
-			"source_workflow_id": share.SourceWorkflowID,
-			"source_sync_mode":   model.WorkflowSyncLinked,
-			"updated_at":         now(),
-		}).Error; err != nil {
-			return err
-		}
-		_ = db.Model(&model.WorkflowShareCopy{}).Where("id = ?", item.ID).Updates(map[string]any{"source_version": share.Version, "updated_at": now()}).Error
+		if err := db.Transaction(func(tx *gorm.DB) error {
+			if err := validateWorkflowCloudFilesTx(tx, share.OwnerID, source.Nodes, source.ChatSessions); err != nil { return err }
+			result := tx.Model(&model.Workflow{}).Where("id = ? AND user_id = ? AND deleted_at = ? AND source_sync_mode = ? AND source_version < ?", item.WorkflowID, item.UserID, "", model.WorkflowSyncLinked, share.Version).Updates(map[string]any{
+				"nodes": source.Nodes, "connections": source.Connections, "chat_sessions": source.ChatSessions,
+				"active_chat_id": source.ActiveChatID, "background_mode": source.BackgroundMode,
+				"show_image_info": source.ShowImageInfo, "viewport": source.Viewport,
+				"source_version": share.Version, "source_share_id": share.ID,
+				"source_workflow_id": share.SourceWorkflowID, "updated_at": now(),
+			})
+			if result.Error != nil || result.RowsAffected == 0 { return result.Error }
+			if err := bindWorkflowCloudFilesTx(tx, item.UserID, item.WorkflowID, source.Nodes, source.ChatSessions); err != nil { return err }
+			return tx.Model(&model.WorkflowShareCopy{}).Where("id = ?", item.ID).Updates(map[string]any{"source_version": share.Version, "updated_at": now()}).Error
+		}); err != nil { return err }
 	}
 	return nil
 }
@@ -1181,9 +1212,12 @@ func decodeStringList(raw json.RawMessage) []string {
 }
 
 func cleanupExpiredBannedCommunityPosts(db *gorm.DB) error {
-	return db.Model(&model.WorkflowCommunityPost{}).
-		Where("status = ? AND deleted_at = ? AND banned_at <> ? AND banned_at < ?", model.WorkflowCommunityStatusBanned, "", "", time.Now().AddDate(0, 0, -7).Format(time.RFC3339)).
-		Updates(map[string]any{"deleted_at": now(), "updated_at": now()}).Error
+	var posts []model.WorkflowCommunityPost
+	if err := db.Where("status = ? AND deleted_at = ? AND banned_at <> ? AND banned_at < ?", model.WorkflowCommunityStatusBanned, "", "", time.Now().AddDate(0, 0, -7).Format(time.RFC3339)).Limit(100).Find(&posts).Error; err != nil { return err }
+	for _, post := range posts {
+		if err := DeleteCommunityWorkflow(post.UserID, post.ID); err != nil { return err }
+	}
+	return nil
 }
 
 func communityJSONTagsContains(db *gorm.DB) string {

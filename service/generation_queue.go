@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log"
 	"mime"
 	"mime/multipart"
 	"net/http"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -38,6 +38,7 @@ type AIProxyExecutor func(ctx context.Context, user model.AuthUser, body io.Read
 
 var (
 	queueMu       sync.Mutex
+	queueWorkerID = newID("worker")
 	proxyExecutor AIProxyExecutor
 )
 
@@ -65,7 +66,9 @@ func SubmitAITask(ctx context.Context, user model.AuthUser, body []byte, content
 	if err != nil {
 		return model.GenerationTaskSubmitResult{}, nil, err
 	}
-	requestCount := ReadAIRequestCount(body, contentType)
+	requestCount, err := ReadAIRequestCount(body, contentType)
+	if err != nil { return model.GenerationTaskSubmitResult{}, nil, err }
+	if credits < 0 || credits > int(^uint(0)>>1)/requestCount { return model.GenerationTaskSubmitResult{}, nil, safeMessageError{message: "模型计费配置无效"} }
 	credits *= requestCount
 	if err := ConsumeUserCreditsWithMeta(user.ID, modelName, credits, path, meta); err != nil {
 		return model.GenerationTaskSubmitResult{}, nil, err
@@ -121,6 +124,8 @@ func SubmitAITask(ctx context.Context, user model.AuthUser, body []byte, content
 	if !*queue.Enabled || canRun {
 		task.Status = model.GenerationTaskExecuting
 		task.StartedAt = now
+		task.WorkerID = queueWorkerID
+		task.LeaseExpiresAt = time.Now().Add(AIRequestTimeout + time.Minute).Format(time.RFC3339)
 		saved, err := repository.SaveGenerationTask(task)
 		queueMu.Unlock()
 		if err != nil {
@@ -175,7 +180,7 @@ func ListGenerationTasks(user model.AuthUser) ([]model.GenerationTaskView, error
 	return result, nil
 }
 
-func GetGenerationTaskResult(user model.AuthUser, id string) (GenerationTaskResultStream, error) {
+func GetGenerationTaskResult(ctx context.Context, user model.AuthUser, id string) (GenerationTaskResultStream, error) {
 	task, ok, err := repository.GetGenerationTask(id)
 	if err != nil {
 		return GenerationTaskResultStream{}, err
@@ -188,7 +193,7 @@ func GetGenerationTaskResult(user model.AuthUser, id string) (GenerationTaskResu
 	}
 	header := http.Header{}
 	_ = json.Unmarshal([]byte(task.ResponseHeader), &header)
-	_, content, err := GetFileContent(user, task.ResponseFileID, "")
+	_, content, err := GetFileContent(ctx, user, task.ResponseFileID, "")
 	if err != nil {
 		return GenerationTaskResultStream{}, err
 	}
@@ -209,13 +214,10 @@ func CancelGenerationTask(user model.AuthUser, id string) error {
 		return safeMessageError{message: "只能撤销排队中的任务"}
 	}
 	now := time.Now().Format(time.RFC3339)
-	if err := RefundUserCredits(user.ID, task.Model, task.Credits, task.Path); err != nil {
-		return err
-	}
-	if err := repository.UpdateGenerationTaskStatus(task.ID, model.GenerationTaskCanceled, map[string]any{"canceled_at": now, "finished_at": now, "error": "用户已撤销", "queue_position": 0}); err != nil {
-		log.Printf("generation task mark canceled failed after refund: task=%s err=%v", task.ID, err)
-		return err
-	}
+	changed, err := repository.FinishGenerationTask(task, model.GenerationTaskCanceled, map[string]any{"canceled_at": now, "finished_at": now, "error": "用户已撤销", "queue_position": 0}, taskRefundLog(task))
+	if err != nil { return err }
+	if !changed { return safeMessageError{message: "任务状态已变化，无法撤销"} }
+
 	if err := deleteTaskPayload(task.RequestFileID); err != nil {
 		log.Printf("generation task request payload delete failed after cancel: task=%s err=%v", task.ID, err)
 	}
@@ -231,6 +233,8 @@ func StartGenerationQueueScheduler() {
 		_ = recoverExecutingTasks()
 		ticker := time.NewTicker(time.Second)
 		cleanupTicker := time.NewTicker(10 * time.Minute)
+		recoveryTicker := time.NewTicker(30 * time.Second)
+		defer recoveryTicker.Stop()
 		defer ticker.Stop()
 		defer cleanupTicker.Stop()
 		for range ticker.C {
@@ -238,6 +242,8 @@ func StartGenerationQueueScheduler() {
 				log.Printf("generation queue dispatch failed: %v", err)
 			}
 			select {
+			case <-recoveryTicker.C:
+				_ = recoverExecutingTasks()
 			case <-cleanupTicker.C:
 				_ = cleanupOldGenerationTasks()
 			default:
@@ -275,7 +281,8 @@ func dispatchQueuedTasks() error {
 		}
 		for _, task := range items {
 			startedAt := time.Now().Format(time.RFC3339)
-			changed, err := repository.MarkQueuedTaskExecuting(task.ID, startedAt)
+			lease := time.Now().Add(AIRequestTimeout + time.Minute).Format(time.RFC3339)
+			changed, err := repository.MarkQueuedTaskExecuting(task.ID, startedAt, queueWorkerID, lease)
 			if err != nil {
 				return err
 			}
@@ -284,6 +291,7 @@ func dispatchQueuedTasks() error {
 			}
 			task.Status = model.GenerationTaskExecuting
 			task.StartedAt = startedAt
+			task.WorkerID, task.LeaseExpiresAt = queueWorkerID, lease
 			task.QueuePosition = 0
 			go func(item model.GenerationTask) {
 				user := model.AuthUser{ID: item.UserID, Username: item.Username}
@@ -300,13 +308,15 @@ func dispatchQueuedTasks() error {
 }
 
 func executeTask(ctx context.Context, user model.AuthUser, task model.GenerationTask) (AIProxyResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, AIRequestTimeout)
+	defer cancel()
 	if proxyExecutor == nil {
 		return failExecutingTask(task, "AI 执行器未初始化")
 	}
 	if strings.TrimSpace(task.RequestFileID) == "" {
 		return failExecutingTask(task, "AI 请求内容读取失败")
 	}
-	file, content, err := GetFileContent(user, task.RequestFileID, "")
+	file, content, err := GetFileContent(ctx, user, task.RequestFileID, "")
 	if err != nil {
 		return failExecutingTask(task, "AI 请求内容读取失败")
 	}
@@ -327,34 +337,26 @@ func executeTask(ctx context.Context, user model.AuthUser, task model.Generation
 		return failExecutingTask(task, "AI 结果保存失败")
 	}
 	fields := map[string]any{"response_status": resp.StatusCode, "response_header": string(headerJSON), "response_file_id": responseFile.File.ID, "finished_at": now}
-	if err := repository.UpdateGenerationTaskStatus(task.ID, model.GenerationTaskSucceeded, fields); err != nil {
-		log.Printf("generation task persist succeeded response failed: task=%s err=%v", task.ID, err)
-	}
+	changed, err := repository.FinishGenerationTask(task, model.GenerationTaskSucceeded, fields, nil)
+	if err != nil { return failExecutingTask(task, "AI 结果保存失败") }
+	if !changed { return AIProxyResponse{}, safeMessageError{message: "任务已结束，请刷新任务列表"} }
 	return resp, nil
 }
 
+func taskRefundLog(task model.GenerationTask) *model.CreditLog {
+	return &model.CreditLog{ID: newID("credit"), UserID: task.UserID, Type: model.CreditLogTypeAIRefund, Category: creditLogCategory(model.CreditLogTypeAIRefund), Model: task.Model, Path: task.Path, Amount: task.Credits, RelatedID: task.ID, Remark: "生成任务失败或撤销退款", CreatedAt: now()}
+}
+
 func failExecutingTask(task model.GenerationTask, message string) (AIProxyResponse, error) {
-	now := time.Now().Format(time.RFC3339)
-	if updateErr := repository.UpdateGenerationTaskStatus(task.ID, model.GenerationTaskFailed, map[string]any{"error": message, "finished_at": now}); updateErr != nil {
-		log.Printf("generation task mark failed failed before refund: task=%s err=%v", task.ID, updateErr)
-		return AIProxyResponse{}, safeMessageError{message: message}
-	}
-	if refundErr := RefundUserCredits(task.UserID, task.Model, task.Credits, task.Path); refundErr != nil {
-		log.Printf("generation task refund failed: task=%s err=%v", task.ID, refundErr)
-	}
+	_, err := repository.FinishGenerationTask(task, model.GenerationTaskFailed, map[string]any{"error": message, "finished_at": now()}, taskRefundLog(task))
+	if err != nil { log.Printf("generation task settlement failed: task=%s err=%v", task.ID, err) }
 	return AIProxyResponse{}, safeMessageError{message: message}
 }
 
 func recoverExecutingTasks() error {
-	items, err := repository.MarkExecutingTasksFailed("服务重启，任务已中断")
-	if err != nil {
-		return err
-	}
-	for _, item := range items {
-		if err := RefundUserCredits(item.UserID, item.Model, item.Credits, item.Path); err != nil {
-			log.Printf("generation task startup refund failed: task=%s err=%v", item.ID, err)
-		}
-	}
+	items, err := repository.ListExpiredExecutingTasks(now())
+	if err != nil { return err }
+	for _, item := range items { _, _ = failExecutingTask(item, "任务执行超时或执行实例已离线") }
 	return nil
 }
 
@@ -443,7 +445,8 @@ func ReadAIRequest(body io.Reader, contentType string) ([]byte, string, error) {
 	}
 	modelName := ""
 	if strings.HasPrefix(contentType, "multipart/form-data") {
-		modelName = readMultipartValue(payload, contentType, "model")
+		modelName, err = readMultipartValue(payload, contentType, "model")
+		if err != nil { return nil, "", err }
 	} else {
 		var data struct {
 			Model string `json:"model"`
@@ -531,39 +534,39 @@ func rewriteMultipartModel(body []byte, contentType string, modelName string) ([
 	return buffer.Bytes(), writer.FormDataContentType(), nil
 }
 
-func ReadAIRequestCount(body []byte, contentType string) int {
+func ReadAIRequestCount(body []byte, contentType string) (int, error) {
 	count := 1
+	invalid := safeMessageError{message: "生成数量需为 1–10 的整数"}
 	if strings.HasPrefix(contentType, "multipart/form-data") {
-		if value := readMultipartValue(body, contentType, "n"); value != "" {
-			_, _ = fmt.Sscan(value, &count)
+		value, err := readMultipartValue(body, contentType, "n")
+		if err != nil { return 0, invalid }
+		if value != "" {
+			count, err = strconv.Atoi(value)
+			if err != nil { return 0, invalid }
 		}
 	} else {
-		var payload struct {
-			N int `json:"n"`
+		var payload map[string]json.RawMessage
+		if err := json.Unmarshal(body, &payload); err != nil { return 0, invalid }
+		if value, ok := payload["n"]; ok {
+			if string(value) == "null" || json.Unmarshal(value, &count) != nil { return 0, invalid }
 		}
-		_ = json.Unmarshal(body, &payload)
-		count = payload.N
 	}
-	if count < 1 {
-		return 1
-	}
-	return count
+	if count < 1 || count > 10 { return 0, invalid }
+	return count, nil
 }
 
-func readMultipartValue(body []byte, contentType string, key string) string {
+func readMultipartValue(body []byte, contentType string, key string) (string, error) {
 	_, params, err := mime.ParseMediaType(contentType)
-	if err != nil {
-		return ""
-	}
+	if err != nil { return "", err }
 	form, err := multipart.NewReader(bytes.NewReader(body), params["boundary"]).ReadForm(32 << 20)
-	if err != nil {
-		return ""
-	}
+	if err != nil { return "", err }
 	defer form.RemoveAll()
-	if values := form.Value[key]; len(values) > 0 {
-		return values[0]
+	values := form.Value[key]
+	if len(values) > 1 || len(form.File[key]) > 0 || (len(values) == 1 && strings.TrimSpace(values[0]) == "") {
+		return "", safeMessageError{message: "请求字段重复或格式无效"}
 	}
-	return ""
+	if len(values) == 1 { return values[0], nil }
+	return "", nil
 }
 
 func StoreTaskPayload(ctx context.Context, user model.AuthUser, filename string, body []byte, contentType string, source string) (CloudObjectResult, error) {

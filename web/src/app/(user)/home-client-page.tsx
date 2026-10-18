@@ -23,12 +23,14 @@ import { useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
 import { useImageComposerStore } from "@/stores/use-image-composer-store";
 import { useUserStore } from "@/stores/use-user-store";
 import { useHomeScroll } from "./use-home-scroll";
+import { HomeModels } from "./home-models";
+import { HomePlans } from "./home-plans";
 import styles from "./home.module.css";
 
 const scenes = [
-    { label: "图像创作", icon: ImagePlus, title: <>一句描述。<br />万千种可能。</>, text: "用文字勾勒画面，也用参考图传递那些难以描述的细节。在每一次生成中，靠近心里的答案。", route: "/image", points: ["文字生图与参考图编辑", "自由比例与多张生成", "保存作品，继续创作"] },
-    { label: "视频叙事", icon: Video, title: <>让故事，<br />从这一帧继续。</>, text: "为静态的灵感赋予时间。描述镜头的运动、主体的动作与场景氛围，让想象逐帧展开。", route: "/video", points: ["文字与参考图输入", "镜头、尺寸与时长", "从灵感到动态叙事"] },
-    { label: "空间探索", icon: Box, title: <>多一个维度，<br />多一种表达。</>, text: "从文字、一张图片或多个视角出发，探索三维形体。让材质与结构，成为表达的一部分。", route: "/model-3d", points: ["文字、图片与多视角", "网格、纹理与 PBR", "生成并下载模型"] },
+    { label: "图像创作", icon: ImagePlus, title: <>一句描述<br />万千种可能</>, text: "用文字勾勒画面，也用参考图传递那些难以描述的细节。在每一次生成中，靠近心里的答案。", route: "/image", points: ["文字生图与参考图编辑", "自由比例与多张生成", "保存作品，继续创作"] },
+    { label: "视频叙事", icon: Video, title: <>让故事<br />从这一帧继续</>, text: "为静态的灵感赋予时间。描述镜头的运动、主体的动作与场景氛围，让想象逐帧展开。", route: "/video", points: ["文字与参考图输入", "镜头、尺寸与时长", "从灵感到动态叙事"] },
+    { label: "空间探索", icon: Box, title: <>多一个维度<br />多一种表达</>, text: "从文字、一张图片或多个视角出发，探索三维形体。让材质与结构，成为表达的一部分。", route: "/model-3d", points: ["文字、图片与多视角", "网格、纹理与 PBR", "生成并下载模型"] },
 ];
 
 export function HomeClientPage() {
@@ -103,6 +105,9 @@ export function HomeClientPage() {
                 </div>
             </section>
 
+            <HomeModels />
+            <HomePlans />
+
             <div id="platform" className={styles.platformHeading}>
                 <span className={styles.eyebrow}>一个想法，更多表达。</span>
                 <div className={styles.sceneLinks}>{scenes.map(({ label, icon: Icon }, index) => <a key={label} href={"#scene-" + index}><Icon size={18} />{label}<ArrowDown size={14} /></a>)}</div>
@@ -119,12 +124,12 @@ export function HomeClientPage() {
             </section>)}
 
             <section className={styles.workflow} data-reveal>
-                <div><span className={styles.eyebrow}><Maximize2 size={17} />04 / 让创作连起来</span><h2>像思考一样，<br />自由连接。</h2><p>把灵感、参考与生成步骤放到无限画布上。<br />让每一步，都成为下一次创作的起点。</p><Link href={localizedPath("/canvas")} className={styles.textLink}>打开工作流 <ArrowRight size={18} /></Link></div>
+                <div><span className={styles.eyebrow}><Maximize2 size={17} />04 / 让创作连起来</span><h2>像思考一样<br />自由连接</h2><p>把灵感、参考与生成步骤放到无限画布上。<br />让每一步，都成为下一次创作的起点。</p><Link href={localizedPath("/canvas")} className={styles.textLink}>打开工作流 <ArrowRight size={18} /></Link></div>
                 <div className={styles.workflowImages} aria-label="参考图与创作灵感"><PromptLibraryImage prompt={gallery.items[3]} /><span aria-hidden="true">→</span><PromptLibraryImage prompt={gallery.items[4]} /><span aria-hidden="true">→</span><PromptLibraryImage prompt={gallery.items[5]} /></div>
             </section>
 
             <section id="showcase" className={styles.section} data-reveal>
-                <div className={styles.sectionHeading}><div><span className={styles.eyebrow}>05 / 灵感没有边界</span><h2>先看见，<br />再创造你的版本。</h2></div><Link href={localizedPath("/prompts")} className={styles.textLink}>探索完整图库 <ArrowUpRight size={18} /></Link></div>
+                <div className={styles.sectionHeading}><div><span className={styles.eyebrow}>05 / 灵感没有边界</span><h2>先看见<br />再创造你的版本</h2></div><Link href={localizedPath("/prompts")} className={styles.textLink}>探索完整图库 <ArrowUpRight size={18} /></Link></div>
                 <div className={styles.filterTabs} data-native-scroll aria-label="灵感图库分类">{[{ id: "all", label: "全部灵感" }, ...promptGallerySources].map((source) => <button type="button" key={source.id} data-active={category === source.id} aria-pressed={category === source.id} onClick={() => setCategory(source.id)}>{source.label}</button>)}</div>
                 <div className={styles.gallery} aria-busy={gallery.isLoading}>
                     {featured.map((item) => <Link key={item.id} href={localizedPath("/image?prompt=" + encodeURIComponent(item.prompt))} className={styles.galleryCard}><PromptLibraryImage prompt={item} className={styles.galleryImage} /><div className={styles.galleryCaption}><span><small>{promptGallerySources.find((source) => source.id === item.category)?.label || item.category}</small><strong>{item.title}</strong></span><ArrowUpRight size={20} /></div></Link>)}
@@ -136,15 +141,15 @@ export function HomeClientPage() {
             </section>
 
             <section className={styles.section} data-reveal>
-                <div className={styles.sectionHeading}><div><span className={styles.eyebrow}>06 / 创作工具箱</span><h2>各有所长，<br />也彼此相连。</h2></div><p>生成、整理、探索、复用。<br />为每一个想法，找到合适的工具。</p></div>
+                <div className={styles.sectionHeading}><div><span className={styles.eyebrow}>06 / 创作工具箱</span><h2>各有所长<br />也彼此相连</h2></div><p>生成、整理、探索、复用。<br />为每一个想法，找到合适的工具。</p></div>
                 <div className={styles.toolGrid}>{navigationTools.map((tool) => <Link key={tool.slug} href={tool.external ? tool.href + ("localeAware" in tool && tool.localeAware && locale === "zh-CN" ? "/zh-CN" : "") : localizedPath("/" + tool.slug)} target={tool.external ? "_blank" : undefined} rel={tool.external ? "noopener noreferrer" : undefined} className={styles.toolCard}><tool.icon size={30} strokeWidth={1.2} /><h3>{tool.label}<ArrowUpRight size={19} /></h3><p>{toolDescriptions[tool.slug]}</p><span>{tool.external ? "在独立站点打开" : "在工作空间中打开"}</span></Link>)}</div>
             </section>
 
-            <section className={styles.stepsSection} data-reveal><span className={styles.eyebrow}>07 / 现在，轮到你了</span><h2>从想法到作品，<br className="sm:hidden" />就从这三步开始。</h2><div className={styles.steps}>{[{ title: "找到一个起点", text: "一句描述、一张参考图，或图库里让你心动的画面。", href: "/prompts", link: "寻找灵感" }, { title: "选择你的表达", text: "打开图片、视频或 3D 工作台，把想象写下来。", href: "/image", link: "尝试生成" }, { title: "让创作继续", text: "保存作品，在画布中连接下一步，建立自己的工作流。", href: "/canvas", link: "打开画布" }].map((step, index) => <div key={step.title}><span className={styles.stepNumber}>0{index + 1}</span><h3>{step.title}</h3><p>{step.text}</p><Link href={localizedPath(step.href)} className={styles.textLink}>{step.link}<ArrowRight size={17} /></Link></div>)}</div></section>
+            <section className={styles.stepsSection} data-reveal><span className={styles.eyebrow}>07 / 现在，轮到你了</span><h2>从想法到作品<br className="sm:hidden" />就从这三步开始</h2><div className={styles.steps}>{[{ title: "找到一个起点", text: "一句描述、一张参考图，或图库里让你心动的画面。", href: "/prompts", link: "寻找灵感" }, { title: "选择你的表达", text: "打开图片、视频或 3D 工作台，把想象写下来。", href: "/image", link: "尝试生成" }, { title: "让创作继续", text: "保存作品，在画布中连接下一步，建立自己的工作流。", href: "/canvas", link: "打开画布" }].map((step, index) => <div key={step.title}><span className={styles.stepNumber}>0{index + 1}</span><h3>{step.title}</h3><p>{step.text}</p><Link href={localizedPath(step.href)} className={styles.textLink}>{step.link}<ArrowRight size={17} /></Link></div>)}</div></section>
 
-            <section id="faq" className={styles.faqSection} data-reveal><div><span className={styles.eyebrow}>08 / 开始之前</span><h2>你可能<br />还想了解。</h2><Link href={localizedPath("/pricing")} className={styles.textLink}>查看套餐 <ArrowUpRight size={17} /></Link></div><div>{questions.map((item, index) => <div key={item.question} className={styles.faq} data-open={openQuestion === item.question}><h3><button type="button" id={`faq-question-${index}`} aria-expanded={openQuestion === item.question} aria-controls={`faq-answer-${index}`} onClick={() => setOpenQuestion((value) => value === item.question ? null : item.question)}>{item.question}<Plus size={19} /></button></h3><div id={`faq-answer-${index}`} role="region" aria-labelledby={`faq-question-${index}`} aria-hidden={openQuestion !== item.question} className={styles.faqBody}><div><p>{item.answer}</p></div></div></div>)}</div></section>
+            <section id="faq" className={styles.faqSection} data-reveal><div><span className={styles.eyebrow}>08 / 开始之前</span><h2>你可能<br />还想了解</h2><Link href={localizedPath("/pricing")} className={styles.textLink}>查看套餐 <ArrowUpRight size={17} /></Link></div><div>{questions.map((item, index) => <div key={item.question} className={styles.faq} data-open={openQuestion === item.question}><h3><button type="button" id={`faq-question-${index}`} aria-expanded={openQuestion === item.question} aria-controls={`faq-answer-${index}`} onClick={() => setOpenQuestion((value) => value === item.question ? null : item.question)}>{item.question}<Plus size={19} /></button></h3><div id={`faq-answer-${index}`} role="region" aria-labelledby={`faq-question-${index}`} aria-hidden={openQuestion !== item.question} className={styles.faqBody}><div><p>{item.answer}</p></div></div></div>)}</div></section>
 
-            <section className={styles.closing} data-reveal><span className={styles.eyebrow}>下一个好作品，从你的想象开始。</span><h2>想到了，<br />就去创造。</h2><div className={styles.actions}><Link href={localizedPath("/canvas")} className={styles.primary}>开启我的创作 <ArrowUpRight size={18} /></Link><Link href={localizedPath("/prompts")} className={styles.secondary}>再找一点灵感 <ArrowRight size={17} /></Link></div></section>
+            <section className={styles.closing} data-reveal><span className={styles.eyebrow}>下一个好作品从你的想象开始</span><h2>想到了就去创造</h2><div className={styles.actions}><Link href={localizedPath("/canvas")} className={styles.primary}>开启我的创作 <ArrowUpRight size={18} /></Link><Link href={localizedPath("/prompts")} className={styles.secondary}>再找一点灵感 <ArrowRight size={17} /></Link></div></section>
 
             <footer className={styles.footer}>
                 <div className={styles.footerTop}><div><Link href={localizedPath("/")} className={styles.footerBrand}><span className={styles.logoMark} />Aivro</Link><p className={styles.footerIntro}>让想象成为作品。<br />连接文字、图像、视频与三维世界，<br />把每一次灵感，变成值得分享的创作。</p><div className={styles.footerSocial} aria-label="社交媒体">{homeSocialPlatforms.map(({ id, label }) => {

@@ -41,9 +41,7 @@ func UploadUserAvatar(ctx context.Context, user model.AuthUser, reader io.Reader
 	if err != nil {
 		return model.AuthUser{}, err
 	}
-	saved.AvatarURL = result.PublicURL
-	saved.UpdatedAt = now()
-	saved, err = repository.SaveUser(saved)
+	saved, err = repository.UpdateUser(saved.ID, map[string]any{"avatar_url": result.PublicURL, "updated_at": now()})
 	if err != nil {
 		return model.AuthUser{}, err
 	}

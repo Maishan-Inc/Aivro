@@ -509,7 +509,7 @@ function AssistantComposer({
                     </div>
                     <Button
                         type="primary"
-                        className="!h-10 !min-w-16 shrink-0 !rounded-full !px-3"
+                        className="!h-10 !w-10 !min-w-10 shrink-0 !rounded-full !p-0"
                         disabled={isRunning || !prompt.trim()}
                         onClick={() => void onSubmit()}
                         aria-label="发送"

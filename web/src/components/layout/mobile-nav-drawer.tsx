@@ -27,7 +27,7 @@ export function MobileNavDrawer({ open, activeToolSlug, onClose }: MobileNavDraw
                 {user ? (
                     <Link href={withLocalePath("/console", locale)} onClick={onClose} className="flex items-center gap-3 rounded-lg px-3 py-3 text-base font-medium text-stone-900 transition hover:bg-stone-100 dark:text-stone-100 dark:hover:bg-stone-800">
                         <LayoutDashboard className="size-5" />
-                        <span>{locale === "en-US" ? "Console" : "控制台"}</span>
+                        <span>控制台</span>
                     </Link>
                 ) : null}
                 {navigationTools.map((tool) => {

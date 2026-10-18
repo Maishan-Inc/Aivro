@@ -20,6 +20,14 @@ func New() *gin.Engine {
 	_ = router.SetTrustedProxies(nil)
 	router.GET("/ads.txt", gin.WrapF(handler.AdsTxt))
 	api := router.Group("/api")
+	api.Use(func(c *gin.Context) {
+		limit := int64(80 << 20)
+		if strings.HasPrefix(c.Request.URL.Path, "/api/webhooks/") || strings.HasPrefix(c.Request.URL.Path, "/api/auth/") || c.Request.URL.Path == "/api/admin/login" {
+			limit = 1 << 20
+		}
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, limit)
+		c.Next()
+	})
 	api.GET("/health", func(c *gin.Context) {
 		c.String(http.StatusOK, "ok")
 	})
@@ -54,6 +62,8 @@ func New() *gin.Engine {
 	})
 	v1 := api.Group("/v1", middleware.UserAuth)
 	v1.POST("/files", gin.WrapF(handler.UploadFile))
+	v1.POST("/asset-files/:id", func(c *gin.Context) { handler.RetainAssetFiles(c.Writer, c.Request, c.Param("id")) })
+	v1.DELETE("/asset-files/:id", func(c *gin.Context) { handler.ReleaseAssetFiles(c.Writer, c.Request, c.Param("id")) })
 	v1.POST("/images/generations", gin.WrapF(handler.AIImagesGenerations))
 	v1.POST("/images/edits", gin.WrapF(handler.AIImagesEdits))
 	v1.POST("/chat/completions", gin.WrapF(handler.AIChatCompletions))

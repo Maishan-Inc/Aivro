@@ -1,4 +1,4 @@
-import { apiGet, compactApiParams } from "@/services/api/request";
+import { apiDelete, apiGet, apiPost, compactApiParams } from "@/services/api/request";
 
 export type AssetLibraryItem = {
     id: string;
@@ -30,4 +30,12 @@ export type AssetLibraryQuery = {
 
 export async function fetchAssetLibrary(query: AssetLibraryQuery = {}) {
     return apiGet<AssetLibraryResponse>("/api/assets", compactApiParams(query));
+}
+
+export function retainAssetFiles(token: string, id: string, fileIds: string[]) {
+    return apiPost<boolean>(`/api/v1/asset-files/${encodeURIComponent(id)}`, { fileIds }, token);
+}
+
+export function releaseAssetFiles(token: string, id: string) {
+    return apiDelete<boolean>(`/api/v1/asset-files/${encodeURIComponent(id)}`, token);
 }

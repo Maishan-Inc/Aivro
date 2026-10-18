@@ -2,6 +2,8 @@ package main
 
 import (
 	"log"
+	"net/http"
+	"time"
 
 	"github.com/basketikun/aivro/config"
 	"github.com/basketikun/aivro/handler"
@@ -23,5 +25,6 @@ func main() {
 	service.StartCloudStorageCleanupScheduler()
 	service.RegisterAIProxyExecutor(handler.ExecuteAIProxyTask)
 	service.StartGenerationQueueScheduler()
-	log.Fatal(router.New().Run(":" + config.Cfg.Port))
+	server := &http.Server{Addr: ":" + config.Cfg.Port, Handler: router.New(), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: time.Minute}
+	log.Fatal(server.ListenAndServe())
 }

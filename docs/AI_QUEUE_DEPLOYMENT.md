@@ -259,22 +259,11 @@ docker compose logs -f app | grep "refund"
 ### 故障恢复
 
 **进程重启后**：
-- 所有 `executing` 任务自动标记为 `failed`
-- 点数自动返还
-- `queued` 任务继续排队，不受影响
-
-**手动恢复卡死任务**：
-```sql
--- 标记长时间执行中的任务为失败
-UPDATE generation_tasks 
-SET status = 'failed', 
-    error = '任务执行超时', 
-    finished_at = CURRENT_TIMESTAMP 
-WHERE status = 'executing' 
-  AND started_at < datetime('now', '-10 minutes');
-```
-
-然后手动执行点数返还（需通过管理后台或 API）。
+- 只回收租约到期的 `executing` 任务，不终止其他进程仍在执行且租约有效的任务。
+- 单次执行最多 5 分钟，租约为 6 分钟；启动时和每 30 秒检查过期任务。
+- 失败/撤销的终态、余额返还和流水在同一事务中写入；重复恢复不会重复退款。
+- `queued` 任务继续排队。不要直接用 SQL 修改状态后单独退款，这会绕过原子结算。
+- 领取状态有数据库条件更新保护，但模型每分钟容量与排队数仍使用进程内调度锁，多实例严格共享限流仍需要分布式调度方案。
 
 ## 前端集成
 
@@ -313,7 +302,7 @@ WHERE status = 'executing'
 ### Q4：多实例部署需要注意什么？
 **A**：
 - 必须使用 PostgreSQL 或 MySQL（不能用 SQLite）
-- 第一版只支持单实例，多实例会导致任务重复调度
+- 当前任务领取和终态结算有条件更新保护；模型速率与排队容量仍应按单实例部署理解
 - 多实例支持需实现 Redis 队列后端或分布式锁（第二阶段）
 
 ### Q5：任务保留时间改为 0 会怎样？

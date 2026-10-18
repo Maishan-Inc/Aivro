@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net"
@@ -42,8 +43,31 @@ func IsWebhookSignatureError(err error) bool {
 	return errors.As(err, &signatureErr)
 }
 
-func publicHTTPClient() *http.Client {
+func publicHTTPClient() *http.Client { return publicClient }
+
+var publicClient = newPublicHTTPClient()
+
+func newPublicHTTPClient() *http.Client {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.Proxy = nil
+	transport.DialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
+		host, port, err := net.SplitHostPort(address)
+		if err != nil {
+			return nil, err
+		}
+		ips, err := net.DefaultResolver.LookupIPAddr(ctx, host)
+		if err != nil || len(ips) == 0 {
+			return nil, errors.New("无法解析远程地址")
+		}
+		for _, ip := range ips {
+			if !isPublicIP(ip.IP) {
+				return nil, errors.New("远程地址不安全")
+			}
+		}
+		return (&net.Dialer{Timeout: 15 * time.Second}).DialContext(ctx, network, net.JoinHostPort(ips[0].IP.String(), port))
+	}
 	return &http.Client{
+		Transport: transport,
 		Timeout: 2 * time.Minute,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			if len(via) >= 5 {
@@ -56,6 +80,10 @@ func publicHTTPClient() *http.Client {
 		},
 	}
 }
+
+const AIRequestTimeout = 5 * time.Minute
+
+var AIHTTPClient = &http.Client{Timeout: AIRequestTimeout}
 
 func VerifyCaptcha(r *http.Request, token string) error {
 	settings, err := repository.GetSettings()

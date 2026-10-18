@@ -36,108 +36,216 @@ export const seoPages: Record<SeoPageKey, SeoPage> = {
     home: {
         path: "/",
         index: true,
-        title: { "zh-CN": "Aivro - AI 无限画布创作工具", "en-US": "Aivro - AI Infinite Canvas Creation Tool" },
-        description: { "zh-CN": "Aivro 支持图片、视频、文本、提示词和工作流创作，让每次生成都沉淀为连续可复用的 AI 创作流程。", "en-US": "Aivro helps you create images, videos, text, prompts, and workflows so every generation becomes a reusable AI creation process." },
+        title: {
+            "zh-CN": "Aivro - AI 无限画布创作工具",
+            "en-US": "Aivro - AI Infinite Canvas Creation Tool",
+            "ja-JP": "Aivro - AI インフィニットキャンバス創作ツール",
+            "ko-KR": "Aivro - AI 무한 캔버스 창작 도구",
+            "fr-FR": "Aivro - Outil de création IA sur canevas infini",
+        },
+        description: {
+            "zh-CN": "Aivro 支持图片、视频、文本、提示词和工作流创作，让每次生成都沉淀为连续可复用的 AI 创作流程。",
+            "en-US": "Aivro helps you create images, videos, text, prompts, and workflows so every generation becomes a reusable AI creation process.",
+            "ja-JP": "Aivro は画像・動画・テキスト・プロンプト・ワークフローの作成に対応し、生成のたびに再利用できる AI 創作フローを築きます。",
+            "ko-KR": "Aivro는 이미지, 영상, 텍스트, 프롬프트, 워크플로 제작을 지원하며 모든 생성이 재사용 가능한 AI 창작 흐름으로 이어집니다.",
+            "fr-FR": "Aivro permet de créer images, vidéos, textes, prompts et workflows pour que chaque génération devienne un processus créatif IA réutilisable.",
+        },
     },
     pricing: {
         path: "/pricing",
         index: true,
-        title: { "zh-CN": "套餐购买 - Aivro", "en-US": "Plans - Aivro" },
-        description: { "zh-CN": "购买 Aivro 套餐，获取算力点和云端工作流创建次数，支持图片、视频、画布和 AI 创作。", "en-US": "Buy Aivro plans to get credits and cloud workflow quota for image, video, canvas, and AI creation." },
+        title: { "zh-CN": "套餐购买 - Aivro", "en-US": "Plans - Aivro", "ja-JP": "プラン - Aivro", "ko-KR": "요금제 - Aivro", "fr-FR": "Offres - Aivro" },
+        description: {
+            "zh-CN": "购买 Aivro 套餐，获取算力点和云端工作流创建次数，支持图片、视频、画布和 AI 创作。",
+            "en-US": "Buy Aivro plans to get credits and cloud workflow quota for image, video, canvas, and AI creation.",
+            "ja-JP": "Aivro のプランを購入してクレジットとクラウドワークフローの作成回数を取得し、画像・動画・キャンバス・AI 創作に活用できます。",
+            "ko-KR": "Aivro 요금제를 구매해 크레딧과 클라우드 워크플로 생성 횟수를 받고 이미지, 영상, 캔버스, AI 창작에 사용하세요.",
+            "fr-FR": "Achetez une offre Aivro pour obtenir des crédits et des créations de workflows cloud pour l'image, la vidéo, le canevas et la création IA.",
+        },
     },
     image: {
         path: "/image",
         index: true,
-        title: { "zh-CN": "AI 生图工作台 - Aivro", "en-US": "AI Image Studio - Aivro" },
-        description: { "zh-CN": "在 Aivro 生图工作台使用后台配置的模型生成图片，管理参考图、参数和云端生成记录。", "en-US": "Generate images with configured AI models in Aivro Image Studio, with reference images, settings, and cloud history." },
+        title: { "zh-CN": "AI 生图工作台 - Aivro", "en-US": "AI Image Studio - Aivro", "ja-JP": "AI 画像スタジオ - Aivro", "ko-KR": "AI 이미지 스튜디오 - Aivro", "fr-FR": "Studio d'image IA - Aivro" },
+        description: {
+            "zh-CN": "在 Aivro 生图工作台使用后台配置的模型生成图片，管理参考图、参数和云端生成记录。",
+            "en-US": "Generate images with configured AI models in Aivro Image Studio, with reference images, settings, and cloud history.",
+            "ja-JP": "Aivro 画像スタジオでは設定済みのモデルで画像を生成し、参照画像・パラメーター・クラウド生成履歴を管理できます。",
+            "ko-KR": "Aivro 이미지 스튜디오에서 설정된 모델로 이미지를 생성하고 참조 이미지, 설정, 클라우드 생성 기록을 관리하세요.",
+            "fr-FR": "Générez des images avec les modèles configurés dans le Studio d'image Aivro, avec images de référence, réglages et historique cloud.",
+        },
     },
     video: {
         path: "/video",
         index: true,
-        title: { "zh-CN": "AI 视频创作台 - Aivro", "en-US": "AI Video Studio - Aivro" },
-        description: { "zh-CN": "使用 Aivro 视频创作台生成视频，支持提示词、参考图、清晰度、尺寸、秒数和生成记录。", "en-US": "Create videos in Aivro Video Studio with prompts, reference images, resolution, size, duration, and generation history." },
+        title: { "zh-CN": "AI 视频创作台 - Aivro", "en-US": "AI Video Studio - Aivro", "ja-JP": "AI 動画スタジオ - Aivro", "ko-KR": "AI 비디오 스튜디오 - Aivro", "fr-FR": "Studio vidéo IA - Aivro" },
+        description: {
+            "zh-CN": "使用 Aivro 视频创作台生成视频，支持提示词、参考图、清晰度、尺寸、秒数和生成记录。",
+            "en-US": "Create videos in Aivro Video Studio with prompts, reference images, resolution, size, duration, and generation history.",
+            "ja-JP": "Aivro 動画スタジオではプロンプト、参照画像、解像度、サイズ、秒数、生成履歴を使って動画を生成できます。",
+            "ko-KR": "Aivro 비디오 스튜디오에서 프롬프트, 참조 이미지, 해상도, 크기, 길이, 생성 기록을 활용해 영상을 만드세요.",
+            "fr-FR": "Créez des vidéos dans le Studio vidéo Aivro avec prompts, images de référence, résolution, taille, durée et historique.",
+        },
     },
     model3d: {
         path: "/model-3d",
         index: true,
-        title: { "zh-CN": "AI 3D 模型工作台 - Aivro", "en-US": "AI 3D Model Studio - Aivro" },
-        description: { "zh-CN": "通过 Aivro 3D 模型工作台探索 AI 生成 3D 内容的创作流程。", "en-US": "Explore AI-generated 3D content workflows with Aivro 3D Model Studio." },
+        title: { "zh-CN": "AI 3D 模型工作台 - Aivro", "en-US": "AI 3D Model Studio - Aivro", "ja-JP": "AI 3D モデルスタジオ - Aivro", "ko-KR": "AI 3D 모델 스튜디오 - Aivro", "fr-FR": "Studio de modèles 3D IA - Aivro" },
+        description: {
+            "zh-CN": "通过 Aivro 3D 模型工作台探索 AI 生成 3D 内容的创作流程。",
+            "en-US": "Explore AI-generated 3D content workflows with Aivro 3D Model Studio.",
+            "ja-JP": "Aivro 3D モデルスタジオで、AI による 3D コンテンツ生成の制作フローを体験できます。",
+            "ko-KR": "Aivro 3D 모델 스튜디오에서 AI 3D 콘텐츠 생성 작업 흐름을 살펴보세요.",
+            "fr-FR": "Explorez les flux de création 3D assistés par IA avec le Studio de modèles 3D Aivro.",
+        },
     },
     canvas: {
         path: "/canvas",
         index: false,
-        title: { "zh-CN": "AI 工作流画布 - Aivro", "en-US": "AI Workflow Canvas - Aivro" },
-        description: { "zh-CN": "在 Aivro 无限画布中连接图片、文本、参考图和生成节点，把创作变成可复用工作流。", "en-US": "Connect images, text, references, and generation nodes in Aivro's infinite canvas to build reusable workflows." },
+        title: { "zh-CN": "AI 工作流画布 - Aivro", "en-US": "AI Workflow Canvas - Aivro", "ja-JP": "AI ワークフローキャンバス - Aivro", "ko-KR": "AI 워크플로 캔버스 - Aivro", "fr-FR": "Canevas de workflow IA - Aivro" },
+        description: {
+            "zh-CN": "在 Aivro 无限画布中连接图片、文本、参考图和生成节点，把创作变成可复用工作流。",
+            "en-US": "Connect images, text, references, and generation nodes in Aivro's infinite canvas to build reusable workflows.",
+            "ja-JP": "Aivro のインフィニティキャンバスで画像・テキスト・参照画像・生成ノードをつなぎ、再利用できるワークフローにします。",
+            "ko-KR": "Aivro 무한 캔버스에서 이미지, 텍스트, 참조 이미지, 생성 노드를 연결해 재사용 가능한 워크플로를 만드세요.",
+            "fr-FR": "Reliez images, textes, références et nœuds de génération dans le canevas infini Aivro pour créer des workflows réutilisables.",
+        },
     },
     prompts: {
         path: "/prompts",
         index: true,
-        title: { "zh-CN": "AI 提示词库 - Aivro", "en-US": "AI Prompt Library - Aivro" },
-        description: { "zh-CN": "浏览和收藏 Aivro 提示词库中的图片、视频和创作提示词，快速复用稳定风格。", "en-US": "Browse and save image, video, and creative prompts in Aivro's prompt library to reuse proven styles." },
+        title: { "zh-CN": "AI 提示词库 - Aivro", "en-US": "AI Prompt Library - Aivro", "ja-JP": "AI プロンプトライブラリ - Aivro", "ko-KR": "AI 프롬프트 라이브러리 - Aivro", "fr-FR": "Bibliothèque de prompts IA - Aivro" },
+        description: {
+            "zh-CN": "浏览和收藏 Aivro 提示词库中的图片、视频和创作提示词，快速复用稳定风格。",
+            "en-US": "Browse and save image, video, and creative prompts in Aivro's prompt library to reuse proven styles.",
+            "ja-JP": "Aivro プロンプトライブラリの画像・動画・創作プロンプトを閲覧・保存して、安定したスタイルをすぐに再利用できます。",
+            "ko-KR": "Aivro 프롬프트 라이브러리의 이미지, 영상, 창작 프롬프트를 둘러보고 저장해 안정적인 스타일을 바로 재사용하세요.",
+            "fr-FR": "Parcourez et enregistrez les prompts image, vidéo et créatifs de la bibliothèque Aivro pour réutiliser des styles éprouvés.",
+        },
     },
     assets: {
         path: "/assets",
         index: false,
-        title: { "zh-CN": "我的素材 - Aivro", "en-US": "My Assets - Aivro" },
-        description: { "zh-CN": "管理 Aivro 中保存的文本、图片和视频素材，支持导入、导出和云端文件引用。", "en-US": "Manage saved text, image, and video assets in Aivro with import, export, and cloud file references." },
+        title: { "zh-CN": "我的素材 - Aivro", "en-US": "My Assets - Aivro", "ja-JP": "マイ素材 - Aivro", "ko-KR": "내 에셋 - Aivro", "fr-FR": "Mes assets - Aivro" },
+        description: {
+            "zh-CN": "管理 Aivro 中保存的文本、图片和视频素材，支持导入、导出和云端文件引用。",
+            "en-US": "Manage saved text, image, and video assets in Aivro with import, export, and cloud file references.",
+            "ja-JP": "Aivro に保存したテキスト・画像・動画の素材を管理し、インポート・エクスポート・クラウドファイル参照が行えます。",
+            "ko-KR": "Aivro에 저장된 텍스트, 이미지, 영상 에셋을 관리하고 가져오기, 내보내기, 클라우드 파일 참조를 사용하세요.",
+            "fr-FR": "Gérez les assets texte, image et vidéo enregistrés dans Aivro avec import, export et références de fichiers cloud.",
+        },
     },
     assetLibrary: {
         path: "/asset-library",
         index: true,
-        title: { "zh-CN": "素材库 - Aivro", "en-US": "Asset Library - Aivro" },
-        description: { "zh-CN": "浏览 Aivro 素材库，发现可用于 AI 创作的文本、图片和视频内容。", "en-US": "Browse Aivro's asset library to discover text, image, and video content for AI creation." },
+        title: { "zh-CN": "素材库 - Aivro", "en-US": "Asset Library - Aivro", "ja-JP": "素材ライブラリ - Aivro", "ko-KR": "에셋 라이브러리 - Aivro", "fr-FR": "Bibliothèque d'assets - Aivro" },
+        description: {
+            "zh-CN": "浏览 Aivro 素材库，发现可用于 AI 创作的文本、图片和视频内容。",
+            "en-US": "Browse Aivro's asset library to discover text, image, and video content for AI creation.",
+            "ja-JP": "Aivro 素材ライブラリを閲覧し、AI 創作に使えるテキスト・画像・動画を見つけましょう。",
+            "ko-KR": "Aivro 에셋 라이브러리에서 AI 창작에 활용할 텍스트, 이미지, 영상 콘텐츠를 찾아보세요.",
+            "fr-FR": "Parcourez la bibliothèque d'assets Aivro pour découvrir des contenus texte, image et vidéo pour la création IA.",
+        },
     },
     privacy: {
         path: "/privacy",
         index: true,
-        title: { "zh-CN": "隐私政策 - Aivro", "en-US": "Privacy Policy - Aivro" },
-        description: { "zh-CN": "查看 Aivro 隐私政策，了解账号、生成内容、云存储和第三方服务相关数据处理方式。", "en-US": "Read Aivro's privacy policy for account, generated content, cloud storage, and third-party service data handling." },
+        title: { "zh-CN": "隐私政策 - Aivro", "en-US": "Privacy Policy - Aivro", "ja-JP": "プライバシーポリシー - Aivro", "ko-KR": "개인정보 처리방침 - Aivro", "fr-FR": "Politique de confidentialité - Aivro" },
+        description: {
+            "zh-CN": "查看 Aivro 隐私政策，了解账号、生成内容、云存储和第三方服务相关数据处理方式。",
+            "en-US": "Read Aivro's privacy policy for account, generated content, cloud storage, and third-party service data handling.",
+            "ja-JP": "Aivro のプライバシーポリシーで、アカウント・生成コンテンツ・クラウドストレージ・第三者サービスのデータの取り扱いを確認できます。",
+            "ko-KR": "Aivro 개인정보 처리방침에서 계정, 생성 콘텐츠, 클라우드 저장소, 제3자 서비스의 데이터 처리 방식을 확인하세요.",
+            "fr-FR": "Consultez la politique de confidentialité Aivro pour le traitement des données de compte, contenus générés, stockage cloud et services tiers.",
+        },
     },
     terms: {
         path: "/terms",
         index: true,
-        title: { "zh-CN": "服务条款 - Aivro", "en-US": "Terms of Service - Aivro" },
-        description: { "zh-CN": "查看 Aivro 服务条款，了解 AI 创作、账号、安全、内容责任和服务变更规则。", "en-US": "Read Aivro's terms for AI creation, accounts, security, content responsibility, and service changes." },
+        title: { "zh-CN": "服务条款 - Aivro", "en-US": "Terms of Service - Aivro", "ja-JP": "利用規約 - Aivro", "ko-KR": "서비스 약관 - Aivro", "fr-FR": "Conditions d'utilisation - Aivro" },
+        description: {
+            "zh-CN": "查看 Aivro 服务条款，了解 AI 创作、账号、安全、内容责任和服务变更规则。",
+            "en-US": "Read Aivro's terms for AI creation, accounts, security, content responsibility, and service changes.",
+            "ja-JP": "Aivro の利用規約で、AI 創作・アカウント・セキュリティ・コンテンツの責任・サービス変更のルールを確認できます。",
+            "ko-KR": "Aivro 서비스 약관에서 AI 창작, 계정, 보안, 콘텐츠 책임, 서비스 변경 규칙을 확인하세요.",
+            "fr-FR": "Consultez les conditions Aivro pour la création IA, les comptes, la sécurité, la responsabilité des contenus et les évolutions du service.",
+        },
     },
     login: {
         path: "/login",
         index: false,
-        title: { "zh-CN": "登录 - Aivro", "en-US": "Sign in - Aivro" },
-        description: { "zh-CN": "登录 Aivro 账号，继续使用工作流、生图、视频、提示词和素材能力。", "en-US": "Sign in to Aivro to continue using workflows, image generation, video creation, prompts, and assets." },
+        title: { "zh-CN": "登录 - Aivro", "en-US": "Sign in - Aivro", "ja-JP": "ログイン - Aivro", "ko-KR": "로그인 - Aivro", "fr-FR": "Connexion - Aivro" },
+        description: {
+            "zh-CN": "登录 Aivro 账号，继续使用工作流、生图、视频、提示词和素材能力。",
+            "en-US": "Sign in to Aivro to continue using workflows, image generation, video creation, prompts, and assets.",
+            "ja-JP": "Aivro アカウントにログインして、ワークフロー・画像生成・動画・プロンプト・素材の機能を続けて利用できます。",
+            "ko-KR": "Aivro 계정에 로그인해 워크플로, 이미지 생성, 영상, 프롬프트, 에셋 기능을 계속 사용하세요.",
+            "fr-FR": "Connectez-vous à Aivro pour continuer à utiliser workflows, génération d'images, vidéo, prompts et assets.",
+        },
     },
     forgotPassword: {
         path: "/forgot-password",
         index: false,
-        title: { "zh-CN": "找回密码 - Aivro", "en-US": "Reset password - Aivro" },
-        description: { "zh-CN": "通过已绑定邮箱重置 Aivro 账号密码。", "en-US": "Reset your Aivro account password with your verified email." },
+        title: { "zh-CN": "找回密码 - Aivro", "en-US": "Reset password - Aivro", "ja-JP": "パスワード再設定 - Aivro", "ko-KR": "비밀번호 재설정 - Aivro", "fr-FR": "Réinitialiser le mot de passe - Aivro" },
+        description: {
+            "zh-CN": "通过已绑定邮箱重置 Aivro 账号密码。",
+            "en-US": "Reset your Aivro account password with your verified email.",
+            "ja-JP": "登録済みのメールアドレスで Aivro アカウントのパスワードを再設定します。",
+            "ko-KR": "등록된 이메일로 Aivro 계정 비밀번호를 재설정하세요.",
+            "fr-FR": "Réinitialisez le mot de passe de votre compte Aivro avec votre e-mail vérifié.",
+        },
     },
     profileSetup: {
         path: "/profile/setup",
         index: false,
         private: true,
-        title: { "zh-CN": "完善账户信息 - Aivro", "en-US": "Complete profile - Aivro" },
-        description: { "zh-CN": "完善 Aivro 账号资料后继续创作。", "en-US": "Complete your Aivro profile before continuing." },
+        title: { "zh-CN": "完善账户信息 - Aivro", "en-US": "Complete profile - Aivro", "ja-JP": "アカウント情報の入力 - Aivro", "ko-KR": "계정 정보 완성 - Aivro", "fr-FR": "Compléter le profil - Aivro" },
+        description: {
+            "zh-CN": "完善 Aivro 账号资料后继续创作。",
+            "en-US": "Complete your Aivro profile before continuing.",
+            "ja-JP": "Aivro アカウント情報を入力してから制作を続けてください。",
+            "ko-KR": "Aivro 계정 정보를 완성한 후 창작을 계속하세요.",
+            "fr-FR": "Complétez votre profil Aivro avant de continuer.",
+        },
     },
     pricingSuccess: {
         path: "/pricing/success",
         index: false,
         private: true,
-        title: { "zh-CN": "支付处理中 - Aivro", "en-US": "Payment processing - Aivro" },
-        description: { "zh-CN": "查看 Aivro 套餐支付后的额度到账状态。", "en-US": "Check your Aivro plan payment and credit update status." },
+        title: { "zh-CN": "支付处理中 - Aivro", "en-US": "Payment processing - Aivro", "ja-JP": "決済処理中 - Aivro", "ko-KR": "결제 처리 중 - Aivro", "fr-FR": "Paiement en cours - Aivro" },
+        description: {
+            "zh-CN": "查看 Aivro 套餐支付后的额度到账状态。",
+            "en-US": "Check your Aivro plan payment and credit update status.",
+            "ja-JP": "Aivro プランの決済後のクレジット反映状況を確認できます。",
+            "ko-KR": "Aivro 요금제 결제 후 크레딧 반영 상태를 확인하세요.",
+            "fr-FR": "Vérifiez l'état du paiement de votre offre Aivro et de l'ajout des crédits.",
+        },
     },
     metamaskEmail: {
         path: "/metamask-email",
         index: false,
         private: true,
-        title: { "zh-CN": "绑定 MetaMask 邮箱 - Aivro", "en-US": "Bind MetaMask email - Aivro" },
-        description: { "zh-CN": "首次使用 MetaMask 登录 Aivro 时绑定邮箱。", "en-US": "Bind an email when signing in to Aivro with MetaMask for the first time." },
+        title: { "zh-CN": "绑定 MetaMask 邮箱 - Aivro", "en-US": "Bind MetaMask email - Aivro", "ja-JP": "MetaMask メールアドレスの連携 - Aivro", "ko-KR": "MetaMask 이메일 연동 - Aivro", "fr-FR": "Associer un e-mail MetaMask - Aivro" },
+        description: {
+            "zh-CN": "首次使用 MetaMask 登录 Aivro 时绑定邮箱。",
+            "en-US": "Bind an email when signing in to Aivro with MetaMask for the first time.",
+            "ja-JP": "MetaMask で初めて Aivro にログインする際にメールアドレスを連携します。",
+            "ko-KR": "MetaMask로 Aivro에 처음 로그인할 때 이메일을 연동하세요.",
+            "fr-FR": "Associez un e-mail lors de votre première connexion à Aivro avec MetaMask.",
+        },
     },
     workflowShare: {
         path: "/share/workflows",
         index: false,
         private: true,
-        title: { "zh-CN": "工作流分享 - Aivro", "en-US": "Workflow share - Aivro" },
-        description: { "zh-CN": "查看受保护的 Aivro 工作流分享。", "en-US": "View a protected Aivro workflow share." },
+        title: { "zh-CN": "工作流分享 - Aivro", "en-US": "Workflow share - Aivro", "ja-JP": "ワークフロー共有 - Aivro", "ko-KR": "워크플로 공유 - Aivro", "fr-FR": "Partage de workflow - Aivro" },
+        description: {
+            "zh-CN": "查看受保护的 Aivro 工作流分享。",
+            "en-US": "View a protected Aivro workflow share.",
+            "ja-JP": "保護された Aivro ワークフローの共有を表示します。",
+            "ko-KR": "보호된 Aivro 워크플로 공유를 확인하세요.",
+            "fr-FR": "Consultez un partage de workflow Aivro protégé.",
+        },
     },
 };
 
@@ -150,11 +258,7 @@ export function localizedUrl(path: string, locale: Locale) {
 }
 
 export function alternateLanguages(path: string) {
-    return {
-        "zh-CN": localizedUrl(path, "zh-CN"),
-        "en-US": localizedUrl(path, "en-US"),
-        "x-default": localizedUrl(path, defaultLocale),
-    };
+    return Object.fromEntries([...locales.map((locale) => [locale, localizedUrl(path, locale)]), ["x-default", localizedUrl(path, defaultLocale)]]);
 }
 
 export function buildMetadata(page: SeoPage, locale: Locale): Metadata {
@@ -166,33 +270,16 @@ export function buildMetadata(page: SeoPage, locale: Locale): Metadata {
         return {
             title,
             description,
-            alternates: page.private
-                ? {}
-                : {
-                      canonical: url,
-                  },
-            openGraph: {
-                title,
-                description,
-                siteName: "Aivro",
-                type: "website",
-                locale: locale.replace("-", "_"),
-            },
-            twitter: {
-                card: "summary",
-                title,
-                description,
-            },
+            alternates: page.private ? {} : { canonical: url },
+            openGraph: { title, description, siteName: "Aivro", type: "website", locale: locale.replace("-", "_") },
+            twitter: { card: "summary", title, description },
             robots,
         };
     }
     return {
         title,
         description,
-        alternates: {
-            canonical: url,
-            languages: alternateLanguages(page.path),
-        },
+        alternates: { canonical: url, languages: alternateLanguages(page.path) },
         openGraph: {
             title,
             description,
@@ -202,11 +289,7 @@ export function buildMetadata(page: SeoPage, locale: Locale): Metadata {
             locale: locale.replace("-", "_"),
             alternateLocale: locales.filter((item) => item !== locale).map((item) => item.replace("-", "_")),
         },
-        twitter: {
-            card: "summary_large_image",
-            title,
-            description,
-        },
+        twitter: { card: "summary_large_image", title, description },
         robots,
     };
 }

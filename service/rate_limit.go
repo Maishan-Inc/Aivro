@@ -16,18 +16,23 @@ type rateBucket struct {
 var (
 	loginRateMu      sync.Mutex
 	loginRateBuckets = map[string]rateBucket{}
+	rateCleanupAt time.Time
 )
 
 func CheckAuthRateLimit(r *http.Request, action string, account string) error {
 	ip := requestIP(r)
 	account = strings.ToLower(strings.TrimSpace(account))
+	ipLimit := 20
+	if ip == "" {
+		ip, ipLimit = "unknown-proxy", 120
+	}
 	limits := []struct {
 		key      string
 		limit    int
 		window   time.Duration
 		blockFor time.Duration
 	}{
-		{key: "ip:" + action + ":" + ip, limit: 20, window: time.Minute, blockFor: 2 * time.Minute},
+		{key: "ip:" + action + ":" + ip, limit: ipLimit, window: time.Minute, blockFor: 2 * time.Minute},
 	}
 	if account != "" {
 		limits = append(limits, struct {
@@ -61,6 +66,17 @@ func hitRateBucket(key string, limit int, window time.Duration, blockFor time.Du
 	loginRateMu.Lock()
 	defer loginRateMu.Unlock()
 	now := time.Now()
+	if now.After(rateCleanupAt) {
+		for entry, value := range loginRateBuckets {
+			if now.After(value.resetAt) && now.After(value.blockedAt) {
+				delete(loginRateBuckets, entry)
+			}
+		}
+		rateCleanupAt = now.Add(time.Minute)
+	}
+	if _, exists := loginRateBuckets[key]; !exists && len(loginRateBuckets) >= 10000 {
+		return safeMessageError{message: "请求太频繁，请稍后再试"}
+	}
 	bucket := loginRateBuckets[key]
 	if !bucket.blockedAt.IsZero() && now.Before(bucket.blockedAt) {
 		return safeMessageError{message: "请求太频繁，请稍后再试"}

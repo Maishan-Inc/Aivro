@@ -14,7 +14,7 @@
 .toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 4px; }
 .toolbar :global(.ant-btn) { font-size: 12px; }
 .toolbar :global(.canvas-composer-model-picker) { max-width: min(240px, 45cqw); border: 0; box-shadow: none; font-size: 12px; }
-.toolbar > .send { border-radius: 50%; margin-left: auto; width: 40px; height: 40px; flex-shrink: 0; }
+.toolbar > .send { border-radius: 50% !important; margin-left: auto; margin-right: -4px; width: 40px !important; min-width: 40px !important; max-width: 40px !important; height: 40px !important; aspect-ratio: 1; padding: 0 !important; flex: none !important; }
 .composerHint { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 12px; margin-top: 10px; font-size: 10px; color: var(--muted-foreground); }
 .references { display: flex; gap: 10px; padding: 6px 10px 12px; overflow-x: auto; overscroll-behavior-x: contain; }
 .reference { position: relative; width: 68px; height: 68px; flex-shrink: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 12px; }
@@ -38,7 +38,7 @@
 @container (min-width: 1040px) { .history { display: block; }.historyActions { display: none; } }
 @container (min-width: 1600px) { .history { width: 350px; } }
 @container (max-width: 600px) {
-    .header { align-items: start; padding: 20px 16px 8px; gap: 10px; }.header h1 { font-size: 19px; }.header p { max-width: 230px; font-size: 11px; }.headerActions { gap: 0; }.headerActions :global(.ant-btn) { padding-inline: 8px; }.form { padding: 10px 12px 14px; }.composer { padding: 8px; border-radius: 20px; }.composer :global(textarea.ant-input) { font-size: 14px; }.toolbar { gap: 2px; }.toolbar :global(.ant-btn) { padding-inline: 7px; font-size: 11px; }.toolbar > .send { width: 34px; height: 34px; }.results { padding: 16px; }.empty { min-height: 300px; padding-inline: 0; }.emptyArt { max-width: 320px; margin-bottom: 24px; }.empty h3 { font-size: 22px; }.empty > p { font-size: 12px; }.composerHint { font-size: 9px; }
+    .header { align-items: start; padding: 20px 16px 8px; gap: 10px; }.header h1 { font-size: 19px; }.header p { max-width: 230px; font-size: 11px; }.headerActions { gap: 0; }.headerActions :global(.ant-btn) { padding-inline: 8px; }.form { padding: 10px 12px 14px; }.composer { padding: 8px; border-radius: 20px; }.composer :global(textarea.ant-input) { font-size: 14px; }.toolbar { gap: 2px; }.toolbar :global(.ant-btn) { padding-inline: 7px; font-size: 11px; }.toolbar > .send { border-radius: 50% !important; margin-left: auto; margin-right: -4px; width: 34px !important; min-width: 34px !important; max-width: 34px !important; height: 34px !important; aspect-ratio: 1; padding: 0 !important; flex: none !important; }.results { padding: 16px; }.empty { min-height: 300px; padding-inline: 0; }.emptyArt { max-width: 320px; margin-bottom: 24px; }.empty h3 { font-size: 22px; }.empty > p { font-size: 12px; }.composerHint { font-size: 9px; }
 }
 @media (max-height: 740px) { .emptyArt { max-width: 300px; margin-bottom: 22px; }.empty { min-height: 280px; }.empty h3 { font-size: 22px; }.empty > small { display: none; } }
 @media (prefers-reduced-motion: reduce) { .composer, .empty button { transition: none; } }

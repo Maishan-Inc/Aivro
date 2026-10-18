@@ -1,12 +1,11 @@
 "use client";
 
 import { create } from "zustand";
-import { persist, type PersistStorage, type StorageValue } from "zustand/middleware";
+import localforage from "localforage";
 
 import { nanoid } from "nanoid";
-import { localForageStorage } from "@/lib/localforage-storage";
-import { cleanupUnusedImages, resolveImageUrl, uploadImage } from "@/services/image-storage";
-import { cleanupUnusedMedia, resolveMediaUrl } from "@/services/file-storage";
+import { retainAssetFiles, releaseAssetFiles } from "@/services/api/assets";
+import { useUserStore } from "@/stores/use-user-store";
 
 export type AssetKind = "text" | "image" | "video" | "model3d";
 export type TextAsset = AssetBase<"text"> & { data: { content: string } };
@@ -30,72 +29,113 @@ type AssetBase<T extends AssetKind> = {
 
 type AssetStore = {
     assets: Asset[];
-    addAsset: (asset: Omit<Asset, "id" | "createdAt" | "updatedAt">) => string;
-    updateAsset: (id: string, patch: Partial<Omit<Asset, "id" | "createdAt">>) => void;
-    removeAsset: (id: string) => void;
+    ownerId: string;
+    isReady: boolean;
+    loadAssets: (ownerId: string) => Promise<void>;
+    addAsset: (asset: Omit<Asset, "id" | "createdAt" | "updatedAt">) => Promise<string>;
+    updateAsset: (id: string, patch: Partial<Omit<Asset, "id" | "createdAt">>) => Promise<void>;
+    removeAsset: (id: string) => Promise<void>;
     cleanupImages: (extra?: unknown) => void;
 };
 
-const ASSET_STORE_KEY = "aivro:asset_store";
+const assetStorage = localforage.createInstance({ name: "aivro", storeName: "user_assets" });
+let assetWrites: Promise<unknown> = Promise.resolve();
+let loadVersion = 0;
+let assetChanges: Promise<unknown> = Promise.resolve();
 
-const assetStorage: PersistStorage<AssetStore> = {
-    getItem: async (name) => {
-        const value = await localForageStorage.getItem(name);
-        if (!value) return null;
-        const parsed = JSON.parse(value) as StorageValue<AssetStore>;
-        parsed.state.assets = await Promise.all(
-            parsed.state.assets.map(async (asset) => {
-                if (asset.kind === "video" && asset.data.storageKey) return { ...asset, data: { ...asset.data, url: await resolveMediaUrl(asset.data.storageKey, asset.data.url) } };
-                if (asset.kind !== "image") return asset;
-                if (asset.data.storageKey)
-                    return {
-                        ...asset,
-                        coverUrl: asset.coverUrl.startsWith("blob:") ? await resolveImageUrl(asset.data.storageKey, asset.coverUrl) : asset.coverUrl,
-                        data: { ...asset.data, dataUrl: await resolveImageUrl(asset.data.storageKey, asset.data.dataUrl) },
-                    };
-                if (!asset.data.dataUrl.startsWith("data:image/")) return asset;
-                const image = await uploadImage(asset.data.dataUrl);
-                return { ...asset, coverUrl: asset.coverUrl.startsWith("data:image/") ? image.url : asset.coverUrl, data: { ...asset.data, dataUrl: image.url, storageKey: image.storageKey, bytes: image.bytes, mimeType: image.mimeType } };
-            }),
-        );
-        return parsed;
+function changeAssets<T>(action: () => Promise<T>): Promise<T> {
+    const version = loadVersion;
+    const result = assetChanges.catch(() => undefined).then(() => {
+        if (version !== loadVersion) throw new Error("账号已切换，请重试");
+        return action();
+    });
+    assetChanges = result;
+    return result;
+}
+
+function storageKey(ownerId: string) { return `aivro:assets:${ownerId || "guest"}`; }
+
+function fileIDs(value: unknown, ids = new Set<string>()): string[] {
+    if (typeof value === "string") {
+        if (value.startsWith("cloud:")) ids.add(value.slice(6));
+        const match = value.match(/(?:^|\/)api\/files\/([^/?]+)\/content(?:[?#]|$)/);
+        if (match) {
+            try { ids.add(decodeURIComponent(match[1])); } catch { throw new Error("素材文件地址无效"); }
+        }
+    } else if (value && typeof value === "object") {
+        for (const [key, item] of Object.entries(value)) {
+            if (key === "cloudFileId" && typeof item === "string") ids.add(item.replace(/^cloud:/, ""));
+            fileIDs(item, ids);
+        }
+    }
+    return [...ids];
+}
+
+function saveAssets(ownerId: string, assets: Asset[]) {
+    assetWrites = assetWrites.catch(() => undefined).then(() => assetStorage.setItem(storageKey(ownerId), assets));
+    return assetWrites;
+}
+
+export const useAssetStore = create<AssetStore>()((set, get) => ({
+    assets: [], ownerId: "", isReady: false,
+    loadAssets: async (ownerId) => {
+        const version = ++loadVersion;
+        set({ assets: [], ownerId, isReady: false });
+        try {
+            await assetChanges.catch(() => undefined);
+            const assets = await assetStorage.getItem<Asset[]>(storageKey(ownerId));
+            if (version === loadVersion && get().ownerId === ownerId) set({ assets: assets || [], isReady: true });
+        } catch {
+            if (version === loadVersion && get().ownerId === ownerId) set({ assets: [], isReady: false });
+        }
     },
-    setItem: (name, value) => localForageStorage.setItem(name, JSON.stringify(value)),
-    removeItem: (name) => localForageStorage.removeItem(name),
-};
+    addAsset: (asset) => changeAssets(async () => {
+        const { ownerId, isReady } = get();
+        if (!isReady || ownerId !== (useUserStore.getState().user?.id || "")) throw new Error("素材尚未加载完成，请稍后重试");
+        const id = nanoid();
+        const now = new Date().toISOString();
+        const token = useUserStore.getState().token;
+        const ids = fileIDs(asset);
+        if (ids.length) {
+            if (!token) throw new Error("请先登录后再保存文件素材");
+            await retainAssetFiles(token, id, ids);
+        }
+        if (get().ownerId !== ownerId) throw new Error("账号已切换，请重新保存素材");
+        const assets = [{ ...asset, id, createdAt: now, updatedAt: now } as Asset, ...get().assets];
+        await saveAssets(ownerId, assets);
+        if (get().ownerId === ownerId) set({ assets });
+        return id;
+    }),
+    updateAsset: (id, patch) => changeAssets(async () => {
+        const { ownerId, isReady } = get();
+        if (!isReady || ownerId !== (useUserStore.getState().user?.id || "")) throw new Error("素材尚未加载完成");
+        const asset = get().assets.find((item) => item.id === id);
+        if (!asset) throw new Error("素材不存在");
+        const updated = { ...asset, ...patch, updatedAt: new Date().toISOString() } as Asset;
+        const token = useUserStore.getState().token;
+        if (token) await retainAssetFiles(token, id, fileIDs(updated));
+        if (get().ownerId !== ownerId) throw new Error("账号已切换");
+        const assets = get().assets.map((item) => item.id === id ? updated : item);
+        await saveAssets(ownerId, assets);
+        if (get().ownerId === ownerId) set({ assets });
+    }),
+    removeAsset: (id) => changeAssets(async () => {
+        const { ownerId, isReady } = get();
+        if (!isReady || ownerId !== (useUserStore.getState().user?.id || "")) throw new Error("素材尚未加载完成");
+        const token = useUserStore.getState().token;
+        if (token) await releaseAssetFiles(token, id);
+        if (get().ownerId !== ownerId) return;
+        const assets = get().assets.filter((item) => item.id !== id);
+        await saveAssets(ownerId, assets);
+        if (get().ownerId === ownerId) set({ assets });
+    }),
+    cleanupImages: () => {},
+}));
 
-export const useAssetStore = create<AssetStore>()(
-    persist(
-        (set, get) => ({
-            assets: [],
-            addAsset: (asset) => {
-                const now = new Date().toISOString();
-                const id = nanoid();
-                set((state) => ({ assets: [{ ...asset, id, createdAt: now, updatedAt: now } as Asset, ...state.assets] }));
-                return id;
-            },
-            updateAsset: (id, patch) =>
-                set((state) => ({
-                    assets: state.assets.map((asset) => (asset.id === id ? ({ ...asset, ...patch, updatedAt: new Date().toISOString() } as Asset) : asset)),
-                })),
-            removeAsset: (id) =>
-                set((state) => {
-                    const assets = state.assets.filter((asset) => asset.id !== id);
-                    get().cleanupImages({ assets });
-                    return { assets };
-                }),
-            cleanupImages: (extra) => {
-                window.setTimeout(async () => {
-                    const { useCanvasStore } = await import("@/app/(user)/canvas/stores/use-canvas-store");
-                    await cleanupUnusedImages({ assets: get().assets, projects: useCanvasStore.getState().projects, extra });
-                    await cleanupUnusedMedia({ assets: get().assets, projects: useCanvasStore.getState().projects, extra });
-                }, 0);
-            },
-        }),
-        {
-            name: ASSET_STORE_KEY,
-            storage: assetStorage,
-            partialize: (state) => ({ assets: state.assets }) as StorageValue<AssetStore>["state"],
-        },
-    ),
-);
+if (typeof window !== "undefined") {
+    useUserStore.subscribe((state, previous) => {
+        if (state.isReady && (!previous.isReady || state.user?.id !== previous.user?.id)) void useAssetStore.getState().loadAssets(state.user?.id || "");
+    });
+    const session = useUserStore.getState();
+    if (session.isReady) void useAssetStore.getState().loadAssets(session.user?.id || "");
+}

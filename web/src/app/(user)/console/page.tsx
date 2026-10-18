@@ -12,6 +12,7 @@ import { useLocalizedPath } from "@/hooks/use-localized-path";
 import { createKycSession, fetchKycStatus } from "@/services/api/billing";
 import { fetchWorkflows, type CloudWorkflow } from "@/services/api/workflows";
 import { useUserStore } from "@/stores/use-user-store";
+import { formatNumber } from "@/lib/datetime";
 
 type KycStatus = Awaited<ReturnType<typeof fetchKycStatus>>;
 
@@ -75,9 +76,9 @@ export default function ConsolePage() {
                 </section>
 
                 <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    <MetricCard icon={<CreditSymbol />} label="当前余额" value={(user?.credits ?? 0).toLocaleString()} helper="算力点" />
-                    <MetricCard icon={<Sparkles className="size-5" />} label="工作流创建次数" value={(user?.workflowCreateCredits ?? 0).toLocaleString()} helper="新建云端工作流额度" />
-                    <MetricCard icon={<Layers3 className="size-5" />} label="我的工作流" value={workflows.length.toLocaleString()} helper={`${stats.nodes} 个节点`} />
+                    <MetricCard icon={<CreditSymbol />} label="当前余额" value={formatNumber(user?.credits ?? 0)} helper="算力点" />
+                    <MetricCard icon={<Sparkles className="size-5" />} label="工作流创建次数" value={formatNumber(user?.workflowCreateCredits ?? 0)} helper="新建云端工作流额度" />
+                    <MetricCard icon={<Layers3 className="size-5" />} label="我的工作流" value={formatNumber(workflows.length)} helper={`${stats.nodes} 个节点`} />
                     <MetricCard icon={<BadgeCheck className="size-5" />} label="KYC 身份验证" value={formatKycStatus(kyc?.status)} helper={kyc?.enabled ? "可获取认证奖励" : "管理员未开启"} />
                 </section>
 

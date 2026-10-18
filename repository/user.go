@@ -143,47 +143,59 @@ func SaveUser(user model.User) (model.User, error) {
 	if err != nil {
 		return user, err
 	}
-	return user, db.Save(&user).Error
+	return user, db.Create(&user).Error
 }
 
-func ConsumeUserCredits(id string, credits int, now string) (model.User, bool, error) {
+func UpdateUser(id string, fields map[string]any) (model.User, error) {
 	db, err := DB()
 	if err != nil {
-		return model.User{}, false, err
+		return model.User{}, err
 	}
-	if credits <= 0 {
-		user, ok, err := GetUserByID(id)
-		return user, ok, err
-	}
-	tx := db.Model(&model.User{}).Where("id = ? AND credits >= ?", id, credits).Updates(map[string]any{
-		"credits":    gorm.Expr("credits - ?", credits),
-		"updated_at": now,
-	})
-	if tx.Error != nil {
-		return model.User{}, false, tx.Error
+	if err := db.Model(&model.User{}).Where("id = ?", id).Updates(fields).Error; err != nil {
+		return model.User{}, err
 	}
 	user, ok, err := GetUserByID(id)
-	return user, ok && tx.RowsAffected > 0, err
+	if err == nil && !ok {
+		err = gorm.ErrRecordNotFound
+	}
+	return user, err
 }
 
-func RefundUserCredits(id string, credits int, now string) (model.User, bool, error) {
+// ApplyCreditLog changes the balance and writes its ledger entry atomically.
+func ApplyCreditLog(log model.CreditLog) (bool, error) {
 	db, err := DB()
-	if err != nil {
-		return model.User{}, false, err
-	}
-	if credits <= 0 {
-		user, ok, err := GetUserByID(id)
-		return user, ok, err
-	}
-	tx := db.Model(&model.User{}).Where("id = ?", id).Updates(map[string]any{
-		"credits":    gorm.Expr("credits + ?", credits),
-		"updated_at": now,
+	if err != nil { return false, err }
+	changed := false
+	err = db.Transaction(func(tx *gorm.DB) error {
+		query := tx.Model(&model.User{}).Where("id = ?", log.UserID)
+		if log.Amount < 0 { query = query.Where("credits >= ?", -log.Amount) }
+		result := query.Updates(map[string]any{"credits": gorm.Expr("credits + ?", log.Amount), "updated_at": log.CreatedAt})
+		if result.Error != nil { return result.Error }
+		if result.RowsAffected == 0 && log.Amount != 0 { return nil }
+		var user model.User
+		if err := tx.Where("id = ?", log.UserID).First(&user).Error; err != nil { return err }
+		log.Balance = user.Credits
+		if err := tx.Create(&log).Error; err != nil { return err }
+		changed = true
+		return nil
 	})
-	if tx.Error != nil {
-		return model.User{}, false, tx.Error
-	}
-	user, ok, err := GetUserByID(id)
-	return user, ok && tx.RowsAffected > 0, err
+	return changed, err
+}
+
+func SetUserCredits(id string, credits int, log model.CreditLog) (model.User, error) {
+	db, err := DB()
+	var user model.User
+	if err != nil { return user, err }
+	err = db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&model.User{}).Where("id = ?", id).Update("credits", gorm.Expr("credits")).Error; err != nil { return err }
+		if err := tx.Where("id = ?", id).First(&user).Error; err != nil { return err }
+		log.Amount, log.Balance = credits-user.Credits, credits
+		if err := tx.Model(&model.User{}).Where("id = ?", id).Updates(map[string]any{"credits": credits, "updated_at": log.CreatedAt}).Error; err != nil { return err }
+		user.Credits, user.UpdatedAt = credits, log.CreatedAt
+		if log.Amount == 0 { return nil }
+		return tx.Create(&log).Error
+	})
+	return user, err
 }
 
 // SaveCreditLog 保存算力点变更流水。

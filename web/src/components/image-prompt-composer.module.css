@@ -3,7 +3,7 @@
 .composer[data-dragging="true"] { background: var(--muted); }
 .inputRow { display: flex; align-items: flex-end; gap: 10px; max-height: 50svh; overflow-y: auto; }
 .inputRow :global(textarea.ant-input) { min-width: 0; flex: 1; padding: 8px 10px; font-size: 15px; line-height: 24px; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; overflow-x: hidden; background: transparent; }
-.send:global(.ant-btn) { width: 40px; min-width: 40px; height: 40px; padding: 0; border-radius: 50%; }
+.send:global(.ant-btn) { flex: none !important; width: 40px !important; min-width: 40px !important; max-width: 40px !important; height: 40px !important; aspect-ratio: 1; margin-right: -4px; padding: 0 !important; border-radius: 50% !important; }
 .controls { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows .25s ease, opacity .2s ease; }
 .controls > div { min-height: 0; overflow: hidden; }
 .composer[data-expanded="true"] .controls { grid-template-rows: 1fr; opacity: 1; }

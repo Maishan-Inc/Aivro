@@ -17,6 +17,7 @@ type Config struct {
 	JWTExpireHours      int    `env:"JWT_EXPIRE_HOURS" envDefault:"168"`
 	AppOrigin           string `env:"APP_ORIGIN"`
 	AllowedOrigins      string `env:"ALLOWED_ORIGINS"`
+	TrustedProxyCIDRs   string `env:"TRUSTED_PROXY_CIDRS" envDefault:"127.0.0.1/32,::1/128"`
 	StorageDriver       string `env:"STORAGE_DRIVER" envDefault:"sqlite"`
 	DatabaseDSN         string `env:"DATABASE_DSN" envDefault:"data/aivro.db"`
 	LocalFileDir        string `env:"LOCAL_FILE_DIR" envDefault:"data/files"`

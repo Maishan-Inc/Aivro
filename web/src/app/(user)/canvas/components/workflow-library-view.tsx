@@ -19,6 +19,7 @@ import {
     type WorkflowCommunityPost,
 } from "@/services/api/workflows";
 import { useLocalizedPath } from "@/hooks/use-localized-path";
+import { formatShortDateTime } from "@/lib/datetime";
 import { useWorkflowModals, workflowConfirmName } from "@/hooks/use-workflow-modals";
 import { FlowBackground } from "@/components/flow-background";
 import { useUserStore } from "@/stores/use-user-store";
@@ -283,9 +284,9 @@ export function WorkflowLibraryView({ initialTab = "workflows", lockTab = false,
             ) : null}
 
             <section className={`${lockTab ? "flex-1" : "order-1 lg:order-2"} flex min-h-0 flex-col`}>
-                {embedded ? <div className="relative shrink-0 overflow-hidden border-b border-border bg-background px-5 py-6 lg:px-8 lg:py-8">
+                {embedded && activeTab !== "workflows" ? <div className="relative shrink-0 overflow-hidden border-b border-border bg-background px-5 py-6 lg:px-8 lg:py-8">
                     <FlowBackground />
-                    <div className="relative"><span className="text-[9px] tracking-widest text-muted-foreground">创作空间 / {activeTab === "community" ? "社区" : activeTab === "shares" ? "分享" : "工作流"}</span><h1 className="mt-3 text-2xl font-medium tracking-tight">{activeTab === "community" ? "从彼此的灵感，发现新的可能。" : activeTab === "shares" ? "让好的想法，被更多人看见。" : "让想法，自由连接。"}</h1><p className="mt-2 text-xs leading-6 text-muted-foreground">{activeTab === "community" ? "探索社区创作，在他人的工作流中找到你的起点。" : activeTab === "shares" ? "管理你的工作流分享，继续传递创作灵感。" : "整理你的创作流程，连接灵感、参考与下一步。"}</p></div>
+                    <div className="relative"><span className="text-[9px] tracking-widest text-muted-foreground">创作空间 / {activeTab === "community" ? "社区" : "分享"}</span><h1 className="mt-3 text-2xl font-medium tracking-tight">{activeTab === "community" ? "从彼此的灵感，发现新的可能。" : "让好的想法，被更多人看见。"}</h1><p className="mt-2 text-xs leading-6 text-muted-foreground">{activeTab === "community" ? "探索社区创作，在他人的工作流中找到你的起点。" : "管理你的工作流分享，继续传递创作灵感。"}</p></div>
                 </div> : null}
                 <header className="shrink-0 border-b border-border bg-background px-4 lg:h-20 lg:overflow-x-auto lg:px-6">
                     <div className="flex min-w-0 flex-wrap items-center gap-2 py-2 lg:h-full lg:min-w-max lg:flex-nowrap lg:py-0">
@@ -626,5 +627,5 @@ function confirmWorkflowTitle(modal: ReturnType<typeof App.useApp>["modal"], tit
 }
 
 function formatWorkflowTime(value: string) {
-    return value ? new Date(value).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : "-";
+    return value ? formatShortDateTime(value) : "-";
 }

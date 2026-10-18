@@ -31,3 +31,13 @@ admin
 ```
 
 管理员密码是在 Render 部署页面里填写的 `ADMIN_PASSWORD`。
+
+## 代理 IP 与安全配置
+
+Go 只信任 `TRUSTED_PROXY_CIDRS` 指定来源发送的内部 `X-Aivro-Client-IP`，默认仅允许回环地址，适用于 Next 和 Go 在同一容器的部署。分开部署时只填写实际代理地址或网段。
+
+Next 默认删除客户端提交的转发 IP/地区头。只有入口反向代理会覆盖真实 IP 头，且无法绕过该代理直接访问 Next 时，才设置 `TRUSTED_CLIENT_IP_HEADER`。例如 Nginx 使用 `proxy_set_header X-Real-IP $remote_addr`，Next 设置 `TRUSTED_CLIENT_IP_HEADER=x-real-ip`。该头必须只有一个合法 IP，不接受客户端自行提供的列表。
+
+未配置可信 IP 头时，代理请求显示未知 IP，登录仍保留账号限流与共享入口限流。务必设置实际 HTTPS `APP_ORIGIN`。本轮修复未执行构建或部署验证，Docker 静态资源路径仍需单独确认。
+
+启动数据库更新包含 `cloud_file_references`、`video_tasks`、任务 worker/lease 字段及可空的 Stripe session ID。修改遵循当前新设计，未添加旧文件绑定关系或浏览器全局素材数据的迁移兼容逻辑。

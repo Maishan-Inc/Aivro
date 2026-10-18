@@ -1,5 +1,6 @@
 import { apiGet, compactApiParams } from "@/services/api/request";
 import type { Locale } from "@/i18n/messages";
+import { formatDate } from "@/lib/datetime";
 
 export type Prompt = {
     id: string;
@@ -39,5 +40,5 @@ export async function fetchPrompts({ keyword = "", tag = [], category = ALL_PROM
 
 export function formatPromptDate(value: string) {
     const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? "" : new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
+    return Number.isNaN(date.getTime()) ? "" : formatDate(date);
 }
