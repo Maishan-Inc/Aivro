@@ -65,7 +65,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
     }, [locale]);
 
     return (
-        <ConfigProvider locale={antdLocales[locale] || zhCN} theme={getAntThemeConfig(dark)}>
+        <ConfigProvider locale={antdLocales[locale] || zhCN} theme={getAntThemeConfig(dark)} button={{ autoInsertSpace: false }}>
             <ProConfigProvider dark={dark}>
                 <App>
                     <QueryClientProvider client={queryClient}>

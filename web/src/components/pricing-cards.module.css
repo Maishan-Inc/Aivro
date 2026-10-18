@@ -31,5 +31,12 @@
 .status { margin-top: 24px; color: var(--muted-foreground); font-size: 11px; line-height: 1.8; }
 .status button { margin-left: 10px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 @media (max-width: 1400px) { .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }.price strong { font-size: 52px; } }
-@media (max-width: 600px) { .cards { grid-template-columns: minmax(0, 1fr); gap: 20px; }.card { padding: 28px; }.subtitle { min-height: 0; }.price strong { font-size: 56px; } }
+@media (max-width: 600px) {
+    .cards { grid-template-columns: minmax(0, 1fr); gap: 20px; }.card { padding: 28px; }.subtitle { min-height: 0; }.price strong { font-size: 56px; }
+    /* 首页套餐：手机端改为左右滑动，默认停在推荐套餐，两侧各露出一点相邻套餐。 */
+    .cards[data-carousel="true"] { display: flex; gap: 12px; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+    .cards[data-carousel="true"]::-webkit-scrollbar { display: none; }
+    .cards[data-carousel="true"] .card { flex: 0 0 86%; scroll-snap-align: center; padding: 26px 24px; }
+    .cards[data-carousel="true"] .card:hover { transform: none; }
+}
 @media (prefers-reduced-motion: reduce) { .card { transition: none; }.card:hover { transform: none; } }

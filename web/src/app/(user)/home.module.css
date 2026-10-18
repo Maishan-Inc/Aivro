@@ -164,5 +164,31 @@
     .modelsSection { padding-block: 48px 24px; }.plansSection { padding-block: 32px 48px; }.discoveryHeading { gap: 16px; margin-bottom: 26px; }.discoveryHeading > a { font-size: 12px; gap: 6px; }.modelList { padding-block: 16px; }.modelBrand { width: 164px; }
     .heroCopy { padding: 48px 20px; }.hero h1 { font-size: clamp(27px, 7.6vw, 52px); margin-block: 26px; }.primary, .secondary { padding-inline: 18px; min-height: 44px; font-size: 12px; gap: 18px; }.platformHeading { gap: 22px; padding-block: 28px; }.platformHeading > .eyebrow { width: 100%; }.sceneLinks { gap: 18px; }.sceneLinks a { gap: 6px; font-size: 11px; }.sceneLinks a > svg:last-child { display: none; }.motionToggle { margin-left: auto; }.scene, .scene[data-reverse="true"] { grid-template-columns: minmax(0, 1fr); gap: 40px; padding-block: 64px; min-height: 0; }.scene[data-reverse="true"] .sceneCopy, .scene[data-reverse="true"] .sceneVisual { grid-column: auto; grid-row: auto; }.sceneVisual { padding-left: 16px; }.scene[data-reverse="true"] .sceneVisual { padding-right: 16px; }.sceneCopy > p { max-width: none; }.sceneCopy ul { margin-block: 24px 28px; }.home h2 { font-size: 38px; }.eyebrow { font-size: 11px; margin-bottom: 22px; }.workflow { grid-template-columns: 1fr; padding-block: 64px; gap: 50px; }.workflowImages { padding-bottom: 25px; }.workflow p { font-size: 14px; }.section, .stepsSection, .faqSection { padding-block: 64px; }.sectionHeading { flex-direction: column; align-items: start; gap: 24px; margin-bottom: 30px; }.sectionHeading > p { font-size: 13px; }.filterTabs { gap: 24px; }.gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px 14px; }.galleryImage { aspect-ratio: 3 / 4; }.galleryCaption strong { font-size: 12px; }.galleryCaption small { font-size: 9px; }.galleryCaption > svg { width: 16px; }.toolCard { padding: 30px 18px; }.toolCard h3 { font-size: 14px; }.toolCard p { font-size: 12px; }.toolCard > span { font-size: 10px; }.steps { grid-template-columns: 1fr; gap: 34px; margin-top: 40px; }.steps h3 { font-size: 20px; }.stepNumber { margin-bottom: 22px; }.faqSection { grid-template-columns: 1fr; gap: 36px; }.faqSection h2 br { display: none; }.faq h3 > button { font-size: 14px; }.faqBody p { font-size: 13px; }.closing { padding-block: 90px; }.closing h2 { font-size: clamp(30px, 9vw, 60px); }.footer { padding-top: 48px; }.footerTop { grid-template-columns: repeat(3, 1fr); gap: 36px 20px; }.footerTop > div:first-child { grid-column: 1 / -1; }.footerTop > div { font-size: 12px; }.footerBottom { font-size: 10px; }.footerWordmark { margin-top: 28px; }
 }
+/* 手机端：标题与小字、页脚品牌介绍和版权统一居中；电脑和平板保持原排版。 */
+@media (max-width: 700px) {
+    .heroCopy, .heroComposer { min-width: 0; max-width: 100%; }
+    .hero h1 { overflow-wrap: anywhere; }
+    .eyebrow { justify-content: center; }
+    .platformHeading { flex-direction: column; align-items: center; text-align: center; }
+    .platformHeading > .eyebrow { margin: 0; }
+    .sceneLinks { justify-content: center; }
+    .motionToggle { margin-inline: 0; }
+    .discoveryHeading { flex-direction: column; align-items: center; text-align: center; }
+    .discoveryHeading > a { padding-bottom: 0; }
+    .sectionHeading { flex-direction: column; align-items: center; text-align: center; }
+    .modelTicker + .sourceNote, .section > .sourceNote { text-align: center; }
+    .sceneCopy { text-align: center; }
+    .sceneCopy > p, .sceneCopy > .primary { margin-inline: auto; }
+    .sceneCopy ul { justify-items: center; text-align: left; }
+    .workflow > div:first-child, .faqSection > div:first-child { text-align: center; }
+    .workflow .textLink, .faqSection .textLink { margin-inline: auto; }
+    .stepsSection > h2, .steps > div { text-align: center; }
+    .steps .stepNumber { justify-content: center; }
+    .footerTop > div:first-child { align-items: center; text-align: center; }
+    .footerIntro { margin-inline: auto; }
+    .footerSocial { justify-content: center; }
+    .footerBottom { flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+    .footerBottom .copyright { margin-left: 0; text-align: center; }
+}
 @media (max-height: 620px) { .hero h1 { font-size: clamp(27px, 5.2vw, 68px); margin-block: 18px; }.heroCopy { transform: none; }.actions { margin-top: 20px; } }
 @media (prefers-reduced-motion: reduce) { .home { scroll-behavior: auto; }.home *, .home *::before, .home *::after { animation: none !important; transition: none !important; }.modelTicker { overflow-x: auto; mask-image: none; }.modelList[aria-hidden="true"] { display: none; }.footerWordmark [data-wordmark-trace] { visibility: visible; stroke-dashoffset: 0; } }

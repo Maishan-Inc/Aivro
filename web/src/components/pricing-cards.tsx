@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { Button } from "antd";
 import { useQuery } from "@tanstack/react-query";
@@ -43,15 +44,24 @@ function GptLogo() {
     return <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><path d={gptLogoPath} fillRule="evenodd" /></svg>;
 }
 
-export function PricingCards({ onBuy, loadingPlanId = "" }: { onBuy?: (plan: Plan) => void; loadingPlanId?: string }) {
+export function PricingCards({ onBuy, loadingPlanId = "", carousel = false }: { onBuy?: (plan: Plan) => void; loadingPlanId?: string; carousel?: boolean }) {
     const { locale, tr } = useI18n();
     const localizedPath = useLocalizedPath();
     const { data = [], isPending, isError, refetch } = useQuery({ queryKey: ["plans"], queryFn: fetchPlans, staleTime: 60_000 });
     const plans = data.filter((plan) => plan.enabled).map((plan) => resolvePlanLocale(plan, locale));
     const number = new Intl.NumberFormat(locale, { maximumFractionDigits: 0 });
+    const cardsRef = useRef<HTMLDivElement>(null);
+
+    // 手机端套餐是横向滑动列表，渲染后把推荐套餐居中，两侧各露出一点相邻套餐。
+    useEffect(() => {
+        const track = cardsRef.current;
+        const recommended = track?.querySelector<HTMLElement>('[data-recommended="true"]');
+        if (!track || !recommended || track.scrollWidth <= track.clientWidth) return;
+        track.scrollLeft = recommended.offsetLeft - (track.clientWidth - recommended.offsetWidth) / 2;
+    }, [plans.length]);
 
     return <>
-        <div className={styles.cards} aria-busy={isPending}>
+        <div ref={cardsRef} className={styles.cards} data-carousel={carousel} aria-busy={isPending}>
             {planDefaults.map((fallback) => {
                 const plan = plans.find((item) => item.code === fallback.code);
                 const title = plan?.name || fallback.title;
@@ -62,7 +72,7 @@ export function PricingCards({ onBuy, loadingPlanId = "" }: { onBuy?: (plan: Pla
                     plan.workflowCreateCredits === 1 ? tr("1 次工作流创建") : tr("{0} 次工作流创建").replace("{0}", number.format(plan.workflowCreateCredits)),
                     "图像、视频、3D 与创作工作流",
                 ] : ["图像、视频与 3D 创作", "连接灵感的创作工作流", "灵感图库与素材管理"];
-                const cta = <>{tr(`升级至 ${title}`)}<ArrowRight size={15} /></>;
+                const cta = <>{tr("升级至 {0}").replace("{0}", title)}<ArrowRight size={15} /></>;
                 const perks = planPerks[fallback.code] || [];
 
                 return <section key={fallback.code} className={styles.card} data-recommended={recommended}>

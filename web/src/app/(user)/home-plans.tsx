@@ -14,6 +14,6 @@ export function HomePlans() {
             <div><span className={styles.eyebrow}>为每一种创作节奏</span><h2 id="plans-title">套餐推荐</h2></div>
             <Link href={localizedPath("/pricing")} className={styles.textLink}>查看全部套餐 <ArrowUpRight size={17} /></Link>
         </div>
-        <PricingCards />
+        <PricingCards carousel />
     </section>;
 }
