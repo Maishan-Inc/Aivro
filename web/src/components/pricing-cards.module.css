@@ -1,7 +1,10 @@
-.cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; }
-.card { --card-ink: var(--foreground); --card-muted: var(--muted-foreground); --card-line: var(--border); --cta-bg: var(--foreground); --cta-ink: var(--background); position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 550px; border: 1px solid var(--card-line); border-radius: 16px; padding: clamp(24px, 2vw, 38px); background: var(--background); color: var(--card-ink); transition: transform .3s, border-color .3s; }
+.cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: 1fr; align-items: stretch; gap: 20px; }
+.card { --card-ink: var(--foreground); --card-muted: var(--muted-foreground); --card-line: var(--border); --cta-bg: var(--foreground); --cta-ink: var(--background); position: relative; display: flex; flex-direction: column; min-width: 0; border: 1px solid var(--card-line); border-radius: 16px; padding: clamp(24px, 2vw, 38px); background: var(--background); color: var(--card-ink); transition: transform .3s, border-color .3s; }
 .card:hover { transform: translateY(-6px); border-color: var(--foreground); }
-.card[data-recommended="true"] { --card-ink: var(--background); --card-muted: color-mix(in srgb, var(--background) 70%, transparent); --card-line: color-mix(in srgb, var(--background) 20%, transparent); --cta-bg: var(--background); --cta-ink: var(--foreground); background: var(--foreground); border-color: var(--foreground); }
+/* The recommended plan is outlined rather than filled: a heavier border keeps it
+   prominent without competing with the dark card background. */
+.card[data-recommended="true"] { border: 2px solid var(--card-ink); }
+.card[data-recommended="true"]:hover { border-color: var(--card-ink); }
 .cardTop { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .card .cardTop h2 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 24px; font-weight: 550; line-height: 1.3; letter-spacing: -.04em; }
 .badge { flex-shrink: 0; padding: 5px 9px; border: 1px solid var(--card-line); border-radius: 5px; color: var(--card-ink); font-size: 10px; }
@@ -14,13 +17,19 @@
 .card :global(.ant-btn).cta:hover, .card a.cta:hover { background: var(--cta-bg); color: var(--cta-ink); opacity: .86; }
 .card :global(.ant-btn).cta:disabled { opacity: .4; }
 .featuresLabel { margin-top: 30px; border-top: 1px solid var(--card-line); padding-top: 25px; font-size: 10px; color: var(--card-muted); }
-.card ul { display: grid; gap: 18px; margin-block: 24px 36px; list-style: none; padding: 0; }
+.card ul { display: grid; gap: 18px; margin-block: 24px 18px; list-style: none; padding: 0; }
 .feature { display: flex; align-items: start; gap: 11px; color: var(--card-muted); font-size: 13px; line-height: 1.8; }
 .feature > svg { flex-shrink: 0; margin-top: 4px; color: var(--card-ink); }
 .feature > span[data-strong="true"] { color: var(--card-ink); font-weight: 600; }
+/* Model perk block: outline rows keep the discount list visually secondary to the
+   plan features above while still reading as part of the card. */
+.perks { display: grid; gap: 10px; margin-top: 16px; padding-top: 18px; border-top: 1px dashed var(--card-line); min-height: 85px; }
+.perk { display: flex; align-items: center; gap: 10px; font-size: 12px; line-height: 1.6; color: var(--card-muted); }
+.perk svg { flex-shrink: 0; width: 14px; height: 14px; color: var(--card-ink); }
+.perk strong { color: var(--card-ink); font-weight: 600; }
 .cardFoot { margin-top: auto; padding-top: 16px; color: var(--card-muted); font-size: 10px; }
 .status { margin-top: 24px; color: var(--muted-foreground); font-size: 11px; line-height: 1.8; }
 .status button { margin-left: 10px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
-@media (max-width: 1400px) { .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }.card { min-height: 510px; }.price strong { font-size: 52px; } }
-@media (max-width: 600px) { .cards { grid-template-columns: minmax(0, 1fr); gap: 20px; }.card { min-height: 480px; padding: 28px; }.subtitle { min-height: 0; }.price strong { font-size: 56px; } }
+@media (max-width: 1400px) { .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }.price strong { font-size: 52px; } }
+@media (max-width: 600px) { .cards { grid-template-columns: minmax(0, 1fr); gap: 20px; }.card { padding: 28px; }.subtitle { min-height: 0; }.price strong { font-size: 56px; } }
 @media (prefers-reduced-motion: reduce) { .card { transition: none; }.card:hover { transform: none; } }

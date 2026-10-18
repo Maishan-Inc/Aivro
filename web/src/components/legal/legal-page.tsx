@@ -28,6 +28,26 @@ Aivro 会在浏览器本地保存语言偏好、界面状态等少量配置；�
 六、政策更新
 我们可能根据功能变化更新本政策。更新后的内容会展示在本页面，继续使用 Aivro 表示你理解并同意更新后的政策。`;
 
+const privacyTw = `歡迎使用 Aivro。我們重視你的隱私，並儘量只處理提供服務所必需的資訊。
+
+一、我們處理的資訊
+當你註冊、登入或使用 Aivro 時，我們可能會處理使用者名、郵箱、第三方登入標識、登入狀態、算力點記錄、生成請求、提示詞、參考圖片、生成結果地址以及你主動儲存到素材或畫布中的內容。生成歷史儲存在資料庫中，並跟隨雲存儲檔案有效期展示；如果管理員開啟雲存儲，生成後的圖片和影片會由後端轉存到設定的 Cloudflare R2 或兼容 S3 存儲，並在到期後按設定自動清理。
+
+二、資訊用途
+這些資訊用於完成賬號登入、身份驗證、生成服務、素材和歷史記錄管理、算力點扣減與返還、系統安全審計、故障排查以及必要的產品體驗改進。
+
+三、第三方服務
+Aivro 可能接入 OpenAI 兼容模型渠道、Cloudflare R2 / S3 雲存儲、郵箱服務和第三方登入服務。你提交的生成內容可能會根據管理員設定發送給相應模型服務商處理。請不要提交你無權處理或不希望第三方服務處理的敏感內容。
+
+四、本地存儲與雲端工作流
+Aivro 會在瀏覽器本地儲存語言偏好、界面狀態等少量設定；工作流項目儲存在雲端資料庫中。生成模型渠道由管理員統一設定，使用者側不會儲存或填寫 API Key。你可以通過瀏覽器設定清理本地偏好資料。
+
+五、你的選擇
+你可以停止使用服務、清理瀏覽器本地資料，或聯繫站點管理員請求處理賬號相關資訊。管理員可在後台調整模型渠道、登入方式、郵件和雲存儲設定。
+
+六、政策更新
+我們可能根據功能變化更新本政策。更新後的內容會展示在本頁面，繼續使用 Aivro 表示你理解並同意更新後的政策。`;
+
 const privacyEn = `Welcome to Aivro. We respect your privacy and only process information needed to provide the service.
 
 1. Information we process
@@ -128,6 +148,26 @@ AI 生成结果可能存在不准确、不稳定或不符合预期的情况。�
 六、条款更新
 我们可能根据功能和合规要求更新本条款。更新后的内容会展示在本页面，继续使用或登录 Aivro 表示你接受更新后的条款。`;
 
+const termsTw = `歡迎使用 Aivro。使用、登入或註冊 Aivro，即表示你同意遵守本服務條款。
+
+一、服務說明
+Aivro 提供圖片、影片、文本、提示詞、素材和畫布相關的 AI 創作工具。具體能力取決於管理員設定的模型渠道、算力點規則、登入方式、郵件服務和雲存儲服務。
+
+二、賬號與安全
+你應妥善保管賬號、密碼、郵箱驗證碼、第三方登入賬號和錢包簽名資訊。通過你的賬號發起的操作視為你本人行為；如發現異常，請及時停止使用並聯系站點管理員。
+
+三、內容責任
+你應確保輸入、上傳、生成、儲存和分享的內容合法合規，並擁有必要權利。請勿使用 Aivro 生成、儲存或傳播違法、侵權、欺詐、騷擾、惡意代碼、侵犯隱私或違反模型服務商規則的內容。
+
+四、生成結果
+AI 生成結果可能存在不準確、不穩定或不符合預期的情況。你應自行判斷生成內容是否適合用於商業、公開發布或其他重要場景，並承擔相應責任。
+
+五、服務變更
+管理員可能根據運營需要調整模型、算力點、登入方式、雲存儲、自動清理策略或暫停部分能力。因第三方模型、存儲、郵箱或登入服務異常導致的不可用，Aivro 會盡力恢復但不承諾絕對連續可用。
+
+六、條款更新
+我們可能根據功能和合規要求更新本條款。更新後的內容會展示在本頁面，繼續使用或登入 Aivro 表示你接受更新後的條款。`;
+
 const termsEn = `Welcome to Aivro. By using, signing in to, or registering for Aivro, you agree to these Terms of Service.
 
 1. Service description
@@ -210,6 +250,7 @@ Nous pouvons mettre à jour ces conditions pour des raisons fonctionnelles ou de
 
 const fallbackContent: Record<Locale, { privacy: string; terms: string }> = {
     "zh-CN": { privacy: privacyZh, terms: termsZh },
+    "zh-TW": { privacy: privacyTw, terms: termsTw },
     "en-US": { privacy: privacyEn, terms: termsEn },
     "ja-JP": { privacy: privacyJa, terms: termsJa },
     "ko-KR": { privacy: privacyKo, terms: termsKo },
@@ -218,6 +259,7 @@ const fallbackContent: Record<Locale, { privacy: string; terms: string }> = {
 
 const titles: Record<Locale, { privacy: string; terms: string; back: string }> = {
     "zh-CN": { privacy: "隐私政策", terms: "服务条款", back: "返回登录" },
+    "zh-TW": { privacy: "隱私政策", terms: "服務條款", back: "返回登入" },
     "en-US": { privacy: "Privacy Policy", terms: "Terms of Service", back: "Back to sign in" },
     "ja-JP": { privacy: "プライバシーポリシー", terms: "利用規約", back: "ログインに戻る" },
     "ko-KR": { privacy: "개인정보 처리방침", terms: "서비스 약관", back: "로그인으로 돌아가기" },
@@ -229,7 +271,8 @@ export function LegalPage({ type }: { type: "privacy" | "terms" }) {
     const locale = useLocaleStore((state) => state.locale);
     const localizedPath = useLocalizedPath();
     const isPrivacy = type === "privacy";
-    // Admin overrides exist for Chinese and English only; other locales use the built-in copy.
+    // Admin overrides exist for Simplified Chinese and English only; every other
+    // locale, including Traditional Chinese, uses its built-in copy.
     const chinese = locale === "zh-CN";
     const english = locale === "en-US";
     const title = isPrivacy ? (chinese ? pages?.privacyTitle || titles[locale].privacy : english ? pages?.privacyTitleEn || titles[locale].privacy : titles[locale].privacy) : chinese ? pages?.termsTitle || titles[locale].terms : english ? pages?.termsTitleEn || titles[locale].terms : titles[locale].terms;

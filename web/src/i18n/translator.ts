@@ -58,6 +58,7 @@ export function createTranslator(dictionaries: LocaleDictionaries) {
     }
 
     return function translate(value: string, locale: Locale): string {
+        // Simplified Chinese is the source language, so it needs no lookup.
         if (locale === "zh-CN" || !value || !hasChinese.test(value)) return value;
         const table = compiled.get(locale);
         if (!table) return value;
@@ -115,8 +116,19 @@ function tile(body: string, table: CompiledLocale, locale: Locale) {
     return output;
 }
 
-// Counters and durations assembled at runtime rather than as enum keys.
-const numericRules: Record<Exclude<Locale, "zh-CN">, [RegExp, string][]> = {
+// Runtime-composed counts and durations. Traditional Chinese keeps its own
+// characters, so it only needs the locale-specific unit words.
+type NumericLocale = Exclude<Locale, "zh-CN">;
+
+const numericRules: Record<NumericLocale, [RegExp, string][]> = {
+    "zh-TW": [
+        [/(\d+)\s*张/g, "$1 張"],
+        [/(\d+)\s*个/g, "$1 個"],
+        [/(\d+)\s*条/g, "$1 條"],
+        [/(\d+)\s*次/g, "$1 次"],
+        [/(\d+)\s*天/g, "$1 天"],
+        [/(\d+)\s*秒/g, "$1 秒"],
+    ],
     "en-US": [
         [/(\d+)\s*分\s*(\d+)\s*秒/, "$1m $2s"],
         [/(\d+)\s*张/, "$1 images"],

@@ -7,6 +7,7 @@ import { requestLocale } from "@/lib/page-metadata";
 
 const copy: Record<Locale, { title: string; description: string; home: string; login: string }> = {
     "zh-CN": { title: "页面不存在", description: "这个地址没有对应的页面，可能已经移动或被合并到其他入口。", home: "返回首页", login: "去登录" },
+    "zh-TW": { title: "頁面不存在", description: "這個地址沒有對應的頁面，可能已經移動或被合併到其他入口。", home: "返回首頁", login: "去登入" },
     "en-US": { title: "Page not found", description: "This address does not match an active page. It may have moved or been merged into another entry.", home: "Home", login: "Sign in" },
     "ja-JP": { title: "ページが見つかりません", description: "このアドレスに対応するページはありません。移動または別の入口に統合された可能性があります。", home: "ホームへ戻る", login: "ログイン" },
     "ko-KR": { title: "페이지를 찾을 수 없습니다", description: "이 주소에 해당하는 페이지가 없습니다. 이동되었거나 다른 진입점으로 통합되었을 수 있습니다.", home: "홈으로", login: "로그인" },

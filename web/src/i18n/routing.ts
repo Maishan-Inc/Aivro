@@ -1,6 +1,6 @@
 import type { Locale } from "@/i18n/messages";
 
-export const locales = ["zh-CN", "en-US", "ja-JP", "ko-KR", "fr-FR"] as const satisfies readonly Locale[];
+export const locales = ["zh-CN", "zh-TW", "en-US", "ja-JP", "ko-KR", "fr-FR"] as const satisfies readonly Locale[];
 export const defaultLocale: Locale = "zh-CN";
 
 export function isLocale(value: string | undefined): value is Locale {
@@ -40,8 +40,13 @@ const browserLanguageMap: Record<string, Locale> = {
     fr: "fr-FR",
 };
 
+// Traditional-Chinese regions resolve before the generic `zh` fallback.
+const traditionalChinese = /^zh-(tw|hk|mo|hant)\b/;
+
 export function localeFromLanguageTag(tag: string): Locale | undefined {
-    return browserLanguageMap[tag.toLowerCase().split("-")[0]];
+    const lower = tag.toLowerCase();
+    if (traditionalChinese.test(lower)) return "zh-TW";
+    return browserLanguageMap[lower.split("-")[0]];
 }
 
 export function preferredLocale(acceptLanguage: string | null): Locale {

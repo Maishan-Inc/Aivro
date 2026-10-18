@@ -1,7 +1,8 @@
-export type Locale = "zh-CN" | "en-US" | "ja-JP" | "ko-KR" | "fr-FR";
+export type Locale = "zh-CN" | "zh-TW" | "en-US" | "ja-JP" | "ko-KR" | "fr-FR";
 
 export const localeLabels: Record<Locale, string> = {
     "zh-CN": "简体中文",
+    "zh-TW": "繁體中文",
     "en-US": "English",
     "ja-JP": "日本語",
     "ko-KR": "한국어",

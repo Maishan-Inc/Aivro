@@ -10,6 +10,7 @@ import frFR from "antd/locale/fr_FR";
 import jaJP from "antd/locale/ja_JP";
 import koKR from "antd/locale/ko_KR";
 import zhCN from "antd/locale/zh_CN";
+import zhTW from "antd/locale/zh_TW";
 import type { Locale as AntdLocale } from "antd/lib/locale";
 
 import { ClientRootInit } from "@/components/layout/client-root-init";
@@ -35,6 +36,7 @@ const queryClient = new QueryClient({
 
 const antdLocales: Record<Locale, AntdLocale> = {
     "zh-CN": zhCN,
+    "zh-TW": zhTW,
     "en-US": enUS,
     "ja-JP": jaJP,
     "ko-KR": koKR,
