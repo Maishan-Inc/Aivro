@@ -11,6 +11,7 @@ import { EditorView } from "@uiw/react-codemirror";
 import { fetchAdminSettings, fetchAuthProviderStats, fetchChannelModels, saveAdminSettings, testChannelModel, testCloudStorage, testMailSettings, type AdminCloudStorageSettings, type AdminModelChannel, type AdminModelChannelModel, type AdminModelCost, type AdminPrivateAuthProvider, type AdminPublicAuthProvider, type AdminSettings } from "@/services/api/admin";
 import { useI18n } from "@/hooks/use-i18n";
 import { useUserStore } from "@/stores/use-user-store";
+import { defaultHomeSettings, homeSocialPlatforms } from "@/constant/home-settings";
 
 const CodeMirror = dynamic(() => import("@uiw/react-codemirror"), { ssr: false });
 const jsonEditorTheme = EditorView.theme({
@@ -107,6 +108,7 @@ We may update these terms for feature and compliance reasons. Updated content wi
 
 const emptySettings: AdminSettings = {
     public: {
+        home: defaultHomeSettings,
         modelChannel: {
             availableModels: [],
             imageModels: [],
@@ -984,6 +986,22 @@ export default function AdminSettingsPage() {
                                         <Form.Item name={["public", "auth", "emailVerification"]} label="是否开启邮箱验证" extra="开启后，账号密码注册必须填写邮箱验证码" valuePropName="checked">
                                             <Switch />
                                         </Form.Item>
+                                    </Col>
+                                    <Col span={24}>
+                                        <Card size="small" title="首页视频背景" extra={sectionSaveButton()} className="mb-4">
+                                            <Typography.Paragraph type="secondary">视频静音循环播放并叠加灰色蒙层；关闭后首屏恢复流线动画。流线背景覆盖整个首页。</Typography.Paragraph>
+                                            <Row gutter={16}>
+                                                <Col xs={24} md={6}><Form.Item name={["public", "home", "videoEnabled"]} label="启用视频背景" valuePropName="checked"><Switch /></Form.Item></Col>
+                                                <Col xs={24} md={18}><Form.Item name={["public", "home", "videoUrl"]} label="视频地址"><Input placeholder={defaultHomeSettings.videoUrl} /></Form.Item></Col>
+                                            </Row>
+                                        </Card>
+                                        <Card size="small" title="首页社交媒体" extra={sectionSaveButton()} className="mb-4">
+                                            <Typography.Paragraph type="secondary">各平台默认显示，链接留空时入口不可点击；关闭开关后隐藏对应平台。</Typography.Paragraph>
+                                            {homeSocialPlatforms.map(({ id, label }) => <Row key={id} gutter={16}>
+                                                <Col xs={24} md={6}><Form.Item name={["public", "home", "socialLinks", id, "enabled"]} label={label} valuePropName="checked"><Switch /></Form.Item></Col>
+                                                <Col xs={24} md={18}><Form.Item name={["public", "home", "socialLinks", id, "url"]} label="链接地址"><Input placeholder="https://" /></Form.Item></Col>
+                                            </Row>)}
+                                        </Card>
                                     </Col>
                                     <Col span={24}>
                                         <Card size="small" title="页面访问控制" extra={sectionSaveButton()}>
@@ -2217,6 +2235,11 @@ function normalizePublicSetting(setting: Partial<AdminSettings["public"]> = {}):
             customProviders: (setting.auth?.customProviders?.length ? setting.auth.customProviders : [emptyPublicProvider("o2", "O2")]).map((item) => normalizePublicProvider(item, item.id || "o2", item.name || "O2")),
         },
         pages: normalizePublicPagesSetting(setting.pages),
+        home: {
+            ...defaultHomeSettings,
+            ...setting.home,
+            socialLinks: Object.fromEntries(homeSocialPlatforms.map(({ id }) => [id, { ...defaultHomeSettings.socialLinks[id], ...setting.home?.socialLinks?.[id] }])),
+        },
         pageAccess: normalizePublicPageAccessSetting(setting.pageAccess),
         adSense: normalizeAdSenseSetting(setting.adSense),
     };

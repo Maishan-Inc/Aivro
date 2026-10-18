@@ -13,7 +13,7 @@ export function AppTopNav() {
     const localizedPath = useLocalizedPath();
     return <>
         <header className="relative z-30 h-16 shrink-0 border-b border-border bg-background/90 backdrop-blur-xl">
-            <div className="flex h-full items-center justify-between gap-5 px-6 lg:px-[5vw]">
+            <div className="mx-auto flex h-full w-full max-w-[1960px] items-center justify-between gap-5 px-6 lg:w-[77%] lg:px-0">
                 <div className="flex items-center gap-10">
                     <Link href={localizedPath("/")} className="flex items-center gap-2.5 text-xl font-semibold tracking-[-0.06em]" aria-label="Aivro 首页"><span className="size-7 bg-foreground" style={{ mask: "url(/logo.svg) center / contain no-repeat" }} />Aivro</Link>
                     <nav aria-label="站点导航" className="hidden items-center gap-7 text-[13px] text-muted-foreground lg:flex">

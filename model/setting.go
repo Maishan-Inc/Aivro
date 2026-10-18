@@ -75,8 +75,20 @@ type PublicSetting struct {
 	ModelChannel PublicModelChannelSetting `json:"modelChannel"`
 	Auth         PublicAuthSetting         `json:"auth"`
 	Pages        PublicPagesSetting        `json:"pages"`
+	Home         PublicHomeSetting         `json:"home"`
 	PageAccess   PublicPageAccessSetting   `json:"pageAccess"`
 	AdSense      PublicAdSenseSetting      `json:"adSense"`
+}
+
+type PublicHomeSetting struct {
+	VideoEnabled *bool                        `json:"videoEnabled"`
+	VideoURL     string                       `json:"videoUrl"`
+	SocialLinks  map[string]SocialLinkSetting `json:"socialLinks"`
+}
+
+type SocialLinkSetting struct {
+	Enabled *bool  `json:"enabled"`
+	URL     string `json:"url"`
 }
 
 type PublicPagesSetting struct {

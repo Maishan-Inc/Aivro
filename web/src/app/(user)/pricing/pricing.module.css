@@ -1,0 +1,48 @@
+.pricing { position: relative; isolation: isolate; height: 100%; overflow-y: auto; background: var(--background); color: var(--foreground); }
+.background { position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5; }
+.content { width: 77%; max-width: 1960px; min-height: 100%; margin-inline: auto; padding-bottom: 32px; }
+.nav { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding-block: 30px; }
+.brand { display: inline-flex; align-items: center; gap: 10px; color: var(--foreground); font-size: 23px; font-weight: 600; letter-spacing: -.06em; }
+.brand > span { width: 25px; height: 25px; background: currentColor; mask: url(/logo.svg) center / contain no-repeat; }
+.close { display: inline-flex; align-items: center; gap: 14px; color: var(--muted-foreground); font-size: 12px; }
+.close:hover { color: var(--foreground); }
+.heading { padding: 68px 24px 60px; text-align: center; }
+.heading > span { color: var(--muted-foreground); font-size: 11px; letter-spacing: .14em; }
+.heading h1 { margin: 24px 0; font-size: clamp(36px, 4.2vw, 72px); font-weight: 550; line-height: 1.25; letter-spacing: -.06em; }
+.heading p { max-width: 610px; margin-inline: auto; color: var(--muted-foreground); font-size: 14px; line-height: 2; }
+.heading > small { display: inline-block; margin-top: 28px; border-top: 1px solid var(--border); padding-top: 20px; color: var(--muted-foreground); font-size: 11px; }
+.cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; }
+.card { --card-ink: var(--foreground); --card-muted: var(--muted-foreground); --card-line: var(--border); --cta-bg: var(--foreground); --cta-ink: var(--background); position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 550px; border: 1px solid var(--card-line); border-radius: 16px; padding: clamp(24px, 2vw, 38px); background: var(--background); color: var(--card-ink); transition: transform .3s, border-color .3s; }
+.card:hover { transform: translateY(-6px); border-color: var(--foreground); }
+.card[data-recommended="true"] { --card-ink: var(--background); --card-muted: color-mix(in srgb, var(--background) 70%, transparent); --card-line: color-mix(in srgb, var(--background) 20%, transparent); --cta-bg: var(--background); --cta-ink: var(--foreground); background: var(--foreground); border-color: var(--foreground); }
+.cardTop { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.cardTop h2 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 24px; font-weight: 550; letter-spacing: -.04em; }
+.badge { flex-shrink: 0; padding: 5px 9px; border: 1px solid var(--card-line); border-radius: 5px; color: var(--card-ink); font-size: 10px; }
+.subtitle { min-height: 60px; margin-top: 18px; color: var(--card-muted); font-size: 13px; line-height: 1.9; }
+.price { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; margin: 28px 0; }
+.price > span { font-size: 24px; }
+.price strong { font-size: clamp(36px, 2.7vw, 60px); font-weight: 550; line-height: 1.2; letter-spacing: -.06em; font-variant-numeric: tabular-nums; }
+.price > small { margin-left: 2px; color: var(--card-muted); font-size: 12px; }
+.card :global(.ant-btn).cta { display: flex; justify-content: space-between; height: 44px; border: 0; border-radius: 8px; padding-inline: 16px; background: var(--cta-bg); color: var(--cta-ink); font-size: 13px; box-shadow: none; }
+.card :global(.ant-btn).cta:hover { background: var(--cta-bg); color: var(--cta-ink); opacity: .86; }
+.card :global(.ant-btn).cta:disabled { opacity: .4; }
+.featuresLabel { margin-top: 30px; border-top: 1px solid var(--card-line); padding-top: 25px; font-size: 10px; color: var(--card-muted); }
+.card ul { display: grid; gap: 18px; margin-block: 24px 36px; list-style: none; padding: 0; }
+.feature { display: flex; align-items: start; gap: 11px; color: var(--card-muted); font-size: 13px; line-height: 1.8; }
+.feature > svg { margin-top: 4px; color: var(--card-ink); }
+.feature > span:global(.font-semibold) { color: var(--card-ink); }
+.cardFoot { margin-top: auto; padding-top: 16px; color: var(--card-muted); font-size: 10px; }
+.enterprise { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 28px; margin-top: 48px; border-block: 1px solid var(--border); padding-block: 32px; }
+.enterprise > div { display: flex; align-items: center; gap: 20px; }
+.enterprise > div > svg { flex-shrink: 0; color: var(--muted-foreground); }
+.enterprise h2 { font-size: 19px; font-weight: 500; letter-spacing: -.03em; }
+.enterprise p { margin-top: 8px; color: var(--muted-foreground); font-size: 12px; line-height: 1.9; }
+.enterprise > a { display: inline-flex; align-items: center; gap: 14px; color: var(--foreground); font-size: 13px; }
+.enterprise > a:hover svg { transform: translateX(4px); }
+.enterprise > a svg { transition: transform .2s; }
+.note { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 18px; padding-top: 26px; font-size: 10px; color: var(--muted-foreground); }
+.note a { display: inline-flex; align-items: center; gap: 8px; color: inherit; }
+@media (max-width: 1400px) { .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }.card { min-height: 510px; }.price strong { font-size: 52px; } }
+@media (max-width: 1000px) { .content { width: calc(100% - 64px); }.heading { padding-block: 48px; }.enterprise { margin-top: 36px; } }
+@media (max-width: 600px) { .content { width: calc(100% - 40px); }.nav { padding-block: 24px; }.close { gap: 8px; font-size: 11px; }.heading { padding: 38px 0 40px; }.heading h1 { font-size: 36px; }.heading p { font-size: 13px; }.cards { grid-template-columns: minmax(0, 1fr); gap: 20px; }.card { min-height: 480px; padding: 28px; }.subtitle { min-height: 0; }.price strong { font-size: 56px; }.enterprise { align-items: start; padding-block: 28px; }.enterprise > a { margin-left: 44px; }.note { font-size: 10px; } }
+@media (prefers-reduced-motion: reduce) { .card, .enterprise > a svg { transition: none; }.card:hover { transform: none; } }

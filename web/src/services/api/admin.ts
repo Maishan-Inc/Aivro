@@ -304,6 +304,7 @@ export type AdminPublicSettings = {
         customProviders: AdminPublicAuthProvider[];
     };
     pages: AdminPublicPagesSettings;
+    home: AdminPublicHomeSettings;
     pageAccess: AdminPublicPageAccessSettings;
     adSense: AdminAdSenseSettings;
 };
@@ -314,6 +315,12 @@ export type AdminPublicCaptchaSettings = {
     enabled: boolean;
     provider: AdminCaptchaProvider;
     siteKey: string;
+};
+
+export type AdminPublicHomeSettings = {
+    videoEnabled: boolean;
+    videoUrl: string;
+    socialLinks: Record<string, { enabled: boolean; url: string }>;
 };
 
 export type AdminPublicPagesSettings = {

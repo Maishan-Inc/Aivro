@@ -48,6 +48,9 @@ func SaveSettings(settings model.Settings) (model.Settings, error) {
 		return model.Settings{}, err
 	}
 	settings = normalizeSettings(settings)
+	if err := validateHomeSetting(settings.Public.Home); err != nil {
+		return model.Settings{}, err
+	}
 	syncBuiltinAuthEnabled(&settings)
 	keepPrivateAPIKeys(&settings, normalizeSettings(saved))
 	keepPrivateAuthSecrets(&settings, normalizeSettings(saved))
@@ -237,9 +240,47 @@ func normalizePublicSettingWithChannels(setting model.PublicSetting, channels []
 		setting.Auth.CustomProviders[i] = normalizePublicAuthProvider(setting.Auth.CustomProviders[i], setting.Auth.CustomProviders[i].ID, setting.Auth.CustomProviders[i].Name, setting.Auth.CustomProviders[i].IconURL)
 	}
 	setting.Pages = normalizePublicPagesSetting(setting.Pages)
+	setting.Home = normalizeHomeSetting(setting.Home)
 	setting.PageAccess = normalizePublicPageAccessSetting(setting.PageAccess)
 	setting.AdSense = normalizePublicAdSenseSetting(setting.AdSense)
 	return setting
+}
+
+func normalizeHomeSetting(setting model.PublicHomeSetting) model.PublicHomeSetting {
+	if setting.VideoEnabled == nil {
+		enabled := true
+		setting.VideoEnabled = &enabled
+	}
+	setting.VideoURL = strings.TrimSpace(firstNonEmpty(setting.VideoURL, "https://oss-us-gn.aivro.org/d/onedrive-oen-default/Aivro/Aivro.mp4"))
+	links := make(map[string]model.SocialLinkSetting, 5)
+	for _, platform := range []string{"x", "facebook", "discord", "tiktok", "bilibili"} {
+		link := setting.SocialLinks[platform]
+		if link.Enabled == nil {
+			enabled := true
+			link.Enabled = &enabled
+		}
+		link.URL = strings.TrimSpace(link.URL)
+		links[platform] = link
+	}
+	setting.SocialLinks = links
+	return setting
+}
+
+func validateHomeSetting(setting model.PublicHomeSetting) error {
+	links := map[string]string{"首页视频": setting.VideoURL}
+	for platform, link := range setting.SocialLinks {
+		links[platform] = link.URL
+	}
+	for name, address := range links {
+		if address == "" {
+			continue
+		}
+		parsed, err := url.Parse(address)
+		if err != nil || parsed.Host == "" || (parsed.Scheme != "https" && parsed.Scheme != "http") {
+			return safeMessageError{message: name + "地址须使用完整的 HTTP 或 HTTPS 链接"}
+		}
+	}
+	return nil
 }
 
 func normalizePublicPageAccessSetting(setting model.PublicPageAccessSetting) model.PublicPageAccessSetting {

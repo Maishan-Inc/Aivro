@@ -9,7 +9,8 @@ import { ArrowRight, BadgeCheck, Layers3, Sparkles, Users, X } from "lucide-reac
 import { createStripeCheckout, fetchPlans, resolvePlanLocale, type Plan } from "@/services/api/billing";
 import { useI18n } from "@/hooks/use-i18n";
 import { localeFromPath, withLocalePath } from "@/i18n/routing";
-import { cn } from "@/lib/utils";
+import { FlowBackground } from "@/components/flow-background";
+import styles from "./pricing.module.css";
 import { useUserStore } from "@/stores/use-user-store";
 
 type PlanCode = "go" | "plus" | "pro" | "max";
@@ -89,78 +90,47 @@ export default function PricingPage() {
     });
 
     return (
-        <main className="aivro-wire-surface h-full overflow-y-auto bg-background text-stone-950 dark:text-stone-100">
-            <Link href={withLocalePath("/", locale)} aria-label={en ? "Close pricing" : "关闭套餐页"} className="fixed right-5 top-5 z-10 inline-flex size-9 items-center justify-center rounded-full border border-stone-200 bg-background/70 text-stone-500 backdrop-blur transition hover:border-stone-300 hover:text-stone-950 dark:border-stone-800 dark:bg-stone-950/70 dark:text-stone-400 dark:hover:border-stone-700 dark:hover:text-white">
-                <X className="size-4" />
-            </Link>
-            <div className="mx-auto flex min-h-full w-full max-w-[1360px] flex-col px-5 pb-6 pt-6 sm:px-8">
-                <section className="flex flex-1 flex-col justify-center pb-10 pt-28 md:pt-32">
-                    <h1 className="mb-14 text-center text-[3rem] font-semibold leading-none tracking-[0] text-stone-950 dark:text-white md:text-[4rem]">{en ? "Upgrade plan" : "升级套餐"}</h1>
-                    <div className="grid gap-7 md:grid-cols-2 xl:grid-cols-4">
-                        {cards.map((card) => (
-                            <PricingCardView key={card.code} card={card} loading={!!card.plan && loadingPlanId === card.plan.id} en={en} onBuy={() => void buy(card.plan)} />
-                        ))}
-                    </div>
+        <main className={styles.pricing}>
+            <div className={styles.background} aria-hidden="true"><FlowBackground /></div>
+            <div className={styles.content}>
+                <header className={styles.nav}>
+                    <Link href={withLocalePath("/", locale)} className={styles.brand}><span />Aivro</Link>
+                    <Link href={withLocalePath("/", locale)} className={styles.close} aria-label={en ? "Close pricing" : "关闭套餐页"}>{en ? "Back to creating" : "返回创作"}<X size={17} /></Link>
+                </header>
+                <section className={styles.heading}>
+                    <span>{en ? "A PLAN FOR EVERY CREATOR" : "为每一种创作节奏"}</span>
+                    <h1>{en ? "More room for your next idea." : "让创作，多一点可能。"}</h1>
+                    <p>{en ? "Choose your creative space. Bring your next idea to life with images, video, 3D, and connected workflows." : "从第一次尝试，到持续探索。选择适合你的创作空间，让图像、视频与 3D 灵感继续生长。"}</p>
+                    <small>{en ? "One workspace. More possibilities." : "一个创作空间，更多表达可能。"}</small>
                 </section>
-                <div className="mx-auto mt-auto flex shrink-0 flex-col items-center pb-2 text-center text-sm font-medium leading-6 text-stone-500 dark:text-stone-400">
-                    <Users className="mb-3 size-5 text-stone-500 dark:text-stone-300" />
-                    <p>{en ? "Need more for your organization?" : "贵组织需要更多功能？"}</p>
-                    <a href="mailto:enterprise@aivro.org?subject=Aivro%20Enterprise" className="group inline-flex items-center gap-1 text-stone-900 underline decoration-stone-400 underline-offset-4 transition hover:text-black dark:text-stone-100 dark:decoration-stone-600 dark:hover:text-white">
-                        {en ? "View Aivro Enterprise" : "查看Aivro Enterprise"}
-                        <ArrowRight className="size-4 transition group-hover:translate-x-0.5" />
-                    </a>
+                <div className={styles.cards}>
+                    {cards.map((card) => <PricingCardView key={card.code} card={card} loading={!!card.plan && loadingPlanId === card.plan.id} onBuy={() => void buy(card.plan)} en={en} />)}
                 </div>
+                <section className={styles.enterprise}>
+                    <div><Users size={24} strokeWidth={1.2} /><div><h2>{en ? "Create together. Go further." : "一起创作，走得更远。"}</h2><p>{en ? "Need more for your organization?" : "贵组织需要更多功能？为团队探索更合适的创作方案。"}</p></div></div>
+                    <a href="mailto:enterprise@aivro.org?subject=Aivro%20Enterprise">{en ? "View Aivro Enterprise" : "查看 Aivro Enterprise"}<ArrowRight size={17} /></a>
+                </section>
+                <div className={styles.note}><span>{en ? "Ready when inspiration strikes." : "让工具顺着想法走，让创作自然发生。"}</span><Link href={withLocalePath("/#faq", locale)}>{en ? "Have a question?" : "了解更多常见问题"}<ArrowRight size={14} /></Link></div>
             </div>
         </main>
     );
 }
 
 function PricingCardView({ card, loading, en, onBuy }: { card: PricingCard; loading: boolean; en: boolean; onBuy: () => void }) {
-    return (
-        <section
-            className={cn(
-                "group relative flex min-h-[34rem] min-w-0 flex-col overflow-hidden rounded-md px-6 pb-8 pt-8 transition duration-300 hover:-translate-y-1",
-                card.highlighted ? "border border-stone-900 bg-stone-950 text-white shadow-none dark:border-stone-100 dark:bg-stone-100 dark:text-stone-950" : "aivro-wire-card",
-            )}
-        >
-            {card.badge && <span className={cn("absolute right-5 top-8 rounded-md px-3 py-1 text-xs font-semibold leading-none", card.highlighted ? "bg-white text-stone-950 dark:bg-stone-950 dark:text-white" : "bg-stone-950 text-white dark:bg-stone-100 dark:text-stone-950")}>{card.badge}</span>}
-            <div className="min-h-[14rem]">
-                <h2 className={cn("max-w-[76%] truncate text-2xl font-semibold leading-none tracking-[0]", card.highlighted ? "text-white dark:text-stone-950" : "text-stone-950 dark:text-white")}>{card.title}</h2>
-                <p className={cn("mt-5 min-h-16 text-base font-medium leading-7", card.highlighted ? "text-white/72 dark:text-stone-600" : "text-stone-500 dark:text-stone-400")}>{card.subtitle}</p>
-                <div className="mt-9 flex items-baseline gap-2">
-                    <span className={cn("text-[2.25rem] font-medium leading-none tracking-[0]", card.highlighted ? "text-white dark:text-stone-950" : "text-stone-950 dark:text-white")}>{currencySymbol(card.currency)}</span>
-                    <span className={cn("text-[3.5rem] font-medium leading-none tracking-[0] tabular-nums", card.highlighted ? "text-white dark:text-stone-950" : "text-stone-950 dark:text-white")}>{card.price}</span>
-                    <span className={cn("text-base font-semibold tracking-[0]", card.highlighted ? "text-white/62 dark:text-stone-500" : "text-stone-500 dark:text-stone-400")}>{pricePeriodLabel(card.currency, en)}</span>
-                </div>
-            </div>
-            <Button
-                block
-                loading={loading}
-                disabled={!card.plan}
-                onClick={onBuy}
-                className={`mt-5 h-11 rounded-md border-0 text-base font-medium shadow-none ${
-                    card.highlighted ? "bg-white text-stone-950 hover:!bg-stone-100 hover:!text-stone-950 dark:bg-stone-950 dark:text-white dark:hover:!bg-stone-800 dark:hover:!text-white" : "bg-stone-950 text-white hover:!bg-stone-800 hover:!text-white dark:bg-stone-100 dark:text-stone-950 dark:hover:!bg-white dark:hover:!text-stone-950"
-                }`}
-            >
-                {card.cta}
-            </Button>
-            <ul className="mt-auto flex flex-col gap-4 pt-8">
-                {card.features.map((feature) => (
-                    <PlanFeature key={feature.text} feature={feature} highlighted={card.highlighted} />
-                ))}
-            </ul>
-        </section>
-    );
+    return <section className={styles.card} data-recommended={card.highlighted}>
+        <div className={styles.cardTop}><h2>{card.title}</h2>{card.badge ? <span className={styles.badge}>{card.badge}</span> : null}</div>
+        <p className={styles.subtitle}>{card.subtitle}</p>
+        <div className={styles.price}><span>{currencySymbol(card.currency)}</span><strong>{card.price}</strong><small>{pricePeriodLabel(card.currency, en)}</small></div>
+        <Button block loading={loading} disabled={!card.plan} onClick={onBuy} className={styles.cta}>{card.cta}<ArrowRight size={15} /></Button>
+        <div className={styles.featuresLabel}>{en ? "Your creative space includes" : "你的创作空间包含"}</div>
+        <ul>{card.features.map((feature) => <PlanFeature key={feature.text} feature={feature} />)}</ul>
+        <span className={styles.cardFoot}>{en ? "Images · Video · 3D · Workflows" : "图像 · 视频 · 3D · 工作流"}</span>
+    </section>;
 }
 
-function PlanFeature({ feature, highlighted }: { feature: Feature; highlighted?: boolean }) {
+function PlanFeature({ feature }: { feature: Feature }) {
     const Icon = feature.icon;
-    return (
-        <li className={cn("flex items-center gap-3 text-base leading-6", highlighted ? "text-white/76 dark:text-stone-600" : "text-stone-600 dark:text-stone-300")}>
-            <Icon className={cn("size-5 shrink-0", highlighted ? "text-white/82 dark:text-stone-700" : "text-stone-800 dark:text-stone-100")} />
-            <span className={feature.strong ? cn("font-bold", highlighted ? "text-white dark:text-stone-950" : "text-stone-950 dark:text-white") : "font-medium"}>{feature.text}</span>
-        </li>
-    );
+    return <li className={styles.feature}><Icon className="size-4 shrink-0" /><span className={feature.strong ? "font-semibold" : undefined}>{feature.text}</span></li>;
 }
 
 function displayPrice(plan: Plan | undefined, fallback: string) {
@@ -195,16 +165,16 @@ function fallbackPrice(code: PlanCode) {
 
 function fallbackSubtitle(code: PlanCode, en: boolean) {
     const zh: Record<PlanCode, string> = {
-        go: "通过更长对话深入探索话题",
-        plus: "保存个人上下文，让 AI 助手持续协助工作",
-        pro: "以尖端智能自动化完成你最具体化的工作",
-        max: "面向高强度创作者的最高使用空间",
+        go: "从第一个灵感开始，轻松探索你的创作方式",
+        plus: "为日常创作留出更多空间，让好想法持续发生",
+        pro: "让灵感进入完整工作流，支持更密集的创作",
+        max: "为高强度创作者，打开更广阔的表达空间",
     };
     const enText: Record<PlanCode, string> = {
-        go: "Explore topics in longer conversations",
-        plus: "Save personal context so your assistant can keep helping",
-        pro: "Automate highly specific work with frontier intelligence",
-        max: "The highest usage room for intensive creators",
+        go: "Start with an idea and explore your creative style",
+        plus: "More room for everyday ideas and creative exploration",
+        pro: "Connect your ideas in workflows for intensive creation",
+        max: "A wider creative space for your most ambitious ideas",
     };
     return en ? enText[code] : zh[code];
 }
@@ -213,9 +183,9 @@ function planFeaturesFromPlan(plan: Plan | undefined, en: boolean): Feature[] {
     const icons = [Sparkles, Layers3, BadgeCheck];
     if (!plan) {
         return [
-            { icon: Sparkles, text: en ? "Configured credits" : "可配置算力点", strong: true },
-            { icon: Layers3, text: en ? "Configurable workflow quota" : "可配置工作流创建次数" },
-            { icon: BadgeCheck, text: en ? "Managed in plan management" : "内容由套餐管理维护" },
+            { icon: Sparkles, text: en ? "Images, video, and 3D creation" : "图像、视频与 3D 创作", strong: true },
+            { icon: Layers3, text: en ? "Connected creative workflows" : "连接灵感的创作工作流" },
+            { icon: BadgeCheck, text: en ? "Prompt gallery and asset library" : "灵感图库与素材管理" },
         ];
     }
     if (plan.features?.length) {
@@ -224,7 +194,7 @@ function planFeaturesFromPlan(plan: Plan | undefined, en: boolean): Feature[] {
     return [
         { icon: Sparkles, text: en ? `${formatQuota(plan.credits)} credits` : `${formatQuota(plan.credits)} 算力点`, strong: true },
         { icon: Layers3, text: en ? `${formatQuota(plan.workflowCreateCredits)} workflow creations` : `${formatQuota(plan.workflowCreateCredits)} 次工作流创建` },
-        { icon: BadgeCheck, text: en ? "Name, description, price, currency, and quota are customizable" : "名称、描述、价格、币种和额度均可在套餐管理中自定义" },
+        { icon: BadgeCheck, text: en ? "Images, video, 3D, and creative workflows" : "图像、视频、3D 与创作工作流" },
     ];
 }
 
