@@ -44,6 +44,17 @@ export function getAntThemeConfig(dark: boolean): ThemeConfig {
         algorithm: dark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
         cssVar: { key: dark ? "aivro-dark" : "aivro-light" },
         token: {
+            borderRadius: 6,
+            colorBgBase: dark ? "#090909" : "#ffffff",
+            colorBgContainer: dark ? "#0d0d0d" : "#ffffff",
+            colorBgElevated: dark ? "#141414" : "#ffffff",
+            colorBgLayout: dark ? "#090909" : "#fafafa",
+            colorBorder: dark ? "#2a2a2a" : "#e5e5e5",
+            colorBorderSecondary: dark ? "#222222" : "#ebebeb",
+            colorText: dark ? "#ededed" : "#171717",
+            colorTextSecondary: dark ? "#a1a1a1" : "#666666",
+            fontFamily: '"SF Pro Display", "PingFang SC", "Microsoft YaHei", sans-serif',
+            controlHeight: 36,
             colorPrimary: color.primary,
             colorInfo: color.primary,
             colorLink: color.primary,
@@ -54,7 +65,10 @@ export function getAntThemeConfig(dark: boolean): ThemeConfig {
         components: {
             Button: {
                 primaryShadow: "none",
+                defaultShadow: "none",
             },
+            Card: { boxShadowTertiary: "none" },
+            Input: { activeShadow: "0 0 0 2px rgba(128,128,128,.12)" },
             Menu: {
                 itemActiveBg: color.menuBg,
                 itemHoverBg: color.menuBg,

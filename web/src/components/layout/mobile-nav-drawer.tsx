@@ -21,7 +21,7 @@ export function MobileNavDrawer({ open, activeToolSlug, onClose }: MobileNavDraw
     const user = useUserStore((state) => state.user);
 
     return (
-        <Drawer title={t("nav.title")} placement="left" size={280} open={open} onClose={onClose} className="md:hidden">
+        <Drawer title={t("nav.title")} placement="left" size={280} open={open} onClose={onClose} className="lg:hidden">
             <div className="space-y-1">
                 {user ? (
                     <Link href={withLocalePath("/console", locale)} onClick={onClose} className="flex items-center gap-3 rounded-lg px-3 py-3 text-base font-medium text-stone-900 transition hover:bg-stone-100 dark:text-stone-100 dark:hover:bg-stone-800">

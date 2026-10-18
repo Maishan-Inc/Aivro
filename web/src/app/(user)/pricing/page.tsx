@@ -93,10 +93,10 @@ export default function PricingPage() {
             <Link href={withLocalePath("/", locale)} aria-label={en ? "Close pricing" : "关闭套餐页"} className="fixed right-5 top-5 z-10 inline-flex size-9 items-center justify-center rounded-full border border-stone-200 bg-background/70 text-stone-500 backdrop-blur transition hover:border-stone-300 hover:text-stone-950 dark:border-stone-800 dark:bg-stone-950/70 dark:text-stone-400 dark:hover:border-stone-700 dark:hover:text-white">
                 <X className="size-4" />
             </Link>
-            <div className="mx-auto flex min-h-full w-full max-w-[1680px] flex-col px-5 pb-6 pt-6 sm:px-8">
+            <div className="mx-auto flex min-h-full w-full max-w-[1360px] flex-col px-5 pb-6 pt-6 sm:px-8">
                 <section className="flex flex-1 flex-col justify-center pb-10 pt-28 md:pt-32">
                     <h1 className="mb-14 text-center text-[3rem] font-semibold leading-none tracking-[0] text-stone-950 dark:text-white md:text-[4rem]">{en ? "Upgrade plan" : "升级套餐"}</h1>
-                    <div className="grid gap-7 md:grid-cols-2 2xl:grid-cols-4">
+                    <div className="grid gap-7 md:grid-cols-2 xl:grid-cols-4">
                         {cards.map((card) => (
                             <PricingCardView key={card.code} card={card} loading={!!card.plan && loadingPlanId === card.plan.id} en={en} onBuy={() => void buy(card.plan)} />
                         ))}
@@ -119,17 +119,17 @@ function PricingCardView({ card, loading, en, onBuy }: { card: PricingCard; load
     return (
         <section
             className={cn(
-                "group relative flex min-h-[34rem] min-w-0 flex-col overflow-hidden rounded-lg px-8 pb-8 pt-8 transition duration-300 hover:-translate-y-1",
-                card.highlighted ? "border border-stone-900 bg-stone-950 text-white shadow-[0_22px_70px_rgba(28,25,23,0.22)] dark:border-stone-100 dark:bg-stone-100 dark:text-stone-950" : "aivro-wire-card",
+                "group relative flex min-h-[34rem] min-w-0 flex-col overflow-hidden rounded-md px-6 pb-8 pt-8 transition duration-300 hover:-translate-y-1",
+                card.highlighted ? "border border-stone-900 bg-stone-950 text-white shadow-none dark:border-stone-100 dark:bg-stone-100 dark:text-stone-950" : "aivro-wire-card",
             )}
         >
-            {card.badge && <span className={cn("absolute right-8 top-8 rounded-full px-3 py-1 text-xs font-semibold leading-none", card.highlighted ? "bg-white text-stone-950 dark:bg-stone-950 dark:text-white" : "bg-stone-950 text-white dark:bg-stone-100 dark:text-stone-950")}>{card.badge}</span>}
+            {card.badge && <span className={cn("absolute right-5 top-8 rounded-md px-3 py-1 text-xs font-semibold leading-none", card.highlighted ? "bg-white text-stone-950 dark:bg-stone-950 dark:text-white" : "bg-stone-950 text-white dark:bg-stone-100 dark:text-stone-950")}>{card.badge}</span>}
             <div className="min-h-[14rem]">
                 <h2 className={cn("max-w-[76%] truncate text-2xl font-semibold leading-none tracking-[0]", card.highlighted ? "text-white dark:text-stone-950" : "text-stone-950 dark:text-white")}>{card.title}</h2>
                 <p className={cn("mt-5 min-h-16 text-base font-medium leading-7", card.highlighted ? "text-white/72 dark:text-stone-600" : "text-stone-500 dark:text-stone-400")}>{card.subtitle}</p>
                 <div className="mt-9 flex items-baseline gap-2">
-                    <span className={cn("text-[3.15rem] font-medium leading-none tracking-[0]", card.highlighted ? "text-white dark:text-stone-950" : "text-stone-950 dark:text-white")}>{currencySymbol(card.currency)}</span>
-                    <span className={cn("text-[4.5rem] font-medium leading-none tracking-[0] tabular-nums", card.highlighted ? "text-white dark:text-stone-950" : "text-stone-950 dark:text-white")}>{card.price}</span>
+                    <span className={cn("text-[2.25rem] font-medium leading-none tracking-[0]", card.highlighted ? "text-white dark:text-stone-950" : "text-stone-950 dark:text-white")}>{currencySymbol(card.currency)}</span>
+                    <span className={cn("text-[3.5rem] font-medium leading-none tracking-[0] tabular-nums", card.highlighted ? "text-white dark:text-stone-950" : "text-stone-950 dark:text-white")}>{card.price}</span>
                     <span className={cn("text-base font-semibold tracking-[0]", card.highlighted ? "text-white/62 dark:text-stone-500" : "text-stone-500 dark:text-stone-400")}>{pricePeriodLabel(card.currency, en)}</span>
                 </div>
             </div>
@@ -138,7 +138,7 @@ function PricingCardView({ card, loading, en, onBuy }: { card: PricingCard; load
                 loading={loading}
                 disabled={!card.plan}
                 onClick={onBuy}
-                className={`mt-5 h-12 rounded-full border-0 text-base font-medium shadow-none ${
+                className={`mt-5 h-11 rounded-md border-0 text-base font-medium shadow-none ${
                     card.highlighted ? "bg-white text-stone-950 hover:!bg-stone-100 hover:!text-stone-950 dark:bg-stone-950 dark:text-white dark:hover:!bg-stone-800 dark:hover:!text-white" : "bg-stone-950 text-white hover:!bg-stone-800 hover:!text-white dark:bg-stone-100 dark:text-stone-950 dark:hover:!bg-white dark:hover:!text-stone-950"
                 }`}
             >

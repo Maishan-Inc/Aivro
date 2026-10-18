@@ -27,11 +27,11 @@ export function PromptCard({
     return (
         <Card
             hoverable
-            className="overflow-hidden"
+            className="group overflow-hidden !shadow-none"
             styles={{ body: { padding: 0 } }}
             cover={
                 <button type="button" className="block w-full text-left" onClick={onOpen}>
-                    <img src={promptImageUrl(item.coverUrl)} alt={item.title} className="aspect-[4/3] w-full object-cover" onError={(event) => (event.currentTarget.src = "/logo.svg")} />
+                    <img src={promptImageUrl(item.coverUrl)} alt={item.title} loading="lazy" className="aspect-[4/3] w-full object-cover transition-transform duration-500 group-hover:scale-[1.025]" onError={(event) => { if (event.currentTarget.getAttribute("src") !== "/logo.svg") event.currentTarget.src = "/logo.svg"; }} />
                 </button>
             }
         >

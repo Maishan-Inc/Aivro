@@ -4,18 +4,21 @@ import type { ReactNode } from "react";
 import { usePathname } from "next/navigation";
 
 import { AppTopNav } from "@/components/layout/app-top-nav";
+import { ConsoleShell } from "@/components/console-shell";
 import { stripLocalePath } from "@/i18n/routing";
 
 export default function UserLayout({ children }: { children: ReactNode }) {
     const cleanPathname = stripLocalePath(usePathname());
-    const immersivePath = cleanPathname === "/pricing";
-    const showTopNav = !immersivePath && cleanPathname !== "/canvas" && cleanPathname !== "/console" && !/^\/(canvas|console)\//.test(cleanPathname);
+    const workspacePath = ["/canvas", "/image", "/video", "/model-3d", "/prompts", "/assets", "/asset-library", "/console"].includes(cleanPathname) || cleanPathname.startsWith("/console/");
+    const immersivePath = cleanPathname === "/pricing" || cleanPathname.startsWith("/canvas/");
+
+    if (workspacePath) return <div className="h-dvh overflow-hidden"><ConsoleShell>{children}</ConsoleShell></div>;
 
     return (
         <div className="flex h-dvh flex-col overflow-hidden bg-background text-foreground">
-            {showTopNav ? <AppTopNav /> : null}
+            {immersivePath ? null : <AppTopNav />}
             <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
-            {immersivePath ? null : <footer className="shrink-0 border-t border-stone-200 bg-background px-6 py-3 text-center text-xs text-stone-500 dark:border-stone-800 dark:text-stone-400">Copyright © 2026 Maishan Inc. All rights reserved Aivro</footer>}
+            {immersivePath || cleanPathname === "/" ? null : <footer className="shrink-0 border-t border-border bg-background px-6 py-3 text-center text-xs text-muted-foreground">Copyright © 2026 Maishan Inc. All rights reserved Aivro</footer>}
         </div>
     );
 }

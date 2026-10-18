@@ -1,9 +1,12 @@
 "use client";
 
-import { BookOpen, CheckSquare, ClipboardPaste, Download, FileText, FolderPlus, History, ImagePlus, PenLine, Plus, SlidersHorizontal, Sparkles, Trash2, Upload } from "lucide-react";
+import { StudioEmptyState } from "@/components/studio-empty-state";
+import studio from "@/components/studio-layout.module.css";
+
+import { BookOpen, CheckSquare, ClipboardPaste, Download, FileText, FolderPlus, History, PenLine, Plus, SlidersHorizontal, Sparkles, Trash2, Upload } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { App, Button, Checkbox, Drawer, Dropdown, Empty, Image, Input, Modal, Tag, Typography } from "antd";
+import { App, Button, Checkbox, Drawer, Dropdown, Image, Input, Modal, Tag, Typography } from "antd";
 import { saveAs } from "file-saver";
 
 import { AivroDrawableLoader } from "@/components/aivro-drawable-loader";
@@ -368,9 +371,9 @@ export default function ImagePage() {
     };
 
     return (
-        <div className="flex h-full flex-col overflow-hidden bg-stone-50 text-stone-900 dark:bg-stone-950 dark:text-stone-100">
-            <main className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-y-auto p-3 lg:grid-cols-[300px_minmax(0,1fr)] lg:overflow-hidden xl:grid-cols-[320px_minmax(0,1fr)]">
-                <aside className="thin-scrollbar hidden min-h-0 overflow-y-auto rounded-lg border border-stone-200 bg-card p-4 shadow-sm dark:border-stone-800 lg:block">
+        <div className={studio.studio}>
+            <main className={studio.layout}>
+                <aside className={studio.history}>
                     <LogPanel
                         logs={visibleLogs}
                         selectedLogIds={selectedLogIds}
@@ -383,14 +386,15 @@ export default function ImagePage() {
                     />
                 </aside>
 
-                <section className="grid gap-3 lg:min-h-0 lg:overflow-hidden xl:grid-cols-[420px_minmax(0,1fr)]">
-                    <div className="thin-scrollbar flex flex-col rounded-lg border border-stone-200 bg-card p-4 shadow-sm dark:border-stone-800 lg:min-h-0 lg:overflow-y-auto">
+                <section className={studio.panels}>
+                    <div className={studio.form}>
                         <div>
                             <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0">
                                     <h1 className="text-2xl font-semibold text-stone-950 dark:text-stone-100">{locale === "en-US" ? "Image Studio" : "生图工作台"}</h1>
+                                    <p>从一句描述开始，让画面自然发生。</p>
                                 </div>
-                                <div className="flex shrink-0 gap-2 lg:hidden">
+                                <div className={studio.historyActions}>
                                     <Button icon={<History className="size-4" />} onClick={() => setLogsOpen(true)}>
                                         {locale === "en-US" ? "History" : "记录"}
                                     </Button>
@@ -483,7 +487,7 @@ export default function ImagePage() {
                         </div>
                     </div>
 
-                    <div className="thin-scrollbar rounded-lg border border-stone-200 bg-card p-4 shadow-sm dark:border-stone-800 lg:min-h-0 lg:overflow-y-auto lg:p-5">
+                    <div className={studio.results}>
                         <div className="mb-4 flex items-center justify-between gap-3">
                             <div>
                                 <h2 className="text-xl font-semibold">{locale === "en-US" ? "Results" : "生成结果"}</h2>
@@ -508,10 +512,7 @@ export default function ImagePage() {
                                 })}
                             </div>
                         ) : (
-                            <div className="flex min-h-[320px] flex-col items-center justify-center rounded-lg border border-dashed border-stone-300 text-center dark:border-stone-700 lg:min-h-[560px]">
-                                <ImagePlus className="mb-4 size-11 text-stone-400" />
-                                <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={locale === "en-US" ? "No images yet" : "还没有生成图片"} />
-                            </div>
+                            <StudioEmptyState kind="image" onUsePrompt={setPrompt} />
                         )}
                     </div>
                 </section>

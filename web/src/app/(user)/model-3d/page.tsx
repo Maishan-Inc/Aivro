@@ -1,6 +1,10 @@
 "use client";
 
+import { StudioEmptyState } from "@/components/studio-empty-state";
+import studio from "@/components/studio-layout.module.css";
+
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { App, Button, Drawer, Empty, InputNumber, Modal, Segmented, Slider, Spin, Switch, Tag } from "antd";
 import { Box, Download, FolderPlus, History, Loader2, Plus, Trash2, Upload } from "lucide-react";
 import { useUserStore } from "@/stores/use-user-store";
@@ -33,10 +37,10 @@ function ModelPreview({ result, mode }: { result: Model3DGenerationResult | null
         <div className="flex min-h-[320px] w-full flex-col items-center justify-center rounded-lg border border-dashed border-stone-300 bg-stone-50 p-6 text-center dark:border-stone-700 dark:bg-stone-900 lg:min-h-[520px]">
             <div className="relative mb-8 h-56 w-56 [perspective:800px]">
                 <div
-                    className={`absolute inset-8 rotate-45 rounded-2xl border ${mode === "wireframe" ? "border-cyan-500 bg-transparent" : mode === "white" ? "border-stone-300 bg-white dark:border-stone-500 dark:bg-stone-100" : "border-emerald-300 bg-gradient-to-br from-emerald-300 via-cyan-400 to-blue-600"} shadow-xl shadow-cyan-500/10 [transform:rotateX(55deg)_rotateZ(45deg)]`}
+                    className={`absolute inset-8 rotate-45 rounded-2xl border ${mode === "wireframe" ? "border-foreground bg-transparent" : mode === "white" ? "border-stone-300 bg-white dark:border-stone-500 dark:bg-stone-100" : "border-border bg-gradient-to-br from-muted to-background"} [transform:rotateX(55deg)_rotateZ(45deg)]`}
                 />
                 <div
-                    className={`absolute inset-16 rounded-xl border ${mode === "wireframe" ? "border-cyan-400 bg-transparent" : mode === "white" ? "border-stone-200 bg-stone-100" : "border-blue-200 bg-gradient-to-br from-blue-300 to-indigo-600"} [transform:rotateX(55deg)_rotateZ(45deg)_translateZ(70px)]`}
+                    className={`absolute inset-16 rounded-xl border ${mode === "wireframe" ? "border-foreground/60 bg-transparent" : mode === "white" ? "border-stone-200 bg-stone-100" : "border-border bg-gradient-to-br from-background to-muted"} [transform:rotateX(55deg)_rotateZ(45deg)_translateZ(70px)]`}
                 />
             </div>
             <div className="rounded-lg border border-stone-200 bg-background px-4 py-2 text-sm text-stone-600 shadow-sm dark:border-stone-800 dark:text-stone-300">
@@ -52,6 +56,7 @@ function ModelPreview({ result, mode }: { result: Model3DGenerationResult | null
 }
 
 export default function Model3DPage() {
+    const searchParams = useSearchParams();
     const { message } = App.useApp();
     const { token } = useUserStore();
     const { addAsset } = useAssetStore();
@@ -79,6 +84,14 @@ export default function Model3DPage() {
     const [detailHistory, setDetailHistory] = useState<GenerationHistory | null>(null);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        const urlPrompt = searchParams.get("prompt");
+        if (urlPrompt) {
+            setPrompt(urlPrompt);
+            setMode("text");
+        }
+    }, [searchParams]);
 
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(e.target.files || []);
@@ -207,17 +220,17 @@ export default function Model3DPage() {
     const estimatedEnergy = Math.round(30 * quantity * (meshQuality === "high" ? 1.6 : meshQuality === "ultra" ? 2.5 : 1) * (textureEnabled ? 1.2 : 1) * (pbrEnabled ? 1.3 : 1));
 
     return (
-        <div className="flex h-full flex-col overflow-hidden bg-stone-50 text-stone-900 dark:bg-stone-950 dark:text-stone-100">
-            <main className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-y-auto p-3 lg:grid-cols-[300px_minmax(0,1fr)] lg:overflow-hidden xl:grid-cols-[320px_minmax(0,1fr)]">
-                <aside className="thin-scrollbar hidden min-h-0 overflow-y-auto rounded-lg border border-stone-200 bg-card p-4 shadow-sm dark:border-stone-800 lg:block">
+        <div className={studio.studio}>
+            <main className={studio.layout}>
+                <aside className={studio.history}>
                     <HistoryPanel histories={histories} loading={loadingHistory} token={token} onRefresh={handleLoadHistory} onOpenDetail={setDetailHistory} />
                 </aside>
 
-                <section className="grid gap-3 lg:min-h-0 lg:overflow-hidden xl:grid-cols-[420px_minmax(0,1fr)]">
-                    <div className="thin-scrollbar flex flex-col rounded-lg border border-stone-200 bg-card p-4 shadow-sm dark:border-stone-800 lg:min-h-0 lg:overflow-y-auto">
+                <section className={studio.panels}>
+                    <div className={studio.form}>
                         <div className="flex items-start justify-between gap-3">
-                            <h1 className="text-2xl font-semibold text-stone-950 dark:text-stone-100">3D 模型创作台</h1>
-                            <div className="flex shrink-0 gap-2 lg:hidden">
+                            <div><h1>3D 模型工作台</h1><p>从平面灵感，探索三维世界。</p></div>
+                            <div className={studio.historyActions}>
                                 <Button icon={<History className="size-4" />} onClick={openHistory}>
                                     记录
                                 </Button>
@@ -308,7 +321,7 @@ export default function Model3DPage() {
                         </div>
                     </div>
 
-                    <div className="thin-scrollbar rounded-lg border border-stone-200 bg-card p-4 shadow-sm dark:border-stone-800 lg:min-h-0 lg:overflow-y-auto lg:p-5">
+                    <div className={studio.results}>
                         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                             <h2 className="text-xl font-semibold">生成结果</h2>
                             <div className="flex gap-2">
@@ -324,7 +337,7 @@ export default function Model3DPage() {
                             </div>
                         </div>
 
-                        <ModelPreview result={currentResult} mode={viewMode} />
+                        {currentResult ? <ModelPreview result={currentResult} mode={viewMode} /> : <StudioEmptyState kind="model-3d" onUsePrompt={(value) => { setPrompt(value); setMode("text"); }} />}
 
                         <div className="mt-4 grid gap-3 xl:grid-cols-2">
                             <div className="rounded-lg border border-stone-200 bg-background p-3 dark:border-stone-800">

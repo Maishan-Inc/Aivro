@@ -5,6 +5,17 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+    --color-stone-50: var(--color-neutral-50);
+    --color-stone-100: var(--color-neutral-100);
+    --color-stone-200: var(--color-neutral-200);
+    --color-stone-300: var(--color-neutral-300);
+    --color-stone-400: var(--color-neutral-400);
+    --color-stone-500: var(--color-neutral-500);
+    --color-stone-600: var(--color-neutral-600);
+    --color-stone-700: var(--color-neutral-700);
+    --color-stone-800: var(--color-neutral-800);
+    --color-stone-900: var(--color-neutral-900);
+    --color-stone-950: var(--color-neutral-950);
     --color-background: var(--background);
     --color-foreground: var(--foreground);
     --color-border: var(--border);
@@ -48,7 +59,7 @@
 }
 
 :root {
-    --radius: 0.625rem;
+    --radius: 0.5rem;
     --border: oklch(0.922 0 0);
     --ring: oklch(0.708 0 0);
     --background: oklch(1 0 0);
@@ -83,11 +94,11 @@
 }
 
 .dark {
-    --background: oklch(0.145 0 0);
+    --background: #090909;
     --foreground: oklch(0.985 0 0);
     --border: oklch(1 0 0 / 10%);
     --ring: oklch(0.556 0 0);
-    --card: oklch(0.205 0 0);
+    --card: #0d0d0d;
     --card-foreground: oklch(0.985 0 0);
     --popover: oklch(0.205 0 0);
     --popover-foreground: oklch(0.985 0 0);
@@ -95,7 +106,7 @@
     --primary-foreground: oklch(0.205 0 0);
     --secondary: oklch(0.269 0 0);
     --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
+    --muted: #171717;
     --muted-foreground: oklch(0.708 0 0);
     --accent: oklch(0.269 0 0);
     --accent-foreground: oklch(0.985 0 0);
@@ -106,11 +117,11 @@
     --chart-3: oklch(0.439 0 0);
     --chart-4: oklch(0.371 0 0);
     --chart-5: oklch(0.269 0 0);
-    --sidebar: oklch(0.205 0 0);
+    --sidebar: #0c0c0c;
     --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.488 0.243 264.376);
+    --sidebar-primary: #ededed;
     --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
+    --sidebar-accent: #202020;
     --sidebar-accent-foreground: oklch(0.985 0 0);
     --sidebar-border: oklch(1 0 0 / 10%);
     --sidebar-ring: oklch(0.556 0 0);
@@ -133,6 +144,10 @@
     }
     textarea::-webkit-resizer {
         display: none;
+    }
+    :focus-visible {
+        outline: 2px solid var(--ring);
+        outline-offset: 4px;
     }
     html {
         @apply font-sans;
@@ -178,148 +193,14 @@
     }
 
     .aivro-wire-surface {
-        background-image: radial-gradient(circle, rgba(120, 113, 108, 0.28) 1px, transparent 1.4px);
-        background-size: 18px 18px;
-    }
-
-    .dark .aivro-wire-surface {
-        background-image: radial-gradient(circle, rgba(214, 211, 209, 0.18) 1px, transparent 1.4px);
+        background-image: linear-gradient(color-mix(in srgb, var(--foreground) 4%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--foreground) 4%, transparent) 1px, transparent 1px);
+        background-size: 64px 64px;
     }
 
     .aivro-wire-card {
-        border: 1px solid rgba(120, 113, 108, 0.24);
-        background: rgba(255, 255, 255, 0.72);
-        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.58);
-    }
-
-    .dark .aivro-wire-card {
-        border-color: rgba(214, 211, 209, 0.18);
-        background: rgba(28, 25, 23, 0.58);
-        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
-    }
-
-    .aivro-auth-form .ant-segmented {
-        background: #030303;
-        border-radius: 8px;
-        height: 58px;
-        padding: 3px;
-    }
-
-    .aivro-auth-form .ant-segmented-group {
-        height: 100%;
-    }
-
-    .aivro-auth-form .ant-segmented-item {
-        border-radius: 7px;
-        color: rgba(231, 229, 228, 0.7);
-        font-size: 22px;
-        font-weight: 500;
-        height: 52px;
-        line-height: 1;
-        min-height: 52px;
-    }
-
-    .aivro-auth-form .ant-segmented-item-label {
-        align-items: center;
-        display: flex;
-        height: 52px;
-        justify-content: center;
-        line-height: 1;
-        min-height: 52px;
-        padding: 0;
-    }
-
-    .aivro-auth-form .ant-segmented-item-selected {
-        background: #222222;
-        color: #e7e5e4;
-    }
-
-    .aivro-auth-form .ant-form-item {
-        margin-bottom: 32px;
-    }
-
-    .aivro-auth-fields {
-        min-height: 218px;
-    }
-
-    @media (max-width: 640px) {
-        .aivro-auth-form .ant-segmented {
-            height: 56px;
-        }
-
-        .aivro-auth-form .ant-segmented-item,
-        .aivro-auth-form .ant-segmented-item-label {
-            height: 50px;
-            min-height: 50px;
-        }
-
-        .aivro-auth-form .ant-segmented-item {
-            font-size: 20px;
-        }
-
-        .aivro-auth-fields {
-            min-height: 210px;
-        }
-    }
-
-    .aivro-auth-form .ant-form-item-label {
-        padding-bottom: 14px;
-    }
-
-    .aivro-auth-form .ant-form-item-label > label {
-        color: #e7e5e4;
-        font-size: 17px;
-        height: auto;
-    }
-
-    .aivro-auth-form .ant-input-affix-wrapper,
-    .aivro-auth-form .ant-input,
-    .aivro-auth-form .ant-input-password {
-        background: #111111;
-        border-color: rgba(231, 229, 228, 0.28);
-        border-radius: 8px;
-        color: #e7e5e4;
-    }
-
-    .aivro-auth-form .ant-input-affix-wrapper {
-        height: 56px;
-        padding-inline: 16px;
-    }
-
-    .aivro-auth-form .ant-input-affix-wrapper:hover,
-    .aivro-auth-form .ant-input-affix-wrapper-focused {
-        background: #111111;
-        border-color: rgba(231, 229, 228, 0.5);
+        border: 1px solid var(--border);
+        background: var(--card);
         box-shadow: none;
-    }
-
-    .aivro-auth-form .ant-input-prefix,
-    .aivro-auth-form .ant-input-suffix {
-        color: rgba(231, 229, 228, 0.86);
-        font-size: 22px;
-    }
-
-    .aivro-auth-form .ant-input {
-        color: #e7e5e4;
-        font-size: 16px;
-    }
-
-    .aivro-auth-form .ant-btn-link {
-        color: #d6d3d1;
-        font-size: 21px;
-        height: 38px;
-    }
-
-    .aivro-auth-form .ant-btn-default {
-        background: #111111;
-        border-color: rgba(231, 229, 228, 0.28);
-        color: #e7e5e4;
-    }
-
-    .aivro-auth-form .ant-btn-default:hover {
-        background: #171717 !important;
-        border-color: rgba(231, 229, 228, 0.5) !important;
-        color: #ffffff !important;
     }
 
     .aivro-reveal {
@@ -340,8 +221,8 @@
         border: 1px solid transparent;
         border-radius: 6px;
         padding: 5px 10px;
-        color: #57534e;
-        font-size: 14px;
+        color: var(--muted-foreground);
+        font-size: 12px;
         line-height: 1;
         transition:
             background 0.15s ease,
@@ -351,36 +232,16 @@
     }
 
     .prompt-filter-tag.ant-tag-checkable:hover {
-        background: rgba(28, 25, 23, 0.06);
-        color: #1c1917;
+        background: var(--muted);
+        color: var(--foreground);
     }
 
     .prompt-filter-tag.ant-tag-checkable.is-active,
     .prompt-filter-tag.ant-tag-checkable-checked {
-        background: #111111;
-        border-color: #111111;
-        color: #ffffff;
-        font-weight: 600;
-    }
-
-    .dark .prompt-filter-tag.ant-tag-checkable {
-        color: #e7e5e4;
-    }
-
-    .dark .prompt-filter-tag.ant-tag-checkable:hover {
-        background: rgba(255, 255, 255, 0.1);
-        color: #ffffff;
-    }
-
-    .dark .prompt-filter-tag.ant-tag-checkable.is-active,
-    .dark .prompt-filter-tag.ant-tag-checkable-checked {
-        background: rgba(250, 250, 249, 0.96);
-        border-color: rgba(255, 255, 255, 0.88);
-        box-shadow:
-            0 0 0 1px rgba(255, 255, 255, 0.18),
-            0 6px 18px rgba(0, 0, 0, 0.22);
-        color: #0c0a09 !important;
-        font-weight: 700;
+        background: var(--foreground);
+        border-color: var(--foreground);
+        color: var(--background) !important;
+        font-weight: 500;
     }
 
     .thin-scrollbar {

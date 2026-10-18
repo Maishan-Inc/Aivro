@@ -97,16 +97,16 @@ export function LegalPage({ type }: { type: "privacy" | "terms" }) {
     const content = locale === "en-US" ? (isPrivacy ? pages?.privacyContentEn || fallbackContent : pages?.termsContentEn || fallbackContent) : isPrivacy ? pages?.privacyContent || fallbackContent : pages?.termsContent || fallbackContent;
 
     return (
-        <main className="h-full overflow-y-auto bg-black px-6 py-10 text-stone-100">
+        <main className="h-full overflow-y-auto bg-background px-6 py-10 text-foreground">
             <section className="mx-auto max-w-3xl">
-                <Button href={localizedPath("/login")} icon={<ArrowLeft className="size-4" />} type="text" className="mb-8 !text-stone-300 hover:!bg-white/10 hover:!text-white">
+                <Button href={localizedPath("/login")} icon={<ArrowLeft className="size-4" />} type="text" className="mb-8 !text-muted-foreground hover:!bg-muted hover:!text-foreground">
                     {locale === "en-US" ? "Back to sign in" : "返回登录"}
                 </Button>
                 <div className="py-8">
                     <div className="mb-9">
-                        <h1 className="text-4xl font-semibold tracking-normal text-white sm:text-5xl">{title}</h1>
+                        <h1 className="text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">{title}</h1>
                     </div>
-                    <article className="whitespace-pre-line text-base leading-8 text-stone-300">{content}</article>
+                    <article className="whitespace-pre-line text-base leading-8 text-muted-foreground">{content}</article>
                 </div>
             </section>
         </main>

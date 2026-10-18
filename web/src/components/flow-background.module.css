@@ -1,0 +1,15 @@
+.flow { position: absolute; inset: 0; overflow: hidden; pointer-events: none; color: var(--foreground); }
+.grid { position: absolute; inset: 0; background-image: linear-gradient(to right, color-mix(in srgb, currentColor 5%, transparent) 1px, transparent 1px), linear-gradient(to bottom, color-mix(in srgb, currentColor 5%, transparent) 1px, transparent 1px); background-size: 72px 72px; mask-image: linear-gradient(transparent, #000 15%, #000 85%, transparent); }
+.vertical, .horizontal { position: absolute; background: color-mix(in srgb, currentColor 8%, transparent); }
+.vertical { top: 0; bottom: 0; width: 1px; }
+.horizontal { left: 0; right: 0; height: 1px; }
+.vertical span, .horizontal span { position: absolute; inset: 0; display: block; animation-duration: var(--duration); animation-delay: var(--delay); animation-timing-function: linear; animation-iteration-count: infinite; }
+.vertical span { animation-name: vertical; }.horizontal span { animation-name: horizontal; }
+.vertical span::after { content: ""; position: absolute; top: 50%; width: 1px; height: 170px; background: linear-gradient(transparent, currentColor, transparent); }
+.horizontal span::after { content: ""; position: absolute; left: 50%; width: 220px; height: 1px; background: linear-gradient(90deg, transparent, currentColor, transparent); }
+.cross { position: absolute; top: 50%; transform: translate(-50%, -50%); font: 16px monospace; color: color-mix(in srgb, currentColor 30%, transparent); }
+.clearance { position: absolute; inset: 0; background: radial-gradient(ellipse 44% 50% at 50% 38%, var(--background) 20%, transparent 100%); }
+@keyframes vertical { 0% { transform: translateY(-70%); opacity: 0; } 15%, 75% { opacity: .65; } 100% { transform: translateY(70%); opacity: 0; } }
+@keyframes horizontal { 0% { transform: translateX(-70%); opacity: 0; } 15%, 75% { opacity: .65; } 100% { transform: translateX(70%); opacity: 0; } }
+@media (max-width: 700px) { .grid { background-size: 48px 48px; } .clearance { background: radial-gradient(ellipse 80% 45% at 50% 30%, var(--background) 30%, transparent); } }
+@media (prefers-reduced-motion: reduce) { .vertical span, .horizontal span { animation: none; display: none; } }

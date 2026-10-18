@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"sort"
 	"strings"
 
@@ -131,16 +132,19 @@ func AdminTestChannelModel(index *int, channel model.ModelChannel, modelName str
 	}
 	resolved = normalizeModelChannel(resolved)
 	modelName = strings.TrimSpace(modelName)
+	capability := "text"
 	for _, item := range resolved.ModelMappings {
 		if item.Name == modelName || item.UpstreamName == modelName {
 			modelName = item.UpstreamName
+			capability = item.Capability
 			break
 		}
 	}
 	if modelName == "" && len(resolved.ModelMappings) > 0 {
 		modelName = resolved.ModelMappings[0].UpstreamName
+		capability = resolved.ModelMappings[0].Capability
 	}
-	return testAdminChannelModel(resolved, modelName)
+	return testAdminChannelModel(resolved, modelName, capability)
 }
 
 func AdminTestMail(setting model.MailSetting, email string, context MailTemplateContext) error {
@@ -765,11 +769,23 @@ func ModelChannelRouteAttempts(routes []ModelChannelRoute) []ModelChannelRoute {
 }
 
 func BuildModelChannelURL(channel model.ModelChannel, path string) string {
-	baseURL := strings.TrimRight(channel.BaseURL, "/")
-	if !strings.HasSuffix(baseURL, "/v1") {
-		baseURL += "/v1"
+	baseURL := normalizeModelChannelBaseURL(channel.BaseURL)
+	endpoint, err := url.Parse(baseURL)
+	if err != nil {
+		return baseURL
 	}
-	return baseURL + path
+	if !strings.HasSuffix(strings.TrimRight(endpoint.Path, "/"), "/v1") {
+		endpoint = endpoint.JoinPath("v1")
+	}
+	return endpoint.JoinPath(path).String()
+}
+
+func normalizeModelChannelBaseURL(value string) string {
+	value = strings.TrimRight(strings.TrimSpace(value), "/")
+	if value != "" && !strings.Contains(value, "://") {
+		value = "https://" + value
+	}
+	return value
 }
 
 func normalizeModelChannel(channel model.ModelChannel) model.ModelChannel {
@@ -811,7 +827,7 @@ func normalizeModelChannelWithIDs(channel model.ModelChannel, index int, usedIDs
 	}
 	channel.Name = strings.TrimSpace(channel.Name)
 	channel.Color = normalizeChannelColor(channel.Color, index)
-	channel.BaseURL = strings.TrimSpace(channel.BaseURL)
+	channel.BaseURL = normalizeModelChannelBaseURL(channel.BaseURL)
 	if channel.Models == nil {
 		channel.Models = []string{}
 	}
@@ -1109,18 +1125,27 @@ func fetchAdminChannelModels(channel model.ModelChannel) ([]string, error) {
 	return result, nil
 }
 
-func testAdminChannelModel(channel model.ModelChannel, modelName string) (string, error) {
+func testAdminChannelModel(channel model.ModelChannel, modelName, capability string) (string, error) {
 	if strings.TrimSpace(modelName) == "" {
 		return "", errors.New("缺少模型名称")
 	}
-	body, _ := json.Marshal(map[string]any{
-		"model": modelName,
-		"messages": []map[string]string{{
+	path := "/chat/completions"
+	input := map[string]any{"model": modelName}
+	switch capability {
+	case "image":
+		path = "/images/generations"
+		input["prompt"] = "A simple red circle on a white background"
+		input["n"] = 1
+	case "text":
+		input["messages"] = []map[string]string{{
 			"role":    "user",
 			"content": "hi",
-		}},
-	})
-	request, err := http.NewRequest(http.MethodPost, BuildModelChannelURL(channel, "/chat/completions"), strings.NewReader(string(body)))
+		}}
+	default:
+		return "", safeMessageError{message: "当前仅支持图片和对话模型测试，视频和 3D 模型请在对应工作台验证"}
+	}
+	body, _ := json.Marshal(input)
+	request, err := http.NewRequest(http.MethodPost, BuildModelChannelURL(channel, path), strings.NewReader(string(body)))
 	if err != nil {
 		return "", err
 	}
@@ -1136,6 +1161,10 @@ func testAdminChannelModel(channel model.ModelChannel, modelName string) (string
 		return "", readAdminChannelError(responseBody, response.StatusCode, "测试失败")
 	}
 	var payload struct {
+		Data []struct {
+			URL     string `json:"url"`
+			B64JSON string `json:"b64_json"`
+		} `json:"data"`
 		Choices []struct {
 			Message struct {
 				Content string `json:"content"`
@@ -1143,6 +1172,14 @@ func testAdminChannelModel(channel model.ModelChannel, modelName string) (string
 		} `json:"choices"`
 	}
 	_ = json.Unmarshal(responseBody, &payload)
+	if capability == "image" {
+		for _, item := range payload.Data {
+			if item.URL != "" || item.B64JSON != "" {
+				return "图片生成测试成功", nil
+			}
+		}
+		return "", readAdminChannelError(responseBody, 0, "接口没有返回图片")
+	}
 	if len(payload.Choices) > 0 && strings.TrimSpace(payload.Choices[0].Message.Content) != "" {
 		return payload.Choices[0].Message.Content, nil
 	}

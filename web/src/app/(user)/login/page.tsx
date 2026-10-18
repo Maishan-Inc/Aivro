@@ -1,5 +1,8 @@
 "use client";
 
+import { FlowBackground } from "@/components/flow-background";
+import auth from "./login.module.css";
+
 import { EyeInvisibleOutlined, LockOutlined, MailOutlined, UserOutlined } from "@ant-design/icons";
 import { App, Button, Form, Input, Segmented, Space } from "antd";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -209,14 +212,15 @@ function LoginContent() {
     };
 
     return (
-        <main className="aivro-wire-surface flex h-full min-h-0 items-center justify-center overflow-y-auto bg-[#080808] px-5 py-8 text-stone-200">
-            <AivroReveal className="w-full max-w-[444px]">
-                <Form<LoginFormValues> form={form} layout="vertical" size="large" requiredMark={false} onFinish={submit} className="aivro-auth-form">
+        <main className={auth.page}>
+            <FlowBackground />
+            <AivroReveal className={auth.container}>
+                <Form<LoginFormValues> form={form} layout="vertical" size="large" requiredMark={false} onFinish={submit} className={auth.form}>
                     <div data-aivro-reveal className="mb-8 flex items-center justify-center gap-3">
-                        <span className="block size-10 bg-stone-100" style={{ mask: "url(/logo.svg) center / contain no-repeat", WebkitMask: "url(/logo.svg) center / contain no-repeat" }} aria-hidden="true" />
-                        <span className="text-4xl font-semibold leading-none tracking-normal text-stone-100">Aivro</span>
+                        <span className="block size-10 bg-foreground" style={{ mask: "url(/logo.svg) center / contain no-repeat", WebkitMask: "url(/logo.svg) center / contain no-repeat" }} aria-hidden="true" />
+                        <span className="text-4xl font-semibold leading-none tracking-normal text-foreground">Aivro</span>
                     </div>
-                    <Form.Item className="!mb-11">
+                    <Form.Item className="!mb-7">
                         <Segmented
                             block
                             value={mode}
@@ -236,16 +240,16 @@ function LoginContent() {
                     </AivroReveal>
                     <Space orientation="vertical" size={14} style={{ width: "100%" }}>
                         {captchaField}
-                        <Button className="!mt-1 !h-14 !rounded-xl !border-0 !bg-stone-200 !text-lg !font-medium !text-stone-950 hover:!bg-white disabled:!bg-stone-500" block type="primary" htmlType="submit" loading={isLoading || sendingCode} disabled={!publicSettings}>
+                        <Button className="!mt-1 !h-11 !rounded-md !text-sm !font-medium" block type="primary" htmlType="submit" loading={isLoading || sendingCode} disabled={!publicSettings}>
                             {isLoading || sendingCode ? (locale === "en-US" ? "Processing" : "处理中") : registerButtonText(mode, registerStep, locale)}
                         </Button>
-                        <p className="m-0 px-1 text-center text-sm leading-6 text-stone-400">
+                        <p className="m-0 px-1 text-center text-xs leading-6 text-muted-foreground">
                             {mode === "register" ? (locale === "en-US" ? "Registering" : "注册") : locale === "en-US" ? "Signing in to" : "登录"} Aivro，{locale === "en-US" ? "means you agree to our" : "即代表你同意我们的"}{" "}
-                            <a href={localizedPath("/privacy")} className="font-medium text-stone-200 underline underline-offset-4">
+                            <a href={localizedPath("/privacy")} className="font-medium text-foreground underline underline-offset-4">
                                 {locale === "en-US" ? "Privacy Policy" : "隐私政策"}
                             </a>{" "}
                             {locale === "en-US" ? "and" : "和"}{" "}
-                            <a href={localizedPath("/terms")} className="font-medium text-stone-200 underline underline-offset-4">
+                            <a href={localizedPath("/terms")} className="font-medium text-foreground underline underline-offset-4">
                                 {locale === "en-US" ? "Terms of Service" : "服务条款"}
                             </a>
                         </p>
@@ -261,10 +265,10 @@ function LoginContent() {
 function LoginFields({ locale }: { locale: string }) {
     return (
         <>
-            <Form.Item name="username" label={<span className="font-medium text-stone-200">{locale === "en-US" ? "Email" : "邮箱"}</span>} rules={[{ required: true, message: "请输入邮箱" }]}>
+            <Form.Item name="username" label={<span className="font-medium text-foreground">{locale === "en-US" ? "Email" : "邮箱"}</span>} rules={[{ required: true, message: "请输入邮箱" }]}>
                 <Input prefix={<MailOutlined />} autoComplete="email" />
             </Form.Item>
-            <Form.Item name="password" label={<span className="font-medium text-stone-200">{locale === "en-US" ? "Password" : "密码"}</span>} rules={[{ required: true, message: "请输入密码" }]}>
+            <Form.Item name="password" label={<span className="font-medium text-foreground">{locale === "en-US" ? "Password" : "密码"}</span>} rules={[{ required: true, message: "请输入密码" }]}>
                 <Input.Password prefix={<LockOutlined />} iconRender={() => <EyeInvisibleOutlined />} autoComplete="current-password" />
             </Form.Item>
         </>
@@ -278,16 +282,16 @@ function RegisterFields({ step, locale, sendingCode, codeSeconds, publicReady, o
             <div className="mt-8">
                 {step === "credential" ? (
                     <>
-                        <Form.Item name="email" label={<span className="font-medium text-stone-200">{locale === "en-US" ? "Email" : "邮箱"}</span>} rules={[{ required: true, message: "请输入邮箱" }, { type: "email", message: "邮箱格式不正确" }]}>
+                        <Form.Item name="email" label={<span className="font-medium text-foreground">{locale === "en-US" ? "Email" : "邮箱"}</span>} rules={[{ required: true, message: "请输入邮箱" }, { type: "email", message: "邮箱格式不正确" }]}>
                             <Input prefix={<MailOutlined />} autoComplete="email" />
                         </Form.Item>
-                        <Form.Item name="password" label={<span className="font-medium text-stone-200">{locale === "en-US" ? "Password" : "密码"}</span>} rules={[{ required: true, message: "请输入密码" }]}>
+                        <Form.Item name="password" label={<span className="font-medium text-foreground">{locale === "en-US" ? "Password" : "密码"}</span>} rules={[{ required: true, message: "请输入密码" }]}>
                             <Input.Password prefix={<LockOutlined />} iconRender={() => <EyeInvisibleOutlined />} autoComplete="new-password" />
                         </Form.Item>
                     </>
                 ) : null}
                 {step === "code" ? (
-                    <Form.Item label={<span className="font-medium text-stone-200">{locale === "en-US" ? "Email code" : "邮箱验证码"}</span>}>
+                    <Form.Item label={<span className="font-medium text-foreground">{locale === "en-US" ? "Email code" : "邮箱验证码"}</span>}>
                         <Space.Compact style={{ width: "100%" }}>
                             <Form.Item name="code" noStyle rules={[{ required: true, message: "请输入验证码" }]}>
                                 <Input autoComplete="one-time-code" />
@@ -302,8 +306,8 @@ function RegisterFields({ step, locale, sendingCode, codeSeconds, publicReady, o
                     <>
                         <Form.Item
                             name="username"
-                            label={<span className="font-medium text-stone-200">{locale === "en-US" ? "Route name" : "路由名称"}</span>}
-                            extra={<span className="text-stone-400">{locale === "en-US" ? "Used in public URLs. Only lowercase letters and numbers. It cannot be changed later." : "用于系统中的公开路由，仅支持小写字母和数字，当前系统暂不支持修改。"}</span>}
+                            label={<span className="font-medium text-foreground">{locale === "en-US" ? "Route name" : "路由名称"}</span>}
+                            extra={<span className="text-muted-foreground">{locale === "en-US" ? "Used in public URLs. Only lowercase letters and numbers. It cannot be changed later." : "用于系统中的公开路由，仅支持小写字母和数字，当前系统暂不支持修改。"}</span>}
                             rules={[
                                 { required: true, message: locale === "en-US" ? "Enter a route name" : "请输入路由名称" },
                                 { pattern: /^[a-z0-9]{3,24}$/, message: locale === "en-US" ? "Use 3-24 lowercase letters or numbers" : "请输入 3-24 位小写字母或数字" },
@@ -314,7 +318,7 @@ function RegisterFields({ step, locale, sendingCode, codeSeconds, publicReady, o
                         <Form.Item name="accountType" initialValue="personal">
                             <Segmented block options={[{ label: locale === "en-US" ? "Personal" : "个人", value: "personal" }, { label: locale === "en-US" ? "Company" : "公司", value: "company" }]} />
                         </Form.Item>
-                        <Form.Item name="displayName" label={<span className="font-medium text-stone-200">{locale === "en-US" ? "Public name" : "公开名称"}</span>} extra={<span className="text-stone-400">{locale === "en-US" ? "Shown on your profile, workflow cards, and shared pages." : "展示在个人资料、工作流卡片和分享页面中。"}</span>} rules={[{ required: true, message: locale === "en-US" ? "Enter a public name" : "请输入公开名称" }]}>
+                        <Form.Item name="displayName" label={<span className="font-medium text-foreground">{locale === "en-US" ? "Public name" : "公开名称"}</span>} extra={<span className="text-muted-foreground">{locale === "en-US" ? "Shown on your profile, workflow cards, and shared pages." : "展示在个人资料、工作流卡片和分享页面中。"}</span>} rules={[{ required: true, message: locale === "en-US" ? "Enter a public name" : "请输入公开名称" }]}>
                             <Input prefix={<UserOutlined />} autoComplete="name" />
                         </Form.Item>
                     </>
@@ -332,9 +336,9 @@ function RegisterSteps({ active, locale }: { active: RegisterStep; locale: strin
     ];
     const activeIndex = steps.findIndex((item) => item.key === active);
     return (
-        <div className="grid grid-cols-3 overflow-hidden rounded-xl border border-stone-700 text-center text-xs font-medium">
+        <div className="grid grid-cols-3 overflow-hidden rounded-xl border border-border text-center text-xs font-medium">
             {steps.map((step, index) => (
-                <div key={step.key} className={`py-2 ${index <= activeIndex ? "bg-stone-200 text-stone-950" : "bg-transparent text-stone-400"}`}>
+                <div key={step.key} className={`py-2 ${index <= activeIndex ? "bg-foreground text-background" : "bg-transparent text-muted-foreground"}`}>
                     {step.label}
                 </div>
             ))}

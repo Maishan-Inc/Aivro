@@ -1,5 +1,7 @@
 "use client";
 
+import { FlowBackground } from "@/components/flow-background";
+
 import { LockOutlined, MailOutlined } from "@ant-design/icons";
 import { App, Button, Form, Input, Space } from "antd";
 import Link from "next/link";
@@ -78,8 +80,9 @@ export default function ForgotPasswordPage() {
     };
 
     return (
-        <main className="flex h-full min-h-0 items-center justify-center overflow-y-auto bg-background px-6 py-10">
-            <section className="w-full max-w-[420px]">
+        <main className="relative flex h-full min-h-0 flex-col overflow-y-auto bg-background px-6 py-10">
+            <FlowBackground />
+            <section className="relative z-10 m-auto w-full max-w-[420px]">
                 <div className="mb-7 text-center">
                     <h1 className="text-3xl font-semibold tracking-normal text-stone-950 dark:text-stone-100">{locale === "en-US" ? "Forgot password" : "找回密码"}</h1>
                     <p className="mt-3 text-base leading-7 text-stone-500 dark:text-stone-400">{locale === "en-US" ? "Reset your password with your verified email." : "通过已绑定邮箱重置账号密码。"}</p>

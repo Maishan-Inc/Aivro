@@ -51,12 +51,12 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
     useEffect(() => {
         if (isLoginPage || !publicSettings || isPublicSettingsLoading || !isUserReady || user) return;
         if (!isLoginRequiredPath(cleanPathname, publicSettings.pageAccess)) return;
-        router.replace(withLocalePath(`/login?redirect=${encodeURIComponent(pathname)}`, locale));
+        router.replace(withLocalePath(`/login?redirect=${encodeURIComponent(pathname + window.location.search)}`, locale));
     }, [cleanPathname, isLoginPage, isPublicSettingsLoading, isUserReady, locale, pathname, publicSettings, router, user]);
 
     useEffect(() => {
         if (!isUserReady || !user || user.role === "guest" || user.profileCompleted || isProfileSetupPage || isLoginPage) return;
-        router.replace(withLocalePath(`/profile/setup?redirect=${encodeURIComponent(pathname)}`, locale));
+        router.replace(withLocalePath(`/profile/setup?redirect=${encodeURIComponent(pathname + window.location.search)}`, locale));
     }, [isLoginPage, isProfileSetupPage, isUserReady, locale, pathname, router, user]);
 
     return <>{children}</>;

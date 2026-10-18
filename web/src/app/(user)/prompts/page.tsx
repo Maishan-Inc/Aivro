@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { App, Button, Empty, Input, Spin, Tag } from "antd";
 
 import { PromptCard } from "@/components/prompts/prompt-card";
+import { FlowBackground } from "@/components/flow-background";
+import library from "@/components/library-layout.module.css";
 import { PromptDetailDialog } from "@/components/prompts/prompt-detail-dialog";
 import { usePromptList } from "@/components/prompts/use-prompt-list";
 import { useCopyText } from "@/hooks/use-copy-text";
@@ -56,13 +58,14 @@ export default function PromptsPage() {
     return (
         <div className="flex h-full flex-col overflow-hidden bg-background text-stone-800 dark:text-stone-100">
             <main
-                className="min-h-0 flex-1 overflow-y-auto bg-background bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] px-6 py-8 [background-size:16px_16px] dark:bg-[radial-gradient(rgba(245,245,244,.16)_1px,transparent_1px)]"
+                className={library.page}
                 onScroll={handleListScroll}
             >
-                <div className="pb-8">
-                    <div className="mx-auto max-w-5xl text-center">
-                        <h1 className="text-4xl font-semibold tracking-tight text-stone-950 dark:text-stone-100">提示词中心</h1>
-                        <p className="mt-3 text-sm text-stone-500 dark:text-stone-400">共 {totalPrompts} 条提示词，按标题、标签与分类快速查找灵感。</p>
+                <div className={library.filters}>
+                    <div className={library.intro}>
+                        <FlowBackground />
+                        <div><small>灵感 / 提示词库</small><h1>好作品，从好灵感开始。</h1><p>探索 {totalPrompts} 条提示词，发现画面背后的表达方式。</p></div>
+                        <div className={library.art} aria-hidden="true">{["desert", "portrait", "architecture"].map((name) => <img key={name} src={`/showcase/${name}.webp`} alt="" width={72} height={90} loading="lazy" />)}</div>
                     </div>
                     {query.isLoading ? (
                         <div className="flex h-60 items-center justify-center">
@@ -71,10 +74,10 @@ export default function PromptsPage() {
                     ) : null}
                     {!query.isLoading ? (
                         <>
-                            <div className="mx-auto mt-8 w-full max-w-2xl">
+                            <div className={library.search}>
                                 <Input size="large" className="w-full" prefix={<Search className="size-4 text-stone-400" />} value={titleKeyword} placeholder="按标题查询" onChange={(event) => setTitleKeyword(event.target.value)} />
                             </div>
-                            <div className="mx-auto mt-6 grid max-w-6xl gap-3 text-left">
+                            <div className="grid gap-3 text-left">
                                 <div className="grid gap-2 sm:grid-cols-[56px_minmax(0,1fr)] sm:items-start">
                                     <div className="pt-2 text-xs font-medium text-stone-500 dark:text-stone-400">分类</div>
                                     <div className="flex flex-wrap gap-2">
@@ -107,7 +110,7 @@ export default function PromptsPage() {
 
                 {!query.isLoading ? (
                     <div>
-                        <div className="mx-auto grid max-w-7xl gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                        <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                             {promptItems.map((item) => (
                                 <PromptCard
                                     key={item.id}

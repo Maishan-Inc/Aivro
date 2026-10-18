@@ -1,5 +1,7 @@
 "use client";
 
+import { FlowBackground } from "@/components/flow-background";
+
 import { MailOutlined } from "@ant-design/icons";
 import { App, Button, Form, Input, Space, Typography } from "antd";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -125,8 +127,9 @@ function MetaMaskEmailContent() {
     };
 
     return (
-        <main className="flex h-full min-h-0 items-center justify-center overflow-y-auto bg-background px-6 py-10">
-            <section className="w-full max-w-[420px]">
+        <main className="relative flex h-full min-h-0 flex-col overflow-y-auto bg-background px-6 py-10">
+            <FlowBackground />
+            <section className="relative z-10 m-auto w-full max-w-[420px]">
                 <div className="mb-7 text-center">
                     <h1 className="text-3xl font-semibold tracking-normal text-stone-950 dark:text-stone-100">{locale === "en-US" ? "Verify email" : "验证邮箱"}</h1>
                     <p className="mt-3 text-base leading-7 text-stone-500 dark:text-stone-400">{locale === "en-US" ? "Bind an email for your first MetaMask sign in." : "MetaMask 首次登录需要绑定一个邮箱。"}</p>

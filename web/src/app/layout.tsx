@@ -31,7 +31,7 @@ export default async function RootLayout({
 }>) {
     const locale = await requestLocale();
     return (
-        <html lang={locale} suppressHydrationWarning className="font-sans">
+        <html lang={locale} suppressHydrationWarning className="dark font-sans">
             <body
                 className="bg-background text-foreground antialiased"
                 style={{

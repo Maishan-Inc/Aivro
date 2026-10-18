@@ -1572,8 +1572,8 @@ export default function AdminSettingsPage() {
                                 </Form.Item>
                             </Col>
                             <Col span={24}>
-                                <Form.Item name="baseUrl" label="接口地址" rules={[{ required: true, message: "请输入接口地址" }]}>
-                                    <Input />
+                                <Form.Item name="baseUrl" label="接口地址" extra="只需填写域名，默认使用 HTTPS，自动补全 /v1 和对应接口路径；也可填写带协议或自定义前缀的基础地址。" rules={[{ required: true, whitespace: true, message: "请输入接口地址" }]}>
+                                    <Input placeholder="api.example.com" />
                                 </Form.Item>
                             </Col>
                             <Col span={24}>
@@ -1729,7 +1729,7 @@ export default function AdminSettingsPage() {
                     destroyOnHidden
                 >
                     <Flex vertical gap={12}>
-                        <Typography.Text type="secondary">测试会向选中模型发送一条 hi，用于确认渠道是否有响应。</Typography.Text>
+                        <Typography.Text type="secondary">按模型服务范围测试：图片模型生成 1 张测试图，对话模型发送 hi，可能产生上游费用；视频和 3D 模型请在对应工作台验证。</Typography.Text>
                         <Input.Search placeholder="搜索模型..." allowClear value={testKeyword} onChange={(event) => setTestKeyword(event.target.value)} />
                         <Table
                             rowKey="model"
