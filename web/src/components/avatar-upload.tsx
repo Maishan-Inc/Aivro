@@ -1,14 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import dynamic from "next/dynamic";
-import type { Area } from "react-easy-crop";
+import Cropper, { type Area } from "react-easy-crop";
 import { App, Button, Modal, Slider } from "antd";
 import { Camera } from "lucide-react";
 import { uploadAvatar } from "@/services/api/auth";
 import { useUserStore } from "@/stores/use-user-store";
-
-const Cropper = dynamic(() => import("react-easy-crop"), { ssr: false });
 
 export function AvatarUpload() {
     const { message } = App.useApp();
