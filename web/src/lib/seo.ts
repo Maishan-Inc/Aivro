@@ -56,7 +56,7 @@ export const seoPages: Record<SeoPageKey, SeoPage> = {
     pricing: {
         path: "/pricing",
         index: true,
-        title: { "zh-CN": "套餐购买 - Aivro", "en-US": "Plans - Aivro", "ja-JP": "プラン - Aivro", "ko-KR": "요금제 - Aivro", "fr-FR": "Offres - Aivro" },
+        title: { "zh-CN": "套餐购买 - Aivro", "zh-TW": "套餐購買 - Aivro", "en-US": "Plans - Aivro", "ja-JP": "プラン - Aivro", "ko-KR": "요금제 - Aivro", "fr-FR": "Offres - Aivro" },
         description: {
             "zh-CN": "购买 Aivro 套餐，获取算力点和云端工作流创建次数，支持图片、视频、画布和 AI 创作。",
             "zh-TW": "購買 Aivro 套餐，獲取算力點和雲端工作流建立次數，支持圖片、影片、畫布和 AI 創作。",
@@ -69,7 +69,7 @@ export const seoPages: Record<SeoPageKey, SeoPage> = {
     image: {
         path: "/image",
         index: true,
-        title: { "zh-CN": "AI 生图工作台 - Aivro", "en-US": "AI Image Studio - Aivro", "ja-JP": "AI 画像スタジオ - Aivro", "ko-KR": "AI 이미지 스튜디오 - Aivro", "fr-FR": "Studio d'image IA - Aivro" },
+        title: { "zh-CN": "AI 生图工作台 - Aivro", "zh-TW": "AI 生圖工作台 - Aivro", "en-US": "AI Image Studio - Aivro", "ja-JP": "AI 画像スタジオ - Aivro", "ko-KR": "AI 이미지 스튜디오 - Aivro", "fr-FR": "Studio d'image IA - Aivro" },
         description: {
             "zh-CN": "在 Aivro 生图工作台使用后台配置的模型生成图片，管理参考图、参数和云端生成记录。",
             "zh-TW": "在 Aivro 生圖工作台使用後台設定的模型生成圖片，管理參考圖、參數和雲端生成記錄。",
@@ -82,7 +82,7 @@ export const seoPages: Record<SeoPageKey, SeoPage> = {
     video: {
         path: "/video",
         index: true,
-        title: { "zh-CN": "AI 视频创作台 - Aivro", "en-US": "AI Video Studio - Aivro", "ja-JP": "AI 動画スタジオ - Aivro", "ko-KR": "AI 비디오 스튜디오 - Aivro", "fr-FR": "Studio vidéo IA - Aivro" },
+        title: { "zh-CN": "AI 视频创作台 - Aivro", "zh-TW": "AI 影片創作台 - Aivro", "en-US": "AI Video Studio - Aivro", "ja-JP": "AI 動画スタジオ - Aivro", "ko-KR": "AI 비디오 스튜디오 - Aivro", "fr-FR": "Studio vidéo IA - Aivro" },
         description: {
             "zh-CN": "使用 Aivro 视频创作台生成视频，支持提示词、参考图、清晰度、尺寸、秒数和生成记录。",
             "zh-TW": "使用 Aivro 影片創作台生成影片，支持提示詞、參考圖、清晰度、尺寸、秒數和生成記錄。",
@@ -95,7 +95,7 @@ export const seoPages: Record<SeoPageKey, SeoPage> = {
     model3d: {
         path: "/model-3d",
         index: true,
-        title: { "zh-CN": "AI 3D 模型工作台 - Aivro", "en-US": "AI 3D Model Studio - Aivro", "ja-JP": "AI 3D モデルスタジオ - Aivro", "ko-KR": "AI 3D 모델 스튜디오 - Aivro", "fr-FR": "Studio de modèles 3D IA - Aivro" },
+        title: { "zh-CN": "AI 3D 模型工作台 - Aivro", "zh-TW": "AI 3D 模型工作台 - Aivro", "en-US": "AI 3D Model Studio - Aivro", "ja-JP": "AI 3D モデルスタジオ - Aivro", "ko-KR": "AI 3D 모델 스튜디오 - Aivro", "fr-FR": "Studio de modèles 3D IA - Aivro" },
         description: {
             "zh-CN": "通过 Aivro 3D 模型工作台探索 AI 生成 3D 内容的创作流程。",
             "zh-TW": "通過 Aivro 3D 模型工作台探索 AI 生成 3D 內容的創作流程。",
@@ -108,7 +108,7 @@ export const seoPages: Record<SeoPageKey, SeoPage> = {
     canvas: {
         path: "/canvas",
         index: false,
-        title: { "zh-CN": "AI 工作流画布 - Aivro", "en-US": "AI Workflow Canvas - Aivro", "ja-JP": "AI ワークフローキャンバス - Aivro", "ko-KR": "AI 워크플로 캔버스 - Aivro", "fr-FR": "Canevas de workflow IA - Aivro" },
+        title: { "zh-CN": "AI 工作流画布 - Aivro", "zh-TW": "AI 工作流畫布 - Aivro", "en-US": "AI Workflow Canvas - Aivro", "ja-JP": "AI ワークフローキャンバス - Aivro", "ko-KR": "AI 워크플로 캔버스 - Aivro", "fr-FR": "Canevas de workflow IA - Aivro" },
         description: {
             "zh-CN": "在 Aivro 无限画布中连接图片、文本、参考图和生成节点，把创作变成可复用工作流。",
             "zh-TW": "在 Aivro 無限畫布中連接圖片、文本、參考圖和生成節點，把創作變成可複用工作流。",
@@ -121,7 +121,7 @@ export const seoPages: Record<SeoPageKey, SeoPage> = {
     prompts: {
         path: "/prompts",
         index: true,
-        title: { "zh-CN": "AI 提示词库 - Aivro", "en-US": "AI Prompt Library - Aivro", "ja-JP": "AI プロンプトライブラリ - Aivro", "ko-KR": "AI 프롬프트 라이브러리 - Aivro", "fr-FR": "Bibliothèque de prompts IA - Aivro" },
+        title: { "zh-CN": "AI 提示词库 - Aivro", "zh-TW": "AI 提示詞庫 - Aivro", "en-US": "AI Prompt Library - Aivro", "ja-JP": "AI プロンプトライブラリ - Aivro", "ko-KR": "AI 프롬프트 라이브러리 - Aivro", "fr-FR": "Bibliothèque de prompts IA - Aivro" },
         description: {
             "zh-CN": "浏览和收藏 Aivro 提示词库中的图片、视频和创作提示词，快速复用稳定风格。",
             "zh-TW": "瀏覽和收藏 Aivro 提示詞庫中的圖片、影片和創作提示詞，快速複用穩定風格。",
@@ -134,7 +134,7 @@ export const seoPages: Record<SeoPageKey, SeoPage> = {
     assets: {
         path: "/assets",
         index: false,
-        title: { "zh-CN": "我的素材 - Aivro", "en-US": "My Assets - Aivro", "ja-JP": "マイ素材 - Aivro", "ko-KR": "내 에셋 - Aivro", "fr-FR": "Mes assets - Aivro" },
+        title: { "zh-CN": "我的素材 - Aivro", "zh-TW": "我的素材 - Aivro", "en-US": "My Assets - Aivro", "ja-JP": "マイ素材 - Aivro", "ko-KR": "내 에셋 - Aivro", "fr-FR": "Mes assets - Aivro" },
         description: {
             "zh-CN": "管理 Aivro 中保存的文本、图片和视频素材，支持导入、导出和云端文件引用。",
             "zh-TW": "管理 Aivro 中儲存的文本、圖片和影片素材，支持匯入、匯出和雲端檔案引用。",
@@ -147,7 +147,7 @@ export const seoPages: Record<SeoPageKey, SeoPage> = {
     assetLibrary: {
         path: "/asset-library",
         index: true,
-        title: { "zh-CN": "素材库 - Aivro", "en-US": "Asset Library - Aivro", "ja-JP": "素材ライブラリ - Aivro", "ko-KR": "에셋 라이브러리 - Aivro", "fr-FR": "Bibliothèque d'assets - Aivro" },
+        title: { "zh-CN": "素材库 - Aivro", "zh-TW": "素材庫 - Aivro", "en-US": "Asset Library - Aivro", "ja-JP": "素材ライブラリ - Aivro", "ko-KR": "에셋 라이브러리 - Aivro", "fr-FR": "Bibliothèque d'assets - Aivro" },
         description: {
             "zh-CN": "浏览 Aivro 素材库，发现可用于 AI 创作的文本、图片和视频内容。",
             "zh-TW": "瀏覽 Aivro 素材庫，發現可用於 AI 創作的文本、圖片和影片內容。",
@@ -160,7 +160,7 @@ export const seoPages: Record<SeoPageKey, SeoPage> = {
     privacy: {
         path: "/privacy",
         index: true,
-        title: { "zh-CN": "隐私政策 - Aivro", "en-US": "Privacy Policy - Aivro", "ja-JP": "プライバシーポリシー - Aivro", "ko-KR": "개인정보 처리방침 - Aivro", "fr-FR": "Politique de confidentialité - Aivro" },
+        title: { "zh-CN": "隐私政策 - Aivro", "zh-TW": "隱私政策 - Aivro", "en-US": "Privacy Policy - Aivro", "ja-JP": "プライバシーポリシー - Aivro", "ko-KR": "개인정보 처리방침 - Aivro", "fr-FR": "Politique de confidentialité - Aivro" },
         description: {
             "zh-CN": "查看 Aivro 隐私政策，了解账号、生成内容、云存储和第三方服务相关数据处理方式。",
             "zh-TW": "查看 Aivro 隱私政策，瞭解帳號、生成內容、雲存儲和第三方服務相關資料處理方式。",
@@ -173,7 +173,7 @@ export const seoPages: Record<SeoPageKey, SeoPage> = {
     terms: {
         path: "/terms",
         index: true,
-        title: { "zh-CN": "服务条款 - Aivro", "en-US": "Terms of Service - Aivro", "ja-JP": "利用規約 - Aivro", "ko-KR": "서비스 약관 - Aivro", "fr-FR": "Conditions d'utilisation - Aivro" },
+        title: { "zh-CN": "服务条款 - Aivro", "zh-TW": "服務條款 - Aivro", "en-US": "Terms of Service - Aivro", "ja-JP": "利用規約 - Aivro", "ko-KR": "서비스 약관 - Aivro", "fr-FR": "Conditions d'utilisation - Aivro" },
         description: {
             "zh-CN": "查看 Aivro 服务条款，了解 AI 创作、账号、安全、内容责任和服务变更规则。",
             "zh-TW": "查看 Aivro 服務條款，瞭解 AI 創作、帳號、安全、內容責任和服務變更規則。",
@@ -186,7 +186,7 @@ export const seoPages: Record<SeoPageKey, SeoPage> = {
     login: {
         path: "/login",
         index: false,
-        title: { "zh-CN": "登录 - Aivro", "en-US": "Sign in - Aivro", "ja-JP": "ログイン - Aivro", "ko-KR": "로그인 - Aivro", "fr-FR": "Connexion - Aivro" },
+        title: { "zh-CN": "登录 - Aivro", "zh-TW": "登入 - Aivro", "en-US": "Sign in - Aivro", "ja-JP": "ログイン - Aivro", "ko-KR": "로그인 - Aivro", "fr-FR": "Connexion - Aivro" },
         description: {
             "zh-CN": "登录 Aivro 账号，继续使用工作流、生图、视频、提示词和素材能力。",
             "zh-TW": "登入 Aivro 帳號，繼續使用工作流、生圖、影片、提示詞和素材能力。",
@@ -199,7 +199,7 @@ export const seoPages: Record<SeoPageKey, SeoPage> = {
     forgotPassword: {
         path: "/forgot-password",
         index: false,
-        title: { "zh-CN": "找回密码 - Aivro", "en-US": "Reset password - Aivro", "ja-JP": "パスワード再設定 - Aivro", "ko-KR": "비밀번호 재설정 - Aivro", "fr-FR": "Réinitialiser le mot de passe - Aivro" },
+        title: { "zh-CN": "找回密码 - Aivro", "zh-TW": "找回密碼 - Aivro", "en-US": "Reset password - Aivro", "ja-JP": "パスワード再設定 - Aivro", "ko-KR": "비밀번호 재설정 - Aivro", "fr-FR": "Réinitialiser le mot de passe - Aivro" },
         description: {
             "zh-CN": "通过已绑定邮箱重置 Aivro 账号密码。",
             "zh-TW": "通過已綁定信箱重置 Aivro 帳號密碼。",
@@ -213,7 +213,7 @@ export const seoPages: Record<SeoPageKey, SeoPage> = {
         path: "/profile/setup",
         index: false,
         private: true,
-        title: { "zh-CN": "完善账户信息 - Aivro", "en-US": "Complete profile - Aivro", "ja-JP": "アカウント情報の入力 - Aivro", "ko-KR": "계정 정보 완성 - Aivro", "fr-FR": "Compléter le profil - Aivro" },
+        title: { "zh-CN": "完善账户信息 - Aivro", "zh-TW": "完善帳戶資訊 - Aivro", "en-US": "Complete profile - Aivro", "ja-JP": "アカウント情報の入力 - Aivro", "ko-KR": "계정 정보 완성 - Aivro", "fr-FR": "Compléter le profil - Aivro" },
         description: {
             "zh-CN": "完善 Aivro 账号资料后继续创作。",
             "zh-TW": "完善 Aivro 帳號資料後繼續創作。",
@@ -227,7 +227,7 @@ export const seoPages: Record<SeoPageKey, SeoPage> = {
         path: "/pricing/success",
         index: false,
         private: true,
-        title: { "zh-CN": "支付处理中 - Aivro", "en-US": "Payment processing - Aivro", "ja-JP": "決済処理中 - Aivro", "ko-KR": "결제 처리 중 - Aivro", "fr-FR": "Paiement en cours - Aivro" },
+        title: { "zh-CN": "支付处理中 - Aivro", "zh-TW": "支付處理中 - Aivro", "en-US": "Payment processing - Aivro", "ja-JP": "決済処理中 - Aivro", "ko-KR": "결제 처리 중 - Aivro", "fr-FR": "Paiement en cours - Aivro" },
         description: {
             "zh-CN": "查看 Aivro 套餐支付后的额度到账状态。",
             "zh-TW": "查看 Aivro 套餐支付後的額度到賬狀態。",
@@ -241,7 +241,7 @@ export const seoPages: Record<SeoPageKey, SeoPage> = {
         path: "/metamask-email",
         index: false,
         private: true,
-        title: { "zh-CN": "绑定 MetaMask 邮箱 - Aivro", "en-US": "Bind MetaMask email - Aivro", "ja-JP": "MetaMask メールアドレスの連携 - Aivro", "ko-KR": "MetaMask 이메일 연동 - Aivro", "fr-FR": "Associer un e-mail MetaMask - Aivro" },
+        title: { "zh-CN": "绑定 MetaMask 邮箱 - Aivro", "zh-TW": "綁定 MetaMask 郵箱 - Aivro", "en-US": "Bind MetaMask email - Aivro", "ja-JP": "MetaMask メールアドレスの連携 - Aivro", "ko-KR": "MetaMask 이메일 연동 - Aivro", "fr-FR": "Associer un e-mail MetaMask - Aivro" },
         description: {
             "zh-CN": "首次使用 MetaMask 登录 Aivro 时绑定邮箱。",
             "zh-TW": "首次使用 MetaMask 登入 Aivro 時綁定信箱。",
@@ -255,7 +255,7 @@ export const seoPages: Record<SeoPageKey, SeoPage> = {
         path: "/share/workflows",
         index: false,
         private: true,
-        title: { "zh-CN": "工作流分享 - Aivro", "en-US": "Workflow share - Aivro", "ja-JP": "ワークフロー共有 - Aivro", "ko-KR": "워크플로 공유 - Aivro", "fr-FR": "Partage de workflow - Aivro" },
+        title: { "zh-CN": "工作流分享 - Aivro", "zh-TW": "工作流分享 - Aivro", "en-US": "Workflow share - Aivro", "ja-JP": "ワークフロー共有 - Aivro", "ko-KR": "워크플로 공유 - Aivro", "fr-FR": "Partage de workflow - Aivro" },
         description: {
             "zh-CN": "查看受保护的 Aivro 工作流分享。",
             "zh-TW": "查看受保護的 Aivro 工作流分享。",
