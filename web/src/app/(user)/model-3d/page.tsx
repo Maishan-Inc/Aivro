@@ -5,8 +5,8 @@ import studio from "@/components/studio-layout.module.css";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { App, Button, Drawer, Empty, InputNumber, Modal, Segmented, Slider, Spin, Switch, Tag } from "antd";
-import { Box, Download, FolderPlus, History, Loader2, Plus, Trash2, Upload } from "lucide-react";
+import { App, Button, Drawer, Dropdown, Empty, Input, InputNumber, Modal, Select, Spin, Tag } from "antd";
+import { ArrowUp, ChevronDown, Download, FolderPlus, History, Plus, SlidersHorizontal, Trash2, Upload, X } from "lucide-react";
 import { useUserStore } from "@/stores/use-user-store";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { requestModel3DGeneration, type Model3DGenerationInput, type Model3DGenerationResult } from "@/services/api/model-3d";
@@ -65,7 +65,7 @@ export default function Model3DPage() {
     const isAiConfigReady = useConfigStore((state) => state.isAiConfigReady);
     const model = effectiveConfig.model3DModel || effectiveConfig.model;
 
-    const [mode, setMode] = useState<"image" | "multi_image" | "text">("image");
+    const [mode, setMode] = useState<"image" | "multi_image" | "text">("text");
     const [prompt, setPrompt] = useState("");
     const [images, setImages] = useState<UploadedReference[]>([]);
     const [textureEnabled, setTextureEnabled] = useState(true);
@@ -79,6 +79,7 @@ export default function Model3DPage() {
     const [viewMode, setViewMode] = useState<ViewMode>("default");
 
     const [historyOpen, setHistoryOpen] = useState(false);
+    const [settingsOpen, setSettingsOpen] = useState(false);
     const [histories, setHistories] = useState<GenerationHistory[]>([]);
     const [loadingHistory, setLoadingHistory] = useState(false);
     const [detailHistory, setDetailHistory] = useState<GenerationHistory | null>(null);
@@ -110,6 +111,7 @@ export default function Model3DPage() {
             }),
         );
         setImages((prev) => [...prev, ...uploaded]);
+        setMode(images.length + uploaded.length > 1 ? "multi_image" : "image");
     };
 
     const handleGenerate = async () => {
@@ -217,110 +219,20 @@ export default function Model3DPage() {
         message.success("已加入我的素材");
     };
 
+    const canGenerate = mode === "text" ? Boolean(prompt.trim()) : images.length > 0;
     const estimatedEnergy = Math.round(30 * quantity * (meshQuality === "high" ? 1.6 : meshQuality === "ultra" ? 2.5 : 1) * (textureEnabled ? 1.2 : 1) * (pbrEnabled ? 1.3 : 1));
 
     return (
         <div className={studio.studio}>
             <main className={studio.layout}>
-                <aside className={studio.history}>
-                    <HistoryPanel histories={histories} loading={loadingHistory} token={token} onRefresh={handleLoadHistory} onOpenDetail={setDetailHistory} />
-                </aside>
-
                 <section className={studio.panels}>
-                    <div className={studio.form}>
-                        <div className="flex items-start justify-between gap-3">
-                            <div><h1>3D 模型工作台</h1><p>从平面灵感，探索三维世界。</p></div>
-                            <div className={studio.historyActions}>
-                                <Button icon={<History className="size-4" />} onClick={openHistory}>
-                                    记录
-                                </Button>
-                            </div>
+                    <header className={studio.header}>
+                        <div><h1>3D 模型工作台</h1><p>从平面灵感，探索三维世界。</p></div>
+                        <div className={studio.headerActions}>
+                            <Button type="text" icon={<Plus size={15} />} disabled={generating} onClick={createSession}>新建</Button>
+                            <div className={studio.historyActions}><Button type="text" icon={<History size={15} />} onClick={openHistory}>记录</Button></div>
                         </div>
-
-                        <div className="mt-6 space-y-5">
-                            <div>
-                                <span className="mb-2 block text-base font-semibold">模型</span>
-                                <ModelPicker config={effectiveConfig} models={effectiveConfig.model3DModels} value={model} onChange={(value) => updateConfig("model3DModel", value)} fullWidth onMissingConfig={() => message.warning("管理员尚未配置可用3D模型")} />
-                            </div>
-
-                            <div>
-                                <span className="mb-2 block text-base font-semibold">生成方式</span>
-                                <Segmented
-                                    value={mode}
-                                    onChange={(v) => setMode(v as typeof mode)}
-                                    options={[
-                                        { label: "图片生成", value: "image" },
-                                        { label: "多图生成 Pro", value: "multi_image" },
-                                        { label: "文字生成", value: "text" },
-                                    ]}
-                                    block
-                                />
-                            </div>
-
-                            {mode !== "text" ? (
-                                <div>
-                                    <div className="mb-2 flex items-center justify-between gap-3">
-                                        <span className="text-base font-semibold">参考图</span>
-                                        <Button size="small" icon={<Upload className="size-3.5" />} onClick={() => fileInputRef.current?.click()}>
-                                            上传
-                                        </Button>
-                                    </div>
-                                    <div className="hover-scrollbar hover-scrollbar-hint flex min-h-24 w-full min-w-0 max-w-full gap-2 overflow-x-scroll overflow-y-hidden rounded-lg border border-dashed border-stone-300 p-2 pb-3 overscroll-x-contain dark:border-stone-700">
-                                        {images.map((img) => (
-                                            <div key={img.id} className="group relative size-20 shrink-0 overflow-hidden rounded-md border border-stone-200 dark:border-stone-800">
-                                                <img src={img.dataUrl} alt={img.name} className="size-full object-cover" />
-                                                <button type="button" onClick={() => setImages((prev) => prev.filter((i) => i.id !== img.id))} className="absolute right-1 top-1 hidden size-6 items-center justify-center rounded bg-black/60 text-white group-hover:flex" aria-label="移除参考图">
-                                                    <Trash2 className="size-3.5" />
-                                                </button>
-                                                {(img.width < 256 || img.height < 256) && <div className="absolute inset-x-0 bottom-0 bg-yellow-600/90 px-1 text-xs text-white">低于 256</div>}
-                                            </div>
-                                        ))}
-                                        {!images.length ? <div className="flex min-w-full items-center justify-center text-sm text-stone-500">暂无参考图，建议不低于 256x256</div> : null}
-                                    </div>
-                                </div>
-                            ) : (
-                                <div>
-                                    <span className="mb-2 block text-base font-semibold">提示词</span>
-                                    <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="描述要生成的模型主体、材质和风格" className="w-full rounded-lg border border-stone-200 bg-background p-3 text-sm outline-none transition placeholder:text-stone-400 focus:border-stone-400 dark:border-stone-800 dark:focus:border-stone-600" rows={7} />
-                                </div>
-                            )}
-
-                            <div className="grid grid-cols-2 gap-3">
-                                <label className="flex items-center justify-between rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm dark:border-stone-800 dark:bg-stone-900">
-                                    <span className="font-medium">纹理</span>
-                                    <Switch checked={textureEnabled} onChange={setTextureEnabled} />
-                                </label>
-                                <label className="flex items-center justify-between rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm dark:border-stone-800 dark:bg-stone-900">
-                                    <span className="font-medium">PBR</span>
-                                    <Switch checked={pbrEnabled} onChange={setPbrEnabled} />
-                                </label>
-                            </div>
-
-                            <div>
-                                <span className="mb-2 block text-base font-semibold">网格质量</span>
-                                <Segmented value={meshQuality} onChange={(v) => setMeshQuality(v as typeof meshQuality)} options={[{ label: "标准", value: "standard" }, { label: "高", value: "high" }, { label: "超高", value: "ultra" }]} block />
-                            </div>
-
-                            <div>
-                                <span className="mb-2 block text-base font-semibold">面数</span>
-                                <Slider value={targetFaceCount} onChange={(v) => setTargetFaceCount(v)} min={500000} max={1000000} step={50000} />
-                                <InputNumber value={targetFaceCount} onChange={(v) => setTargetFaceCount(v || 500000)} min={500000} max={1000000} className="mt-2 w-full" />
-                            </div>
-
-                            <div>
-                                <span className="mb-2 block text-base font-semibold">数量</span>
-                                <Segmented value={quantity} onChange={(v) => setQuantity(v as number)} options={[1, 2, 3, 4].map((n) => ({ label: n > 1 ? `${n} Pro` : String(n), value: n }))} block />
-                            </div>
-                        </div>
-
-                        <div className="mt-auto pt-6">
-                            <Button type="primary" onClick={handleGenerate} loading={generating} block size="large" icon={generating ? <Loader2 className="animate-spin" /> : <Box />}>
-                                生成模型
-                            </Button>
-                            <div className="mt-2 text-center text-sm text-stone-500 dark:text-stone-400">预计消耗 {estimatedEnergy} 电量</div>
-                        </div>
-                    </div>
-
+                    </header>
                     <div className={studio.results}>
                         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                             <h2 className="text-xl font-semibold">生成结果</h2>
@@ -339,7 +251,7 @@ export default function Model3DPage() {
 
                         {currentResult ? <ModelPreview result={currentResult} mode={viewMode} /> : <StudioEmptyState kind="model-3d" onUsePrompt={(value) => { setPrompt(value); setMode("text"); }} />}
 
-                        <div className="mt-4 grid gap-3 xl:grid-cols-2">
+                        {currentResult ? <div className="mt-4 grid gap-3 xl:grid-cols-2">
                             <div className="rounded-lg border border-stone-200 bg-background p-3 dark:border-stone-800">
                                 <div className="mb-2 flex items-center justify-between gap-3">
                                     <h3 className="text-sm font-semibold">内容信息</h3>
@@ -392,9 +304,49 @@ export default function Model3DPage() {
                                     </div>
                                 )}
                             </div>
+                        </div> : null}
+                    </div>
+                    <div className={studio.form}>
+                        <div className={studio.composer}>
+                            {images.length ? <div className={studio.references}>
+                                {images.map((img) => <div key={img.id} className={studio.reference}>
+                                    <img src={img.dataUrl} alt={img.name} />
+                                    <button type="button" onClick={() => setImages((value) => value.filter((item) => item.id !== img.id))} aria-label="移除参考图"><X size={13} /></button>
+                                    {img.width < 256 || img.height < 256 ? <span>低于 256</span> : null}
+                                </div>)}
+                            </div> : null}
+                            <Input.TextArea value={prompt} onChange={(event) => setPrompt(event.target.value)} variant="borderless" autoSize={{ minRows: 3, maxRows: 8 }} aria-label="模型描述" placeholder={mode === "text" ? "描述你想创造的形体、材质和风格…" : "添加参考图，也可以补充模型描述…"} onKeyDown={(event) => {
+                                if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+                                    event.preventDefault();
+                                    if (canGenerate && !generating) void handleGenerate();
+                                }
+                            }} />
+                            <div className={studio.toolbar}>
+                                <Button type="text" shape="circle" icon={<Upload size={17} />} onClick={() => fileInputRef.current?.click()} aria-label="上传参考图" title="上传参考图" />
+                                <ModelPicker config={effectiveConfig} models={effectiveConfig.model3DModels} value={model} onChange={(value) => updateConfig("model3DModel", value)} onMissingConfig={() => message.warning("管理员尚未配置可用3D模型")} />
+                                <Dropdown trigger={["click"]} placement="topLeft" menu={{ selectable: true, selectedKeys: [mode], items: [
+                                    { key: "text", label: "文字生成" }, { key: "image", label: "图片生成" }, { key: "multi_image", label: "多图生成 Pro" },
+                                ], onClick: ({ key }) => setMode(key as typeof mode) }}>
+                                    <Button type="text">{mode === "text" ? "文字生成" : mode === "image" ? "图片生成" : "多图生成"}<ChevronDown size={12} /></Button>
+                                </Dropdown>
+                                <Dropdown trigger={["click"]} placement="topLeft" menu={{ selectable: true, selectedKeys: [meshQuality], items: [
+                                    { key: "standard", label: "标准网格" }, { key: "high", label: "高质量网格" }, { key: "ultra", label: "超高质量网格" },
+                                ], onClick: ({ key }) => setMeshQuality(key as typeof meshQuality) }}>
+                                    <Button type="text">{meshQuality === "standard" ? "标准" : meshQuality === "high" ? "高质量" : "超高质量"}<ChevronDown size={12} /></Button>
+                                </Dropdown>
+                                <Dropdown trigger={["click"]} placement="topLeft" menu={{ selectable: true, selectedKeys: [String(quantity)], items: [1, 2, 3, 4].map((value) => ({ key: String(value), label: value > 1 ? `${value} 个 Pro` : "1 个" })), onClick: ({ key }) => setQuantity(Number(key)) }}>
+                                    <Button type="text">{quantity} 个<ChevronDown size={12} /></Button>
+                                </Dropdown>
+                                <Button type="text" icon={<SlidersHorizontal size={14} />} onClick={() => setSettingsOpen(true)} aria-label="调整材质和面数" title="材质和面数" />
+                                <Button className={studio.send} type="primary" shape="circle" icon={<ArrowUp size={20} />} loading={generating} disabled={!canGenerate || generating} onClick={() => void handleGenerate()} aria-label="生成模型" title="生成模型" />
+                            </div>
                         </div>
+                        <p className={studio.composerHint}><span>Enter 生成 · Shift + Enter 换行</span><span>预计消耗 {estimatedEnergy} 电量</span></p>
                     </div>
                 </section>
+                <aside className={studio.history}>
+                    <HistoryPanel histories={histories} loading={loadingHistory} token={token} onRefresh={handleLoadHistory} onOpenDetail={setDetailHistory} />
+                </aside>
             </main>
 
             <input
@@ -409,9 +361,16 @@ export default function Model3DPage() {
                 }}
             />
 
-            <Drawer title="生成历史" placement="bottom" size="large" open={historyOpen} onClose={() => setHistoryOpen(false)}>
+            <Drawer title="生成记录" placement="right" size={340} open={historyOpen} onClose={() => setHistoryOpen(false)}>
                 <HistoryPanel histories={histories} loading={loadingHistory} token={token} onRefresh={handleLoadHistory} onOpenDetail={setDetailHistory} />
             </Drawer>
+            <Modal title="模型生成参数" open={settingsOpen} onCancel={() => setSettingsOpen(false)} footer={<Button type="primary" onClick={() => setSettingsOpen(false)}>完成</Button>} width={500}>
+                <div className="grid grid-cols-2 gap-5 py-4">
+                    <label className="space-y-2"><span className="block text-sm">纹理</span><Select className="w-full" value={textureEnabled ? "on" : "off"} onChange={(value) => setTextureEnabled(value === "on")} options={[{ value: "on", label: "生成纹理" }, { value: "off", label: "关闭纹理" }]} /></label>
+                    <label className="space-y-2"><span className="block text-sm">PBR 材质</span><Select className="w-full" value={pbrEnabled ? "on" : "off"} onChange={(value) => setPbrEnabled(value === "on")} options={[{ value: "on", label: "开启 PBR" }, { value: "off", label: "关闭 PBR" }]} /></label>
+                    <label className="col-span-2 space-y-2"><span className="block text-sm">目标面数</span><InputNumber value={targetFaceCount} onChange={(value) => setTargetFaceCount(value || 500000)} min={500000} max={1000000} step={50000} className="!w-full" /></label>
+                </div>
+            </Modal>
             <GenerationHistoryDetailModal open={Boolean(detailHistory)} history={detailHistory} onClose={() => setDetailHistory(null)} />
         </div>
     );
