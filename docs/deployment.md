@@ -50,3 +50,43 @@ Next 默认删除客户端提交的转发 IP/地区头。只有入口反向代�
 - 新增限流桶、容量预留和素材归属表，由当前模型自动创建；没有旧数据兼容/清理迁移。多实例限流要求共用同一持久化数据库，独立 SQLite 文件不能合并计数。
 - MAX_USER_STORAGE_BYTES 默认 5368709120（5 GiB），包含未删除的上传、生成和任务文件。需要更高额度时显式调整。
 - 生产 CSP 改用逐请求 nonce，API 添加 sandbox CSP。上线前验证 CAPTCHA、OAuth、广告、媒体上传及下载；具体场景见 [安全审阅记录](security-review.md)。
+
+## PostgreSQL 验证码唯一索引创建失败
+
+如果更新后应用反复重启，日志出现 `could not create unique index "idx_email_verification_target"` 和 `Key (purpose, target) ... is duplicated`，说明旧版 `email_verifications` 中同一用途、邮箱存在多条记录，新版启动时无法创建联合唯一索引。当前发码已通过 upsert 替换同一目标的验证码；按项目约定不添加启动时旧数据清理逻辑，需要对受影响的数据库执行一次性修复。
+
+在部署的 Compose 目录，把下面整个代码块一次性粘贴到 Bash 执行；如果自定义了数据库用户或库名，把命令中的 `aivro` 改为实际值。SQL 通过标准输入传给 psql，无需进入交互界面；最后一行 `SQL` 必须单独一行且不缩进，命令末尾不要额外添加反斜杠。
+
+事务只删除每组较旧的重复验证码，保留最新记录原有的使用状态、过期时间和尝试次数，用户及其他表不受影响。相同创建时间按 ID 排序选一条；创建索引失败时事务不会提交删除。
+
+```sh
+docker compose stop app
+docker compose exec -T db psql -X -v ON_ERROR_STOP=1 -U aivro -d aivro <<'SQL'
+BEGIN;
+LOCK TABLE email_verifications IN SHARE ROW EXCLUSIVE MODE;
+
+WITH ranked AS (
+    SELECT id, ROW_NUMBER() OVER (
+        PARTITION BY purpose, target
+        ORDER BY created_at DESC NULLS LAST, id DESC
+    ) AS rn
+    FROM email_verifications
+)
+DELETE FROM email_verifications AS verification
+USING ranked
+WHERE verification.id = ranked.id AND ranked.rn > 1;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_email_verification_target
+    ON email_verifications (purpose, target);
+COMMIT;
+SQL
+```
+
+输出应包含 `DELETE n`、`CREATE INDEX` 和 `COMMIT`。看到 `COMMIT` 后再启动应用并查看最近日志：
+
+```sh
+docker compose start app
+docker compose logs --since=2m --tail=100 app
+```
+
+确认应用启动成功，再重新获取验证码并测试验证和再次发码；同一 `purpose + target` 应始终只有一条记录，再次发码后旧码应失效。使用本地编排时，上述所有 Compose 命令加上 `-f docker-compose.local.yml`。
