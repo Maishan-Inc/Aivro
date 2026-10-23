@@ -222,10 +222,18 @@ MetaMask 登录服务端签名挑战表。nonce 与钱包地址绑定，短时�
 | --- | --- | --- |
 | `modelId` | string | 渠道模型隐藏 ID，用于计费匹配和审计；由后端按新增顺序分配，删除后不复用旧 ID |
 | `model` | string | 当前前台模型名；展示名称变更时随渠道模型同步更新 |
-| `credits` | number | 计费值；按次计费时表示每次调用点数，Token 计费时表示每 1000 token 点数 |
+| `credits` | number | 控制台标准价；按次计费时表示每次调用点数，Token 计费时表示每 1000 token 点数 |
 | `billingType` | string | 计费方式：`fixed` 按次计费，`token` 按 Token 计费 |
+| `vendor` | string | 厂商名称；留空时按模型名关键词自动识别 |
+| `icon` | string | 厂商图标路径，例如 `/icons/openai.svg`；留空时按自动识别结果填充 |
+| `planCredits` | object | 套餐专属价，键为 `go`、`plus`、`pro`、`max`；未配置的套餐沿用 `credits` |
+| `apiCredits` | number | API 显式单价；为 0 时按 `credits × apiMultiplier` 计算 |
+| `apiBilling` | string | API 计费方式，取值同 `billingType`；未配置时沿用 `billingType` |
+| `apiMultiplier` | number | API 价相对标准价的倍数，默认 `2` |
 
 `modelCosts` 只跟随 `availableModels` 中开放给前台的模型生成，内部优先按 `modelId` 匹配计费配置，不再依赖模型名称作为唯一计费标识。
+`planCredits` 只保留大于 0 的套餐档位，配置为 0 或留空都表示沿用标准价；`apiCredits`、`apiMultiplier` 和厂商信息由后端在保存时统一补齐，管理员不需要逐条填写。
+当前 AI 请求扣费仍按 `credits` 和 `billingType` 结算，套餐专属价与 API 价先用于定价表展示，API 调用部分的扣费在后续单独接入。
 
 `auth` 当前字段：
 

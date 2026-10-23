@@ -1,6 +1,8 @@
 .composer { width: 100%; min-width: 0; border: 1px solid var(--border); border-radius: 28px; padding: 10px 12px; text-align: left; color: var(--foreground); background: color-mix(in srgb, var(--background) 94%, transparent); box-shadow: 0 8px 36px #00000008; transition: border-color .2s, background .2s; }
 .composer:focus-within, .composer[data-dragging="true"] { border-color: var(--ring); }
 .composer[data-dragging="true"] { background: var(--muted); }
+.main { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.body { flex: 1; min-width: 0; }
 .inputRow { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .inputRow > :global(.ant-input-textarea) { flex: 1; min-width: 0; }
 .inputRow :global(textarea.ant-input) { width: 100%; min-width: 0; flex: 1; padding: 8px 10px; font-size: 15px; line-height: 24px; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; overflow-x: hidden; background: transparent; }
@@ -19,6 +21,7 @@
 .reference > button { position: absolute; top: 3px; right: 3px; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--background); color: var(--foreground); cursor: pointer; }
 @media (max-width: 600px) {
     .composer { padding: 8px; }
+    .main { gap: 4px; }
     .inputRow { gap: 4px; }
     /* 占位提示固定一行，超出显示省略号；有输入内容时恢复正常换行。 */
     .inputRow :global(textarea.ant-input) { font-size: 13px; white-space: nowrap; text-overflow: ellipsis; }

@@ -1,0 +1,3 @@
+.logo { flex-shrink: 0; object-fit: contain; }
+.logoMask { flex-shrink: 0; background: var(--foreground); mask-size: contain; mask-position: center; mask-repeat: no-repeat; }
+.wordmark { display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center; border: 1px solid var(--border); border-radius: 4px; font-size: 8px; font-weight: 650; letter-spacing: .02em; }

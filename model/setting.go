@@ -46,12 +46,19 @@ type ModelChannelModel struct {
 	Capability   string `json:"capability"`
 }
 
-// ModelCost 模型计费配置。
+// ModelCost 模型计费配置。Credits 是控制台标准价，套餐专属价留空时沿用标准价；
+// API 价默认按标准价的 ApiMultiplier 倍计算。
 type ModelCost struct {
-	ModelID     string `json:"modelId"`
-	Model       string `json:"model"`
-	Credits     int    `json:"credits"`
-	BillingType string `json:"billingType"`
+	ModelID       string         `json:"modelId"`
+	Model         string         `json:"model"`
+	Credits       int            `json:"credits"`
+	BillingType   string         `json:"billingType"`
+	Vendor        string         `json:"vendor"`
+	Icon          string         `json:"icon"`
+	PlanCredits   map[string]int `json:"planCredits"`
+	APICredits    int            `json:"apiCredits"`
+	APIBilling    string         `json:"apiBilling"`
+	ApiMultiplier int            `json:"apiMultiplier"`
 }
 
 // PublicModelChannelSetting 公开模型渠道配置。

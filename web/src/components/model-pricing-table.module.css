@@ -1,0 +1,58 @@
+.wrapper { display: flex; flex-direction: column; gap: 18px; }
+
+.controls { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+.filters { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.search { width: 220px; }
+.select { width: 132px; }
+
+.hint { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; border-left: 2px solid var(--foreground); padding: 2px 0 2px 14px; color: var(--muted-foreground); font-size: 12px; line-height: 1.9; }
+.hint a { color: var(--foreground); text-decoration: underline; text-underline-offset: 3px; }
+
+.table { display: flex; flex-direction: column; border-top: 1px solid var(--border); }
+
+.head { display: grid; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--border); color: var(--muted-foreground); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; }
+.head[data-view="standard"] { grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr) 76px 148px; }
+.head[data-view="member"] { grid-template-columns: minmax(0, 2fr) minmax(0, .9fr) 70px repeat(4, minmax(0, 1fr)); }
+.head[data-view="api"] { grid-template-columns: minmax(0, 2fr) minmax(0, .9fr) 70px minmax(0, 1fr); }
+.priceHead, .planHead { text-align: right; }
+
+.group { border-bottom: 1px solid var(--border); }
+
+.row { display: grid; align-items: center; gap: 12px; width: 100%; padding: 13px 14px; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: background-color .18s ease; }
+.row[data-view="standard"] { grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr) 76px 148px; }
+.row[data-view="member"] { grid-template-columns: minmax(0, 2fr) minmax(0, .9fr) 70px repeat(4, minmax(0, 1fr)); }
+.row[data-view="api"] { grid-template-columns: minmax(0, 2fr) minmax(0, .9fr) 70px minmax(0, 1fr); }
+.row:hover, .row[aria-expanded="true"] { background: color-mix(in oklab, var(--foreground) 4%, transparent); }
+.row:focus-visible { outline: 2px solid var(--foreground); outline-offset: -2px; }
+
+.model { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.modelName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 500; letter-spacing: -.01em; }
+.vendor { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted-foreground); font-size: 12px; }
+.badge { display: inline-flex; align-items: center; border: 1px solid var(--border); border-radius: 999px; padding: 1px 9px; color: var(--muted-foreground); font-size: 10px; line-height: 18px; }
+
+.price { display: inline-flex; align-items: baseline; justify-content: flex-end; gap: 4px; font-size: 13px; font-variant-numeric: tabular-nums; }
+.price small { color: var(--muted-foreground); font-size: 10px; }
+.price[data-muted="true"] { color: var(--muted-foreground); }
+.planPrice { justify-self: end; font-size: 12px; font-variant-numeric: tabular-nums; }
+.planPrice[data-muted="true"] { color: var(--muted-foreground); }
+
+.detail { display: flex; flex-wrap: wrap; gap: 10px 28px; padding: 4px 14px 16px; }
+.detail > div { display: flex; flex-direction: column; gap: 3px; min-width: 78px; }
+.detail span { color: var(--muted-foreground); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+.detail strong { font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; }
+
+.empty { display: grid; place-items: center; padding: 56px 0; }
+.note { color: var(--muted-foreground); font-size: 11px; line-height: 1.9; }
+
+@media (max-width: 900px) {
+    .search { width: 100%; }
+    .filters { width: 100%; }
+    .select { flex: 1; width: auto; min-width: 118px; }
+    .head { display: none; }
+    .row[data-view] { grid-template-columns: minmax(0, 1fr) auto; row-gap: 8px; padding: 14px; }
+    .row[data-view] > span:nth-child(2), .row[data-view] > span:nth-child(3) { display: none; }
+    .row[data-view="standard"] > span:last-child, .row[data-view="api"] > span:last-child { grid-column: 2; }
+    .row[data-view="member"] .planPrice:not([data-plan="GO"]) { display: none; }
+    .row[data-view="member"] .planPrice[data-plan="GO"] { grid-column: 2; grid-row: 1; }
+    .detail { gap: 10px 20px; }
+}

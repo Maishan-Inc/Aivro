@@ -8,6 +8,7 @@ export const siteUrl = "https://aivro.org";
 export type SeoPageKey =
     | "home"
     | "pricing"
+    | "models"
     | "image"
     | "video"
     | "model3d"
@@ -64,6 +65,19 @@ export const seoPages: Record<SeoPageKey, SeoPage> = {
             "ja-JP": "Aivro のプランを購入してクレジットとクラウドワークフローの作成回数を取得し、画像・動画・キャンバス・AI 創作に活用できます。",
             "ko-KR": "Aivro 요금제를 구매해 크레딧과 클라우드 워크플로 생성 횟수를 받고 이미지, 영상, 캔버스, AI 창작에 사용하세요.",
             "fr-FR": "Achetez une offre Aivro pour obtenir des crédits et des créations de workflows cloud pour l'image, la vidéo, le canevas et la création IA.",
+        },
+    },
+    models: {
+        path: "/models",
+        index: true,
+        title: { "zh-CN": "模型定价表 - Aivro", "zh-TW": "模型定價表 - Aivro", "en-US": "Model pricing - Aivro", "ja-JP": "モデル料金表 - Aivro", "ko-KR": "모델 요금표 - Aivro", "fr-FR": "Tarifs des modèles - Aivro" },
+        description: {
+            "zh-CN": "查看 Aivro 各模型在控制台的标准价、GO、Plus、Pro、Max 会员价和 API 单价，了解每个模型消耗多少算力点。",
+            "zh-TW": "查看 Aivro 各模型在控制台的標準價、GO、Plus、Pro、Max 會員價和 API 單價，了解每個模型消耗多少算力點。",
+            "en-US": "Check standard credits, GO / Plus / Pro / Max member pricing, and API unit prices for every model available in Aivro.",
+            "ja-JP": "Aivro で利用できる各モデルの標準クレジット、GO・Plus・Pro・Max の会員価格、API 単価を確認できます。",
+            "ko-KR": "Aivro에서 사용할 수 있는 모든 모델의 표준 크레딧, GO·Plus·Pro·Max 회원 가격, API 단가를 확인하세요.",
+            "fr-FR": "Consultez les crédits standard, les tarifs membres GO / Plus / Pro / Max et les prix API de chaque modèle Aivro.",
         },
     },
     image: {

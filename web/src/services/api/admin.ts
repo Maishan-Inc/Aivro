@@ -282,6 +282,12 @@ export type AdminModelCost = {
     model: string;
     credits: number;
     billingType: "fixed" | "token";
+    vendor: string;
+    icon: string;
+    planCredits: Record<string, number>;
+    apiCredits: number;
+    apiBilling: "fixed" | "token";
+    apiMultiplier: number;
 };
 
 export type AdminPublicSettings = {

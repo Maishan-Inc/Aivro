@@ -1093,6 +1093,7 @@ func normalizeModelCosts(items []model.ModelCost, availableModels []string, chan
 		if item.Credits < 0 {
 			item.Credits = 0
 		}
+		item = normalizeModelCostPricing(item)
 		key := firstNonEmpty(modelID, modelName)
 		if key == "" || seenIDs[key] {
 			continue
