@@ -17,23 +17,6 @@ const noStoreHeaders = [
 ];
 
 const securityHeaders = [
-    {
-        key: "Content-Security-Policy",
-        value: [
-            "default-src 'self'",
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com https://hcaptcha.com https://*.hcaptcha.com https://pagead2.googlesyndication.com https://*.googlesyndication.com https://*.doubleclick.net https://*.googletagservices.com https://*.googletagmanager.com https://*.google.com",
-            "style-src 'self' 'unsafe-inline'",
-            "img-src 'self' data: blob: https:",
-            "media-src 'self' blob: https:",
-            "font-src 'self' data:",
-            "connect-src 'self' https: wss:",
-            "frame-src 'self' https://challenges.cloudflare.com https://hcaptcha.com https://*.hcaptcha.com https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com",
-            "object-src 'none'",
-            "base-uri 'self'",
-            "form-action 'self'",
-            "frame-ancestors 'none'",
-        ].join("; "),
-    },
     { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
     { key: "X-Frame-Options", value: "DENY" },
     { key: "X-Content-Type-Options", value: "nosniff" },

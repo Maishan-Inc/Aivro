@@ -20,6 +20,7 @@ func New() *gin.Engine {
 	_ = router.SetTrustedProxies(nil)
 	router.GET("/ads.txt", gin.WrapF(handler.AdsTxt))
 	api := router.Group("/api")
+	api.Use(middleware.Security)
 	api.Use(func(c *gin.Context) {
 		limit := int64(80 << 20)
 		if strings.HasPrefix(c.Request.URL.Path, "/api/webhooks/") || strings.HasPrefix(c.Request.URL.Path, "/api/auth/") || c.Request.URL.Path == "/api/admin/login" {
@@ -32,7 +33,6 @@ func New() *gin.Engine {
 		c.String(http.StatusOK, "ok")
 	})
 	api.POST("/auth/register", gin.WrapF(handler.Register))
-	api.POST("/auth/register/check", gin.WrapF(handler.CheckRegisterEmail))
 	api.POST("/auth/register/code", gin.WrapF(handler.SendRegisterEmailCode))
 	api.POST("/auth/login", gin.WrapF(handler.Login))
 	api.GET("/auth/captcha-session", gin.WrapF(handler.CaptchaSession))
@@ -62,6 +62,7 @@ func New() *gin.Engine {
 	})
 	v1 := api.Group("/v1", middleware.UserAuth)
 	v1.POST("/files", gin.WrapF(handler.UploadFile))
+	v1.POST("/asset-files", func(c *gin.Context) { handler.RetainAssetFiles(c.Writer, c.Request, "") })
 	v1.POST("/asset-files/:id", func(c *gin.Context) { handler.RetainAssetFiles(c.Writer, c.Request, c.Param("id")) })
 	v1.DELETE("/asset-files/:id", func(c *gin.Context) { handler.ReleaseAssetFiles(c.Writer, c.Request, c.Param("id")) })
 	v1.POST("/images/generations", gin.WrapF(handler.AIImagesGenerations))
@@ -189,10 +190,6 @@ func New() *gin.Engine {
 	admin.GET("/request-logs", gin.WrapF(handler.AdminCreditLogs))
 	admin.GET("/audit-logs", gin.WrapF(handler.AdminAuditLogs))
 	admin.GET("/credit-logs", gin.WrapF(handler.AdminCreditLogs))
-	admin.POST("/credit-logs", gin.WrapF(handler.AdminSaveCreditLog))
-	admin.DELETE("/credit-logs/:id", func(c *gin.Context) {
-		handler.AdminDeleteCreditLog(c.Writer, c.Request, c.Param("id"))
-	})
 	admin.GET("/settings", gin.WrapF(handler.AdminSettings))
 	admin.POST("/settings", gin.WrapF(handler.AdminSaveSettings))
 	admin.GET("/database/status", gin.WrapF(handler.AdminDatabaseStatus))

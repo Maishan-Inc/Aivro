@@ -5,8 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"net"
+	"net/netip"
 	"net/http"
 	"net/url"
+	"path"
+	"regexp"
 	"strings"
 	"time"
 
@@ -16,6 +19,21 @@ import (
 
 const turnstileVerifyURL = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
 const hCaptchaVerifyURL = "https://api.hcaptcha.com/siteverify"
+
+func CheckRequestOrigin(r *http.Request) error {
+	if r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodOptions || strings.HasPrefix(r.URL.Path, "/api/webhooks/") { return nil }
+	origin := r.Header.Get("Origin")
+	if origin == "" && r.Header.Get("Referer") != "" {
+		parsed, err := url.Parse(r.Header.Get("Referer"))
+		if err == nil { origin = parsed.Scheme+"://"+parsed.Host }
+	}
+	if origin == "" && len(r.Cookies()) == 0 { return nil }
+	if origin == RequestOrigin(r) { return nil }
+	for _, allowed := range strings.Split(configuredAllowedOrigins(), ",") {
+		if origin != "" && origin == strings.TrimRight(strings.TrimSpace(allowed), "/") { return nil }
+	}
+	return errors.New("请求来源无效")
+}
 
 func CaptchaSessionFromRequest(r *http.Request) map[string]string {
 	meta := RequestLogMetaFromRequest(r)
@@ -83,7 +101,12 @@ func newPublicHTTPClient() *http.Client {
 
 const AIRequestTimeout = 5 * time.Minute
 
-var AIHTTPClient = &http.Client{Timeout: AIRequestTimeout}
+var AIHTTPClient = func() *http.Client {
+	client := newPublicHTTPClient()
+	client.Timeout = AIRequestTimeout
+	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	return client
+}()
 
 func VerifyCaptcha(r *http.Request, token string) error {
 	settings, err := repository.GetSettings()
@@ -92,8 +115,11 @@ func VerifyCaptcha(r *http.Request, token string) error {
 	}
 	captcha := normalizeCaptchaSetting(settings.Private.Captcha, settings.Private.Turnstile)
 	provider := captchaProviderSetting(captcha)
-	if !captcha.Enabled || provider.SiteKey == "" || provider.SecretKey == "" {
+	if !captcha.Enabled {
 		return nil
+	}
+	if provider.SiteKey == "" || provider.SecretKey == "" {
+		return safeMessageError{message: "人机验证配置不完整，请联系管理员"}
 	}
 	if strings.TrimSpace(token) == "" {
 		return safeMessageError{message: "请先完成人机验证"}
@@ -126,17 +152,27 @@ func captchaVerifyURL(provider model.CaptchaProvider) string {
 	return turnstileVerifyURL
 }
 
+var redirectPagePattern = regexp.MustCompile(`^/(assets|asset-library|image|video|model-3d|prompts|pricing(/success)?|terms|privacy|login|forgot-password|metamask-email|profile/setup|canvas(/[A-Za-z0-9_-]+|/community/[A-Za-z0-9_-]+)?|share/workflows/[A-Za-z0-9_-]+|console(/(workflows|wallet|shares|profile|community))?|admin(/(database|workflow-community|settings|credit-logs|users|ads|request-logs|prompts|audit-logs|assets|plans))?)$`)
+var redirectSharePattern = regexp.MustCompile(`^/[a-z0-9]{3,24}/[a-z0-9]{1,40}$`)
+
 func SafeRedirectPath(redirect string) string {
-	redirect = strings.TrimSpace(redirect)
-	if redirect == "" || !strings.HasPrefix(redirect, "/") || strings.HasPrefix(redirect, "//") || strings.HasPrefix(redirect, `/\`) || strings.Contains(redirect, `\`) {
-		return "/"
-	}
-	return redirect
+	decoded, err := url.PathUnescape(redirect)
+	if err != nil || strings.Contains(decoded, "\\") || strings.IndexFunc(decoded, func(r rune) bool { return r < 32 || r == 127 }) >= 0 || !strings.HasPrefix(redirect, "/") || strings.HasPrefix(decoded, "//") { return "/" }
+	parsed, err := url.Parse(redirect)
+	if err != nil || parsed.Host != "" || strings.Contains(parsed.Path, "%") { return "/" }
+	parsed.Path = path.Clean(parsed.Path)
+	parsed.RawPath = ""
+	parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
+	switch parts[0] { case "zh-CN", "zh-TW", "en-US", "ja-JP", "ko-KR", "fr-FR": parts = parts[1:] }
+	page := "/"+strings.Join(parts, "/")
+	if len(parts) > 0 { switch parts[0] { case "api", "_next", "icons": return "/" } }
+	if page != "/" && !redirectPagePattern.MatchString(page) && !redirectSharePattern.MatchString(page) { return "/" }
+	return parsed.String()
 }
 
 func IsPublicHTTPURL(raw string) bool {
 	parsed, err := url.Parse(strings.TrimSpace(raw))
-	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Hostname() == "" {
+	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Hostname() == "" || parsed.User != nil {
 		return false
 	}
 	ips, err := net.LookupIP(parsed.Hostname())
@@ -155,8 +191,16 @@ func isPublicIP(ip net.IP) bool {
 	if ip == nil || ip.IsLoopback() || ip.IsPrivate() || ip.IsUnspecified() || ip.IsMulticast() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
 		return false
 	}
-	if ip4 := ip.To4(); ip4 != nil {
-		return ip4[0] != 0 && ip4[0] != 127 && ip4[0] < 224
-	}
+	address, ok := netip.AddrFromSlice(ip)
+	if !ok || !ip.IsGlobalUnicast() { return false }
+	for _, prefix := range reservedPublicRanges { if prefix.Contains(address.Unmap()) { return false } }
 	return true
+}
+
+var reservedPublicRanges = []netip.Prefix{
+	netip.MustParsePrefix("0.0.0.0/8"), netip.MustParsePrefix("100.64.0.0/10"),
+	netip.MustParsePrefix("192.0.0.0/24"), netip.MustParsePrefix("192.0.2.0/24"), netip.MustParsePrefix("198.18.0.0/15"),
+	netip.MustParsePrefix("198.51.100.0/24"), netip.MustParsePrefix("203.0.113.0/24"), netip.MustParsePrefix("240.0.0.0/4"),
+	netip.MustParsePrefix("::/96"), netip.MustParsePrefix("64:ff9b::/96"), netip.MustParsePrefix("64:ff9b:1::/48"),
+	netip.MustParsePrefix("100::/64"), netip.MustParsePrefix("2001::/23"), netip.MustParsePrefix("2001:db8::/32"), netip.MustParsePrefix("2002::/16"),
 }

@@ -1,7 +1,7 @@
 import { create } from "zustand";
 
 import type { CanvasBackgroundMode } from "@/lib/canvas-theme";
-import type { CanvasAssistantSession, CanvasConnection, CanvasNodeData, ViewportTransform } from "../types";
+import type { CanvasConnection, CanvasNodeData, ViewportTransform } from "../types";
 
 export type CanvasProject = {
     id: string;
@@ -12,8 +12,6 @@ export type CanvasProject = {
     updatedAt: string;
     nodes: CanvasNodeData[];
     connections: CanvasConnection[];
-    chatSessions: CanvasAssistantSession[];
-    activeChatId: string | null;
     backgroundMode: CanvasBackgroundMode;
     showImageInfo: boolean;
     viewport: ViewportTransform;

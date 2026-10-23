@@ -11,7 +11,6 @@ import { canvasThemes } from "@/lib/canvas-theme";
 import { nanoid } from "nanoid";
 import { cn } from "@/lib/utils";
 import { batchDeleteCanvasAssistantSessions, fetchCanvasAssistantSessions, planCanvasAgent, sendCanvasAssistantMessage } from "@/services/api/workflows";
-import { useAssetStore } from "@/stores/use-asset-store";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { useUserStore } from "@/stores/use-user-store";
 import { DiaTextReveal } from "@/components/ui/dia-text-reveal";
@@ -49,7 +48,6 @@ export function CanvasAssistantPanel({ workflowId, nodes, selectedNodeIds, snaps
     const token = useUserStore((state) => state.token);
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
     const effectiveConfig = useEffectiveConfig();
-    const cleanupImages = useAssetStore((state) => state.cleanupImages);
     const isAiConfigReady = useConfigStore((state) => state.isAiConfigReady);
     const [width, setWidth] = useState(390);
     const [view, setView] = useState<"chat" | "history">("chat");
@@ -188,7 +186,6 @@ export function CanvasAssistantPanel({ workflowId, nodes, selectedNodeIds, snaps
             setLocalSessions(next);
             setLocalActiveSessionId(localActiveSessionId && ids.includes(localActiveSessionId) ? next[0].id : localActiveSessionId);
         }
-        cleanupImages({ sessions: next });
         setCheckedChatIds((prev) => prev.filter((id) => !ids.includes(id)));
         if (token) void batchDeleteCanvasAssistantSessions(token, workflowId, ids).catch((error) => message.error(error instanceof Error ? error.message : "删除历史失败"));
     };
@@ -199,7 +196,6 @@ export function CanvasAssistantPanel({ workflowId, nodes, selectedNodeIds, snaps
         setLocalSessions([session]);
         setLocalActiveSessionId(session.id);
         setCheckedChatIds([]);
-        cleanupImages({ sessions: [session] });
         if (token && ids.length) void batchDeleteCanvasAssistantSessions(token, workflowId, ids).catch((error) => message.error(error instanceof Error ? error.message : "清空历史失败"));
     };
 

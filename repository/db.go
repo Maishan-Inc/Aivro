@@ -17,6 +17,7 @@ import (
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 var promptCategories = []model.PromptCategory{
@@ -49,6 +50,8 @@ var databaseMigrationSources = []string{
 	"model/kyc.go",
 	"model/generation_history.go",
 	"model/setting.go",
+	"model/rate_limit.go",
+	"model/storage_limits.go",
 }
 
 // DB 初始化并返回全局数据库连接。
@@ -63,7 +66,7 @@ func DB() (*gorm.DB, error) {
 			}
 		}
 		log.Printf("database connecting driver=%s dsn=%s", driver, sanitizedDatabaseDSN(driver, dsn))
-		db, dbErr = gorm.Open(dialector(driver, dsn), &gorm.Config{})
+		db, dbErr = gorm.Open(dialector(driver, dsn), &gorm.Config{Logger: logger.New(log.New(os.Stderr, "", log.LstdFlags), logger.Config{LogLevel: logger.Error, ParameterizedQueries: true, IgnoreRecordNotFoundError: true})})
 		if dbErr != nil {
 			return
 		}
@@ -134,6 +137,7 @@ func migrateModels(db *gorm.DB) error {
 	err := db.AutoMigrate(
 		&model.User{},
 		&model.UserPreference{},
+		&model.RateLimitBucket{},
 		&model.EmailVerification{},
 		&model.MetaMaskChallenge{},
 		&model.CreditLog{},
@@ -144,6 +148,8 @@ func migrateModels(db *gorm.DB) error {
 		&model.Setting{},
 		&model.CloudFile{},
 		&model.CloudFileReference{},
+		&model.UserAsset{},
+		&model.StorageReservation{},
 		&model.GenerationHistory{},
 		&model.GenerationTask{},
 		&model.VideoTask{},
@@ -235,6 +241,7 @@ func databaseMigrationModelItems() []struct {
 	}{
 		{"model.User", &model.User{}},
 		{"model.UserPreference", &model.UserPreference{}},
+		{"model.RateLimitBucket", &model.RateLimitBucket{}},
 		{"model.EmailVerification", &model.EmailVerification{}},
 		{"model.MetaMaskChallenge", &model.MetaMaskChallenge{}},
 		{"model.CreditLog", &model.CreditLog{}},
@@ -245,6 +252,8 @@ func databaseMigrationModelItems() []struct {
 		{"model.Setting", &model.Setting{}},
 		{"model.CloudFile", &model.CloudFile{}},
 		{"model.CloudFileReference", &model.CloudFileReference{}},
+		{"model.UserAsset", &model.UserAsset{}},
+		{"model.StorageReservation", &model.StorageReservation{}},
 		{"model.GenerationHistory", &model.GenerationHistory{}},
 		{"model.GenerationTask", &model.GenerationTask{}},
 		{"model.VideoTask", &model.VideoTask{}},

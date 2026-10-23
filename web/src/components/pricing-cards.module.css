@@ -1,4 +1,4 @@
-.cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: 1fr; align-items: stretch; gap: 20px; }
+.cards { position: relative; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: 1fr; align-items: stretch; gap: 20px; }
 .card { --card-ink: var(--foreground); --card-muted: var(--muted-foreground); --card-line: var(--border); --cta-bg: var(--foreground); --cta-ink: var(--background); position: relative; display: flex; flex-direction: column; min-width: 0; border: 1px solid var(--card-line); border-radius: 16px; padding: clamp(24px, 2vw, 38px); background: var(--background); color: var(--card-ink); transition: transform .3s, border-color .3s; }
 .card:hover { transform: translateY(-6px); border-color: var(--foreground); }
 /* The recommended plan is outlined rather than filled: a heavier border keeps it
@@ -30,13 +30,31 @@
 .cardFoot { margin-top: auto; padding-top: 16px; color: var(--card-muted); font-size: 10px; }
 .status { margin-top: 24px; color: var(--muted-foreground); font-size: 11px; line-height: 1.8; }
 .status button { margin-left: 10px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
-@media (max-width: 1400px) { .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }.price strong { font-size: 52px; } }
+@media (max-width: 1400px) {
+    .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+    .price strong { font-size: 46px; }
+    .cards[data-carousel="true"] { display: flex; gap: 16px; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scrollbar-width: thin; padding-block: 4px 12px; }
+    .cards[data-carousel="true"] .card { flex: 0 0 clamp(270px, 31%, 350px); scroll-snap-align: center; padding: 24px; }
+    .cards[data-carousel="true"] .subtitle { min-height: 44px; margin-top: 12px; line-height: 1.7; }
+    .cards[data-carousel="true"] .price { margin-block: 18px; }
+    .cards[data-carousel="true"] .featuresLabel { margin-top: 20px; padding-top: 18px; }
+    .cards[data-carousel="true"] ul { gap: 12px; margin-block: 16px 12px; }
+    .cards[data-carousel="true"] .perks { min-height: 0; margin-top: 12px; padding-top: 14px; }
+}
 @media (max-width: 600px) {
     .cards { grid-template-columns: minmax(0, 1fr); gap: 20px; }.card { padding: 28px; }.subtitle { min-height: 0; }.price strong { font-size: 56px; }
     /* 首页套餐：手机端改为左右滑动，默认停在推荐套餐，两侧各露出一点相邻套餐。 */
     .cards[data-carousel="true"] { display: flex; gap: 12px; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
     .cards[data-carousel="true"]::-webkit-scrollbar { display: none; }
-    .cards[data-carousel="true"] .card { flex: 0 0 86%; scroll-snap-align: center; padding: 26px 24px; }
+    .cards[data-carousel="true"] .card { flex: 0 0 88%; scroll-snap-align: center; padding: 20px 18px; }
+    .cards[data-carousel="true"] .cardTop h2 { font-size: 22px; }
+    .cards[data-carousel="true"] .subtitle { min-height: 0; font-size: 12px; }
+    .cards[data-carousel="true"] .price strong { font-size: clamp(36px, 10vw, 46px); }
+    .cards[data-carousel="true"] .price > span { font-size: 21px; }
+    .cards[data-carousel="true"] .feature { font-size: 12px; line-height: 1.65; }
+    .cards[data-carousel="true"] .perk { align-items: start; font-size: 11px; overflow-wrap: anywhere; }
+    .cards[data-carousel="true"] .perk svg { margin-top: 2px; }
+    .cards[data-carousel="true"] .cardFoot { padding-top: 14px; }
     .cards[data-carousel="true"] .card:hover { transform: none; }
 }
 @media (prefers-reduced-motion: reduce) { .card { transition: none; }.card:hover { transform: none; } }

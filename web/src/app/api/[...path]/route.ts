@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { isIP } from "node:net";
+import { apiSecurityHeaders } from "@/lib/security-headers";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -23,11 +24,13 @@ function proxyHeaders(request: NextRequest) {
 
 function responseHeaders(response: Response, path: string[], method: string) {
     const headers = new Headers(response.headers);
+    for (const [key, value] of Object.entries(apiSecurityHeaders)) headers.set(key, value);
     const setCookies = (response.headers as Headers & { getSetCookie?: () => string[] }).getSetCookie?.() || [];
     if (setCookies.length) {
         headers.delete("set-cookie");
         for (const cookie of setCookies) headers.append("set-cookie", cookie);
     }
+    if (path[0] !== "auth" && path.join("/") !== "admin/login") headers.delete("set-cookie");
     headers.delete("content-length");
     headers.delete("content-encoding");
     headers.delete("transfer-encoding");
@@ -70,8 +73,8 @@ async function proxy(request: NextRequest, context: RouteContext) {
             headers: responseHeaders(response, path, request.method),
         });
     } catch (error) {
-        console.error("Failed to proxy", request.nextUrl.pathname, error);
-        return Response.json({ code: 1, data: null, msg: "接口连接失败，请确认后端服务已启动" }, { status: 502 });
+        console.error("Failed to proxy", request.nextUrl.pathname, error instanceof Error ? error.name : "Error");
+        return Response.json({ code: 1, data: null, msg: "接口连接失败，请确认后端服务已启动" }, { status: 502, headers: apiSecurityHeaders });
     }
 }
 

@@ -179,8 +179,8 @@ type AuditLogList struct {
 // EmailVerification 邮箱验证码。
 type EmailVerification struct {
 	ID        string `json:"id" gorm:"primaryKey"`
-	Purpose   string `json:"purpose" gorm:"index"`
-	Target    string `json:"target" gorm:"index"`
+	Purpose   string `json:"purpose" gorm:"index;uniqueIndex:idx_email_verification_target,priority:1"`
+	Target    string `json:"target" gorm:"index;uniqueIndex:idx_email_verification_target,priority:2"`
 	Code      string `json:"code"`
 	Attempts  int    `json:"attempts"`
 	ExpiresAt string `json:"expiresAt" gorm:"index"`

@@ -47,6 +47,7 @@ export function useCaptchaChallenge(captcha?: AdminPublicCaptchaSettings, option
     }, []);
 
     const verify = useCallback(() => {
+        if (captcha?.enabled && !siteKey) return Promise.reject(new Error("人机验证配置不完整，请联系管理员"));
         if (!siteKey) return Promise.resolve("");
         if (mode === "inline") {
             if (token) return Promise.resolve(token);
@@ -58,7 +59,7 @@ export function useCaptchaChallenge(captcha?: AdminPublicCaptchaSettings, option
         return new Promise<string>((resolve, reject) => {
             resolverRef.current = { resolve, reject };
         });
-    }, [mode, siteKey, token]);
+    }, [captcha?.enabled, mode, siteKey, token]);
 
     const onVerify = useCallback((token: string) => {
         if (!token) return;

@@ -213,8 +213,8 @@ func requestHunyuanModel3D(ctx context.Context, user model.AuthUser, input Model
 	if err != nil {
 		return Model3DGenerationResult{}, err
 	}
-	if response.StatusCode >= http.StatusBadRequest {
-		log.Printf("model3d upstream error: status=%d body=%s", response.StatusCode, strings.TrimSpace(string(body)))
+	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+		log.Printf("model3d upstream error: status=%d", response.StatusCode)
 		return Model3DGenerationResult{}, SafeAIError("腾讯混元 3D 生成请求失败")
 	}
 	return normalizeModel3DProviderResponse(ctx, user, input, body)

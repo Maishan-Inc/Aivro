@@ -10,7 +10,7 @@ import { canvasThemes } from "@/lib/canvas-theme";
 import { useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
 import { useThemeStore } from "@/stores/use-theme-store";
 
-export function StudioGenerationSettings({ kind }: { kind: "image" | "video" }) {
+export function StudioGenerationSettings({ kind, part }: { kind: "image" | "video"; part?: "model" | "settings" }) {
     const { message } = App.useApp();
     const config = useEffectiveConfig();
     const updateConfig = useConfigStore((state) => state.updateConfig);
@@ -21,8 +21,10 @@ export function StudioGenerationSettings({ kind }: { kind: "image" | "video" }) 
     const qualityOptions = image ? ["auto", "high", "medium", "low"] : ["480", "720"];
     const quantityOptions = image ? Array.from({ length: 10 }, (_, index) => String(index + 1)) : ["6", "10", "12", "16", "20"];
 
+    if (part === "model") return <ModelPicker config={config} models={image ? config.imageModels : config.videoModels} value={(image ? config.imageModel : config.videoModel) || config.model} onChange={(value) => updateConfig(image ? "imageModel" : "videoModel", value)} onMissingConfig={() => message.warning("管理员尚未配置可用模型")} />;
+
     return <>
-        <ModelPicker config={config} models={image ? config.imageModels : config.videoModels} value={(image ? config.imageModel : config.videoModel) || config.model} onChange={(value) => updateConfig(image ? "imageModel" : "videoModel", value)} onMissingConfig={() => message.warning("管理员尚未配置可用模型")} />
+        {part ? null : <ModelPicker config={config} models={image ? config.imageModels : config.videoModels} value={(image ? config.imageModel : config.videoModel) || config.model} onChange={(value) => updateConfig(image ? "imageModel" : "videoModel", value)} onMissingConfig={() => message.warning("管理员尚未配置可用模型")} />}
         <Button type="text" icon={<Scan size={14} />} onClick={() => setOpen(true)} title="调整宽高比和尺寸">{image ? imageSizeLabel(config.size) : videoSizeLabel(config.size)}<ChevronDown size={12} /></Button>
         <Dropdown trigger={["click"]} placement="bottomLeft" menu={{ selectable: true, selectedKeys: [image ? config.quality : config.vquality], items: qualityOptions.map((key) => ({ key, label: image ? imageQualityLabel(key) : `${key}p` })), onClick: ({ key }) => updateConfig(image ? "quality" : "vquality", key) }}>
             <Button type="text" title={image ? "图像质量" : "视频清晰度"}>{image ? imageQualityLabel(config.quality) : videoResolutionLabel(config.vquality)}<ChevronDown size={12} /></Button>

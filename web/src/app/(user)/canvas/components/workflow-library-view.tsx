@@ -109,12 +109,11 @@ export function WorkflowLibraryView({ initialTab = "workflows", lockTab = false,
                 (stats, project) => ({
                     nodes: stats.nodes + project.nodes.length,
                     connections: stats.connections + project.connections.length,
-                    sessions: stats.sessions + project.chatSessions.length,
                     linked: stats.linked + (project.sourceSyncMode === "linked" ? 1 : 0),
                     detached: stats.detached + (project.sourceSyncMode === "detached" ? 1 : 0),
                     latest: !stats.latest || project.updatedAt > stats.latest ? project.updatedAt : stats.latest,
                 }),
-                { nodes: 0, connections: 0, sessions: 0, linked: 0, detached: 0, latest: "" },
+                { nodes: 0, connections: 0, linked: 0, detached: 0, latest: "" },
             ),
         [projects],
     );
@@ -152,8 +151,6 @@ export function WorkflowLibraryView({ initialTab = "workflows", lockTab = false,
                 title: name,
                 nodes: [],
                 connections: [],
-                chatSessions: [],
-                activeChatId: null,
                 backgroundMode: "lines",
                 showImageInfo: false,
                 viewport: { x: 0, y: 0, k: 1 },
@@ -264,7 +261,6 @@ export function WorkflowLibraryView({ initialTab = "workflows", lockTab = false,
             <HeaderMetric label="工作流" value={projects.length} />
             <HeaderMetric label="节点" value={workflowStats.nodes} />
             <HeaderMetric label="连线" value={workflowStats.connections} />
-            <HeaderMetric label="会话" value={workflowStats.sessions} />
             <HeaderMetric label="自动更新" value={workflowStats.linked} />
             <HeaderMetric label="独立副本" value={workflowStats.detached} />
             <HeaderMetric label="最近更新" value={workflowStats.latest ? formatWorkflowTime(workflowStats.latest) : "-"} wide />
@@ -528,7 +524,6 @@ function CommunityCard({ item, source, mine, onOpen, onSync, onDelete }: { item:
     const stale = Boolean(source && source.updatedAt !== item.snapshotWorkflowAt);
     const nodes = item.snapshot?.nodes || [];
     const connections = item.snapshot?.connections || [];
-    const sessions = item.snapshot?.chatSessions || [];
     const [detailOpen, setDetailOpen] = useState(false);
     return (
         <>
@@ -539,10 +534,9 @@ function CommunityCard({ item, source, mine, onOpen, onSync, onDelete }: { item:
                     <span className="truncate">{item.title}</span>
                     <Tag className="m-0" color={item.status === "banned" ? "red" : item.locale === "en-US" ? "cyan" : "green"}>{item.status === "banned" ? "封禁" : item.locale === "en-US" ? "EN" : "中文"}</Tag>
                 </div>
-                <div className="absolute inset-x-3 bottom-3 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+                <div className="absolute inset-x-3 bottom-3 grid grid-cols-3 gap-1.5">
                     <CardMetric label="节点" value={nodes.length} />
                     <CardMetric label="连线" value={connections.length} />
-                    <CardMetric label="会话" value={sessions.length} />
                     <CardMetric label="消耗" value="1次" />
                 </div>
             </article>
@@ -559,10 +553,9 @@ function CommunityCard({ item, source, mine, onOpen, onSync, onDelete }: { item:
                             </div>
                             <Tag color={item.status === "banned" ? "red" : item.locale === "en-US" ? "cyan" : "green"}>{item.status === "banned" ? "已封禁" : item.locale === "en-US" ? "English" : "中文"}</Tag>
                         </div>
-                        <div className="grid grid-cols-2 gap-2 text-xs text-stone-500 sm:grid-cols-4 dark:text-stone-400">
+                        <div className="grid grid-cols-2 gap-2 text-xs text-stone-500 sm:grid-cols-3 dark:text-stone-400">
                             <HeaderMetric label="节点" value={nodes.length} />
                             <HeaderMetric label="连线" value={connections.length} />
-                            <HeaderMetric label="会话" value={sessions.length} />
                             <HeaderMetric label="消耗额度" value="1次创建" />
                         </div>
                         <div className="flex flex-wrap gap-1.5">{(item.tags || []).map((tag) => <Tag key={tag}>{tag}</Tag>)}</div>

@@ -11,6 +11,7 @@ func CanReferenceCloudFileTx(tx *gorm.DB, userID string, id string, now string) 
 	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND deleted_at = ?", id, "").First(&file).Error; err != nil {
 		return false, err
 	}
+	if file.FileType == model.CloudFileTypeTask { return false, nil }
 	var refs []model.CloudFileReference
 	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("file_id = ? AND (expires_at = ? OR expires_at > ?)", id, "", now).Find(&refs).Error; err != nil { return false, err }
 	if file.ExpiresAt != "" && file.ExpiresAt <= now && len(refs) == 0 { return false, nil }

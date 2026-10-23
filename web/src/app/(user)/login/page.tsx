@@ -1,5 +1,7 @@
 "use client";
 
+import { safeRedirect } from "@/lib/safe-redirect";
+
 import { FlowBackground } from "@/components/flow-background";
 import auth from "./login.module.css";
 
@@ -194,7 +196,7 @@ function LoginContent() {
                 message.error("未获取到钱包地址");
                 return;
             }
-            const challenge = await fetchMetaMaskChallenge(walletAddress);
+            const challenge = await runWithCaptchaReset(resetCaptcha, () => fetchMetaMaskChallenge(walletAddress, captchaToken));
             const signMessage = challenge.message;
             const signature = (await ethereum.request({ method: "personal_sign", params: [signMessage, walletAddress] })) as string;
             try {
@@ -394,7 +396,3 @@ async function runWithCaptchaReset<T>(resetCaptcha: () => void, action: () => Pr
     }
 }
 
-function safeRedirect(value: string) {
-    if (!value.startsWith("/") || value.startsWith("//") || value.includes("\\")) return "/";
-    return value;
-}

@@ -3,7 +3,7 @@ const children = [
         name: "api",
         command: ["/app/server"],
         cwd: "/app",
-        env: { ...process.env, PORT: "8080" },
+        env: { ...process.env, LISTEN_HOST: "127.0.0.1", PORT: "8080" },
     },
     {
         name: "web",

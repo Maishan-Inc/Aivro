@@ -33,8 +33,8 @@ func ListGenerationHistories(userID string, historyType model.GenerationHistoryT
 		tx = tx.Where("type = ?", historyType)
 	}
 	if query.Keyword != "" {
-		like := "%" + query.Keyword + "%"
-		tx = tx.Where("title LIKE ? OR prompt LIKE ? OR model LIKE ?", like, like, like)
+		like := LikePattern(query.Keyword)
+		tx = tx.Where("title LIKE ? ESCAPE '!' OR prompt LIKE ? ESCAPE '!' OR model LIKE ? ESCAPE '!'", like, like, like)
 	}
 	var total int64
 	if err := tx.Count(&total).Error; err != nil {

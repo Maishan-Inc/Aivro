@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowUpRight, Box } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 import { useLocalizedPath } from "@/hooks/use-localized-path";
 import styles from "./home.module.css";
 
@@ -26,10 +26,10 @@ const modelGroups = [
         { name: "TRELLIS", company: "Microsoft Research", versions: "", logo: "trellis.png" },
         { name: "Meshy", company: "Meshy", versions: "", logo: "meshy.svg" },
         { name: "404_GEN", company: "404-GEN", versions: "", logo: "404gen.svg" },
-        { name: "Meshy-7", company: "", versions: "", logo: "meshy.svg" },
+        { name: "Meshy-7", company: "Meshy", versions: "", logo: "meshy.svg" },
         { name: "Zaohaowu3D", company: "Zaohaowu", versions: "", logo: "zaohao.jpeg" },
         { name: "Hunyuan 3D", company: "腾讯", versions: "", logo: "hunyuan.svg" },
-        { name: "UniLat3D-3DGS", company: "", versions: "", logo: "" },
+        { name: "UniLat3D-3DGS", company: "UniLat3D", versions: "", logo: "unilat3d.png" },
         { name: "InstantMesh", company: "腾讯 ARC", versions: "", logo: "tencent.svg" },
         { name: "SAM 3D", company: "Meta", versions: "", logo: "meta.svg" },
     ] },
@@ -48,8 +48,8 @@ export function HomeModels() {
             <div className={styles.modelTrack}>{[0, 1].map((copy) => <ul key={copy} className={styles.modelList} aria-label={copy === 0 ? "支持的模型" : undefined} aria-hidden={copy === 1}>
                 {supportedModels.map((model) => <li key={model.label + model.name}>
                     <Link href={localizedPath(model.href)} tabIndex={copy === 1 ? -1 : undefined} className={styles.modelBrand} title={[model.label, model.name, model.versions, model.company].filter(Boolean).join(" · ")}>
-                        {model.logo.endsWith(".svg") ? <span className={styles.modelLogo} data-wide={model.name === "404_GEN"} style={{ maskImage: `url(/icons/${model.logo})` }} aria-hidden="true" /> : model.logo ? <img className={styles.modelImage} data-monochrome={model.logo === "zaohao.jpeg"} src={`/icons/${model.logo}`} width={34} height={34} alt="" loading="lazy" /> : <span className={styles.modelWordmark} aria-hidden="true">{model.company || <Box size={28} strokeWidth={1.3} />}</span>}
-                        <strong>{model.name}</strong><span>{model.label} · {model.company || "品牌信息待确认"}</span>
+                        {model.logo.endsWith(".svg") ? <span className={styles.modelLogo} data-wide={model.name === "404_GEN"} style={{ maskImage: `url(/icons/${model.logo})` }} aria-hidden="true" /> : model.logo ? <img className={styles.modelImage} data-monochrome={model.logo === "zaohao.jpeg"} src={`/icons/${model.logo}`} width={34} height={34} alt="" loading="lazy" /> : <span className={styles.modelWordmark} aria-hidden="true">{model.company}</span>}
+                        <strong>{model.name}</strong><span>{model.label} · {model.company}</span>
                         <small>{model.versions || "\u00a0"}</small>
                     </Link>
                 </li>)}

@@ -7,6 +7,7 @@ import (
 
 	"github.com/basketikun/aivro/model"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // ListUsers 分页查询用户。
@@ -18,8 +19,8 @@ func ListUsers(q model.Query) ([]model.User, int64, error) {
 	q.Normalize()
 	tx := db.Model(&model.User{})
 	if keyword := strings.TrimSpace(q.Keyword); keyword != "" {
-		like := "%" + keyword + "%"
-		tx = tx.Where("username LIKE ? OR display_name LIKE ? OR email LIKE ? OR linux_do_id LIKE ? OR github_id LIKE ? OR google_id LIKE ? OR metamask_address LIKE ?", like, like, like, like, like, like, like)
+		like := LikePattern(keyword)
+		tx = tx.Where("username LIKE ? ESCAPE '!' OR display_name LIKE ? ESCAPE '!' OR email LIKE ? ESCAPE '!' OR linux_do_id LIKE ? ESCAPE '!' OR github_id LIKE ? ESCAPE '!' OR google_id LIKE ? ESCAPE '!' OR metamask_address LIKE ? ESCAPE '!'", like, like, like, like, like, like, like)
 	}
 
 	var total int64
@@ -198,14 +199,6 @@ func SetUserCredits(id string, credits int, log model.CreditLog) (model.User, er
 	return user, err
 }
 
-// SaveCreditLog 保存算力点变更流水。
-func SaveCreditLog(log model.CreditLog) (model.CreditLog, error) {
-	db, err := DB()
-	if err != nil {
-		return log, err
-	}
-	return log, db.Save(&log).Error
-}
 
 func ListCreditLogs(q model.Query) ([]model.CreditLog, int64, error) {
 	return listCreditLogs("", q)
@@ -238,8 +231,8 @@ func listCreditLogs(userID string, q model.Query) ([]model.CreditLog, int64, err
 		tx = tx.Where("created_at <= ?", normalizeQueryTime(q.EndTime))
 	}
 	if keyword := strings.TrimSpace(q.Keyword); keyword != "" {
-		like := "%" + keyword + "%"
-		tx = tx.Where("user_id LIKE ? OR category LIKE ? OR type LIKE ? OR model LIKE ? OR path LIKE ? OR remark LIKE ? OR related_id LIKE ? OR ip LIKE ? OR country LIKE ?", like, like, like, like, like, like, like, like, like)
+		like := LikePattern(keyword)
+		tx = tx.Where("user_id LIKE ? ESCAPE '!' OR category LIKE ? ESCAPE '!' OR type LIKE ? ESCAPE '!' OR model LIKE ? ESCAPE '!' OR path LIKE ? ESCAPE '!' OR remark LIKE ? ESCAPE '!' OR related_id LIKE ? ESCAPE '!' OR ip LIKE ? ESCAPE '!' OR country LIKE ? ESCAPE '!'", like, like, like, like, like, like, like, like, like)
 	}
 	var total int64
 	if err := tx.Count(&total).Error; err != nil {
@@ -250,13 +243,6 @@ func listCreditLogs(userID string, q model.Query) ([]model.CreditLog, int64, err
 	return logs, total, err
 }
 
-func DeleteCreditLog(id string) error {
-	db, err := DB()
-	if err != nil {
-		return err
-	}
-	return db.Delete(&model.CreditLog{}, "id = ?", id).Error
-}
 
 func SaveAuditLog(log model.AuditLog) (model.AuditLog, error) {
 	db, err := DB()
@@ -286,8 +272,8 @@ func ListAuditLogs(q model.Query) ([]model.AuditLog, int64, error) {
 		tx = tx.Where("created_at <= ?", normalizeQueryTime(q.EndTime))
 	}
 	if keyword := strings.TrimSpace(q.Keyword); keyword != "" {
-		like := "%" + keyword + "%"
-		tx = tx.Where("category LIKE ? OR action LIKE ? OR actor_id LIKE ? OR actor_username LIKE ? OR target_type LIKE ? OR target_id LIKE ? OR remark LIKE ? OR ip LIKE ? OR country LIKE ?", like, like, like, like, like, like, like, like, like)
+		like := LikePattern(keyword)
+		tx = tx.Where("category LIKE ? ESCAPE '!' OR action LIKE ? ESCAPE '!' OR actor_id LIKE ? ESCAPE '!' OR actor_username LIKE ? ESCAPE '!' OR target_type LIKE ? ESCAPE '!' OR target_id LIKE ? ESCAPE '!' OR remark LIKE ? ESCAPE '!' OR ip LIKE ? ESCAPE '!' OR country LIKE ? ESCAPE '!'", like, like, like, like, like, like, like, like, like)
 	}
 	var total int64
 	if err := tx.Count(&total).Error; err != nil {
@@ -346,14 +332,15 @@ func GetUserByAuthProviderOAuthID(provider string, id string) (model.User, bool,
 		return model.User{}, false, err
 	}
 	id = escapeLike(id)
-	return findUser(db, "auth_provider = ? AND (extra LIKE ? ESCAPE '\\' OR extra LIKE ? ESCAPE '\\')", provider, `%"ID":"`+id+`"%`, `%"id":"`+id+`"%`)
+	return findUser(db, "auth_provider = ? AND (extra LIKE ? ESCAPE '!' OR extra LIKE ? ESCAPE '!')", provider, `%"ID":"`+id+`"%`, `%"id":"`+id+`"%`)
 }
 
 func escapeLike(value string) string {
-	value = strings.ReplaceAll(value, `\`, `\\`)
-	value = strings.ReplaceAll(value, `%`, `\%`)
-	return strings.ReplaceAll(value, `_`, `\_`)
+	return strings.NewReplacer("!", "!!", "%", "!%", "_", "!_").Replace(value)
 }
+
+// LikePattern treats search input literally; pair it with SQL ESCAPE '!'.
+func LikePattern(value string) string { return "%" + escapeLike(value) + "%" }
 
 func normalizeQueryTime(value string) string {
 	value = strings.TrimSpace(value)
@@ -366,12 +353,24 @@ func normalizeQueryTime(value string) string {
 	return value
 }
 
-func SaveEmailVerification(item model.EmailVerification) (model.EmailVerification, error) {
+func CreateEmailVerification(item model.EmailVerification) (model.EmailVerification, error) {
 	db, err := DB()
-	if err != nil {
-		return item, err
-	}
-	return item, db.Save(&item).Error
+	if err != nil { return item, err }
+	return item, db.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "purpose"}, {Name: "target"}}, DoUpdates: clause.AssignmentColumns([]string{"id", "code", "attempts", "expires_at", "used_at", "created_at"})}).Create(&item).Error
+}
+
+func ConsumeEmailVerification(id string, code string, current string) (bool, error) {
+	db, err := DB()
+	if err != nil { return false, err }
+	consumed := false
+	err = db.Transaction(func(tx *gorm.DB) error {
+		result := tx.Model(&model.EmailVerification{}).Where("id = ? AND used_at = ? AND expires_at > ? AND attempts < ?", id, "", current, 5).UpdateColumn("attempts", gorm.Expr("attempts + 1"))
+		if result.Error != nil || result.RowsAffected == 0 { return result.Error }
+		result = tx.Model(&model.EmailVerification{}).Where("id = ? AND code = ? AND used_at = ?", id, code, "").UpdateColumn("used_at", current)
+		consumed = result.RowsAffected > 0
+		return result.Error
+	})
+	return consumed, err
 }
 
 func GetLatestActiveEmailVerification(purpose string, target string, now string) (model.EmailVerification, bool, error) {

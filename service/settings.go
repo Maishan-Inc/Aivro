@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"sort"
@@ -56,6 +55,14 @@ func SaveSettings(settings model.Settings) (model.Settings, error) {
 	keepPrivateAuthSecrets(&settings, normalizeSettings(saved))
 	keepCloudStorageSecrets(&settings, normalizeSettings(saved))
 	keepBillingAndKYCSecrets(&settings, normalizeSettings(saved))
+	captcha := settings.Private.Captcha
+	provider := captchaProviderSetting(captcha)
+	if captcha.Enabled && (provider.SiteKey == "" || provider.SecretKey == "") {
+		return model.Settings{}, safeMessageError{message: "启用人机验证前请完整填写 Site Key 和 Secret Key"}
+	}
+	for _, channel := range settings.Private.Channels {
+		if channel.Enabled && !IsPublicHTTPURL(channel.BaseURL) { return model.Settings{}, safeMessageError{message: "启用的模型渠道必须使用公网 HTTP(S) 地址"} }
+	}
 	result, err := repository.SaveSettings(settings, now())
 	if err == nil {
 		ClearPublicPromptCache()
@@ -86,7 +93,7 @@ func syncPublicCaptchaSetting(settings *model.Settings) {
 	captcha := normalizeCaptchaSetting(settings.Private.Captcha, settings.Private.Turnstile)
 	settings.Private.Captcha = captcha
 	settings.Public.Auth.TurnstileSiteKey = ""
-	settings.Public.Auth.Captcha = model.PublicCaptchaSetting{Provider: captcha.Provider}
+	settings.Public.Auth.Captcha = model.PublicCaptchaSetting{Enabled: captcha.Enabled, Provider: captcha.Provider}
 	if !captcha.Enabled {
 		return
 	}
@@ -1168,6 +1175,7 @@ func resolveAdminChannel(index *int, channel model.ModelChannel) (model.ModelCha
 	if strings.TrimSpace(resolved.APIKey) == "" {
 		return model.ModelChannel{}, safeMessageError{message: "缺少 API Key"}
 	}
+	if !IsPublicHTTPURL(resolved.BaseURL) { return model.ModelChannel{}, safeMessageError{message: "模型渠道地址必须为公网 HTTP(S) 地址"} }
 	return resolved, nil
 }
 
@@ -1177,13 +1185,14 @@ func fetchAdminChannelModels(channel model.ModelChannel) ([]string, error) {
 		return nil, err
 	}
 	request.Header.Set("Authorization", "Bearer "+channel.APIKey)
-	response, err := http.DefaultClient.Do(request)
+	response, err := AIHTTPClient.Do(request)
 	if err != nil {
 		return nil, err
 	}
 	defer response.Body.Close()
-	body, _ := io.ReadAll(response.Body)
-	if response.StatusCode >= http.StatusBadRequest {
+	body, err := readLimited(response.Body, 32<<20, "渠道响应过大")
+	if err != nil { return nil, err }
+	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
 		return nil, readAdminChannelError(body, response.StatusCode, "读取模型失败")
 	}
 	var payload struct {
@@ -1228,13 +1237,14 @@ func testAdminChannelModel(channel model.ModelChannel, modelName, capability str
 	}
 	request.Header.Set("Authorization", "Bearer "+channel.APIKey)
 	request.Header.Set("Content-Type", "application/json")
-	response, err := http.DefaultClient.Do(request)
+	response, err := AIHTTPClient.Do(request)
 	if err != nil {
 		return "", err
 	}
 	defer response.Body.Close()
-	responseBody, _ := io.ReadAll(response.Body)
-	if response.StatusCode >= http.StatusBadRequest {
+	responseBody, err := readLimited(response.Body, 32<<20, "渠道响应过大")
+	if err != nil { return "", err }
+	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
 		return "", readAdminChannelError(responseBody, response.StatusCode, "测试失败")
 	}
 	var payload struct {

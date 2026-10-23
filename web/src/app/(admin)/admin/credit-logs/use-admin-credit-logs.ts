@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { App } from "antd";
 
-import { deleteAdminCreditLog, fetchAdminCreditLogs, saveAdminCreditLog, type AdminCreditLog } from "@/services/api/admin";
+import { fetchAdminCreditLogs } from "@/services/api/admin";
 import { useUserStore } from "@/stores/use-user-store";
 import { adminRealtimeQueryOptions } from "../admin-query-options";
 
@@ -12,7 +12,6 @@ const defaultPageSize = 10;
 
 export function useAdminCreditLogs() {
     const { message } = App.useApp();
-    const queryClient = useQueryClient();
     const token = useUserStore((state) => state.token);
     const clearSession = useUserStore((state) => state.clearSession);
     const [keyword, setKeyword] = useState("");
@@ -25,24 +24,6 @@ export function useAdminCreditLogs() {
         enabled: Boolean(token),
         retry: false,
         ...adminRealtimeQueryOptions,
-    });
-
-    const saveMutation = useMutation({
-        mutationFn: (log: Partial<AdminCreditLog>) => saveAdminCreditLog(token, log),
-        onSuccess: async (_, log) => {
-            await queryClient.invalidateQueries({ queryKey: ["admin"] });
-            message.success(log.id ? "日志已保存" : "日志已新增");
-        },
-        onError: (error) => message.error(error instanceof Error ? error.message : "保存失败"),
-    });
-
-    const deleteMutation = useMutation({
-        mutationFn: (id: string) => deleteAdminCreditLog(token, id),
-        onSuccess: async () => {
-            await queryClient.invalidateQueries({ queryKey: ["admin"] });
-            message.success("日志已删除");
-        },
-        onError: (error) => message.error(error instanceof Error ? error.message : "删除失败"),
     });
 
     useEffect(() => {
@@ -69,13 +50,11 @@ export function useAdminCreditLogs() {
         page,
         pageSize,
         total: data?.total || 0,
-        isLoading: query.isFetching || saveMutation.isPending || deleteMutation.isPending,
+        isLoading: query.isFetching,
         searchLogs: (value = keyword) => updateFilters({ keyword: value }),
         changePage: (value: number) => updateFilters({ page: value }),
         changePageSize: (value: number) => updateFilters({ pageSize: value }),
         resetFilters: () => updateFilters({ keyword: "", page: 1, pageSize: defaultPageSize }),
         refreshLogs: () => query.refetch(),
-        saveLog: (log: Partial<AdminCreditLog>) => saveMutation.mutateAsync(log),
-        deleteLog: (id: string) => deleteMutation.mutateAsync(id),
     };
 }

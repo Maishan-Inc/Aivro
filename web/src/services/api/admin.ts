@@ -144,13 +144,7 @@ export async function fetchAdminRequestLogs(token: string, query: AdminLogQuery 
     return apiGet<AdminCreditLogListResponse>("/api/admin/request-logs", compactApiParams(query), token);
 }
 
-export async function saveAdminCreditLog(token: string, log: Partial<AdminCreditLog>) {
-    return apiPost<AdminCreditLog>("/api/admin/credit-logs", log, token);
-}
 
-export async function deleteAdminCreditLog(token: string, id: string) {
-    return apiDelete<boolean>(`/api/admin/credit-logs/${encodeURIComponent(id)}`, token);
-}
 
 export async function fetchAdminAuditLogs(token: string, query: AdminLogQuery = {}) {
     return apiGet<AdminAuditLogListResponse>("/api/admin/audit-logs", compactApiParams(query), token);

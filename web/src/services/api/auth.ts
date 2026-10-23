@@ -48,10 +48,6 @@ export async function register(payload: AuthPayload) {
     return apiPost<AuthSession>("/api/auth/register", payload);
 }
 
-export async function checkRegisterEmail(email: string) {
-    return apiPost<boolean>("/api/auth/register/check", { email });
-}
-
 export async function sendRegisterEmailCode(email: string, captchaToken?: string) {
     return apiPost<boolean>("/api/auth/register/code", { email, captchaToken });
 }
@@ -74,8 +70,8 @@ export async function resetPassword(payload: { email: string; code: string; pass
     return apiPost<boolean>("/api/auth/reset-password", payload);
 }
 
-export async function fetchMetaMaskChallenge(walletAddress: string) {
-    return apiPost<{ walletAddress: string; nonce: string; message: string; expiresAt: string }>("/api/auth/metamask/challenge", { walletAddress });
+export async function fetchMetaMaskChallenge(walletAddress: string, captchaToken?: string) {
+    return apiPost<{ walletAddress: string; nonce: string; message: string; expiresAt: string }>("/api/auth/metamask/challenge", { walletAddress, captchaToken });
 }
 
 export async function loginWithMetaMask(payload: { walletAddress: string; message: string; signature: string; email: string; code: string; captchaToken?: string; turnstileToken?: string }) {

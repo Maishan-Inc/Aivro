@@ -25,7 +25,7 @@ func Fail(w http.ResponseWriter, msg string) {
 }
 
 func FailError(w http.ResponseWriter, err error) {
-	log.Printf("request failed: %v", err)
+	log.Printf("request failed: type=%T", err)
 	if safe, ok := err.(interface{ SafeMessage() string }); ok {
 		Fail(w, safe.SafeMessage())
 		return

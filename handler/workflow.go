@@ -136,9 +136,10 @@ func VerifyWorkflowShare(w http.ResponseWriter, r *http.Request, token string) {
 	}
 	var input struct {
 		Password string `json:"password"`
+		CaptchaToken string `json:"captchaToken"`
 	}
 	_ = json.NewDecoder(r.Body).Decode(&input)
-	result, err := service.VerifyWorkflowShare(user.ID, token, input.Password)
+	result, err := service.VerifyWorkflowShare(r, user.ID, token, input.Password, input.CaptchaToken)
 	if err != nil {
 		FailError(w, err)
 		return
@@ -176,9 +177,10 @@ func VerifyWorkflowShareByPath(w http.ResponseWriter, r *http.Request, username 
 	user, _ := service.UserFromContext(r.Context())
 	var input struct {
 		Password string `json:"password"`
+		CaptchaToken string `json:"captchaToken"`
 	}
 	_ = json.NewDecoder(r.Body).Decode(&input)
-	result, err := service.VerifyWorkflowShareByPath(user.ID, username, slug, input.Password)
+	result, err := service.VerifyWorkflowShareByPath(r, user.ID, username, slug, input.Password, input.CaptchaToken)
 	if err != nil {
 		FailError(w, err)
 		return

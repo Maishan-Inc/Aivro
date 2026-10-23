@@ -84,17 +84,6 @@ export async function imageToDataUrl(image: { url?: string; dataUrl?: string; st
     return blobToDataUrl(await (await fetch(url, authHeaders())).blob());
 }
 
-export async function deleteStoredImages(_keys: Iterable<string>) {}
-
-export async function cleanupUnusedImages(_usedData: unknown) {}
-
-export function collectImageStorageKeys(value: unknown, keys = new Set<string>()) {
-    if (!value || typeof value !== "object") return keys;
-    if ("storageKey" in value && typeof value.storageKey === "string" && value.storageKey.startsWith("cloud:")) keys.add(value.storageKey);
-    Object.values(value).forEach((item) => (Array.isArray(item) ? item.forEach((child) => collectImageStorageKeys(child, keys)) : collectImageStorageKeys(item, keys)));
-    return keys;
-}
-
 async function uploadFile(file: File) {
     const token = useUserStore.getState().token;
     if (!token) throw new Error("请先登录后再上传文件");

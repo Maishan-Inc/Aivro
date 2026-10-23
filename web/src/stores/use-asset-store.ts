@@ -35,7 +35,6 @@ type AssetStore = {
     addAsset: (asset: Omit<Asset, "id" | "createdAt" | "updatedAt">) => Promise<string>;
     updateAsset: (id: string, patch: Partial<Omit<Asset, "id" | "createdAt">>) => Promise<void>;
     removeAsset: (id: string) => Promise<void>;
-    cleanupImages: (extra?: unknown) => void;
 };
 
 const assetStorage = localforage.createInstance({ name: "aivro", storeName: "user_assets" });
@@ -92,17 +91,19 @@ export const useAssetStore = create<AssetStore>()((set, get) => ({
     addAsset: (asset) => changeAssets(async () => {
         const { ownerId, isReady } = get();
         if (!isReady || ownerId !== (useUserStore.getState().user?.id || "")) throw new Error("素材尚未加载完成，请稍后重试");
-        const id = nanoid();
+        let id = nanoid();
         const now = new Date().toISOString();
         const token = useUserStore.getState().token;
         const ids = fileIDs(asset);
-        if (ids.length) {
-            if (!token) throw new Error("请先登录后再保存文件素材");
-            await retainAssetFiles(token, id, ids);
+        if (ids.length && !token) throw new Error("请先登录后再保存文件素材");
+        if (token) id = await retainAssetFiles(token, "", ids);
+        if (get().ownerId !== ownerId) {
+            if (token) await releaseAssetFiles(token, id);
+            throw new Error("账号已切换，请重新保存素材");
         }
-        if (get().ownerId !== ownerId) throw new Error("账号已切换，请重新保存素材");
         const assets = [{ ...asset, id, createdAt: now, updatedAt: now } as Asset, ...get().assets];
-        await saveAssets(ownerId, assets);
+        try { await saveAssets(ownerId, assets); }
+        catch (error) { if (token) await releaseAssetFiles(token, id); throw error; }
         if (get().ownerId === ownerId) set({ assets });
         return id;
     }),
@@ -114,9 +115,14 @@ export const useAssetStore = create<AssetStore>()((set, get) => ({
         const updated = { ...asset, ...patch, updatedAt: new Date().toISOString() } as Asset;
         const token = useUserStore.getState().token;
         if (token) await retainAssetFiles(token, id, fileIDs(updated));
-        if (get().ownerId !== ownerId) throw new Error("账号已切换");
         const assets = get().assets.map((item) => item.id === id ? updated : item);
-        await saveAssets(ownerId, assets);
+        try {
+            if (get().ownerId !== ownerId) throw new Error("账号已切换");
+            await saveAssets(ownerId, assets);
+        } catch (error) {
+            if (token) await retainAssetFiles(token, id, fileIDs(asset));
+            throw error;
+        }
         if (get().ownerId === ownerId) set({ assets });
     }),
     removeAsset: (id) => changeAssets(async () => {
@@ -129,7 +135,6 @@ export const useAssetStore = create<AssetStore>()((set, get) => ({
         await saveAssets(ownerId, assets);
         if (get().ownerId === ownerId) set({ assets });
     }),
-    cleanupImages: () => {},
 }));
 
 if (typeof window !== "undefined") {

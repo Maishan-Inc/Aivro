@@ -17,8 +17,6 @@ type Workflow struct {
 	Title            string           `json:"title"`
 	Nodes            json.RawMessage  `json:"nodes" gorm:"serializer:json"`
 	Connections      json.RawMessage  `json:"connections" gorm:"serializer:json"`
-	ChatSessions     json.RawMessage  `json:"chatSessions" gorm:"serializer:json"`
-	ActiveChatID     string           `json:"activeChatId"`
 	BackgroundMode   string           `json:"backgroundMode"`
 	ShowImageInfo    bool             `json:"showImageInfo"`
 	Viewport         json.RawMessage  `json:"viewport" gorm:"serializer:json"`

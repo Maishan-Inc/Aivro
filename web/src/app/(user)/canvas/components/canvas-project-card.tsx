@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { CalendarDays, Check, Clock3, FileText, GitBranch, MessageSquare, Network, Pencil, Trash2, X } from "lucide-react";
+import { CalendarDays, Check, Clock3, FileText, GitBranch, Network, Pencil, Trash2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button, Dropdown, Input, Modal, Tag } from "antd";
 
@@ -64,10 +64,9 @@ export function CanvasProjectCard({ project, onRename, onDelete }: { project: Cl
                     <div className="absolute left-10 right-3 top-3 rounded-md border border-white/30 bg-white/80 px-2.5 py-1 text-right text-sm font-semibold shadow-none backdrop-blur sm:left-auto sm:max-w-[70%] dark:border-white/10 dark:bg-stone-950/72 dark:shadow-sm">
                         <span className="block truncate">{project.title}</span>
                     </div>
-                    <div className="absolute inset-x-3 bottom-3 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+                    <div className="absolute inset-x-3 bottom-3 grid grid-cols-3 gap-1.5">
                         <CardMetric label="节点" value={project.nodes.length} />
                         <CardMetric label="连线" value={project.connections.length} />
-                        <CardMetric label="会话" value={project.chatSessions.length} />
                         <CardMetric label="消耗" value="1次" />
                     </div>
                 </article>
@@ -98,10 +97,9 @@ export function CanvasProjectCard({ project, onRename, onDelete }: { project: Cl
                                 <Button icon={<Pencil className="size-4" />} onClick={() => setEditing(true)}>修改名称</Button>
                             </div>
                         )}
-                        <div className="grid grid-cols-2 gap-2 text-xs text-stone-500 sm:grid-cols-4 dark:text-stone-400">
+                        <div className="grid grid-cols-2 gap-2 text-xs text-stone-500 sm:grid-cols-3 dark:text-stone-400">
                             <ProjectMetric icon={<Network className="size-3.5" />} label="节点" value={project.nodes.length} />
                             <ProjectMetric icon={<GitBranch className="size-3.5" />} label="连线" value={project.connections.length} />
-                            <ProjectMetric icon={<MessageSquare className="size-3.5" />} label="会话" value={project.chatSessions.length} />
                             <ProjectMetric icon={<Check className="size-3.5" />} label="消耗额度" value={1} suffix="次创建" />
                         </div>
                         <div className="grid gap-1.5 text-xs text-stone-500 dark:text-stone-400">

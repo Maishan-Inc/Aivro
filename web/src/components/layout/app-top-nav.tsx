@@ -38,7 +38,7 @@ export function AppTopNav() {
     }, [home]);
     return <>
         <header className={`${home ? "absolute inset-x-0 top-0" : "relative"} z-30 h-16 shrink-0 border-b transition-[background-color,border-color,backdrop-filter,color] duration-300 ${home && !scrolled ? `border-transparent bg-transparent ${videoEnabled ? "text-white" : "text-foreground"}` : "border-border bg-background/95 text-foreground backdrop-blur-xl"}`}>
-            <div className="mx-auto flex h-full w-full max-w-[1960px] items-center justify-between gap-5 px-6 lg:w-[77%] lg:px-0">
+            <div className="mx-auto flex h-full w-full max-w-[1960px] items-center justify-between gap-3 px-6 min-[1001px]:px-[clamp(32px,5vw,64px)] min-[1401px]:w-[77%] min-[1401px]:px-0">
                     <Link href={localizedPath("/")} className="flex shrink-0 items-center gap-2.5 text-xl font-semibold tracking-[-0.06em]" aria-label="Aivro 首页"><span className="size-7 bg-current" style={{ mask: "url(/logo.svg) center / contain no-repeat" }} />Aivro</Link>
                     <nav aria-label="站点导航" className="hidden min-w-0 flex-1 items-center gap-5 overflow-x-auto whitespace-nowrap text-[12px] [scrollbar-width:none] [&>a]:shrink-0 lg:flex">
                         <Link href={localizedPath("/#platform")} className="transition hover:opacity-70">创作平台</Link>

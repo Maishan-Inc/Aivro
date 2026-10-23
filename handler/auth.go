@@ -60,11 +60,10 @@ type metamaskLoginRequest struct {
 
 type metamaskChallengeRequest struct {
 	WalletAddress string `json:"walletAddress"`
+	CaptchaToken string `json:"captchaToken"`
 }
 
-type registerCheckRequest struct {
-	Email string `json:"email"`
-}
+
 
 type completeProfileRequest struct {
 	Username    string                `json:"username"`
@@ -108,6 +107,7 @@ func requestCaptchaToken(captchaToken string, turnstileToken string) string {
 func Register(w http.ResponseWriter, r *http.Request) {
 	var request registerRequest
 	_ = json.NewDecoder(r.Body).Decode(&request)
+	if err := service.CheckAuthRateLimit(r, "register", request.Email); err != nil { FailError(w, err); return }
 	if err := service.VerifyCaptcha(r, requestCaptchaToken(request.CaptchaToken, request.TurnstileToken)); err != nil {
 		FailError(w, err)
 		return
@@ -133,15 +133,6 @@ func Register(w http.ResponseWriter, r *http.Request) {
 	OK(w, session)
 }
 
-func CheckRegisterEmail(w http.ResponseWriter, r *http.Request) {
-	var request registerCheckRequest
-	_ = json.NewDecoder(r.Body).Decode(&request)
-	if err := service.RegisterEmailAvailable(request.Email); err != nil {
-		FailError(w, err)
-		return
-	}
-	OK(w, true)
-}
 
 func SendEmailCode(w http.ResponseWriter, r *http.Request) {
 	var request emailCodeRequest
@@ -164,15 +155,11 @@ func SendEmailCode(w http.ResponseWriter, r *http.Request) {
 func SendRegisterEmailCode(w http.ResponseWriter, r *http.Request) {
 	var request emailCodeRequest
 	_ = json.NewDecoder(r.Body).Decode(&request)
-	if err := service.CheckAuthRateLimit(r, "register-code", request.Email); err != nil {
+	if err := service.CheckAuthRateLimit(r, "email-code", request.Email); err != nil {
 		FailError(w, err)
 		return
 	}
 	if err := service.VerifyCaptcha(r, requestCaptchaToken(request.CaptchaToken, request.TurnstileToken)); err != nil {
-		FailError(w, err)
-		return
-	}
-	if err := service.RegisterEmailAvailable(request.Email); err != nil {
 		FailError(w, err)
 		return
 	}
@@ -208,6 +195,7 @@ func MetaMaskChallenge(w http.ResponseWriter, r *http.Request) {
 		FailError(w, err)
 		return
 	}
+	if err := service.VerifyCaptcha(r, request.CaptchaToken); err != nil { FailError(w, err); return }
 	result, err := service.CreateMetaMaskChallenge(request.WalletAddress)
 	if err != nil {
 		FailError(w, err)
@@ -220,10 +208,6 @@ func MetaMaskLogin(w http.ResponseWriter, r *http.Request) {
 	var request metamaskLoginRequest
 	_ = json.NewDecoder(r.Body).Decode(&request)
 	if err := service.CheckAuthRateLimit(r, "metamask-login", request.WalletAddress); err != nil {
-		FailError(w, err)
-		return
-	}
-	if err := service.VerifyCaptcha(r, requestCaptchaToken(request.CaptchaToken, request.TurnstileToken)); err != nil {
 		FailError(w, err)
 		return
 	}
@@ -299,7 +283,7 @@ func LinuxDoCallback(w http.ResponseWriter, r *http.Request) {
 func AdminLogin(w http.ResponseWriter, r *http.Request) {
 	var request loginRequest
 	_ = json.NewDecoder(r.Body).Decode(&request)
-	if err := service.CheckAuthRateLimit(r, "admin-login", request.Username); err != nil {
+	if err := service.CheckAuthRateLimit(r, "login", request.Username); err != nil {
 		FailError(w, err)
 		return
 	}
@@ -328,6 +312,7 @@ func AdminLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func Logout(w http.ResponseWriter, r *http.Request) {
+	if err := service.RevokeAuthSession(r); err != nil { FailError(w, err); return }
 	service.ClearAuthCookie(w, r)
 	OK(w, true)
 }
@@ -449,24 +434,7 @@ func AdminAuditLogs(w http.ResponseWriter, r *http.Request) {
 	OK(w, logs)
 }
 
-func AdminSaveCreditLog(w http.ResponseWriter, r *http.Request) {
-	var log model.CreditLog
-	_ = json.NewDecoder(r.Body).Decode(&log)
-	result, err := service.SaveCreditLog(log)
-	if err != nil {
-		FailError(w, err)
-		return
-	}
-	OK(w, result)
-}
 
-func AdminDeleteCreditLog(w http.ResponseWriter, r *http.Request, id string) {
-	if err := service.DeleteCreditLog(id); err != nil {
-		FailError(w, err)
-		return
-	}
-	OK(w, true)
-}
 
 func loginRedirect(r *http.Request, redirect string, message string) string {
 	values := url.Values{}

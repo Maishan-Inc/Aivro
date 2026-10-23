@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
+	"reflect"
 	"strings"
 	"time"
 
@@ -31,8 +32,6 @@ type SaveWorkflowInput struct {
 	Title          string                 `json:"title"`
 	Nodes          json.RawMessage        `json:"nodes"`
 	Connections    json.RawMessage        `json:"connections"`
-	ChatSessions   json.RawMessage        `json:"chatSessions"`
-	ActiveChatID   string                 `json:"activeChatId"`
 	BackgroundMode string                 `json:"backgroundMode"`
 	ShowImageInfo  bool                   `json:"showImageInfo"`
 	Viewport       json.RawMessage        `json:"viewport"`
@@ -121,7 +120,7 @@ func ListWorkflows(userID string, q model.Query) (model.WorkflowList, error) {
 	q.Normalize()
 	tx := db.Model(&model.Workflow{}).Where("user_id = ? AND deleted_at = ?", userID, "")
 	if keyword := strings.TrimSpace(q.Keyword); keyword != "" {
-		tx = tx.Where("title LIKE ?", "%"+keyword+"%")
+		tx = tx.Where("title LIKE ? ESCAPE '!'", repository.LikePattern(keyword))
 	}
 	var total int64
 	if err := tx.Count(&total).Error; err != nil {
@@ -165,13 +164,13 @@ func CreateWorkflow(userID string, input SaveWorkflowInput) (model.Workflow, err
 		if err != nil {
 			return err
 		}
-		if err := validateWorkflowCloudFilesTx(tx, userID, workflow.Nodes, workflow.ChatSessions); err != nil {
+		if err := validateWorkflowCloudFilesTx(tx, userID, workflow.Nodes); err != nil {
 			return err
 		}
 		if err := tx.Create(&workflow).Error; err != nil {
 			return err
 		}
-		if err := bindWorkflowCloudFilesTx(tx, userID, workflow.ID, workflow.Nodes, workflow.ChatSessions); err != nil {
+		if err := bindWorkflowCloudFilesTx(tx, userID, workflow.ID, workflow.Nodes); err != nil {
 			return err
 		}
 		return createEntitlementLogTx(tx, model.EntitlementLog{
@@ -193,13 +192,19 @@ func UpdateWorkflow(userID string, id string, input SaveWorkflowInput) (model.Wo
 	if err != nil { return model.Workflow{}, err }
 	workflow, err := GetWorkflow(userID, id)
 	if err != nil { return workflow, err }
+	previous := workflow
 	workflow = normalizeWorkflowInput(workflow, input)
+	if workflow.UpdatedAt == previous.UpdatedAt {
+		if equalWorkflowJSON(previous.Viewport, workflow.Viewport) { return workflow, nil }
+		err := db.Model(&model.Workflow{}).Where("id = ? AND user_id = ? AND deleted_at = ?", id, userID, "").UpdateColumn("viewport", workflow.Viewport).Error
+		return workflow, err
+	}
 	err = db.Transaction(func(tx *gorm.DB) error {
-		if err := validateWorkflowCloudFilesTx(tx, userID, workflow.Nodes, workflow.ChatSessions); err != nil { return err }
+		if err := validateWorkflowCloudFilesTx(tx, userID, workflow.Nodes); err != nil { return err }
 		result := tx.Model(&model.Workflow{}).Where("id = ? AND user_id = ? AND deleted_at = ?", id, userID, "").Updates(workflowUpdateMap(workflow))
 		if result.Error != nil { return result.Error }
 		if result.RowsAffected == 0 { return safeMessageError{message: "工作流不存在或无权限访问"} }
-		return bindWorkflowCloudFilesTx(tx, userID, id, workflow.Nodes, workflow.ChatSessions)
+		return bindWorkflowCloudFilesTx(tx, userID, id, workflow.Nodes)
 	})
 	if err != nil { return workflow, err }
 	return GetWorkflow(userID, id)
@@ -312,7 +317,7 @@ func ShareWorkflow(r *http.Request, userID string, workflowID string, input Shar
 	share.PasswordHash = passwordHash
 	share.UpdatedAt = now()
 	if err := db.Transaction(func(tx *gorm.DB) error {
-		if err := validateWorkflowCloudFilesTx(tx, userID, workflow.Nodes, workflow.ChatSessions); err != nil { return err }
+		if err := validateWorkflowCloudFilesTx(tx, userID, workflow.Nodes); err != nil { return err }
 		var source model.Workflow
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND user_id = ? AND deleted_at = ?", workflow.ID, userID, "").First(&source).Error; err != nil { return err }
 		if found {
@@ -320,7 +325,7 @@ func ShareWorkflow(r *http.Request, userID string, workflowID string, input Shar
 			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND status = ? AND version = ?", share.ID, model.WorkflowShareStatusActive, share.Version-1).First(&current).Error; err != nil { return err }
 		}
 		if err := tx.Save(&share).Error; err != nil { return err }
-		return repository.SetCloudFileReferencesTx(tx, userID, "share", share.ID, mapKeys(collectCloudFileIDsFromChunks(workflow.Nodes, workflow.ChatSessions)), "")
+		return repository.SetCloudFileReferencesTx(tx, userID, "share", share.ID, mapKeys(collectCloudFileIDsFromChunks(workflow.Nodes)), "")
 	}); err != nil { return nil, err }
 	if found {
 		if err := pushLinkedShareUpdates(db, share); err != nil {
@@ -369,7 +374,7 @@ func GetWorkflowSharePreview(userID string, token string, accessToken string) (W
 	return sharePreviewForUser(share, false, userID, true), nil
 }
 
-func VerifyWorkflowShare(userID string, token string, password string) (map[string]any, error) {
+func VerifyWorkflowShare(r *http.Request, userID string, token string, password string, captchaToken string) (map[string]any, error) {
 	share, err := findActiveShare(token)
 	if err != nil {
 		return nil, err
@@ -378,7 +383,7 @@ func VerifyWorkflowShare(userID string, token string, password string) (map[stri
 		preview := sharePreviewForUser(share, false, userID, true)
 		return map[string]any{"preview": preview, "shareAccessToken": ""}, nil
 	}
-	if err := checkSharePassword(share, password); err != nil {
+	if err := checkSharePassword(r, userID, share, password, captchaToken); err != nil {
 		return nil, err
 	}
 	accessToken, err := newShareAccessToken(userID, share)
@@ -400,7 +405,7 @@ func GetWorkflowSharePreviewByPath(username string, slug string, userID string, 
 	return sharePreviewForUser(share, false, userID, true), nil
 }
 
-func VerifyWorkflowShareByPath(userID string, username string, slug string, password string) (map[string]any, error) {
+func VerifyWorkflowShareByPath(r *http.Request, userID string, username string, slug string, password string, captchaToken string) (map[string]any, error) {
 	share, err := findActiveShareByPath(username, slug)
 	if err != nil {
 		return nil, err
@@ -408,7 +413,7 @@ func VerifyWorkflowShareByPath(userID string, username string, slug string, pass
 	if !share.PasswordEnabled {
 		return map[string]any{"preview": sharePreviewForUser(share, false, userID, true), "shareAccessToken": ""}, nil
 	}
-	if err := checkSharePassword(share, password); err != nil {
+	if err := checkSharePassword(r, userID, share, password, captchaToken); err != nil {
 		return nil, err
 	}
 	accessToken, err := newShareAccessToken(userID, share)
@@ -431,9 +436,7 @@ func CopyWorkflowShare(userID string, token string, input CopyWorkflowShareInput
 		return model.Workflow{}, err
 	}
 	if share.PasswordEnabled && !validShareAccessToken(userID, share, input.ShareAccessToken) {
-		if err := checkSharePassword(share, input.Password); err != nil {
-			return model.Workflow{}, err
-		}
+		return model.Workflow{}, safeMessageError{message: "请先验证分享密码"}
 	}
 	source := model.Workflow{}
 	_ = json.Unmarshal(share.Snapshot, &source)
@@ -451,8 +454,6 @@ func CopyWorkflowShare(userID string, token string, input CopyWorkflowShareInput
 		Title:            slug,
 		Nodes:            source.Nodes,
 		Connections:      source.Connections,
-		ChatSessions:     source.ChatSessions,
-		ActiveChatID:     source.ActiveChatID,
 		BackgroundMode:   source.BackgroundMode,
 		ShowImageInfo:    source.ShowImageInfo,
 		Viewport:         source.Viewport,
@@ -460,7 +461,7 @@ func CopyWorkflowShare(userID string, token string, input CopyWorkflowShareInput
 		SourceWorkflowID: share.SourceWorkflowID,
 		SourceVersion:    share.Version,
 		CreatedAt:        now(),
-		UpdatedAt:        now(),
+		UpdatedAt:        workflowContentTime(""),
 	}
 	if input.Mode == model.WorkflowShareCopyLinked {
 		workflow.SourceSyncMode = model.WorkflowSyncLinked
@@ -472,11 +473,11 @@ func CopyWorkflowShare(userID string, token string, input CopyWorkflowShareInput
 		if err != nil {
 			return err
 		}
-		if err := validateWorkflowCloudFilesTx(tx, share.OwnerID, source.Nodes, source.ChatSessions); err != nil { return err }
+		if err := validateWorkflowCloudFilesTx(tx, share.OwnerID, source.Nodes); err != nil { return err }
 		if err := tx.Create(&workflow).Error; err != nil {
 			return err
 		}
-		if err := bindWorkflowCloudFilesTx(tx, userID, workflow.ID, workflow.Nodes, workflow.ChatSessions); err != nil { return err }
+		if err := bindWorkflowCloudFilesTx(tx, userID, workflow.ID, workflow.Nodes); err != nil { return err }
 		copy := model.WorkflowShareCopy{
 			ID:               newID("share-copy"),
 			ShareID:          share.ID,
@@ -506,10 +507,14 @@ func CopyWorkflowShare(userID string, token string, input CopyWorkflowShareInput
 	})
 }
 
-func checkSharePassword(share model.WorkflowShare, password string) error {
-	if err := hitRateBucket("share:"+share.ID, 10, time.Minute, 5*time.Minute); err != nil {
+func checkSharePassword(r *http.Request, userID string, share model.WorkflowShare, password string, captchaToken string) error {
+	identity := requestIP(r)
+	if identity == "" { identity = userID }
+	if identity == "" { return safeMessageError{message: "无法识别访问来源，请登录后验证分享密码"} }
+	if err := hitRateBucket("share:"+share.ID+":"+identity, 10, time.Minute, 5*time.Minute); err != nil {
 		return err
 	}
+	if err := VerifyCaptcha(r, captchaToken); err != nil { return err }
 	if bcrypt.CompareHashAndPassword([]byte(share.PasswordHash), []byte(password)) != nil {
 		return safeMessageError{message: "分享密码错误"}
 	}
@@ -574,12 +579,9 @@ func ListCommunityWorkflows(q model.Query) (model.WorkflowCommunityPostList, err
 		return model.WorkflowCommunityPostList{}, err
 	}
 	q.Normalize()
-	if err := cleanupExpiredBannedCommunityPosts(db); err != nil {
-		return model.WorkflowCommunityPostList{}, err
-	}
 	tx := db.Model(&model.WorkflowCommunityPost{}).Where("status = ? AND deleted_at = ?", model.WorkflowCommunityStatusActive, "")
 	if keyword := strings.TrimSpace(q.Keyword); keyword != "" {
-		tx = tx.Where("title LIKE ? OR source_workflow_title LIKE ?", "%"+keyword+"%", "%"+keyword+"%")
+		tx = tx.Where("title LIKE ? ESCAPE '!' OR source_workflow_title LIKE ? ESCAPE '!'", repository.LikePattern(keyword), repository.LikePattern(keyword))
 	}
 	if q.Locale != "" {
 		tx = tx.Where("locale = ?", q.Locale)
@@ -606,12 +608,9 @@ func ListMyCommunityWorkflows(userID string, q model.Query) (model.WorkflowCommu
 		return model.WorkflowCommunityPostList{}, err
 	}
 	q.Normalize()
-	if err := cleanupExpiredBannedCommunityPosts(db); err != nil {
-		return model.WorkflowCommunityPostList{}, err
-	}
 	tx := db.Model(&model.WorkflowCommunityPost{}).Where("user_id = ? AND deleted_at = ?", userID, "")
 	if keyword := strings.TrimSpace(q.Keyword); keyword != "" {
-		tx = tx.Where("title LIKE ? OR source_workflow_title LIKE ?", "%"+keyword+"%", "%"+keyword+"%")
+		tx = tx.Where("title LIKE ? ESCAPE '!' OR source_workflow_title LIKE ? ESCAPE '!'", repository.LikePattern(keyword), repository.LikePattern(keyword))
 	}
 	var total int64
 	if err := tx.Count(&total).Error; err != nil {
@@ -660,7 +659,7 @@ func PublishCommunityWorkflow(userID string, input PublishCommunityWorkflowInput
 	post.SnapshotWorkflowAt = workflow.UpdatedAt
 	post.UpdatedAt = now()
 	if err := db.Transaction(func(tx *gorm.DB) error {
-		if err := validateWorkflowCloudFilesTx(tx, userID, workflow.Nodes, workflow.ChatSessions); err != nil { return err }
+		if err := validateWorkflowCloudFilesTx(tx, userID, workflow.Nodes); err != nil { return err }
 		var source model.Workflow
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND user_id = ? AND deleted_at = ?", workflow.ID, userID, "").First(&source).Error; err != nil { return err }
 		var current model.WorkflowCommunityPost
@@ -668,7 +667,7 @@ func PublishCommunityWorkflow(userID string, input PublishCommunityWorkflowInput
 		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) { return err }
 		if err == nil && (current.DeletedAt != "" || current.Status == model.WorkflowCommunityStatusBanned) { return safeMessageError{message: "社区作品已删除或被封禁"} }
 		if err := tx.Save(&post).Error; err != nil { return err }
-		return repository.SetCloudFileReferencesTx(tx, userID, "community", post.ID, mapKeys(collectCloudFileIDsFromChunks(workflow.Nodes, workflow.ChatSessions)), "")
+		return repository.SetCloudFileReferencesTx(tx, userID, "community", post.ID, mapKeys(collectCloudFileIDsFromChunks(workflow.Nodes)), "")
 	}); err != nil { return post, err }
 	return post, nil
 }
@@ -702,7 +701,7 @@ func SyncCommunityWorkflow(userID string, id string, input SyncCommunityWorkflow
 	post.SnapshotWorkflowAt = workflow.UpdatedAt
 	post.UpdatedAt = now()
 	if err := db.Transaction(func(tx *gorm.DB) error {
-		if err := validateWorkflowCloudFilesTx(tx, userID, workflow.Nodes, workflow.ChatSessions); err != nil { return err }
+		if err := validateWorkflowCloudFilesTx(tx, userID, workflow.Nodes); err != nil { return err }
 		var source model.Workflow
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND user_id = ? AND deleted_at = ?", workflow.ID, userID, "").First(&source).Error; err != nil { return err }
 		var current model.WorkflowCommunityPost
@@ -710,7 +709,7 @@ func SyncCommunityWorkflow(userID string, id string, input SyncCommunityWorkflow
 		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) { return err }
 		if err == nil && (current.DeletedAt != "" || current.Status == model.WorkflowCommunityStatusBanned) { return safeMessageError{message: "社区作品已删除或被封禁"} }
 		if err := tx.Save(&post).Error; err != nil { return err }
-		return repository.SetCloudFileReferencesTx(tx, userID, "community", post.ID, mapKeys(collectCloudFileIDsFromChunks(workflow.Nodes, workflow.ChatSessions)), "")
+		return repository.SetCloudFileReferencesTx(tx, userID, "community", post.ID, mapKeys(collectCloudFileIDsFromChunks(workflow.Nodes)), "")
 	}); err != nil { return post, err }
 	return post, nil
 }
@@ -755,12 +754,9 @@ func AdminListCommunityWorkflows(q model.Query) (model.WorkflowCommunityPostList
 		return model.WorkflowCommunityPostList{}, err
 	}
 	q.Normalize()
-	if err := cleanupExpiredBannedCommunityPosts(db); err != nil {
-		return model.WorkflowCommunityPostList{}, err
-	}
 	tx := db.Model(&model.WorkflowCommunityPost{}).Where("deleted_at = ?", "")
 	if keyword := strings.TrimSpace(q.Keyword); keyword != "" {
-		tx = tx.Where("title LIKE ? OR source_workflow_title LIKE ? OR user_id LIKE ?", "%"+keyword+"%", "%"+keyword+"%", "%"+keyword+"%")
+		tx = tx.Where("title LIKE ? ESCAPE '!' OR source_workflow_title LIKE ? ESCAPE '!' OR user_id LIKE ? ESCAPE '!'", repository.LikePattern(keyword), repository.LikePattern(keyword), repository.LikePattern(keyword))
 	}
 	if q.Type != "" {
 		tx = tx.Where("status = ?", q.Type)
@@ -800,6 +796,7 @@ func AdminBanCommunityWorkflow(id string, input BanCommunityWorkflowInput) (mode
 }
 
 func normalizeWorkflowInput(workflow model.Workflow, input SaveWorkflowInput) model.Workflow {
+	previous := workflow
 	if input.Slug != "" {
 		workflow.Slug = input.Slug
 	}
@@ -812,8 +809,6 @@ func normalizeWorkflowInput(workflow model.Workflow, input SaveWorkflowInput) mo
 	}
 	workflow.Nodes = normalizeJSON(input.Nodes, "[]")
 	workflow.Connections = normalizeJSON(input.Connections, "[]")
-	workflow.ChatSessions = normalizeJSON(input.ChatSessions, "[]")
-	workflow.ActiveChatID = input.ActiveChatID
 	workflow.BackgroundMode = input.BackgroundMode
 	if workflow.BackgroundMode == "" {
 		workflow.BackgroundMode = "lines"
@@ -823,8 +818,21 @@ func normalizeWorkflowInput(workflow model.Workflow, input SaveWorkflowInput) mo
 	if workflow.SourceSyncMode == "" {
 		workflow.SourceSyncMode = model.WorkflowSyncNone
 	}
-	workflow.UpdatedAt = now()
+	if previous.UpdatedAt == "" || previous.Title != workflow.Title || previous.Slug != workflow.Slug || previous.BackgroundMode != workflow.BackgroundMode || previous.ShowImageInfo != workflow.ShowImageInfo || previous.SourceSyncMode != workflow.SourceSyncMode || !equalWorkflowJSON(previous.Nodes, workflow.Nodes) || !equalWorkflowJSON(previous.Connections, workflow.Connections) {
+		workflow.UpdatedAt = workflowContentTime(workflow.UpdatedAt)
+	}
 	return workflow
+}
+
+func workflowContentTime(previous string) string {
+	current := time.Now()
+	if last, err := time.Parse(time.RFC3339Nano, previous); err == nil && !current.After(last) { current = last.Add(time.Nanosecond) }
+	return current.Format("2006-01-02T15:04:05.000000000Z07:00")
+}
+
+func equalWorkflowJSON(left, right json.RawMessage) bool {
+	var a, b any
+	return json.Unmarshal(left, &a) == nil && json.Unmarshal(right, &b) == nil && reflect.DeepEqual(a, b)
 }
 
 func normalizeWorkflowSlug(value string) (string, error) {
@@ -890,7 +898,7 @@ func ensureWorkflowSlugForShare(db *gorm.DB, userID string, workflow model.Workf
 			continue
 		}
 		workflow.Slug = slug
-		workflow.UpdatedAt = now()
+		workflow.UpdatedAt = workflowContentTime(workflow.UpdatedAt)
 		return workflow, db.Model(&model.Workflow{}).Where("id = ? AND user_id = ? AND deleted_at = ?", workflow.ID, userID, "").Updates(map[string]any{"slug": workflow.Slug, "updated_at": workflow.UpdatedAt}).Error
 	}
 	return workflow, safeMessageError{message: "无法生成可用的工作流名称"}
@@ -911,8 +919,6 @@ func workflowUpdateMap(workflow model.Workflow) map[string]any {
 		"title":           workflow.Title,
 		"nodes":           workflow.Nodes,
 		"connections":     workflow.Connections,
-		"chat_sessions":   workflow.ChatSessions,
-		"active_chat_id":  workflow.ActiveChatID,
 		"background_mode": workflow.BackgroundMode,
 		"show_image_info": workflow.ShowImageInfo,
 		"viewport":        workflow.Viewport,
@@ -1028,16 +1034,15 @@ func pushLinkedShareUpdates(db *gorm.DB, share model.WorkflowShare) error {
 	}
 	for _, item := range copies {
 		if err := db.Transaction(func(tx *gorm.DB) error {
-			if err := validateWorkflowCloudFilesTx(tx, share.OwnerID, source.Nodes, source.ChatSessions); err != nil { return err }
+			if err := validateWorkflowCloudFilesTx(tx, share.OwnerID, source.Nodes); err != nil { return err }
 			result := tx.Model(&model.Workflow{}).Where("id = ? AND user_id = ? AND deleted_at = ? AND source_sync_mode = ? AND source_version < ?", item.WorkflowID, item.UserID, "", model.WorkflowSyncLinked, share.Version).Updates(map[string]any{
-				"nodes": source.Nodes, "connections": source.Connections, "chat_sessions": source.ChatSessions,
-				"active_chat_id": source.ActiveChatID, "background_mode": source.BackgroundMode,
+				"nodes": source.Nodes, "connections": source.Connections, "background_mode": source.BackgroundMode,
 				"show_image_info": source.ShowImageInfo, "viewport": source.Viewport,
 				"source_version": share.Version, "source_share_id": share.ID,
-				"source_workflow_id": share.SourceWorkflowID, "updated_at": now(),
+				"source_workflow_id": share.SourceWorkflowID, "updated_at": workflowContentTime(""),
 			})
 			if result.Error != nil || result.RowsAffected == 0 { return result.Error }
-			if err := bindWorkflowCloudFilesTx(tx, item.UserID, item.WorkflowID, source.Nodes, source.ChatSessions); err != nil { return err }
+			if err := bindWorkflowCloudFilesTx(tx, item.UserID, item.WorkflowID, source.Nodes); err != nil { return err }
 			return tx.Model(&model.WorkflowShareCopy{}).Where("id = ?", item.ID).Updates(map[string]any{"source_version": share.Version, "updated_at": now()}).Error
 		}); err != nil { return err }
 	}
@@ -1211,7 +1216,9 @@ func decodeStringList(raw json.RawMessage) []string {
 	return items
 }
 
-func cleanupExpiredBannedCommunityPosts(db *gorm.DB) error {
+func CleanupExpiredBannedCommunityPosts() error {
+	db, err := repository.DB()
+	if err != nil { return err }
 	var posts []model.WorkflowCommunityPost
 	if err := db.Where("status = ? AND deleted_at = ? AND banned_at <> ? AND banned_at < ?", model.WorkflowCommunityStatusBanned, "", "", time.Now().AddDate(0, 0, -7).Format(time.RFC3339)).Limit(100).Find(&posts).Error; err != nil { return err }
 	for _, post := range posts {
@@ -1252,7 +1259,7 @@ func validShareAccessToken(userID string, share model.WorkflowShare, tokenText s
 	claims := shareAccessClaims{}
 	token, err := jwt.ParseWithClaims(tokenText, &claims, func(token *jwt.Token) (any, error) {
 		return []byte(config.Cfg.JWTSecret), nil
-	})
+	}, jwt.WithValidMethods([]string{"HS256"}), jwt.WithExpirationRequired())
 	return err == nil && token.Valid && claims.UserID == userID && claims.ShareID == share.ID && claims.Token == share.Token
 }
 

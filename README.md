@@ -34,6 +34,8 @@ Aivro 基于以下技术开发：
 cp .env.example .env
 ```
 
+先在 `.env` 中填写至少 32 字节的随机 `JWT_SECRET`（可用 `openssl rand -base64 32` 生成），并将 `APP_ORIGIN` 设为实际访问地址；按下面默认端口本地访问时填写 `http://localhost:3982`，生产环境填写 HTTPS 域名。
+
 使用 Docker Compose 启动：
 
 ```bash
@@ -73,6 +75,7 @@ PostgreSQL 默认只在 Docker 内部网络中提供给应用容器访问，不�
 - [后端数据库说明](docs/backend-database.md)
 - [系统配置数据结构](docs/system-settings.md)
 - [接口响应约定](docs/api-response.md)
+- [安全审阅与验证清单](docs/security-review.md)
 - [待办事项](docs/todo.md)
 - [待测试事项](docs/pending-test.md)
 

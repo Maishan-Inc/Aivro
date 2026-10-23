@@ -233,6 +233,8 @@ func CompleteUserProfile(user model.AuthUser, username string, accountType model
 	return model.PublicUser(saved), nil
 }
 
+var dummyPasswordHash = func() string { hash, _ := bcrypt.GenerateFromPassword([]byte(mustRandomToken(32)), bcrypt.DefaultCost); return string(hash) }()
+
 func Login(username string, password string) (model.AuthSession, error) {
 	account := strings.TrimSpace(username)
 	user, ok, err := repository.GetUserByUsername(account)
@@ -242,7 +244,10 @@ func Login(username string, password string) (model.AuthSession, error) {
 	if err != nil {
 		return model.AuthSession{}, err
 	}
-	if !ok || bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)) != nil {
+	passwordHash := user.Password
+	if !ok || passwordHash == "" { passwordHash = dummyPasswordHash }
+	passwordErr := bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(password))
+	if !ok || passwordErr != nil {
 		return model.AuthSession{}, safeMessageError{message: "用户名或密码错误"}
 	}
 	if user.Role == model.UserRoleAdmin && isDefaultAdminCredential(user.Username, password) {
@@ -573,11 +578,11 @@ func LoginWithMetaMask(walletAddress string, message string, signature string, e
 func ParseToken(tokenText string) (TokenClaims, error) {
 	claims := TokenClaims{}
 	token, err := jwt.ParseWithClaims(tokenText, &claims, func(token *jwt.Token) (any, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+		if token.Method != jwt.SigningMethodHS256 {
 			return nil, errors.New("登录状态无效")
 		}
 		return []byte(config.Cfg.JWTSecret), nil
-	})
+	}, jwt.WithIssuer("aivro"), jwt.WithAudience("aivro-session"), jwt.WithExpirationRequired())
 	if err != nil || !token.Valid {
 		return TokenClaims{}, errors.New("登录状态无效")
 	}
@@ -649,6 +654,7 @@ func SaveUser(user model.User, password string) (model.User, error) {
 	} else if saved, ok, err := repository.GetUserByID(user.ID); err != nil {
 		return user, err
 	} else if ok {
+		user.TokenVersion = saved.TokenVersion
 		user.CreatedAt = saved.CreatedAt
 		user.Password = saved.Password
 		user.AvatarURL = saved.AvatarURL
@@ -698,10 +704,9 @@ func SaveUser(user model.User, password string) (model.User, error) {
 		user, err = repository.SaveUser(user)
 	} else {
 		fields := map[string]any{"username": user.Username, "email": user.Email, "display_name": user.DisplayName, "account_type": user.AccountType, "profile_completed": user.ProfileCompleted, "role": user.Role, "status": user.Status, "email_verified": user.EmailVerified, "linux_do_id": user.LinuxDoID, "github_id": user.GithubID, "google_id": user.GoogleID, "metamask_address": user.MetaMaskAddress, "auth_provider": user.AuthProvider, "updated_at": user.UpdatedAt}
-		if password != "" {
-			fields["password"] = user.Password
-			fields["token_version"] = gorm.Expr("token_version + 1")
-		}
+		if password != "" { fields["password"] = user.Password }
+		// Administrative identity, role or status changes invalidate existing sessions.
+		fields["token_version"] = gorm.Expr("token_version + 1")
 		user, err = repository.UpdateUser(user.ID, fields)
 	}
 	user.Password = ""
@@ -816,20 +821,7 @@ func SaveAuditLog(log model.AuditLog) error {
 	return err
 }
 
-func SaveCreditLog(log model.CreditLog) (model.CreditLog, error) {
-	if log.ID == "" {
-		log.ID = newID("credit")
-		log.CreatedAt = now()
-	}
-	if log.Category == "" {
-		log.Category = creditLogCategory(log.Type)
-	}
-	return repository.SaveCreditLog(log)
-}
 
-func DeleteCreditLog(id string) error {
-	return repository.DeleteCreditLog(id)
-}
 
 func DeleteUser(id string) error {
 	return repository.DeleteUser(id)
@@ -862,6 +854,9 @@ func newToken(user model.User) (string, error) {
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Duration(expireHours) * time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			Subject:   user.ID,
+			Issuer: "aivro",
+			Audience: jwt.ClaimStrings{"aivro-session"},
+			ID: newID("session"),
 		},
 	}
 	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(config.Cfg.JWTSecret))
@@ -872,10 +867,22 @@ func AuthTokenFromRequest(r *http.Request) string {
 	if strings.TrimSpace(token) != "" {
 		return strings.TrimSpace(token)
 	}
-	if cookie, err := r.Cookie(authCookieName); err == nil {
+	if cookie, err := r.Cookie(authCookieNameForRequest(r)); err == nil {
 		return strings.TrimSpace(cookie.Value)
 	}
 	return ""
+}
+
+func authCookieNameForRequest(r *http.Request) string {
+	if requestSecure(r) { return "__Host-aivro_auth" }
+	return authCookieName
+}
+
+func RevokeAuthSession(r *http.Request) error {
+	user, ok := CurrentAuthUser(AuthTokenFromRequest(r))
+	if !ok { return nil }
+	_, err := repository.UpdateUser(user.ID, map[string]any{"token_version": gorm.Expr("token_version + 1")})
+	return err
 }
 
 func SetAuthCookie(w http.ResponseWriter, r *http.Request, token string) {
@@ -884,7 +891,7 @@ func SetAuthCookie(w http.ResponseWriter, r *http.Request, token string) {
 		maxAge = 168 * 3600
 	}
 	http.SetCookie(w, &http.Cookie{
-		Name:     authCookieName,
+		Name:     authCookieNameForRequest(r),
 		Value:    token,
 		Path:     "/",
 		MaxAge:   maxAge,
@@ -896,7 +903,7 @@ func SetAuthCookie(w http.ResponseWriter, r *http.Request, token string) {
 
 func ClearAuthCookie(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{
-		Name:     authCookieName,
+		Name:     authCookieNameForRequest(r),
 		Value:    "",
 		Path:     "/",
 		MaxAge:   -1,
@@ -1368,9 +1375,7 @@ func SendEmailCode(email string, purpose string, context MailTemplateContext) er
 		return safeMessageError{message: "验证码用途无效"}
 	}
 	if purpose == "register" {
-		if err := RegisterEmailAvailable(email); err != nil {
-			return err
-		}
+		if _, exists, err := repository.GetUserByEmail(email); err != nil { return err } else if exists { return nil }
 	}
 	settings, err := repository.GetSettings()
 	if err != nil {
@@ -1382,7 +1387,7 @@ func SendEmailCode(email string, purpose string, context MailTemplateContext) er
 			if err != nil {
 				return err
 			}
-			return safeMessageError{message: "邮箱未绑定账号"}
+			return nil
 		}
 	}
 	if purpose == "metamask" && !settings.Public.Auth.MetaMask.Enabled {
@@ -1408,24 +1413,10 @@ func SendEmailCode(email string, purpose string, context MailTemplateContext) er
 		ExpiresAt: time.Now().Add(time.Duration(expireMinutes) * time.Minute).Format(time.RFC3339),
 		CreatedAt: now(),
 	}
-	if _, err := repository.SaveEmailVerification(item); err != nil {
+	if _, err := repository.CreateEmailVerification(item); err != nil {
 		return err
 	}
 	return sendVerificationMail(settings.Private.Mail, email, purpose, code, context)
-}
-
-func RegisterEmailAvailable(email string) error {
-	email = strings.TrimSpace(strings.ToLower(email))
-	if email == "" {
-		return safeMessageError{message: "请输入邮箱"}
-	}
-	if _, ok, err := repository.GetUserByEmail(email); err != nil || ok {
-		if err != nil {
-			return err
-		}
-		return safeMessageError{message: "邮箱已被使用"}
-	}
-	return nil
 }
 
 func ResetPassword(email string, code string, password string) error {
@@ -1444,7 +1435,7 @@ func ResetPassword(email string, code string, password string) error {
 		if err != nil {
 			return err
 		}
-		return safeMessageError{message: "邮箱未绑定账号"}
+		return safeMessageError{message: "验证码无效或已过期"}
 	}
 	hash, err := hashPassword(password)
 	if err != nil {
@@ -1465,17 +1456,11 @@ func verifyEmailCode(purpose string, email string, code string) error {
 	if !ok {
 		return safeMessageError{message: "验证码无效或已过期"}
 	}
-	if item.Attempts >= 5 {
-		return safeMessageError{message: "验证码错误次数过多，请重新获取"}
-	}
-	if strings.TrimSpace(item.Code) != strings.TrimSpace(code) {
-		item.Attempts++
-		_, _ = repository.SaveEmailVerification(item)
-		return safeMessageError{message: "验证码无效或已过期"}
-	}
-	item.UsedAt = now()
-	_, err = repository.SaveEmailVerification(item)
-	return err
+	if err := hitRateBucket("email-verify:"+purpose+":"+strings.ToLower(strings.TrimSpace(email)), 5, 10*time.Minute, 10*time.Minute); err != nil { return err }
+	consumed, err := repository.ConsumeEmailVerification(item.ID, strings.TrimSpace(code), now())
+	if err != nil { return err }
+	if !consumed { return safeMessageError{message: "验证码无效或已过期"} }
+	return nil
 }
 
 func randomCode() (string, error) {
@@ -1973,9 +1958,9 @@ func newOAuthState(w http.ResponseWriter, r *http.Request, provider string, redi
 	payload := oauthStatePayload{Redirect: SafeRedirectPath(redirect), Nonce: nonce}
 	body, _ := json.Marshal(payload)
 	http.SetCookie(w, &http.Cookie{
-		Name:     oauthStateCookie(provider),
+		Name:     oauthStateCookie(r, provider),
 		Value:    nonce,
-		Path:     "/api/auth",
+		Path:     "/",
 		MaxAge:   600,
 		HttpOnly: true,
 		Secure:   requestSecure(r),
@@ -1993,7 +1978,7 @@ func decodeState(r *http.Request, provider string, state string) (string, error)
 	if err := json.Unmarshal(data, &payload); err != nil {
 		return "/", safeMessageError{message: "第三方登录状态无效"}
 	}
-	cookie, err := r.Cookie(oauthStateCookie(provider))
+	cookie, err := r.Cookie(oauthStateCookie(r, provider))
 	if err != nil || strings.TrimSpace(cookie.Value) == "" || cookie.Value != payload.Nonce {
 		return SafeRedirectPath(payload.Redirect), safeMessageError{message: "第三方登录状态已过期，请重试"}
 	}
@@ -2002,9 +1987,9 @@ func decodeState(r *http.Request, provider string, state string) (string, error)
 
 func ClearOAuthState(w http.ResponseWriter, r *http.Request, provider string) {
 	http.SetCookie(w, &http.Cookie{
-		Name:     oauthStateCookie(provider),
+		Name:     oauthStateCookie(r, provider),
 		Value:    "",
-		Path:     "/api/auth",
+		Path:     "/",
 		MaxAge:   -1,
 		HttpOnly: true,
 		Secure:   requestSecure(r),
@@ -2012,11 +1997,12 @@ func ClearOAuthState(w http.ResponseWriter, r *http.Request, provider string) {
 	})
 }
 
-func oauthStateCookie(provider string) string {
+func oauthStateCookie(r *http.Request, provider string) string {
 	provider = strings.NewReplacer("/", "_", "\\", "_", ":", "_").Replace(strings.TrimSpace(provider))
 	if provider == "" {
 		provider = "oauth"
 	}
+	if requestSecure(r) { return "__Host-aivro_oauth_state_" + provider }
 	return "aivro_oauth_state_" + provider
 }
 

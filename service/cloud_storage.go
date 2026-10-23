@@ -28,6 +28,7 @@ import (
 	"github.com/basketikun/aivro/model"
 	"github.com/basketikun/aivro/repository"
 	"gorm.io/gorm"
+	"github.com/gabriel-vasile/mimetype"
 )
 
 const (
@@ -142,6 +143,10 @@ func (storage *CloudStorageService) UploadObject(ctx context.Context, request Cl
 	return CloudObjectResult{File: saved, PublicURL: saved.PublicURL}, nil
 }
 
+func CheckUploadRateLimit(userID string) error {
+	return hitRateBucket("upload:"+userID, 30, time.Minute, time.Minute)
+}
+
 func StoreUserFile(ctx context.Context, user model.AuthUser, filename string, body []byte, contentType string, source string, purpose model.CloudFilePurpose) (StoredFileResult, error) {
 	contentType, fileType, ext, err := validateUploadContent(filename, body, contentType)
 	if err != nil {
@@ -199,6 +204,21 @@ func objectExpiresAt(request CloudObjectUpload, setting model.CloudStorageSettin
 }
 
 func storeObject(ctx context.Context, request CloudObjectUpload) (CloudObjectResult, error) {
+	request.Filename = newID("file")+"-"+sanitizeFilename(request.Filename)
+	if err := hitRateBucket("storage:"+request.User.ID, 60, time.Minute, time.Minute); err != nil { return CloudObjectResult{}, err }
+	size := request.Size
+	if request.Reader == nil { size = int64(len(request.Body)) }
+	reservation := model.StorageReservation{ID: newID("storage"), UserID: request.User.ID, Size: size, ExpiresAt: time.Now().Add(AIRequestTimeout+time.Minute).Unix()}
+	reserved, err := repository.ReserveStorage(reservation, time.Now().Unix(), config.Cfg.MaxUserStorageBytes)
+	if err != nil { return CloudObjectResult{}, err }
+	if !reserved { return CloudObjectResult{}, safeMessageError{message: "存储空间不足，请删除不再使用的文件后重试"} }
+	defer repository.ReleaseStorageReservation(reservation.ID)
+	ctx, cancel := context.WithTimeout(ctx, AIRequestTimeout)
+	defer cancel()
+	return storeReservedObject(ctx, request)
+}
+
+func storeReservedObject(ctx context.Context, request CloudObjectUpload) (CloudObjectResult, error) {
 	setting, enabled, err := CloudStorageEnabled()
 	if err != nil {
 		return CloudObjectResult{}, err
@@ -213,7 +233,7 @@ func storeObject(ctx context.Context, request CloudObjectUpload) (CloudObjectRes
 		storage, err := NewCloudStorageService(setting)
 		if err != nil {
 			if setting.StorageMode == storageModeS3WithFallback {
-				log.Printf("cloud storage unavailable, fallback to local: %v", err)
+				log.Printf("cloud storage unavailable, fallback to local: type=%T", err)
 				if request.ExpiresAt == "" && request.Purpose != model.CloudFilePurposeAvatar {
 					request.ExpiresAt = cloudExpiresAt(setting, request.FileType)
 				}
@@ -223,7 +243,7 @@ func storeObject(ctx context.Context, request CloudObjectUpload) (CloudObjectRes
 		}
 		result, err := storage.UploadObject(ctx, request)
 		if err != nil && setting.StorageMode == storageModeS3WithFallback {
-			log.Printf("cloud storage upload failed, fallback to local: %v", err)
+			log.Printf("cloud storage upload failed, fallback to local: type=%T", err)
 			if request.ExpiresAt == "" && request.Purpose != model.CloudFilePurposeAvatar {
 				request.ExpiresAt = cloudExpiresAt(setting, request.FileType)
 			}
@@ -236,6 +256,7 @@ func storeObject(ctx context.Context, request CloudObjectUpload) (CloudObjectRes
 
 func storeLocalObject(request CloudObjectUpload) (CloudObjectResult, error) {
 	objectKey := localObjectKey(request.FileType, request.User.Username, request.Filename, time.Now())
+	if !filepath.IsLocal(filepath.FromSlash(objectKey)) { return CloudObjectResult{}, safeMessageError{message: "文件路径无效"} }
 	fullPath := filepath.Join(config.Cfg.LocalFileDir, filepath.FromSlash(objectKey))
 	if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
 		return CloudObjectResult{}, err
@@ -302,6 +323,7 @@ func GetFileContent(ctx context.Context, user model.AuthUser, id string, accessT
 		}
 	}
 	if file.Provider == "local" {
+		if !filepath.IsLocal(filepath.FromSlash(file.ObjectKey)) { return file, nil, safeMessageError{message: "文件路径无效"} }
 		reader, err := os.Open(filepath.Join(config.Cfg.LocalFileDir, filepath.FromSlash(file.ObjectKey)))
 		return file, reader, err
 	}
@@ -341,15 +363,21 @@ func retainCloudFiles(userID string, kind string, ownerID string, ids []string, 
 	})
 }
 
-func RetainAssetFiles(userID string, assetID string, ids []string) error {
-	if len(assetID) == 0 || len(assetID) > 100 || len(ids) > 100 {
-		return safeMessageError{message: "素材文件参数无效"}
-	}
-	return retainCloudFiles(userID, "asset", assetID, ids, "")
+func RetainAssetFiles(userID string, assetID string, ids []string) (string, error) {
+	if len(assetID) > 100 || len(ids) > 100 { return "", safeMessageError{message: "素材文件参数无效"} }
+	if err := hitRateBucket("asset:"+userID, 60, time.Minute, time.Minute); err != nil { return "", err }
+	create := assetID == ""
+	if create { assetID = newID("asset") }
+	ids = uniqueStrings(ids)
+	sort.Strings(ids)
+	saved, err := repository.SaveUserAssetFiles(model.UserAsset{ID: assetID, UserID: userID, CreatedAt: now()}, ids, create, 1000)
+	if err != nil { return "", err }
+	if !saved { return "", safeMessageError{message: "素材数量已达上限，请删除不再使用的素材"} }
+	return assetID, nil
 }
 
 func ReleaseAssetFiles(userID string, assetID string) error {
-	files, err := repository.ReleaseCloudFileReferences(userID, "asset", assetID)
+	files, err := repository.DeleteUserAssetFiles(userID, assetID)
 	if err != nil {
 		return err
 	}
@@ -470,6 +498,9 @@ func StoreImageResponseToCloud(ctx context.Context, user model.AuthUser, body []
 		if len(content) == 0 {
 			continue
 		}
+		contentType, fileType, ext, err := validateStoredContent("image"+ext, content, contentType, maxUpstreamImageBytes, "上游图片文件过大")
+		if err != nil { return nil, err }
+		if fileType != model.CloudFileTypeImage { return nil, safeMessageError{message: "上游未返回有效图片"} }
 		result, err := storeObject(ctx, CloudObjectUpload{
 			User:        user,
 			FileType:    model.CloudFileTypeImage,
@@ -497,13 +528,9 @@ func StoreImageResponseToCloud(ctx context.Context, user model.AuthUser, body []
 }
 
 func StoreVideoContentToCloud(ctx context.Context, user model.AuthUser, body []byte, contentType string, source string) ([]byte, error) {
-	mediaType, _, _ := mime.ParseMediaType(contentType)
-	if mediaType == "" || mediaType == "application/octet-stream" {
-		mediaType = http.DetectContentType(body)
-	}
-	if !strings.HasPrefix(mediaType, "video/") {
-		mediaType = "video/mp4"
-	}
+	mediaType, fileType, _, err := validateStoredContent("video", body, contentType, maxUpstreamVideoBytes, "上游视频文件过大")
+	if err != nil { return nil, err }
+	if fileType != model.CloudFileTypeVideo { return nil, safeMessageError{message: "上游未返回有效视频"} }
 	result, err := storeObject(ctx, CloudObjectUpload{
 		User:        user,
 		FileType:    model.CloudFileTypeVideo,
@@ -540,21 +567,9 @@ func StoreVideoReaderToCloud(ctx context.Context, user model.AuthUser, reader io
 	}
 	defer os.Remove(tmp.Name())
 	defer tmp.Close()
-	mediaType, _, _ := mime.ParseMediaType(contentType)
-	if mediaType == "" || mediaType == "application/octet-stream" {
-		head := make([]byte, 512)
-		n, err := tmp.Read(head)
-		if err != nil && err != io.EOF {
-			return nil, err
-		}
-		if _, err := tmp.Seek(0, io.SeekStart); err != nil {
-			return nil, err
-		}
-		mediaType = http.DetectContentType(head[:n])
-	}
-	if !strings.HasPrefix(mediaType, "video/") {
-		mediaType = "video/mp4"
-	}
+	mediaType, fileType, _, err := validateStoredFile("video", tmp, size, contentType, maxUpstreamVideoBytes, "上游视频文件过大")
+	if err != nil { return nil, err }
+	if fileType != model.CloudFileTypeVideo { return nil, safeMessageError{message: "上游未返回有效视频"} }
 	result, err := storeObject(ctx, CloudObjectUpload{
 		User:        user,
 		FileType:    model.CloudFileTypeVideo,
@@ -591,11 +606,13 @@ func StartCloudStorageCleanupScheduler() {
 		defer timer.Stop()
 		for {
 			<-timer.C
+			if err := repository.DeleteExpiredRateBuckets(time.Now()); err != nil { log.Printf("rate bucket cleanup failed: type=%T", err) }
+			if err := CleanupExpiredBannedCommunityPosts(); err != nil { log.Printf("community cleanup failed: type=%T", err) }
 			if err := CleanupExpiredGenerationHistories(); err != nil {
-				log.Printf("generation history cleanup failed: %v", err)
+				log.Printf("generation history cleanup failed: type=%T", err)
 			}
 			if err := CleanupExpiredCloudFiles(); err != nil {
-				log.Printf("cloud storage cleanup failed: %v", err)
+				log.Printf("cloud storage cleanup failed: type=%T", err)
 			}
 			timer.Reset(time.Hour)
 		}
@@ -700,7 +717,8 @@ func imageItemBytes(ctx context.Context, item map[string]any) ([]byte, string, s
 		if err != nil {
 			return nil, "", "", err
 		}
-		return content, "image/png", ".png", nil
+		contentType := http.DetectContentType(content)
+		return content, contentType, mediaExtension(contentType, ".png"), nil
 	}
 	if value, ok := item["url"].(string); ok && strings.HasPrefix(value, "http") {
 		if !IsPublicHTTPURL(value) {
@@ -817,6 +835,12 @@ func validateStoredFile(filename string, file *os.File, size int64, contentType 
 	if size > int64(maxBytes) {
 		return "", "", "", safeMessageError{message: maxMessage}
 	}
+	if strings.EqualFold(filepath.Ext(filename), ".gltf") {
+		body, err := readLimited(file, int64(maxBytes), maxMessage)
+		if err != nil { return "", "", "", err }
+		if _, err := file.Seek(0, io.SeekStart); err != nil { return "", "", "", err }
+		return validateStoredContent(filename, body, contentType, maxBytes, maxMessage)
+	}
 	head := make([]byte, 512)
 	n, err := file.Read(head)
 	if err != nil && err != io.EOF {
@@ -837,9 +861,9 @@ func validateStoredContent(filename string, body []byte, contentType string, max
 	}
 	mediaType, _, _ := mime.ParseMediaType(contentType)
 	if mediaType == "" || mediaType == "application/octet-stream" {
-		mediaType = http.DetectContentType(body)
+		mediaType, _, _ = mime.ParseMediaType(mimetype.Detect(body).String())
 	}
-	detectedType := http.DetectContentType(body)
+	detectedType, _, _ := mime.ParseMediaType(mimetype.Detect(body).String())
 	ext := strings.ToLower(filepath.Ext(filename))
 	switch mediaType {
 	case "image/jpeg":
@@ -863,23 +887,26 @@ func validateStoredContent(filename string, body []byte, contentType string, max
 		}
 		return mediaType, model.CloudFileTypeImage, ".gif", nil
 	case "video/mp4":
+		if detectedType != mediaType { return "", "", "", safeMessageError{message: "文件内容类型不匹配"} }
 		return mediaType, model.CloudFileTypeVideo, ".mp4", nil
 	case "video/webm":
+		if detectedType != mediaType { return "", "", "", safeMessageError{message: "文件内容类型不匹配"} }
 		return mediaType, model.CloudFileTypeVideo, ".webm", nil
 	case "video/quicktime":
+		if detectedType != mediaType { return "", "", "", safeMessageError{message: "文件内容类型不匹配"} }
 		return mediaType, model.CloudFileTypeVideo, ".mov", nil
 	case "model/gltf-binary":
-		if ext != ".glb" {
+		if ext != ".glb" || len(body) < 4 || string(body[:4]) != "glTF" {
 			return "", "", "", safeMessageError{message: "GLB 文件扩展名不匹配"}
 		}
 		return mediaType, model.CloudFileTypeModel3D, ".glb", nil
 	case "model/gltf+json":
-		if ext != ".gltf" {
+		if ext != ".gltf" || !json.Valid(body) {
 			return "", "", "", safeMessageError{message: "GLTF 文件扩展名不匹配"}
 		}
 		return mediaType, model.CloudFileTypeModel3D, ".gltf", nil
 	case "application/json":
-		if ext == ".gltf" {
+		if ext == ".gltf" && json.Valid(body) {
 			return "model/gltf+json", model.CloudFileTypeModel3D, ".gltf", nil
 		}
 		return "", "", "", safeMessageError{message: "文件内容类型不匹配"}
@@ -956,6 +983,7 @@ func localObjectKey(fileType model.CloudFileType, username string, filename stri
 
 func deleteStoredFile(item model.CloudFile, setting model.CloudStorageSetting) error {
 	if item.Provider == "local" {
+		if !filepath.IsLocal(filepath.FromSlash(item.ObjectKey)) { return safeMessageError{message: "文件路径无效"} }
 		fullPath := filepath.Join(config.Cfg.LocalFileDir, filepath.FromSlash(item.ObjectKey))
 		if err := os.Remove(fullPath); err != nil && !os.IsNotExist(err) {
 			return err
@@ -977,6 +1005,8 @@ func sanitizePathPart(value string) string {
 
 func sanitizeFilename(value string) string {
 	value = sanitizePathPart(value)
+	// Bound UTF-8 bytes as well as characters for filesystem component limits.
+	for len(value) > 120 { value = string([]rune(value)[:len([]rune(value))-1]) }
 	if value == "" {
 		return "file"
 	}

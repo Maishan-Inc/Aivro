@@ -48,7 +48,7 @@ func RequestChatCompletion(ctx context.Context, userID string, body []byte, mode
 		request.Header.Set("Content-Type", "application/json")
 		response, err := AIHTTPClient.Do(request)
 		if err != nil { continue }
-		if response.StatusCode >= 400 { _ = response.Body.Close(); continue }
+		if response.StatusCode < 200 || response.StatusCode >= 300 { _ = response.Body.Close(); continue }
 		var result []byte
 		if consume == nil { result, err = readLimited(response.Body, 8<<20, "对话响应过大") } else { result, err = consume(response) }
 		_ = response.Body.Close()

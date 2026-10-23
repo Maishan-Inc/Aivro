@@ -49,7 +49,7 @@ func RegisterAIProxyExecutor(executor AIProxyExecutor) {
 func AIQueueEnabled() bool {
 	settings, err := repository.GetSettings()
 	if err != nil {
-		log.Printf("read AI queue setting failed: %v", err)
+		log.Printf("read AI queue setting failed: type=%T", err)
 		return true
 	}
 	queue := normalizeAIQueueSetting(settings.Private.AIQueue)
@@ -76,7 +76,7 @@ func SubmitAITask(ctx context.Context, user model.AuthUser, body []byte, content
 
 	refund := func() {
 		if err := RefundUserCreditsWithMeta(user.ID, modelName, credits, path, meta); err != nil {
-			log.Printf("generation task refund failed: user=%s model=%s credits=%d err=%v", user.ID, modelName, credits, err)
+			log.Printf("generation task refund failed: user=%s model=%s credits=%d errorType=%T", user.ID, modelName, credits, err)
 		}
 	}
 
@@ -219,7 +219,7 @@ func CancelGenerationTask(user model.AuthUser, id string) error {
 	if !changed { return safeMessageError{message: "任务状态已变化，无法撤销"} }
 
 	if err := deleteTaskPayload(task.RequestFileID); err != nil {
-		log.Printf("generation task request payload delete failed after cancel: task=%s err=%v", task.ID, err)
+		log.Printf("generation task request payload delete failed after cancel: task=%s errorType=%T", task.ID, err)
 	}
 	return repository.RecalculateGenerationTaskPositions(task.Model)
 }
@@ -239,7 +239,7 @@ func StartGenerationQueueScheduler() {
 		defer cleanupTicker.Stop()
 		for range ticker.C {
 			if err := dispatchQueuedTasks(); err != nil {
-				log.Printf("generation queue dispatch failed: %v", err)
+				log.Printf("generation queue dispatch failed: type=%T", err)
 			}
 			select {
 			case <-recoveryTicker.C:
@@ -296,7 +296,7 @@ func dispatchQueuedTasks() error {
 			go func(item model.GenerationTask) {
 				user := model.AuthUser{ID: item.UserID, Username: item.Username}
 				if _, err := executeTask(context.Background(), user, item); err != nil {
-					log.Printf("queued AI task failed: id=%s err=%v", item.ID, err)
+					log.Printf("queued AI task failed: id=%s errorType=%T", item.ID, err)
 				}
 			}(task)
 		}
@@ -330,10 +330,11 @@ func executeTask(ctx context.Context, user model.AuthUser, task model.Generation
 	if err != nil {
 		return failExecutingTask(task, "AI 接口请求失败")
 	}
+	resp.Header = SafeResponseHeaders(resp.Header)
 	headerJSON, _ := json.Marshal(resp.Header)
 	responseFile, err := StoreTaskPayload(ctx, user, "response-"+newID("file")+".bin", resp.Body, firstNonEmpty(resp.Header.Get("Content-Type"), "application/octet-stream"), task.Path)
 	if err != nil {
-		log.Printf("generation task persist response payload failed: task=%s err=%v", task.ID, err)
+		log.Printf("generation task persist response payload failed: task=%s errorType=%T", task.ID, err)
 		return failExecutingTask(task, "AI 结果保存失败")
 	}
 	fields := map[string]any{"response_status": resp.StatusCode, "response_header": string(headerJSON), "response_file_id": responseFile.File.ID, "finished_at": now}
@@ -349,7 +350,7 @@ func taskRefundLog(task model.GenerationTask) *model.CreditLog {
 
 func failExecutingTask(task model.GenerationTask, message string) (AIProxyResponse, error) {
 	_, err := repository.FinishGenerationTask(task, model.GenerationTaskFailed, map[string]any{"error": message, "finished_at": now()}, taskRefundLog(task))
-	if err != nil { log.Printf("generation task settlement failed: task=%s err=%v", task.ID, err) }
+	if err != nil { log.Printf("generation task settlement failed: task=%s errorType=%T", task.ID, err) }
 	return AIProxyResponse{}, safeMessageError{message: message}
 }
 
@@ -570,9 +571,7 @@ func readMultipartValue(body []byte, contentType string, key string) (string, er
 }
 
 func StoreTaskPayload(ctx context.Context, user model.AuthUser, filename string, body []byte, contentType string, source string) (CloudObjectResult, error) {
-	if strings.TrimSpace(contentType) == "" {
-		contentType = "application/octet-stream"
-	}
+	contentType = "application/octet-stream"
 	return storeObject(ctx, CloudObjectUpload{
 		User:        user,
 		FileType:    model.CloudFileTypeTask,

@@ -16,11 +16,12 @@ func RetainAssetFiles(w http.ResponseWriter, r *http.Request, id string) {
 		Fail(w, "素材文件参数无效")
 		return
 	}
-	if err := service.RetainAssetFiles(user.ID, id, input.FileIDs); err != nil {
+	assetID, err := service.RetainAssetFiles(user.ID, id, input.FileIDs)
+	if err != nil {
 		FailError(w, err)
 		return
 	}
-	OK(w, true)
+	OK(w, assetID)
 }
 
 func ReleaseAssetFiles(w http.ResponseWriter, r *http.Request, id string) {
@@ -38,6 +39,7 @@ func UploadAvatar(w http.ResponseWriter, r *http.Request) {
 		Fail(w, "未登录或权限不足")
 		return
 	}
+	if err := service.CheckUploadRateLimit(user.ID); err != nil { FailError(w, err); return }
 	r.Body = http.MaxBytesReader(w, r.Body, 6<<20)
 	if err := r.ParseMultipartForm(6 << 20); err != nil {
 		Fail(w, "请选择头像图片，文件不能超过 5MB")
@@ -64,6 +66,7 @@ func UploadFile(w http.ResponseWriter, r *http.Request) {
 		Fail(w, "未登录或权限不足")
 		return
 	}
+	if err := service.CheckUploadRateLimit(user.ID); err != nil { FailError(w, err); return }
 	r.Body = http.MaxBytesReader(w, r.Body, 51<<20)
 	reader, err := r.MultipartReader()
 	if err != nil {
@@ -109,9 +112,7 @@ func FileContent(w http.ResponseWriter, r *http.Request, id string) {
 		return
 	}
 	defer content.Close()
-	if file.ContentType != "" {
-		w.Header().Set("Content-Type", file.ContentType)
-	}
+	copyResponseHeaders(w, http.Header{"Content-Type": []string{file.ContentType}})
 	w.Header().Set("Referrer-Policy", "no-referrer")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Cache-Control", "no-store, no-cache, max-age=0, must-revalidate, proxy-revalidate")

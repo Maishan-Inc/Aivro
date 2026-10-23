@@ -16,11 +16,13 @@ export function ImagePromptComposer({ onSubmit, running = false }: { onSubmit: (
     const { message } = App.useApp();
     const { prompt, references, setPrompt, setReferences } = useImageComposerStore();
     const fileInput = useRef<HTMLInputElement>(null);
-    const [expanded, setExpanded] = useState(false);
+    const [focused, setFocused] = useState(false);
     const [dragging, setDragging] = useState(false);
     const [promptsOpen, setPromptsOpen] = useState(false);
     const [assetsOpen, setAssetsOpen] = useState(false);
     const [reading, setReading] = useState(false);
+    // 输入中、已有文字或参考图时才展开控制栏；失焦且为空时自动收起。
+    const expanded = focused || dragging || references.length > 0 || prompt.trim().length > 0;
     const addImages = async (files: File[]) => {
         if (!files.length || reading || running) return;
         setReading(true);
@@ -28,7 +30,6 @@ export function ImagePromptComposer({ onSubmit, running = false }: { onSubmit: (
             if (files.some((file) => !["image/png", "image/jpeg", "image/webp"].includes(file.type) || file.size > 50 * 1024 * 1024)) throw new Error("参考图仅支持 PNG、JPEG、WebP，单张不超过 50MB");
             const images = await Promise.all(files.map(async (file) => ({ id: nanoid(), name: file.name, type: file.type, dataUrl: await readLocalImage(file) })));
             setReferences((value) => [...value, ...images]);
-            setExpanded(true);
         } catch (error) {
             message.error(error instanceof Error ? error.message : "读取参考图失败");
         } finally {
@@ -47,7 +48,7 @@ export function ImagePromptComposer({ onSubmit, running = false }: { onSubmit: (
     };
 
     return <>
-        <div className={styles.composer} data-expanded={expanded} data-dragging={dragging} onFocus={() => setExpanded(true)} onDragOver={(event) => {
+        <div className={styles.composer} data-expanded={expanded} data-dragging={dragging} onFocus={() => setFocused(true)} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocused(false); }} onDragOver={(event) => {
             if (!event.dataTransfer.types.includes("Files")) return;
             event.preventDefault();
             setDragging(true);
@@ -73,18 +74,23 @@ export function ImagePromptComposer({ onSubmit, running = false }: { onSubmit: (
                 <Button className={styles.send} type="primary" shape="circle" icon={<ArrowUp size={20} />} loading={running || reading} disabled={!prompt.trim() || running || reading} onClick={onSubmit} aria-label="开始生成" title={reading ? "正在读取参考图" : "开始生成"} />
             </div>
             <div className={styles.controls}><div><div className={styles.toolbar} inert={!expanded}>
-                <Dropdown trigger={["click"]} placement="bottomLeft" disabled={running || reading} menu={{ items: [
-                    { key: "upload", icon: <Upload size={15} />, label: "添加参考图" },
-                    { key: "clipboard", icon: <ClipboardPaste size={15} />, label: "读取剪切板图片" },
-                    { key: "assets", icon: <FolderPlus size={15} />, label: "我的素材" },
-                    { key: "prompts", icon: <BookOpen size={15} />, label: "提示词库" },
-                ], onClick: ({ key }) => {
-                    if (key === "upload") fileInput.current?.click();
-                    if (key === "clipboard") void pasteImages();
-                    if (key === "assets") setAssetsOpen(true);
-                    if (key === "prompts") setPromptsOpen(true);
-                } }}><Button type="text" shape="circle" icon={<Plus size={19} />} aria-label="添加参考图或选择灵感" /></Dropdown>
-                <StudioGenerationSettings kind="image" />
+                <div className={styles.toolbarRow}>
+                    <Dropdown trigger={["click"]} placement="bottomLeft" disabled={running || reading} menu={{ items: [
+                        { key: "upload", icon: <Upload size={15} />, label: "添加参考图" },
+                        { key: "clipboard", icon: <ClipboardPaste size={15} />, label: "读取剪切板图片" },
+                        { key: "assets", icon: <FolderPlus size={15} />, label: "我的素材" },
+                        { key: "prompts", icon: <BookOpen size={15} />, label: "提示词库" },
+                    ], onClick: ({ key }) => {
+                        if (key === "upload") fileInput.current?.click();
+                        if (key === "clipboard") void pasteImages();
+                        if (key === "assets") setAssetsOpen(true);
+                        if (key === "prompts") setPromptsOpen(true);
+                    } }}><Button type="text" shape="circle" icon={<Plus size={19} />} aria-label="添加参考图或选择灵感" /></Dropdown>
+                    <StudioGenerationSettings kind="image" part="model" />
+                </div>
+                <div className={styles.toolbarRow}>
+                    <StudioGenerationSettings kind="image" part="settings" />
+                </div>
             </div></div></div>
         </div>
         <input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp" multiple hidden onChange={(event) => { void addImages(Array.from(event.target.files || [])); event.target.value = ""; }} />

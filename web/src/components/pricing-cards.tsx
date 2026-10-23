@@ -56,12 +56,17 @@ export function PricingCards({ onBuy, loadingPlanId = "", carousel = false }: { 
     useEffect(() => {
         const track = cardsRef.current;
         const recommended = track?.querySelector<HTMLElement>('[data-recommended="true"]');
-        if (!track || !recommended || track.scrollWidth <= track.clientWidth) return;
-        track.scrollLeft = recommended.offsetLeft - (track.clientWidth - recommended.offsetWidth) / 2;
-    }, [plans.length]);
+        if (!track || !recommended || !carousel) return;
+        const center = () => {
+            if (track.scrollWidth > track.clientWidth) track.scrollLeft = recommended.offsetLeft - (track.clientWidth - recommended.offsetWidth) / 2;
+        };
+        const observer = new ResizeObserver(center);
+        observer.observe(track);
+        return () => observer.disconnect();
+    }, [carousel, data]);
 
     return <>
-        <div ref={cardsRef} className={styles.cards} data-carousel={carousel} aria-busy={isPending}>
+        <div ref={cardsRef} className={styles.cards} data-carousel={carousel} data-native-scroll aria-busy={isPending}>
             {planDefaults.map((fallback) => {
                 const plan = plans.find((item) => item.code === fallback.code);
                 const title = plan?.name || fallback.title;

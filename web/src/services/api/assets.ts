@@ -33,7 +33,7 @@ export async function fetchAssetLibrary(query: AssetLibraryQuery = {}) {
 }
 
 export function retainAssetFiles(token: string, id: string, fileIds: string[]) {
-    return apiPost<boolean>(`/api/v1/asset-files/${encodeURIComponent(id)}`, { fileIds }, token);
+    return apiPost<string>(`/api/v1/asset-files${id ? `/${encodeURIComponent(id)}` : ""}`, { fileIds }, token);
 }
 
 export function releaseAssetFiles(token: string, id: string) {

@@ -8,6 +8,8 @@ import { GitFork, Lock, Star } from "lucide-react";
 import { fetchWorkflowShareByPath, forkWorkflowShareByPath, toggleWorkflowShareStar, verifyWorkflowShareByPath, type WorkflowSharePreview } from "@/services/api/workflows";
 import { useLocalizedPath } from "@/hooks/use-localized-path";
 import { useWorkflowModals } from "@/hooks/use-workflow-modals";
+import { useCaptchaChallenge } from "@/hooks/use-captcha-challenge";
+import { useConfigStore } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
 import { WorkflowReadonlyCanvas } from "@/app/(user)/canvas/components/workflow-readonly-canvas";
 
@@ -22,6 +24,9 @@ export default function WorkflowPathSharePage() {
     const isReady = useUserStore((state) => state.isReady);
     const hydrateUser = useUserStore((state) => state.hydrateUser);
     const [preview, setPreview] = useState<WorkflowSharePreview | null>(null);
+    const captcha = useConfigStore((state) => state.publicSettings?.auth.captcha);
+    const { verify: verifyCaptcha, reset: resetCaptcha, challenge: captchaChallenge } = useCaptchaChallenge(captcha);
+    const [verifying, setVerifying] = useState(false);
     const [password, setPassword] = useState("");
     const [accessToken, setAccessToken] = useState("");
     const [isLoading, setIsLoading] = useState(true);
@@ -36,13 +41,16 @@ export default function WorkflowPathSharePage() {
     }, [accessToken, isReady, message, params.username, params.workflowSlug, token]);
 
     const verify = async () => {
+        if (verifying) return;
+        setVerifying(true);
         try {
-            const result = await verifyWorkflowShareByPath(token || undefined, params.username, params.workflowSlug, password);
+            const captchaToken = await verifyCaptcha();
+            const result = await verifyWorkflowShareByPath(token || undefined, params.username, params.workflowSlug, password, captchaToken);
             setAccessToken(result.shareAccessToken);
             setPreview(result.preview);
         } catch (error) {
             message.error(error instanceof Error ? error.message : "密码验证失败");
-        }
+        } finally { resetCaptcha(); setVerifying(false); }
     };
 
     const starShare = async () => {
@@ -115,11 +123,12 @@ export default function WorkflowPathSharePage() {
         return (
             <main className="grid min-h-screen place-items-center bg-background px-6">
                 <section className="w-full max-w-sm rounded-lg border bg-white p-6 shadow-sm dark:bg-stone-950">
+                    {captchaChallenge}
                     <Lock className="mb-4 size-8 text-stone-500" />
                     <h1 className="text-xl font-semibold">请输入分享密码进入分享预览</h1>
                     <div className="mt-6 grid gap-4">
                         <Input.Password value={password} onChange={(event) => setPassword(event.target.value)} onPressEnter={verify} />
-                        <Button type="primary" block onClick={verify}>进入分享预览</Button>
+                        <Button type="primary" block loading={verifying} onClick={verify}>进入分享预览</Button>
                     </div>
                 </section>
             </main>

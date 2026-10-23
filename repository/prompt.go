@@ -214,8 +214,8 @@ func applyPromptFilters(tx *gorm.DB, q model.Query, categories []string) *gorm.D
 		}
 	}
 	if q.Keyword != "" {
-		like := "%" + q.Keyword + "%"
-		tx = tx.Where("title LIKE ? OR prompt LIKE ?", like, like)
+		like := LikePattern(q.Keyword)
+		tx = tx.Where("title LIKE ? ESCAPE '!' OR prompt LIKE ? ESCAPE '!'", like, like)
 	}
 	if isActivePromptOption(q.Category) {
 		tx = tx.Where("category = ?", q.Category)

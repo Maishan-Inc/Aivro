@@ -68,7 +68,7 @@ func proxyAIRequest(w http.ResponseWriter, r *http.Request, path string) {
 	contentType := r.Header.Get("Content-Type")
 	body, modelName, err := service.ReadAIRequest(r.Body, contentType)
 	if err != nil {
-		log.Printf("AI proxy request read failed: %v", err)
+		log.Printf("AI proxy request read failed: type=%T", err)
 		Fail(w, "AI 接口请求失败")
 		return
 	}
@@ -106,7 +106,7 @@ func directAIProxyRequest(w http.ResponseWriter, r *http.Request, user model.Aut
 		started := false
 		_, err := service.RequestChatCompletion(r.Context(), user.ID, body, modelName, path, service.RequestLogMetaFromRequest(r), func(response *http.Response) ([]byte, error) {
 			started = true
-			w.Header().Set("Content-Type", response.Header.Get("Content-Type"))
+			copyResponseHeaders(w, response.Header)
 			w.Header().Set("Cache-Control", "no-store")
 			w.Header().Set("X-Accel-Buffering", "no")
 			var captured bytes.Buffer
@@ -114,12 +114,12 @@ func directAIProxyRequest(w http.ResponseWriter, r *http.Request, user model.Aut
 			if captured.Len() > 8<<20 { err = service.SafeAIError("对话响应过大") }
 			return captured.Bytes(), err
 		})
-		if err != nil { if !started { FailError(w, err) } else { log.Printf("chat settlement failed: %v", err) } }
+		if err != nil { if !started { FailError(w, err) } else { log.Printf("chat settlement failed: type=%T", err) } }
 		return
 	}
 	credits, err := service.ModelCost(modelName)
 	if err != nil {
-		log.Printf("AI proxy read model cost failed: model=%s err=%v", modelName, err)
+		log.Printf("AI proxy read model cost failed: model=%s errorType=%T", modelName, err)
 		Fail(w, "AI 接口请求失败")
 		return
 	}
@@ -129,7 +129,7 @@ func directAIProxyRequest(w http.ResponseWriter, r *http.Request, user model.Aut
 	credits *= count
 	routes, err := service.SelectModelChannelRoutes(modelName)
 	if err != nil {
-		log.Printf("AI proxy select channel failed: model=%s err=%v", modelName, err)
+		log.Printf("AI proxy select channel failed: model=%s errorType=%T", modelName, err)
 		Fail(w, "AI 接口请求失败")
 		return
 	}
@@ -140,7 +140,7 @@ func directAIProxyRequest(w http.ResponseWriter, r *http.Request, user model.Aut
 	}
 	copyAIResponseFromRoutes(w, r.Context(), routes, body, contentType, path, func() {
 		if err := service.RefundUserCreditsWithMeta(user.ID, modelName, credits, path, meta); err != nil {
-			log.Printf("AI proxy refund credits failed: user=%s model=%s credits=%d err=%v", user.ID, modelName, credits, err)
+			log.Printf("AI proxy refund credits failed: user=%s model=%s credits=%d errorType=%T", user.ID, modelName, credits, err)
 		}
 	}, aiProxyContext{Request: r, User: user, Path: path})
 }
@@ -151,7 +151,7 @@ func directAIProxyRequest(w http.ResponseWriter, r *http.Request, user model.Aut
 func ExecuteAIProxyTask(ctx context.Context, user model.AuthUser, body io.Reader, contentType string, modelName string, path string) (service.AIProxyResponse, error) {
 	routes, err := service.SelectModelChannelRoutes(modelName)
 	if err != nil {
-		log.Printf("AI proxy select channel failed: model=%s err=%v", modelName, err)
+		log.Printf("AI proxy select channel failed: model=%s errorType=%T", modelName, err)
 		return service.AIProxyResponse{}, err
 	}
 	payload, err := io.ReadAll(body)
@@ -168,7 +168,7 @@ func ExecuteAIProxyTask(ctx context.Context, user model.AuthUser, body io.Reader
 		}
 		request, err := http.NewRequestWithContext(ctx, http.MethodPost, service.BuildModelChannelURL(route.Channel, path), bytes.NewReader(requestBody))
 		if err != nil {
-			log.Printf("AI proxy build request failed: url=%s err=%v", service.BuildModelChannelURL(route.Channel, path), err)
+			log.Printf("AI proxy build request failed: type=%T", err)
 			lastErr = err
 			continue
 		}
@@ -178,21 +178,20 @@ func ExecuteAIProxyTask(ctx context.Context, user model.AuthUser, body io.Reader
 		}
 		response, err := service.AIHTTPClient.Do(request)
 		if err != nil {
-			log.Printf("AI proxy request failed: path=%s err=%v", request.URL.Path, err)
+			log.Printf("AI proxy request failed: path=%s errorType=%T", request.URL.Path, err)
 			lastErr = err
 			continue
 		}
-		if response.StatusCode >= http.StatusBadRequest {
-			body, _ := io.ReadAll(io.LimitReader(response.Body, 4096))
+		if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
 			_ = response.Body.Close()
 			lastStatus = response.StatusCode
-			log.Printf("AI upstream error: path=%s status=%d body=%s", request.URL.Path, response.StatusCode, strings.TrimSpace(string(body)))
+			log.Printf("AI upstream error: status=%d", response.StatusCode)
 			continue
 		}
 		responseBody, err := service.ReadAIProxyResponseBody(response.Body, path)
 		_ = response.Body.Close()
 		if err != nil {
-			log.Printf("AI proxy read response failed: path=%s err=%v", path, err)
+			log.Printf("AI proxy read response failed: path=%s errorType=%T", path, err)
 			lastErr = err
 			continue
 		}
@@ -202,7 +201,7 @@ func ExecuteAIProxyTask(ctx context.Context, user model.AuthUser, body io.Reader
 		}
 		responseBody, header, statusCode, err := rewriteCloudAIResponseBody(ctx, user, path, responseBody, response.Header, response.StatusCode)
 		if err != nil {
-			log.Printf("AI proxy cloud rewrite failed: path=%s err=%v", path, err)
+			log.Printf("AI proxy cloud rewrite failed: path=%s errorType=%T", path, err)
 			return service.AIProxyResponse{}, err
 		}
 		return service.AIProxyResponse{StatusCode: statusCode, Header: header, Body: responseBody}, nil
@@ -245,7 +244,7 @@ type aiProxyContext struct {
 func copyAIResponse(w http.ResponseWriter, request *http.Request, onFailure func(), proxyContext aiProxyContext) {
 	response, err := service.AIHTTPClient.Do(request)
 	if err != nil {
-		log.Printf("AI proxy request failed: path=%s err=%v", request.URL.Path, err)
+		log.Printf("AI proxy request failed: path=%s errorType=%T", request.URL.Path, err)
 		if onFailure != nil {
 			onFailure()
 		}
@@ -254,9 +253,8 @@ func copyAIResponse(w http.ResponseWriter, request *http.Request, onFailure func
 	}
 	defer response.Body.Close()
 
-	if response.StatusCode >= http.StatusBadRequest {
-		payload, _ := io.ReadAll(io.LimitReader(response.Body, 4096))
-		log.Printf("AI upstream error: path=%s status=%d body=%s", request.URL.Path, response.StatusCode, strings.TrimSpace(string(payload)))
+	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+		log.Printf("AI upstream error: status=%d", response.StatusCode)
 		if onFailure != nil {
 			onFailure()
 		}
@@ -269,14 +267,7 @@ func copyAIResponse(w http.ResponseWriter, request *http.Request, onFailure func
 		return
 	}
 
-	for key, values := range response.Header {
-		if strings.EqualFold(key, "Content-Length") {
-			continue
-		}
-		for _, value := range values {
-			w.Header().Add(key, value)
-		}
-	}
+	copyResponseHeaders(w, response.Header)
 	w.WriteHeader(response.StatusCode)
 	_, _ = io.Copy(w, response.Body)
 }
@@ -296,7 +287,7 @@ func rewriteCloudAIResponse(w http.ResponseWriter, response *http.Response, prox
 	if isVideoContent {
 		rewritten, err := service.StoreVideoReaderToCloud(proxyContext.Request.Context(), proxyContext.User, response.Body, response.Header.Get("Content-Type"), proxyContext.Path)
 		if err != nil {
-			log.Printf("AI video cloud transfer failed: path=%s err=%v", proxyContext.Path, err)
+			log.Printf("AI video cloud transfer failed: path=%s errorType=%T", proxyContext.Path, err)
 			if onFailure != nil {
 				onFailure()
 			}
@@ -309,7 +300,7 @@ func rewriteCloudAIResponse(w http.ResponseWriter, response *http.Response, prox
 	}
 	body, readErr := service.ReadAIProxyResponseBody(response.Body, proxyContext.Path)
 	if readErr != nil {
-		log.Printf("AI proxy read cloud response failed: path=%s err=%v", proxyContext.Path, readErr)
+		log.Printf("AI proxy read cloud response failed: path=%s errorType=%T", proxyContext.Path, readErr)
 		if onFailure != nil {
 			onFailure()
 		}
@@ -319,7 +310,7 @@ func rewriteCloudAIResponse(w http.ResponseWriter, response *http.Response, prox
 	if isImageResponse {
 		rewritten, err := service.StoreImageResponseToCloud(proxyContext.Request.Context(), proxyContext.User, body, proxyContext.Path)
 		if err != nil {
-			log.Printf("AI image cloud transfer failed: path=%s err=%v", proxyContext.Path, err)
+			log.Printf("AI image cloud transfer failed: path=%s errorType=%T", proxyContext.Path, err)
 			if onFailure != nil {
 				onFailure()
 			}
@@ -353,7 +344,7 @@ func copyAIResponseFromRoutes(w http.ResponseWriter, ctx context.Context, routes
 		}
 		request, err := http.NewRequestWithContext(ctx, http.MethodPost, service.BuildModelChannelURL(route.Channel, path), bytes.NewReader(requestBody))
 		if err != nil {
-			log.Printf("AI proxy build request failed: url=%s err=%v", service.BuildModelChannelURL(route.Channel, path), err)
+			log.Printf("AI proxy build request failed: type=%T", err)
 			lastErr = err
 			continue
 		}
@@ -363,15 +354,14 @@ func copyAIResponseFromRoutes(w http.ResponseWriter, ctx context.Context, routes
 		}
 		response, err := service.AIHTTPClient.Do(request)
 		if err != nil {
-			log.Printf("AI proxy request failed: path=%s err=%v", request.URL.Path, err)
+			log.Printf("AI proxy request failed: path=%s errorType=%T", request.URL.Path, err)
 			lastErr = err
 			continue
 		}
-		if response.StatusCode >= http.StatusBadRequest {
-			payload, _ := io.ReadAll(io.LimitReader(response.Body, 4096))
+		if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
 			_ = response.Body.Close()
 			lastStatus = response.StatusCode
-			log.Printf("AI upstream error: path=%s status=%d body=%s", request.URL.Path, response.StatusCode, strings.TrimSpace(string(payload)))
+			log.Printf("AI upstream error: status=%d", response.StatusCode)
 			continue
 		}
 		if path == "/videos" {
@@ -402,33 +392,19 @@ func copyAIResponseFromRoutes(w http.ResponseWriter, ctx context.Context, routes
 		return
 	}
 	if lastErr != nil {
-		log.Printf("AI proxy all routes failed: %v", lastErr)
+		log.Printf("AI proxy all routes failed: type=%T", lastErr)
 	}
 	Fail(w, "AI 接口请求失败")
 }
 
 func copyResponseHeaders(w http.ResponseWriter, header http.Header) {
-	for key, values := range header {
-		if strings.EqualFold(key, "Content-Length") {
-			continue
-		}
-		for _, value := range values {
-			w.Header().Add(key, value)
-		}
+	for key, values := range service.SafeResponseHeaders(header) {
+		w.Header()[key] = values
 	}
 }
 
 func cloneHeader(header http.Header) http.Header {
-	result := http.Header{}
-	for key, values := range header {
-		if strings.EqualFold(key, "Content-Length") {
-			continue
-		}
-		for _, value := range values {
-			result.Add(key, value)
-		}
-	}
-	return result
+	return service.SafeResponseHeaders(header)
 }
 
 type flushResponseWriter struct { http.ResponseWriter }

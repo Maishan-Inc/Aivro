@@ -69,8 +69,8 @@ func DeleteAsset(id string) error {
 // applyAssetFilters 应用素材列表的搜索条件。
 func applyAssetFilters(tx *gorm.DB, q model.Query) *gorm.DB {
 	if q.Keyword != "" {
-		like := "%" + q.Keyword + "%"
-		tx = tx.Where("title LIKE ? OR description LIKE ? OR content LIKE ?", like, like, like)
+		like := LikePattern(q.Keyword)
+		tx = tx.Where("title LIKE ? ESCAPE '!' OR description LIKE ? ESCAPE '!' OR content LIKE ? ESCAPE '!'", like, like, like)
 	}
 	if isActiveAssetOption(q.Type) {
 		tx = tx.Where("type = ?", q.Type)

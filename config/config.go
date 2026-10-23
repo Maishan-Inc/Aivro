@@ -1,8 +1,7 @@
 package config
 
 import (
-	"crypto/rand"
-	"encoding/base64"
+	"errors"
 	"strings"
 
 	"github.com/caarlos0/env/v11"
@@ -11,9 +10,11 @@ import (
 
 type Config struct {
 	Port                string `env:"PORT" envDefault:"8080"`
+	ListenHost          string `env:"LISTEN_HOST" envDefault:"127.0.0.1"`
+	MaxUserStorageBytes int64  `env:"MAX_USER_STORAGE_BYTES" envDefault:"5368709120"`
 	AdminUsername       string `env:"ADMIN_USERNAME" envDefault:"admin"`
 	AdminPassword       string `env:"ADMIN_PASSWORD" envDefault:"aivro"`
-	JWTSecret           string `env:"JWT_SECRET" envDefault:"aivro"`
+	JWTSecret           string `env:"JWT_SECRET"`
 	JWTExpireHours      int    `env:"JWT_EXPIRE_HOURS" envDefault:"168"`
 	AppOrigin           string `env:"APP_ORIGIN"`
 	AllowedOrigins      string `env:"ALLOWED_ORIGINS"`
@@ -33,20 +34,7 @@ func Load() error {
 	if err := env.Parse(&Cfg); err != nil {
 		return err
 	}
-	if strings.TrimSpace(Cfg.JWTSecret) == "" || Cfg.JWTSecret == "aivro" {
-		secret, err := randomSecret()
-		if err != nil {
-			return err
-		}
-		Cfg.JWTSecret = secret
-	}
+	if len(strings.TrimSpace(Cfg.JWTSecret)) < 32 { return errors.New("JWT_SECRET 必须配置为至少 32 字节的随机密钥，所有实例需使用相同密钥") }
+	if Cfg.MaxUserStorageBytes <= 0 { return errors.New("MAX_USER_STORAGE_BYTES 必须大于 0") }
 	return nil
-}
-
-func randomSecret() (string, error) {
-	buf := make([]byte, 32)
-	if _, err := rand.Read(buf); err != nil {
-		return "", err
-	}
-	return base64.RawURLEncoding.EncodeToString(buf), nil
 }

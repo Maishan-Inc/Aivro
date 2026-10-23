@@ -1,5 +1,7 @@
 "use client";
 
+import { safeRedirect } from "@/lib/safe-redirect";
+
 import { FlowBackground } from "@/components/flow-background";
 
 import { MailOutlined } from "@ant-design/icons";
@@ -158,7 +160,3 @@ function MetaMaskEmailContent() {
     );
 }
 
-function safeRedirect(value: string) {
-    if (!value.startsWith("/") || value.startsWith("//") || value.includes("\\")) return "/";
-    return value;
-}

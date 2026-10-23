@@ -1,6 +1,6 @@
 "use client";
 
-import { type CSSProperties, useId } from "react";
+import { type CSSProperties, useEffect, useId, useRef } from "react";
 import { Globe2 } from "lucide-react";
 import { useI18n } from "@/hooks/use-i18n";
 import homeStyles from "./home.module.css";
@@ -63,13 +63,24 @@ const routes = cities.map((city, index) => {
 export function HomeNetwork() {
     const id = useId();
     const { tr } = useI18n();
+    const mapRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const map = mapRef.current;
+        if (!map) return;
+        const center = () => { map.scrollLeft = Math.max(0, map.scrollWidth * hongKong.x / 1080 - map.clientWidth / 2); };
+        const observer = new ResizeObserver(center);
+        observer.observe(map);
+        center();
+        return () => observer.disconnect();
+    }, []);
 
     return <section id="network" className={styles.network} aria-labelledby="network-title" data-reveal>
         <div className={`${homeStyles.discoveryHeading} ${styles.heading}`}>
             <div><span className={homeStyles.eyebrow}>灵感不止于此</span><h2 id="network-title">从香港连接世界</h2></div>
             <p>跨越时区，让创作在世界各地发生。</p>
         </div>
-        <div className={styles.map}>
+        <div ref={mapRef} className={styles.map} data-native-scroll tabIndex={0} aria-label="世界连线地图，可左右滑动查看">
             <svg viewBox="0 0 1080 560" role="img" aria-labelledby={`${id}-title ${id}-description`}>
                 <title id={`${id}-title`}>{tr("从香港连接世界")}</title>
                 <desc id={`${id}-description`}>{tr("香港出发，连接亚洲、北美、欧洲、南美、中东、非洲和大洋洲的城市；中国包括北京、成都和上海。")}</desc>

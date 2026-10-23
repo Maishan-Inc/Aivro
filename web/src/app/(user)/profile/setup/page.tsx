@@ -1,5 +1,7 @@
 "use client";
 
+import { safeRedirect } from "@/lib/safe-redirect";
+
 import { FlowBackground } from "@/components/flow-background";
 
 import { UserOutlined } from "@ant-design/icons";
@@ -94,7 +96,3 @@ function ProfileSetupContent() {
     );
 }
 
-function safeRedirect(value: string) {
-    if (!value.startsWith("/") || value.startsWith("//") || value.includes("\\")) return "/";
-    return value;
-}

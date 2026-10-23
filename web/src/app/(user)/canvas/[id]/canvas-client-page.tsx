@@ -19,7 +19,7 @@ import { useWorkflowModals, workflowConfirmName } from "@/hooks/use-workflow-mod
 import { useAssetStore } from "@/stores/use-asset-store";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { useUserStore } from "@/stores/use-user-store";
-import { createWorkflow, deleteWorkflow, fetchWorkflow, fetchWorkflowActiveShare, shareWorkflow, updateWorkflow, type CloudWorkflow } from "@/services/api/workflows";
+import { createWorkflow, deleteWorkflow, fetchWorkflow, fetchWorkflowActiveShare, revokeWorkflowShare, shareWorkflow, updateWorkflow, type CloudWorkflow } from "@/services/api/workflows";
 import { cropDataUrl } from "../utils/canvas-image-data";
 import { fitNodeSize, nodeSizeFromRatio } from "../utils/canvas-node-size";
 import { App, Button, Dropdown, Input, Modal, Switch } from "antd";
@@ -208,7 +208,7 @@ function InfiniteCanvasPage() {
     const historyRef = useRef<{ past: CanvasHistoryEntry[]; future: CanvasHistoryEntry[] }>({ past: [], future: [] });
     const lastHistoryRef = useRef<CanvasHistoryEntry | null>(null);
     const historyCommitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
+    const saveQueueRef = useRef<Promise<unknown>>(Promise.resolve());
     const applyingHistoryRef = useRef(false);
     const historyPausedRef = useRef(false);
     const didInitialCenterRef = useRef(false);
@@ -220,19 +220,18 @@ function InfiniteCanvasPage() {
         hasMoved: boolean;
         startX: number;
         startY: number;
-        initialSelectedNodes: { id: string; x: number; y: number }[];
+        initialSelectedNodes: Map<string, Position>;
     }>({
         isDraggingNode: false,
         hasMoved: false,
         startX: 0,
         startY: 0,
-        initialSelectedNodes: [],
+        initialSelectedNodes: new Map(),
     });
 
     const effectiveConfig = useEffectiveConfig();
     const isAiConfigReady = useConfigStore((state) => state.isAiConfigReady);
     const addAsset = useAssetStore((state) => state.addAsset);
-    const cleanupAssetImages = useAssetStore((state) => state.cleanupImages);
     const token = useUserStore((state) => state.token);
     const user = useUserStore((state) => state.user);
     const isUserReady = useUserStore((state) => state.isReady);
@@ -245,6 +244,7 @@ function InfiniteCanvasPage() {
     const [sharePasswordEnabled, setSharePasswordEnabled] = useState(false);
     const [sharePassword, setSharePassword] = useState("");
     const [shareUrl, setShareUrl] = useState("");
+    const [shareToken, setShareToken] = useState("");
     const [isSharing, setIsSharing] = useState(false);
     const [nodes, setNodes] = useState<CanvasNodeData[]>([]);
     const [connections, setConnections] = useState<CanvasConnection[]>([]);
@@ -317,17 +317,15 @@ function InfiniteCanvasPage() {
         [backgroundMode, showImageInfo],
     );
 
-    const cleanupCanvasFiles = useCallback(
-        (extra?: unknown) => {
-            cleanupAssetImages({ extra, history: historyRef.current, lastHistory: lastHistoryRef.current });
-        },
-        [cleanupAssetImages],
-    );
 
     useEffect(() => {
         let canceled = false;
         setProjectLoaded(false);
         setCurrentProject(null);
+        setShareToken("");
+        setShareUrl("");
+        setSharePassword("");
+        setSharePasswordEnabled(false);
         setNodes([]);
         setConnections([]);
         setChatSessions([]);
@@ -352,11 +350,13 @@ function InfiniteCanvasPage() {
                 .then((activeShare) => {
                     if (canceled) return;
                     setShareUrl(normalizeShareUrl(activeShare.shareUrl || ""));
+                    setShareToken(activeShare.share?.token || "");
                     setSharePasswordEnabled(activeShare.share?.passwordEnabled === true);
                 })
                 .catch(() => {
                     if (canceled) return;
                     setShareUrl("");
+                    setShareToken("");
                     setSharePasswordEnabled(false);
                 });
             const restoredNodes = await hydrateCanvasImages(resetInterruptedGeneration(project.nodes));
@@ -418,12 +418,12 @@ function InfiniteCanvasPage() {
         if (!projectLoaded || historyPausedRef.current || agentPreview || !token || !currentProject) return;
         let canceled = false;
         setSaveStatus("saving");
-        const snapshot = { title: currentProject.title, nodes, connections, chatSessions: [], activeChatId: null, backgroundMode, showImageInfo, viewport };
+        const snapshot = { title: currentProject.title, nodes, connections, backgroundMode, showImageInfo };
         const timer = setTimeout(() => {
             saveQueueRef.current = saveQueueRef.current.catch(() => undefined).then(async () => {
                 if (canceled) return;
                 try {
-                    const saved = await updateWorkflow(token, projectId, snapshot);
+                    const saved = await updateWorkflow(token, projectId, { ...snapshot, viewport: viewportRef.current });
                     if (canceled) return;
                     setCurrentProject(saved);
                     upsertProject(saved);
@@ -434,7 +434,7 @@ function InfiniteCanvasPage() {
             });
         }, 600);
         return () => { canceled = true; clearTimeout(timer); };
-    }, [agentPreview, backgroundMode, connections, currentProject?.title, nodes, projectId, projectLoaded, showImageInfo, token, upsertProject, user?.id, viewport]);
+    }, [agentPreview, backgroundMode, connections, currentProject?.title, nodes, projectId, projectLoaded, showImageInfo, token, upsertProject, user?.id]);
 
     useEffect(() => {
         if (!dialogNodeId) setNodeImageSettingsOpen(false);
@@ -532,7 +532,7 @@ function InfiniteCanvasPage() {
             const { fromNodeId, toNodeId } = connection;
             const exists = connectionsRef.current.some((conn) => conn.fromNodeId === fromNodeId && conn.toNodeId === toNodeId);
             if (!exists) {
-                setConnections((prev) => [...prev, { id: `conn-${Date.now()}`, fromNodeId, toNodeId }]);
+                setConnections((prev) => [...prev, { id: `conn-${nanoid()}`, fromNodeId, toNodeId }]);
             }
             setContextMenu(null);
         },
@@ -694,6 +694,9 @@ function InfiniteCanvasPage() {
                             batchChildIds: childIds,
                             primaryImageId,
                             content: primaryNode?.metadata?.content || node.metadata.content,
+                            storageKey: primaryNode ? primaryNode.metadata?.storageKey : node.metadata.storageKey,
+                            mimeType: primaryNode ? primaryNode.metadata?.mimeType : node.metadata.mimeType,
+                            bytes: primaryNode ? primaryNode.metadata?.bytes : node.metadata.bytes,
                             naturalWidth: primaryNode?.metadata?.naturalWidth || node.metadata.naturalWidth,
                             naturalHeight: primaryNode?.metadata?.naturalHeight || node.metadata.naturalHeight,
                         },
@@ -713,9 +716,8 @@ function InfiniteCanvasPage() {
             setPreviewNodeId((current) => (current && allIds.has(current) ? null : current));
             setRunningNodeId((current) => (current && allIds.has(current) ? null : current));
             setContextMenu((current) => (current && allIds.has(current.nodeId) ? null : current));
-            cleanupCanvasFiles({ projectId, nodes: nodesRef.current.filter((node) => !allIds.has(node.id)), chatSessions });
         },
-        [chatSessions, cleanupCanvasFiles, projectId],
+        [],
     );
 
     const deselectCanvas = useCallback(() => {
@@ -740,8 +742,7 @@ function InfiniteCanvasPage() {
         setRunningNodeId(null);
         deselectCanvas();
         setClearConfirmOpen(false);
-        cleanupCanvasFiles({ projectId, nodes: [], chatSessions: [] });
-    }, [cleanupCanvasFiles, deselectCanvas, projectId]);
+    }, [deselectCanvas]);
 
     const duplicateNode = useCallback((nodeId: string) => {
         const source = nodesRef.current.find((node) => node.id === nodeId);
@@ -986,13 +987,12 @@ function InfiniteCanvasPage() {
             if (!confirmName) return;
             try {
                 await deleteWorkflow(token, projectId, workflowConfirmName(currentProject));
-                cleanupAssetImages();
                 router.push("/canvas");
             } catch (error) {
                 message.error(error instanceof Error ? error.message : "删除失败");
             }
         })();
-    }, [cleanupAssetImages, confirmWorkflowDelete, currentProject, message, projectId, router, token]);
+    }, [confirmWorkflowDelete, currentProject, message, projectId, router, token]);
 
     const handleCanvasMouseDown = useCallback(
         (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -1060,7 +1060,7 @@ function InfiniteCanvasPage() {
             hasMoved: false,
             startX: event.clientX,
             startY: event.clientY,
-            initialSelectedNodes: currentNodes.filter((node) => dragIds.has(node.id)).map((node) => ({ id: node.id, x: node.position.x, y: node.position.y })),
+            initialSelectedNodes: new Map(currentNodes.filter((node) => dragIds.has(node.id)).map((node) => [node.id, node.position])),
         };
         historyPausedRef.current = true;
         nodeDraggingRef.current = true;
@@ -1074,8 +1074,8 @@ function InfiniteCanvasPage() {
         }
         if (!dragRef.current.isDraggingNode) return;
 
-        const wasClick = !dragRef.current.hasMoved && dragRef.current.initialSelectedNodes.length === 1;
-        const clickedNodeId = dragRef.current.initialSelectedNodes[0]?.id;
+        const wasClick = !dragRef.current.hasMoved && dragRef.current.initialSelectedNodes.size === 1;
+        const clickedNodeId = dragRef.current.initialSelectedNodes.keys().next().value;
         const currentViewport = viewportRef.current;
         const dx = clientX == null ? 0 : (clientX - dragRef.current.startX) / currentViewport.k;
         const dy = clientY == null ? 0 : (clientY - dragRef.current.startY) / currentViewport.k;
@@ -1087,7 +1087,7 @@ function InfiniteCanvasPage() {
         if (dragRef.current.hasMoved && clientX != null && clientY != null) {
             setNodes((prev) =>
                 prev.map((node) => {
-                    const initial = initialPositions.find((item) => item.id === node.id);
+                    const initial = initialPositions.get(node.id);
                     if (!initial) return node;
                     return { ...node, position: { x: initial.x + dx, y: initial.y + dy } };
                 }),
@@ -1096,7 +1096,7 @@ function InfiniteCanvasPage() {
 
         dragRef.current.isDraggingNode = false;
         dragRef.current.hasMoved = false;
-        dragRef.current.initialSelectedNodes = [];
+        dragRef.current.initialSelectedNodes = new Map();
         if (wasClick && clickedNodeId) {
             const clickedNode = nodesRef.current.find((node) => node.id === clickedNodeId);
             if (clickedNode?.type === CanvasNodeType.Text) {
@@ -1123,7 +1123,7 @@ function InfiniteCanvasPage() {
                 rafRef.current = requestAnimationFrame(() => {
                     setNodes((prev) =>
                         prev.map((node) => {
-                            const initial = initialPositions.find((item) => item.id === node.id);
+                            const initial = initialPositions.get(node.id);
                             return initial ? { ...node, position: { x: initial.x + dx, y: initial.y + dy } } : node;
                         }),
                     );
@@ -1452,6 +1452,9 @@ function InfiniteCanvasPage() {
                           metadata: {
                               ...node.metadata,
                               content: child.metadata?.content,
+                              storageKey: child.metadata?.storageKey,
+                              mimeType: child.metadata?.mimeType,
+                              bytes: child.metadata?.bytes,
                               primaryImageId: child.id,
                               naturalWidth: child.metadata?.naturalWidth,
                               naturalHeight: child.metadata?.naturalHeight,
@@ -1613,7 +1616,9 @@ function InfiniteCanvasPage() {
     const handleImageInputChange = useCallback(
         async (event: ReactChangeEvent<HTMLInputElement>) => {
             const file = event.target.files?.[0];
+            event.target.value = "";
             const target = uploadTargetRef.current;
+            uploadTargetRef.current = null;
             if (!file || (!file.type.startsWith("image/") && !file.type.startsWith("video/"))) return;
 
             if (target?.nodeId) {
@@ -1709,14 +1714,20 @@ function InfiniteCanvasPage() {
 
     const submitShare = useCallback(async () => {
         if (!token) return;
-        if (sharePasswordEnabled && !sharePassword.trim()) {
+        if (sharePasswordEnabled && !sharePassword.trim() && !shareToken) {
             message.warning("请填写分享密码");
             return;
         }
         setIsSharing(true);
         try {
+            const saving = saveQueueRef.current.catch(() => undefined).then(() => updateWorkflow(token, projectId, { title: currentProject?.title || "未命名工作流", nodes: nodesRef.current, connections: connectionsRef.current, backgroundMode, showImageInfo, viewport: viewportRef.current }));
+            saveQueueRef.current = saving;
+            const saved = await saving;
+            setCurrentProject(saved);
+            upsertProject(saved);
             const result = await shareWorkflow(token, projectId, { passwordEnabled: sharePasswordEnabled, password: sharePassword });
             setShareUrl(normalizeShareUrl(result.shareUrl));
+            setShareToken(result.share.token);
             setSharePasswordEnabled(result.share.passwordEnabled);
             setSharePassword("");
             message.success(result.share.version > 1 ? "分享快照已更新" : "分享链接已生成");
@@ -1725,18 +1736,30 @@ function InfiniteCanvasPage() {
         } finally {
             setIsSharing(false);
         }
-    }, [message, projectId, sharePassword, sharePasswordEnabled, token]);
+    }, [backgroundMode, currentProject?.title, message, projectId, sharePassword, sharePasswordEnabled, shareToken, showImageInfo, token, upsertProject]);
+
+    const revokeShare = async () => {
+        if (!token || !shareToken) return;
+        setIsSharing(true);
+        try {
+            await revokeWorkflowShare(token, shareToken);
+            setShareToken("");
+            setShareUrl("");
+            setSharePassword("");
+            setSharePasswordEnabled(false);
+            message.success("分享已撤销，原链接已失效");
+        } catch (error) {
+            message.error(error instanceof Error ? error.message : "撤销分享失败");
+        } finally { setIsSharing(false); }
+    };
 
     const finishTitleEditing = useCallback(() => {
         const nextTitle = titleDraft.trim();
         if (nextTitle && token && currentProject) {
-            void updateWorkflow(token, projectId, { title: nextTitle, nodes, connections, chatSessions: [], activeChatId: null, backgroundMode, showImageInfo, viewport }).then((saved) => {
-                setCurrentProject(saved);
-                upsertProject(saved);
-            });
+            setCurrentProject({ ...currentProject, title: nextTitle });
         }
         setTitleEditing(false);
-    }, [backgroundMode, connections, currentProject, nodes, projectId, showImageInfo, titleDraft, token, upsertProject, user?.id, viewport]);
+    }, [currentProject, titleDraft, token]);
 
     const preventCanvasContextMenu = useCallback((event: ReactMouseEvent) => {
         if (agentPreview) {
@@ -2242,6 +2265,7 @@ function InfiniteCanvasPage() {
                     confirmLoading={isSharing}
                     onOk={() => void submitShare()}
                     onCancel={() => setShareOpen(false)}
+                    footer={(_, { OkBtn, CancelBtn }) => <div className="flex items-center justify-between gap-3"><div>{shareToken ? <Button danger disabled={isSharing} onClick={() => void revokeShare()}>撤销分享</Button> : null}</div><div className="flex gap-2"><CancelBtn /><OkBtn /></div></div>}
                 >
                     <div className="space-y-4">
                         <div className="flex items-center justify-between rounded-lg border p-3">

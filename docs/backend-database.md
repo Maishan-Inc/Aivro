@@ -16,6 +16,9 @@
 
 - `users`
 - `email_verifications`
+- `rate_limit_buckets`
+- `storage_reservations`
+- `user_assets`
 - `meta_mask_challenges`
 - `credit_logs`
 - `audit_logs`
@@ -71,7 +74,7 @@
 | `auth_provider` | string | 主要登录来源：`password`、`google`、`github`、`linux-do`、`metamask` 等 |
 | `email_verified` | bool | 邮箱是否已验证                 |
 | `status`        | string | 用户状态：`active`、`ban`       |
-| `token_version` | number | 登录令牌版本，改密码后递增并让旧 JWT 失效 |
+| `token_version` | number | 登录令牌版本，登出、改密及管理端更新用户后递增，旧 JWT 失效 |
 | `last_login_at` | string | 最近登录时间                   |
 | `extra`         | json   | 扩展信息，第三方资料按平台命名空间保存，如 `linuxDo` |
 | `created_at`    | string | 创建时间                     |
@@ -79,7 +82,7 @@
 
 ### email_verifications
 
-邮箱验证码表。用于注册绑定邮箱、找回密码和 MetaMask 首次登录绑定邮箱。
+邮箱验证码表。用于注册绑定邮箱、找回密码和 MetaMask 首次登录绑定邮箱。`purpose + target` 为联合唯一索引；重新发码替换之前的记录，旧码立即失效。尝试次数与成功消费在事务内更新；目标累计尝试次数另受共享限流约束。
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
@@ -87,7 +90,7 @@
 | `purpose` | string | 用途：`register`、`reset`、`metamask` |
 | `target` | string | 邮箱地址 |
 | `code` | string | 验证码 |
-| `attempts` | number | 验证失败次数，超过限制后需要重新获取 |
+| `attempts` | number | 验证尝试次数，每条验证码最多 5 次 |
 | `expires_at` | string | 过期时间 |
 | `used_at` | string | 使用时间，未使用为空 |
 | `created_at` | string | 创建时间 |
@@ -529,8 +532,6 @@ AI 生成队列表。任务表只保存状态和对象引用，原始请求体�
 | `title` | string | 工作流名称 |
 | `nodes` | json | 节点数据 |
 | `connections` | json | 连线数据 |
-| `chat_sessions` | json | 旧版助手会话字段，新增画布助手历史保存到 `canvas_assistant_sessions` |
-| `active_chat_id` | string | 旧版当前会话 ID |
 | `background_mode` | string | 画布背景模式 |
 | `show_image_info` | bool | 是否显示图片信息 |
 | `viewport` | json | 画布视口 |
@@ -544,7 +545,7 @@ AI 生成队列表。任务表只保存状态和对象引用，原始请求体�
 
 创建普通工作流和复制分享工作流都会在事务中扣减 `users.workflow_create_credits` 1 次，并写入 `entitlement_logs`。
 
-工作流保存时会把节点和参考图中引用的 `cloud_files` 绑定为 `purpose=workflow` 并清空过期时间；删除工作流时需要输入工作流名称并经过多次确认，删除后同步删除关联文件且不返还工作流创建次数。
+工作流保存时在 `cloud_file_references` 写入 `kind=workflow` 的长期引用，不改写文件原有用途和到期时间。删除工作流释放自身引用，仅回收没有其他有效引用的文件，不返还创建次数。只有内容变化才刷新 `updated_at`；视口单独改变只更新 `viewport`，不影响社区可同步提示和列表排序。助手会话独立保存，不进入工作流、分享或社区快照。
 
 ### canvas_assistant_sessions
 
@@ -802,3 +803,49 @@ KYC 认证记录表。当前服务商为 Didit。
 | `created_at` | string | 创建时间 |
 
 审计日志接口会把操作者和目标用户补全为头像 + 公开名称，便于直接判断是谁改了什么、改到了谁。
+
+## 安全限额与素材归属
+
+### rate_limit_buckets
+
+共享数据库限流桶，替代单进程内存计数。所有实例必须连接同一数据库；独立 SQLite 文件不能共享额度。
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `bucket_key` | string(64) | 业务维度的 SHA-256，主键；不明文保存账号或 IP |
+| `count` | number | 当前窗口请求数 |
+| `reset_at` | time | 窗口重置时间，索引 |
+| `blocked_at` | time | 禁止请求的截止时间，索引 |
+
+通过事务内 upsert 获取写锁后读取并递增。登录桶将用户名和邮箱映射到同一用户 ID；用户登录与管理登录共享基础限额，管理端额外记录失败次数。发码入口共享额度。未知可信 IP 时跳过 IP 桶，保留账号桶；不会把所有用户放进一个 unknown 桶。分享密码按分享 ID 与 IP（缺失时为登录用户 ID）计数。定时任务删除到期桶。
+
+### storage_reservations
+
+文件写入前的短期容量预留，避免并发上传越过总容量。
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | 服务端随机主键 |
+| `user_id` | string | 容量所属用户，索引 |
+| `size` | int64 | 预留字节数 |
+| `expires_at` | int64 | Unix 秒，到期索引 |
+
+在用户行锁内汇总未删除文件与有效预留，默认总上限为 5 GiB。预留有效 6 分钟，存储操作限时 5 分钟；结束释放预留，同用户下一次预留时清理过期项。配额包含任务载荷，长期引用也不会绕过容量统计。
+
+### user_assets
+
+用户本地素材的归属登记表，与后台公共 `assets` 表不同，不保存素材标题、内容或列表。
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | 创建接口分配的随机主键 |
+| `user_id` | string | 所有者，索引 |
+| `created_at` | string | 登记时间 |
+
+每用户最多 1000 条。创建和更新引用均在用户锁内校验；更新已有 ID 必须匹配所有者，每条最多 100 个文件，文件必须可访问且不是任务原始载荷。删除登记释放 `kind=asset` 的引用。素材列表仍保存在各浏览器 localforage，清空浏览器数据不会自动删除服务端登记。
+
+### 会话与算力流水约束
+
+`users.token_version` 在退出登录、改密及管理员修改用户时递增，旧 JWT 随即失效；退出登录影响该账号所有设备。登录 JWT 同时校验 HS256、issuer、audience 与过期时间。
+
+`credit_logs` 只通过余额调整、消费、退款等事务追加。管理端不再提供直接保存或删除流水接口，不能只改账本而不改余额。

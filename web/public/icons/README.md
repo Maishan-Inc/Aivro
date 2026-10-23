@@ -7,9 +7,10 @@
 | `bytedance.svg`、`flux.svg`、`hunyuan.svg`、`kling.svg`、`meshy.svg`、`meta.svg`、`microsoft.svg`、`nanobanana.svg`、`reve.svg`、`tencent.svg` | [Lobe Icons](https://github.com/lobehub/lobe-icons)，来自 `@lobehub/icons-static-svg@1.95.1` |
 | `404gen.svg` | [404—GEN 官网](https://404.xyz)导航中的品牌 SVG |
 | `trellis.png` | [TRELLIS 项目官网](https://microsoft.github.io/TRELLIS/favicon.png) |
+| `unilat3d.png` | [UniLat3D 官方项目](https://unilat3d.github.io/assets_unilat3d/icon/logo.png)，按原比例缩至 128px 宽 |
 | `zaohao.jpeg` | [造好物官网](https://www.zaohaowu.com/apple-touch-icon-cn.jpeg) |
 
-OpenAI、Grok 和 Google 沿用项目已有图标。PicGen3D 暂用 CSM 公司名称字标；UniLat3D-3DGS 的开发商未确认，使用通用三维图标；Meshy-7 使用 Meshy 图标识别模型系列，开发商仍标记待确认。品牌及商标归各自所有者所有。
+OpenAI、Grok 和 Google 沿用项目已有图标。PicGen3D 保留 CSM 公司名称字标（官网连接失败，未使用来源不明的品牌图）；UniLat3D-3DGS 使用官方项目图标；Meshy-7 使用 Meshy 图标与公司名称。品牌及商标归各自所有者所有。
 
 ## Lobe Icons 许可
 

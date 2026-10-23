@@ -33,7 +33,7 @@ export function useHomeScroll(paused: boolean) {
             const media = gsap.matchMedia();
             let anchorTween: ReturnType<typeof gsap.to> | undefined;
             const context = gsap.context(() => {
-                media.add({ motion: "(prefers-reduced-motion: no-preference)", reduced: "(prefers-reduced-motion: reduce)" }, ({ conditions }) => {
+                media.add({ motion: "(prefers-reduced-motion: no-preference)", reduced: "(prefers-reduced-motion: reduce)", desktop: "(min-width: 1401px) and (pointer: fine)" }, ({ conditions }) => {
                     animationsRef.current = [];
                     if (conditions?.reduced) {
                         gsap.set(traces, { autoAlpha: 1, drawSVG: "100%" });
@@ -56,6 +56,7 @@ export function useHomeScroll(paused: boolean) {
                             else drawing.play();
                         } });
                     }
+                    if (!conditions?.desktop) return () => { animationsRef.current = []; };
                     let stops: number[] = [];
                     const updateStops = () => {
                         const max = root.scrollHeight - root.clientHeight;

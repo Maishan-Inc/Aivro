@@ -10,8 +10,6 @@ export type CloudWorkflow = {
     title: string;
     nodes: CanvasNodeData[];
     connections: CanvasConnection[];
-    chatSessions: CanvasAssistantSession[];
-    activeChatId: string | null;
     backgroundMode: CanvasBackgroundMode;
     showImageInfo: boolean;
     viewport: ViewportTransform;
@@ -29,7 +27,7 @@ export type WorkflowListResponse = {
     total: number;
 };
 
-export type SaveWorkflowInput = Pick<CloudWorkflow, "title" | "nodes" | "connections" | "chatSessions" | "activeChatId" | "backgroundMode" | "showImageInfo" | "viewport">;
+export type SaveWorkflowInput = Pick<CloudWorkflow, "title" | "nodes" | "connections" | "backgroundMode" | "showImageInfo" | "viewport">;
 export type CreateWorkflowInput = Partial<SaveWorkflowInput> & { slug: string };
 
 export type WorkflowSharePreview = {
@@ -155,6 +153,10 @@ export async function fetchWorkflowActiveShare(token: string, id: string) {
     return apiGet<{ shareUrl: string; share: WorkflowShareSummary | null }>(`/api/v1/workflows/${encodeURIComponent(id)}/share`, undefined, token);
 }
 
+export async function revokeWorkflowShare(token: string, shareToken: string) {
+    return apiPost<boolean>(`/api/v1/workflow-shares/${encodeURIComponent(shareToken)}/revoke`, {}, token);
+}
+
 export async function fetchCommunityWorkflows(token: string, query: { keyword?: string; locale?: string; tag?: string[]; page?: number; pageSize?: number } = {}) {
     return apiGet<WorkflowCommunityListResponse>("/api/v1/workflow-community", compactApiParams(query), token);
 }
@@ -187,12 +189,12 @@ export async function fetchWorkflowShareByPath(token: string | undefined, userna
     return apiGet<WorkflowSharePreview>(`/api/workflow-share-paths/${encodeURIComponent(username)}/${encodeURIComponent(workflowName)}`, shareAccessToken ? { shareAccessToken } : undefined, token);
 }
 
-export async function verifyWorkflowShare(token: string, shareToken: string, password: string) {
-    return apiPost<{ preview: WorkflowSharePreview; shareAccessToken: string }>(`/api/v1/workflow-shares/${encodeURIComponent(shareToken)}/verify`, { password }, token);
+export async function verifyWorkflowShare(token: string, shareToken: string, password: string, captchaToken?: string) {
+    return apiPost<{ preview: WorkflowSharePreview; shareAccessToken: string }>(`/api/v1/workflow-shares/${encodeURIComponent(shareToken)}/verify`, { password, captchaToken }, token);
 }
 
-export async function verifyWorkflowShareByPath(token: string | undefined, username: string, workflowName: string, password: string) {
-    return apiPost<{ preview: WorkflowSharePreview; shareAccessToken: string }>(`/api/workflow-share-paths/${encodeURIComponent(username)}/${encodeURIComponent(workflowName)}/verify`, { password }, token);
+export async function verifyWorkflowShareByPath(token: string | undefined, username: string, workflowName: string, password: string, captchaToken?: string) {
+    return apiPost<{ preview: WorkflowSharePreview; shareAccessToken: string }>(`/api/workflow-share-paths/${encodeURIComponent(username)}/${encodeURIComponent(workflowName)}/verify`, { password, captchaToken }, token);
 }
 
 export async function copyWorkflowShare(token: string, shareToken: string, input: { slug: string; mode: "detached" | "linked"; password?: string; shareAccessToken?: string }) {

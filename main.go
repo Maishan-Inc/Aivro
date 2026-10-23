@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"net"
 	"net/http"
 	"time"
 
@@ -25,6 +26,6 @@ func main() {
 	service.StartCloudStorageCleanupScheduler()
 	service.RegisterAIProxyExecutor(handler.ExecuteAIProxyTask)
 	service.StartGenerationQueueScheduler()
-	server := &http.Server{Addr: ":" + config.Cfg.Port, Handler: router.New(), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: time.Minute}
+	server := &http.Server{Addr: net.JoinHostPort(config.Cfg.ListenHost, config.Cfg.Port), Handler: router.New(), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: time.Minute}
 	log.Fatal(server.ListenAndServe())
 }
