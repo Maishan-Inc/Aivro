@@ -557,7 +557,7 @@ func rewriteMultipartModel(body []byte, contentType string, modelName string) ([
 			if err != nil {
 				return nil, contentType, err
 			}
-			part, err := writer.CreateFormFile(key, fileHeader.Filename)
+			part, err := writer.CreatePart(fileHeader.Header)
 			if err == nil {
 				_, err = io.Copy(part, src)
 			}
