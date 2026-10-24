@@ -1785,7 +1785,6 @@ const enUS = {
     "等待生成": "Awaiting generation",
     "视频流程示例片段": "Video workflow sample clip",
     "视频暂不可用": "Video unavailable",
-    "视频素材演示，非本次 AI 生成": "Sample footage, not generated in this session",
     "保留参考，连接下一步创作": "Keep references and connect the next step",
     "参考帧取自同一视频；片段用于演示视频创作流程。": "Reference frames come from this clip, which illustrates the video workflow.",
     "图片由 AI 生成，并基于对应参考图编辑；画布为流程演示。": "Images were AI generated and edited from the corresponding references. The canvas demonstrates the workflow.",

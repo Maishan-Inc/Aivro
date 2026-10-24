@@ -1779,7 +1779,6 @@ const frFR = {
     "等待生成": "En attente",
     "视频流程示例片段": "Extrait de démonstration vidéo",
     "视频暂不可用": "Vidéo indisponible",
-    "视频素材演示，非本次 AI 生成": "Extrait existant pour la démonstration",
     "保留参考，连接下一步创作": "Garder la référence et poursuivre",
     "参考帧取自同一视频；片段用于演示视频创作流程。": "Les images proviennent de cet extrait, utilisé pour illustrer le processus vidéo.",
     "图片由 AI 生成，并基于对应参考图编辑；画布为流程演示。": "Images générées par IA puis éditées depuis leurs références respectives. Le canevas illustre le processus.",
