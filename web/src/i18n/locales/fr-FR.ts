@@ -1780,6 +1780,7 @@ const frFR = {
     "工作流画布，可横向滚动查看全部节点": "Canevas du workflow, défilez horizontalement pour voir tous les nœuds",
     "创作要求": "Brief créatif",
     "创意拆解": "Conception",
+    "加载失败": "Échec du chargement",
     "生成方式": "Mode de génération",
     "图生视频": "Image vers vidéo",
     "参考图编辑": "Édition de référence",

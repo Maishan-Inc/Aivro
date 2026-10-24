@@ -14,7 +14,7 @@
 .toolbarRow { display: contents; }
 .toolbar > *, .toolbarRow > * { flex-shrink: 0; max-width: 100%; }
 .toolbar :global(.ant-btn) { font-size: 12px; }
-.toolbar :global(.canvas-composer-model-picker) { width: 190px; max-width: 100%; border: 0; box-shadow: none; font-size: 12px; }
+.toolbar :global(.canvas-composer-model-picker) { width: 264px; max-width: 100%; border: 0; box-shadow: none; font-size: 12px; }
 .references { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 10px 10px; }
 .reference { position: relative; width: 60px; height: 60px; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
 .reference > img { width: 100%; height: 100%; object-fit: cover; }
@@ -34,6 +34,6 @@
     .toolbarRow:first-child { grid-column: 1 / -1; }
     .toolbarRow:last-child { grid-column: 1 / -1; }
     .toolbar :global(.ant-btn) { padding-inline: 7px; }
-    .toolbar :global(.canvas-composer-model-picker) { width: auto; flex: 1 1 auto; min-width: 0; max-width: 190px; }
+    .toolbar :global(.canvas-composer-model-picker) { width: 264px; flex: 0 1 auto; min-width: 0; max-width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) { .composer, .controls { transition: none; } }

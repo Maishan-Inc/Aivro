@@ -1786,6 +1786,7 @@ const enUS = {
     "工作流画布，可横向滚动查看全部节点": "Workflow canvas; scroll horizontally to see all nodes",
     "创作要求": "Creative brief",
     "创意拆解": "Concept planning",
+    "加载失败": "Loading failed",
     "生成方式": "Generation mode",
     "图生视频": "Image to video",
     "参考图编辑": "Reference editing",

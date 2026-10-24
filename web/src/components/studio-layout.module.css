@@ -14,7 +14,7 @@
 .composer :global(.ant-input-textarea) { padding-right: 40px; }
 .toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 4px 44px 4px 4px; }
 .toolbar :global(.ant-btn) { font-size: 12px; }
-.toolbar :global(.canvas-composer-model-picker) { max-width: min(240px, 45cqw); border: 0; box-shadow: none; font-size: 12px; }
+.toolbar :global(.canvas-composer-model-picker) { max-width: 100%; border: 0; box-shadow: none; font-size: 12px; }
 .toolbar > .send { position: absolute; top: 50%; right: 14px; transform: translateY(-50%); border-radius: 50% !important; width: 40px !important; min-width: 40px !important; max-width: 40px !important; height: 40px !important; aspect-ratio: 1; padding: 0 !important; flex: none !important; }
 .composerHint { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 12px; margin-top: 10px; font-size: 10px; color: var(--muted-foreground); }
 .references { display: flex; gap: 10px; padding: 6px 10px 12px; overflow-x: auto; overscroll-behavior-x: contain; }

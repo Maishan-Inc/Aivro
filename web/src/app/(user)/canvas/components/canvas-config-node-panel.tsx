@@ -129,6 +129,7 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, inputs, o
 
             <Button
                 type="primary"
+                data-canvas-action="generate"
                 className="mt-auto !h-9 !w-full !cursor-pointer !rounded-lg"
                 disabled={isRunning || (!inputSummary.textCount && !inputSummary.imageCount)}
                 onMouseDown={(event) => event.stopPropagation()}
