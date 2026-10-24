@@ -15,6 +15,7 @@
 当前服务启动时会自动执行数据库更新并记录更新日志；重新部署或更新镜像后不需要再到后台手动点击更新。数据库状态页会显示当前实际使用的数据库驱动和脱敏连接地址，便于确认安装后连接的是 PostgreSQL、SQLite 还是 MySQL；除检查模型表是否存在外，也会按当前 `AutoMigrate` 模型检查全部数据库字段是否存在。安装更新会主动删除队列表旧的 `request_body`、`response_body` 大字段，并改用 `cloud_files` 对象引用。当前 `AutoMigrate` 自动维护以下表：
 
 - `users`
+- `user_api_keys`
 - `email_verifications`
 - `rate_limit_buckets`
 - `storage_reservations`
@@ -45,6 +46,25 @@
 - `database_update_logs`
 
 后续新增表时再同步补充本文档，未实际使用的规划表不提前写入。
+
+### user_api_keys
+
+用户对外调用本站模型的密钥表。完整密钥仅在创建时返回，不保存明文或可解密副本。该表已纳入启动自动更新和后台数据库状态检查。
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | 密钥主键 |
+| `user_id` | string | 所属用户；与 `name_hash` 组成唯一索引 |
+| `name` | string | 展示名称，最多 50 个字符 |
+| `name_hash` | string | 名称去首尾空格、转小写后的 SHA-256，保证同账号名称唯一；不返回前端 |
+| `key_hash` | string | 完整随机密钥的 SHA-256，唯一索引，不返回前端 |
+| `preview` | string | 仅用于辨认的脱敏密钥片段 |
+| `status` | string | `active`（可用）、`revoked`（已撤销） |
+| `last_used_at` | string | 最近一次成功鉴权时间，不代表模型生成成功 |
+| `created_at` | string | 创建时间 |
+| `revoked_at` | string | 撤销时间 |
+
+已撤销的名称继续保留；不同账号可使用相同名称。每次密钥鉴权查询所属用户，账号禁用或删除后无法继续调用。
 
 ### users
 
@@ -233,7 +253,7 @@ MetaMask 登录服务端签名挑战表。nonce 与钱包地址绑定，短时�
 
 `modelCosts` 只跟随 `availableModels` 中开放给前台的模型生成，内部优先按 `modelId` 匹配计费配置，不再依赖模型名称作为唯一计费标识。
 `planCredits` 只保留大于 0 的套餐档位，配置为 0 或留空都表示沿用标准价；`apiCredits`、`apiMultiplier` 和厂商信息由后端在保存时统一补齐，管理员不需要逐条填写。
-当前 AI 请求扣费仍按 `credits` 和 `billingType` 结算，套餐专属价与 API 价先用于定价表展示，API 调用部分的扣费在后续单独接入。
+登录会话调用按 `credits` 和 `billingType` 结算，套餐专属价仍用于定价表展示。用户 API 密钥调用使用 `apiCredits`、`apiMultiplier` 和 `apiBilling`，共享所属账号的算力点余额。
 
 `auth` 当前字段：
 
@@ -508,7 +528,9 @@ AI 生成队列表。任务表只保存状态和对象引用，原始请求体�
 | `path` | string | 后端代理路径，例如 `/images/generations` |
 | `content_type` | string | 原始请求 Content-Type |
 | `request_file_id` | string | 请求体对象 `cloud_files.id` |
-| `credits` | number | 本任务预扣算力点 |
+| `credits` | number | 本任务预扣算力点；API 词元任务成功后更新为实际结算值 |
+| `api_billing_type` | string | API 请求提交时的计费方式快照，登录会话任务为空，不返回前端 |
+| `api_unit_credits` | number | API 请求提交时的单价快照，不返回前端 |
 | `request_count` | number | 本次请求生成数量 |
 | `status` | string | `queued`、`executing`、`succeeded`、`failed`、`canceled` |
 | `queue_position` | number | 排队位置 |

@@ -62,7 +62,7 @@ export default function WorkflowPathSharePage() {
             const result = await toggleWorkflowShareStar(token, params.username, params.workflowSlug);
             setPreview((current) => (current ? { ...current, starred: result.starred, starCount: result.starCount } : current));
         } catch (error) {
-            message.error(error instanceof Error ? error.message : "Star 失败");
+            message.error(error instanceof Error ? error.message : "收藏失败");
         }
     };
 
@@ -71,11 +71,11 @@ export default function WorkflowPathSharePage() {
             router.push(localizedPath(`/login?redirect=/${params.username}/${params.workflowSlug}`));
             return;
         }
-        const slug = await requestWorkflowName({ title: "Fork 工作流", username: user?.username, okText: "继续" });
+        const slug = await requestWorkflowName({ title: "复制工作流", username: user?.username, okText: "继续" });
         if (!slug) return;
         let mode: "detached" | "linked" = "detached";
         modal.confirm({
-            title: "Fork 到我的工作流",
+            title: "复制到我的工作流",
             width: 560,
             content: (
                 <div className="space-y-4 py-2">
@@ -89,7 +89,7 @@ export default function WorkflowPathSharePage() {
                     <p className="text-sm leading-6 text-stone-500">开启自动更新后，原作者更新分享时，你的工作流内容会跟随更新并可能被覆盖。</p>
                 </div>
             ),
-            okText: "Fork",
+            okText: "复制",
             cancelText: "取消",
             onOk: async () => {
                 try {
@@ -97,7 +97,7 @@ export default function WorkflowPathSharePage() {
                     await hydrateUser();
                     router.push(localizedPath(`/canvas/${workflow.id}`));
                 } catch (error) {
-                    const text = error instanceof Error ? error.message : "Fork 失败";
+                    const text = error instanceof Error ? error.message : "复制失败";
                     if (text.includes("暂无工作流创建次数")) {
                         Modal.confirm({
                             title: "工作流创建次数不足",
@@ -154,11 +154,11 @@ export default function WorkflowPathSharePage() {
                 <div className="flex min-w-0 items-center gap-3">
                     <h1 className="truncate text-xl font-semibold">{preview.title || preview.slug}</h1>
                     <Tag>只读预览</Tag>
-                    <Tag color="gold">Star {preview.starCount}</Tag>
+                    <Tag color="gold">收藏 {preview.starCount}</Tag>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Button icon={<Star className={preview.starred ? "size-4 fill-current" : "size-4"} />} onClick={() => void starShare()}>{preview.starred ? "已 Star" : "Star"}</Button>
-                    <Button type="primary" icon={<GitFork className="size-4" />} onClick={() => void forkShare()}>Fork 运行</Button>
+                    <Button icon={<Star className={preview.starred ? "size-4 fill-current" : "size-4"} />} onClick={() => void starShare()}>{preview.starred ? "已收藏" : "收藏"}</Button>
+                    <Button type="primary" icon={<GitFork className="size-4" />} onClick={() => void forkShare()}>复制并运行</Button>
                 </div>
             </header>
             }

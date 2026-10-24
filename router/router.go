@@ -51,7 +51,7 @@ func New() *gin.Engine {
 	})
 	api.GET("/auth/me", middleware.OptionalAuth, gin.WrapF(handler.CurrentUser))
 	api.GET("/settings", gin.WrapF(handler.Settings))
-	api.GET("/files/:id/content", middleware.OptionalAuth, func(c *gin.Context) {
+	api.GET("/files/:id/content", middleware.OptionalModelAuth, func(c *gin.Context) {
 		handler.FileContent(c.Writer, c.Request, c.Param("id"))
 	})
 	api.GET("/workflow-share-paths/:username/:slug", middleware.OptionalAuth, func(c *gin.Context) {
@@ -61,32 +61,37 @@ func New() *gin.Engine {
 		handler.VerifyWorkflowShareByPath(c.Writer, c.Request, c.Param("username"), c.Param("slug"))
 	})
 	v1 := api.Group("/v1", middleware.UserAuth)
-	v1.POST("/files", gin.WrapF(handler.UploadFile))
+	v1.GET("/api-keys", gin.WrapF(handler.UserAPIKeys))
+	v1.POST("/api-keys", gin.WrapF(handler.CreateUserAPIKey))
+	v1.DELETE("/api-keys/:id", func(c *gin.Context) { handler.RevokeUserAPIKey(c.Writer, c.Request, c.Param("id")) })
+	modelAPI := api.Group("/v1", middleware.ModelAuth)
+	modelAPI.GET("/models", gin.WrapF(handler.APIModels))
+	modelAPI.POST("/files", gin.WrapF(handler.UploadFile))
 	v1.POST("/asset-files", func(c *gin.Context) { handler.RetainAssetFiles(c.Writer, c.Request, "") })
 	v1.POST("/asset-files/:id", func(c *gin.Context) { handler.RetainAssetFiles(c.Writer, c.Request, c.Param("id")) })
 	v1.DELETE("/asset-files/:id", func(c *gin.Context) { handler.ReleaseAssetFiles(c.Writer, c.Request, c.Param("id")) })
-	v1.POST("/images/generations", gin.WrapF(handler.AIImagesGenerations))
-	v1.POST("/images/edits", gin.WrapF(handler.AIImagesEdits))
-	v1.POST("/chat/completions", gin.WrapF(handler.AIChatCompletions))
-	v1.POST("/videos", gin.WrapF(handler.AIVideos))
-	v1.GET("/videos/:id", func(c *gin.Context) {
+	modelAPI.POST("/images/generations", gin.WrapF(handler.AIImagesGenerations))
+	modelAPI.POST("/images/edits", gin.WrapF(handler.AIImagesEdits))
+	modelAPI.POST("/chat/completions", gin.WrapF(handler.AIChatCompletions))
+	modelAPI.POST("/videos", gin.WrapF(handler.AIVideos))
+	modelAPI.GET("/videos/:id", func(c *gin.Context) {
 		handler.AIVideo(c.Writer, c.Request, c.Param("id"))
 	})
-	v1.GET("/videos/:id/content", func(c *gin.Context) {
+	modelAPI.GET("/videos/:id/content", func(c *gin.Context) {
 		handler.AIVideoContent(c.Writer, c.Request, c.Param("id"))
 	})
-	v1.POST("/model-3d/generations", gin.WrapF(handler.AIModel3DGenerations))
-	v1.GET("/model-3d/generations/:id", func(c *gin.Context) {
+	modelAPI.POST("/model-3d/generations", gin.WrapF(handler.AIModel3DGenerations))
+	modelAPI.GET("/model-3d/generations/:id", func(c *gin.Context) {
 		handler.AIModel3DGeneration(c.Writer, c.Request, c.Param("id"))
 	})
-	v1.GET("/generation-tasks", gin.WrapF(handler.GenerationTasks))
-	v1.GET("/generation-tasks/:id", func(c *gin.Context) {
+	modelAPI.GET("/generation-tasks", gin.WrapF(handler.GenerationTasks))
+	modelAPI.GET("/generation-tasks/:id", func(c *gin.Context) {
 		handler.GenerationTask(c.Writer, c.Request, c.Param("id"))
 	})
-	v1.GET("/generation-tasks/:id/result", func(c *gin.Context) {
+	modelAPI.GET("/generation-tasks/:id/result", func(c *gin.Context) {
 		handler.GenerationTaskResult(c.Writer, c.Request, c.Param("id"))
 	})
-	v1.DELETE("/generation-tasks/:id", func(c *gin.Context) {
+	modelAPI.DELETE("/generation-tasks/:id", func(c *gin.Context) {
 		handler.CancelGenerationTask(c.Writer, c.Request, c.Param("id"))
 	})
 	v1.GET("/generation-histories", gin.WrapF(handler.GenerationHistories))

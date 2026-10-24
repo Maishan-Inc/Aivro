@@ -25,6 +25,7 @@ type AIProxyResponse struct {
 	StatusCode int
 	Header     http.Header
 	Body       []byte
+	UsageTokens int
 }
 
 // GenerationTaskResultStream 是任务结果的流式视图，由调用方负责关闭 Content。
@@ -62,10 +63,11 @@ func SubmitAITask(ctx context.Context, user model.AuthUser, body []byte, content
 		return model.GenerationTaskSubmitResult{}, nil, err
 	}
 	queue := normalizeAIQueueSetting(settings.Private.AIQueue)
-	credits, err := ModelCost(modelName)
+	billing, err := RequestModelBilling(ctx, modelName)
 	if err != nil {
 		return model.GenerationTaskSubmitResult{}, nil, err
 	}
+	credits := billing.Credits
 	requestCount, err := ReadAIRequestCount(body, contentType)
 	if err != nil { return model.GenerationTaskSubmitResult{}, nil, err }
 	if credits < 0 || credits > int(^uint(0)>>1)/requestCount { return model.GenerationTaskSubmitResult{}, nil, safeMessageError{message: "模型计费配置无效"} }
@@ -114,6 +116,7 @@ func SubmitAITask(ctx context.Context, user model.AuthUser, body []byte, content
 		CreatedAt:     now,
 		UpdatedAt:     now,
 	}
+	if IsAPIKeyRequest(ctx) { task.APIBillingType, task.APIUnitCredits = billing.BillingType, billing.Credits }
 	canRun, err := canDispatchModel(modelName, queue)
 	if err != nil {
 		queueMu.Unlock()
@@ -338,7 +341,17 @@ func executeTask(ctx context.Context, user model.AuthUser, task model.Generation
 		return failExecutingTask(task, "AI 结果保存失败")
 	}
 	fields := map[string]any{"response_status": resp.StatusCode, "response_header": string(headerJSON), "response_file_id": responseFile.File.ID, "finished_at": now}
-	changed, err := repository.FinishGenerationTask(task, model.GenerationTaskSucceeded, fields, nil)
+	var settlement *model.CreditLog
+	if task.APIBillingType == model.BillingTypeToken {
+		actual := apiUsageCredits(task.APIUnitCredits, task.Credits, resp.UsageTokens)
+		fields["credits"] = actual
+		if delta := task.Credits-actual; delta != 0 {
+			settlement = taskRefundLog(task)
+			settlement.Amount, settlement.Remark = delta, "API 用量结算"
+			if delta < 0 { settlement.Type, settlement.Category = model.CreditLogTypeAIConsume, creditLogCategory(model.CreditLogTypeAIConsume) }
+		}
+	}
+	changed, err := repository.FinishGenerationTask(task, model.GenerationTaskSucceeded, fields, settlement)
 	if err != nil { return failExecutingTask(task, "AI 结果保存失败") }
 	if !changed { return AIProxyResponse{}, safeMessageError{message: "任务已结束，请刷新任务列表"} }
 	return resp, nil

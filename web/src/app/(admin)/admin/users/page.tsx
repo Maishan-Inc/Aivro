@@ -167,7 +167,7 @@ export default function AdminUsersPage() {
             responsive: ["lg"],
             render: (_, item) => (
                 <Space direction="vertical" size={0}>
-                    <Tag>{item.authProvider || "password"}</Tag>
+                    <Tag>{item.authProvider === "password" ? "密码" : item.authProvider || "密码"}</Tag>
                     <Typography.Text type="secondary" ellipsis style={{ maxWidth: 150 }}>
                         {item.metamaskAddress || item.googleId || item.githubId || item.linuxDoId || "-"}
                     </Typography.Text>
@@ -273,7 +273,7 @@ export default function AdminUsersPage() {
                                     <Space size={[6, 6]} wrap>
                                         <Tag>算力点 {editingUser.credits ?? 0}</Tag>
                                         <Tag color="blue">工作流次数 {editingUser.workflowCreateCredits ?? 0}</Tag>
-                                        <Tag>{editingUser.authProvider || "password"}</Tag>
+                                        <Tag>{editingUser.authProvider === "password" ? "密码" : editingUser.authProvider || "密码"}</Tag>
                                     </Space>
                                 ) : null}
                             </Flex>

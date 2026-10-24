@@ -343,7 +343,7 @@ export function WorkflowLibraryView({ initialTab = "workflows", lockTab = false,
                         keyword={keyword}
                         isCreating={isCreating}
                         emptyTitle={activeTab === "shares" ? "还没有分享副本" : "还没有云端工作流"}
-                        emptyDescription={activeTab === "shares" ? "从分享链接 Fork 的独立副本和自动更新工作流会显示在这里。" : "新建工作流会消耗 1 次创建次数，并保存到你的账号。"}
+                        emptyDescription={activeTab === "shares" ? "从分享链接复制的独立副本和自动更新工作流会显示在这里。" : "新建工作流会消耗 1 次创建次数，并保存到你的账号。"}
                         onCreate={createAndEnter}
                         onRename={renameProject}
                         onDelete={deleteProjects}

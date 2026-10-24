@@ -10,4 +10,4 @@
 @keyframes vertical { from { transform: translateY(0); } to { transform: translateY(calc(100% + 170px)); } }
 @keyframes horizontal { from { transform: translateX(0); } to { transform: translateX(calc(100% + 220px)); } }
 @media (max-width: 700px) { .clearance { background: radial-gradient(ellipse 80% 45% at 50% 30%, var(--background) 30%, transparent); } }
-@media (prefers-reduced-motion: reduce) { .vertical span, .horizontal span { animation: none; display: none; } }
+@media (prefers-reduced-motion: reduce) { .flow:not([data-continuous="true"]) .vertical span, .flow:not([data-continuous="true"]) .horizontal span { animation: none; display: none; } }

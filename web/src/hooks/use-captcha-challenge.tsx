@@ -113,7 +113,8 @@ function CaptchaChallenge({ open, provider, siteKey, resetKey, error, onVerify, 
 
     if (!open || !siteKey) return null;
     return (
-        <Modal centered open={open} zIndex={2100} title="人机验证" onCancel={onCancel} footer={null} width={460} destroyOnHidden>
+        <Modal centered open={open} zIndex={2100} title={<span className="text-sm font-medium tracking-wide">Onward WAF</span>} onCancel={onCancel} footer={null} width={460} destroyOnHidden>
+            <h2 className="mb-2 text-center text-base font-semibold text-foreground">请完成安全检查以继续</h2>
             <p className="mb-4 text-center text-sm leading-6 text-muted-foreground">请完成验证后继续，帮助我们保障账户安全。</p>
             <div className="mb-5 grid gap-1 break-all text-center text-[11px] leading-5 text-muted-foreground"><span>会话编号：{session?.sessionId || "—"}</span><div className="flex flex-wrap justify-center gap-x-4"><span>国家/地区：{country}</span><span>IP：{session?.clientIP || "—"}</span></div></div>
             <div className="relative flex min-h-24 items-center justify-center">
@@ -123,6 +124,7 @@ function CaptchaChallenge({ open, provider, siteKey, resetKey, error, onVerify, 
                 </div>
             </div>
             {error ? <div className="mt-3 text-center text-sm text-red-500"><p>{error}</p><button type="button" onClick={onRetry} className="mt-2 underline underline-offset-4">重新验证</button></div> : null}
+            <p className="mt-4 text-center text-[11px] leading-5 text-muted-foreground">由 Onward WAF 提供支持 · © 2026 Onward Inc.</p>
         </Modal>
     );
 }

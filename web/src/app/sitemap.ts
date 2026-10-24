@@ -5,7 +5,7 @@ import { alternateLanguages, localizedUrl, seoPages } from "@/lib/seo";
 
 export default function sitemap(): MetadataRoute.Sitemap {
     const now = new Date();
-    return Object.values(seoPages)
+    const pages: MetadataRoute.Sitemap = Object.values(seoPages)
         .filter((page) => page.index)
         .flatMap((page) =>
             locales.map((locale) => ({
@@ -16,4 +16,5 @@ export default function sitemap(): MetadataRoute.Sitemap {
                 alternates: { languages: alternateLanguages(page.path) },
             })),
         );
+    return pages;
 }

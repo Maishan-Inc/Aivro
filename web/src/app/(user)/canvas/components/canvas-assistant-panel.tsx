@@ -244,7 +244,7 @@ export function CanvasAssistantPanel({ workflowId, nodes, selectedNodeIds, snaps
             });
             setLocalActiveSessionId(result.session.id);
         } catch (error) {
-            updateMessage(session.id, assistantId, { text: error instanceof Error ? error.message : "操作失败", isLoading: false });
+            updateMessage(session.id, assistantId, { text: error instanceof Error ? error.message : "操作失败", isLoading: false, isError: true });
         } finally {
             setIsRunning(false);
         }
@@ -361,10 +361,10 @@ export function CanvasAssistantPanel({ workflowId, nodes, selectedNodeIds, snaps
                     ) : (
                         <div className="flex h-full flex-col items-center justify-center px-1 text-center">
                             <div className="relative font-serif text-4xl font-bold italic tracking-normal" style={{ color: theme.node.text }}>
-                                <span>Infinite Canvas</span>
-                                <DiaTextReveal className="absolute inset-0" colors={["#A97CF8", "#F38CB8", "#FDCC92"]} textColor="transparent" duration={1.8} startOnView={false} text="Infinite Canvas" />
+                                <span>无限画布</span>
+                                <DiaTextReveal className="absolute inset-0" colors={["#A97CF8", "#F38CB8", "#FDCC92"]} textColor="transparent" duration={1.8} startOnView={false} text="无限画布" />
                             </div>
-                            <div className="mt-3 font-serif text-base italic tracking-wide opacity-60">One canvas, infinite ideas</div>
+                            <div className="mt-3 font-serif text-base italic tracking-wide opacity-60">一块画布，无限灵感</div>
                         </div>
                     )}
                 </div>
@@ -547,7 +547,7 @@ function AssistantMessages({
                                 回答
                             </div>
                         ) : null}
-                        {message.text}
+                        <span data-i18n-skip={!message.isLoading && !message.isError ? true : undefined}>{message.text}</span>
                     </div>
                     {message.references?.length ? <MessageReferences message={message} /> : null}
                     {message.isLoading ? <ImageGenerationPending compact label={message.mode === "image" ? "正在生成图片" : "正在规划画布修改"} className="w-[250px] rounded-2xl border" /> : null}
@@ -561,7 +561,7 @@ function AssistantMessages({
                     {message.agentOps?.length ? (
                         <div className="max-w-[88%] rounded-xl border px-3 py-2 text-xs leading-5" style={{ borderColor: theme.node.stroke, color: theme.node.muted }}>
                             <div>{summarizeCanvasAgentOps(message.agentOps)}</div>
-                            {message.agentUsage ? <div className="opacity-70">Token {message.agentUsage.totalTokens}，消耗 {message.agentUsage.credits} 算力点{message.agentUsage.estimated ? "（估算）" : ""}</div> : null}
+                            {message.agentUsage ? <div className="opacity-70">词元 {message.agentUsage.totalTokens}，消耗 {message.agentUsage.credits} 算力点{message.agentUsage.estimated ? "（估算）" : ""}</div> : null}
                         </div>
                     ) : null}
                     {message.images?.map((image) => (

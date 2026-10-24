@@ -80,14 +80,16 @@ func CreateModel3DGeneration(ctx context.Context, user model.AuthUser, input Mod
 		return Model3DGenerationResult{}, err
 	}
 	started := time.Now()
-	credits, err := Model3DCredits(input)
+	billing, err := RequestModelBilling(ctx, input.Model)
+	if err != nil { return Model3DGenerationResult{}, err }
+	credits, err := Model3DCredits(input, billing.Credits)
 	if err != nil {
 		return Model3DGenerationResult{}, err
 	}
 	if err := ConsumeUserCreditsWithMeta(user.ID, input.Model, credits, model3DPath, meta); err != nil {
 		return Model3DGenerationResult{}, err
 	}
-	result, err := requestHunyuanModel3D(ctx, user, input, credits)
+	result, err := requestHunyuanModel3D(ctx, user, input, credits, billing, meta)
 	if err != nil {
 		_ = RefundUserCreditsWithMeta(user.ID, input.Model, credits, model3DPath, meta)
 		return Model3DGenerationResult{}, err
@@ -99,7 +101,6 @@ func CreateModel3DGeneration(ctx context.Context, user model.AuthUser, input Mod
 	result.Model = input.Model
 	result.Mode = input.Mode
 	result.Prompt = input.Prompt
-	result.EnergyCost = credits
 	result.Config = model3DConfig(input, result)
 	result.References = model3DReferences(input.Images)
 	result.DurationMs = time.Since(started).Milliseconds()
@@ -112,11 +113,7 @@ func GetModel3DGeneration(user model.AuthUser, id string) (Model3DGenerationResu
 	return Model3DGenerationResult{}, safeMessageError{message: "3D 模型任务已由创建接口直接返回结果，请从生成历史查看"}
 }
 
-func Model3DCredits(input Model3DGenerationInput) (int, error) {
-	base, err := ModelCost(input.Model)
-	if err != nil {
-		return 0, err
-	}
+func Model3DCredits(input Model3DGenerationInput, base int) (int, error) {
 	if base == 0 { return 0, nil }
 	qualityMultiplier := 1.0
 	switch input.MeshQuality {
@@ -188,7 +185,7 @@ func validateModel3DInput(input Model3DGenerationInput) error {
 	return nil
 }
 
-func requestHunyuanModel3D(ctx context.Context, user model.AuthUser, input Model3DGenerationInput, credits int) (Model3DGenerationResult, error) {
+func requestHunyuanModel3D(ctx context.Context, user model.AuthUser, input Model3DGenerationInput, credits int, billing model.ModelCost, meta RequestLogMeta) (Model3DGenerationResult, error) {
 	route, err := SelectModelChannelRoute(input.Model)
 	if err != nil || strings.TrimSpace(route.Channel.BaseURL) == "" {
 		return Model3DGenerationResult{}, SafeAIError("没有可用的 3D 模型渠道")
@@ -217,7 +214,16 @@ func requestHunyuanModel3D(ctx context.Context, user model.AuthUser, input Model
 		log.Printf("model3d upstream error: status=%d", response.StatusCode)
 		return Model3DGenerationResult{}, SafeAIError("腾讯混元 3D 生成请求失败")
 	}
-	return normalizeModel3DProviderResponse(ctx, user, input, body)
+	result, err := normalizeModel3DProviderResponse(ctx, user, input, body)
+	if err != nil { return result, err }
+	result.EnergyCost = credits
+	if IsAPIKeyRequest(ctx) && billing.BillingType == model.BillingTypeToken {
+		actual := apiUsageCredits(billing.Credits, credits, AIResponseUsageTokens(body))
+		if actual > credits { err = ConsumeUserCreditsWithMeta(user.ID, input.Model, actual-credits, model3DPath, meta) } else if actual < credits { err = RefundUserCreditsWithMeta(user.ID, input.Model, credits-actual, model3DPath, meta) }
+		if err != nil { return result, err }
+		result.EnergyCost = actual
+	}
+	return result, nil
 }
 
 func normalizeModel3DProviderResponse(ctx context.Context, user model.AuthUser, input Model3DGenerationInput, body []byte) (Model3DGenerationResult, error) {

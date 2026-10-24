@@ -18,7 +18,7 @@ export default function UserLayout({ children }: { children: ReactNode }) {
         <div className="relative flex h-dvh flex-col overflow-hidden bg-background text-foreground">
             {immersivePath ? null : <AppTopNav />}
             <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
-            {immersivePath || cleanPathname === "/" ? null : <footer className="shrink-0 border-t border-border bg-background px-6 py-3 text-center text-xs text-muted-foreground">Copyright © 2026 Maishan Inc. All rights reserved Aivro</footer>}
+            {immersivePath || cleanPathname === "/" ? null : <footer className="shrink-0 border-t border-border bg-background px-6 py-3 text-center text-xs text-muted-foreground">© 2026 Maishan Inc. · Aivro 版权所有</footer>}
         </div>
     );
 }

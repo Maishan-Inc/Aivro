@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Select } from "antd";
 
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/hooks/use-i18n";
 
 const sizeOptions = ["auto", "1:1", "3:2", "2:3", "4:3", "3:4", "16:9", "9:16"];
 
@@ -14,11 +15,12 @@ type CanvasSizePickerProps = {
 };
 
 export function CanvasSizePicker({ value, className, onChange }: CanvasSizePickerProps) {
+    const { tr } = useI18n();
     const rootRef = useRef<HTMLDivElement>(null);
     const [open, setOpen] = useState(false);
     const [search, setSearch] = useState("");
     const extraOptions = [value, search.trim()].filter((item) => item && !sizeOptions.includes(item));
-    const options = [...sizeOptions, ...Array.from(new Set(extraOptions))].map((size) => ({ value: size, label: size }));
+    const options = [...sizeOptions, ...Array.from(new Set(extraOptions))].map((size) => ({ value: size, label: size === "auto" ? tr("自动") : size }));
     const selectSize = (next: string) => {
         onChange(next.trim());
         setSearch("");

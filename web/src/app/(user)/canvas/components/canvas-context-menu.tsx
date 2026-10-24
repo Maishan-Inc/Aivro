@@ -5,11 +5,13 @@ import type { ReactNode } from "react";
 import { Plus, Trash2 } from "lucide-react";
 
 import { canvasThemes } from "@/lib/canvas-theme";
+import { useI18n } from "@/hooks/use-i18n";
 import { useThemeStore } from "@/stores/use-theme-store";
 import type { ContextMenuState } from "../types";
 
 export function CanvasNodeContextMenu({ menu, onClose, onDuplicate, onDelete }: { menu: ContextMenuState; onClose: () => void; onDuplicate: () => void; onDelete: () => void }) {
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
+    const { tr } = useI18n();
 
     useEffect(() => {
         const close = (event: PointerEvent) => {
@@ -27,8 +29,8 @@ export function CanvasNodeContextMenu({ menu, onClose, onDuplicate, onDelete }: 
             style={{ left: menu.x, top: menu.y, background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.node.text }}
             onPointerDown={(event) => event.stopPropagation()}
         >
-            <MenuButton icon={<Plus className="size-4" />} label="Duplicate" onClick={onDuplicate} />
-            <MenuButton icon={<Trash2 className="size-4" />} label="Delete" onClick={onDelete} danger />
+            <MenuButton icon={<Plus className="size-4" />} label={tr("复制")} onClick={onDuplicate} />
+            <MenuButton icon={<Trash2 className="size-4" />} label={tr("删除")} onClick={onDelete} danger />
         </div>
     );
 }

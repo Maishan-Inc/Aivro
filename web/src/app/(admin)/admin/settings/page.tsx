@@ -1188,12 +1188,12 @@ export default function AdminSettingsPage() {
                                                 </Form.Item>
                                             </Col>
                                             <Col span={24}>
-                                                <Form.Item name={["private", "stripe", "secretKey"]} label="Secret Key" extra="后台返回时隐藏；留空保存表示沿用已保存密钥。">
+                                                <Form.Item name={["private", "stripe", "secretKey"]} label="私密密钥" extra="后台返回时隐藏；留空保存表示沿用已保存密钥。">
                                                     <Input.Password placeholder="sk_live_..." />
                                                 </Form.Item>
                                             </Col>
                                             <Col span={24}>
-                                                <Form.Item name={["private", "stripe", "webhookSecret"]} label="Webhook Secret" extra="用于校验 Stripe webhook 签名；留空保存表示沿用已保存密钥。">
+                                                <Form.Item name={["private", "stripe", "webhookSecret"]} label="回调签名密钥" extra="用于校验 Stripe webhook 签名；留空保存表示沿用已保存密钥。">
                                                     <Input.Password placeholder="whsec_..." />
                                                 </Form.Item>
                                             </Col>
@@ -1224,17 +1224,17 @@ export default function AdminSettingsPage() {
                                                 </Form.Item>
                                             </Col>
                                             <Col span={24}>
-                                                <Form.Item name={["private", "kyc", "diditApiKey"]} label="Didit API Key" extra="后台返回时隐藏；留空保存表示沿用已保存密钥。">
+                                                <Form.Item name={["private", "kyc", "diditApiKey"]} label="Didit API 密钥" extra="后台返回时隐藏；留空保存表示沿用已保存密钥。">
                                                     <Input.Password />
                                                 </Form.Item>
                                             </Col>
                                             <Col span={24}>
-                                                <Form.Item name={["private", "kyc", "diditWebhookSecret"]} label="Didit Webhook Secret" extra="用于校验 Didit webhook 签名；留空保存表示沿用已保存密钥。">
+                                                <Form.Item name={["private", "kyc", "diditWebhookSecret"]} label="Didit 回调签名密钥" extra="用于校验 Didit webhook 签名；留空保存表示沿用已保存密钥。">
                                                     <Input.Password />
                                                 </Form.Item>
                                             </Col>
                                             <Col span={24}>
-                                                <Form.Item name={["private", "kyc", "workflowId"]} label="Didit Workflow ID">
+                                                <Form.Item name={["private", "kyc", "workflowId"]} label="Didit 工作流 ID">
                                                     <Input />
                                                 </Form.Item>
                                             </Col>
@@ -1270,7 +1270,7 @@ export default function AdminSettingsPage() {
                                                 </Form.Item>
                                             </Col>
                                             <Col xs={24} md={16}>
-                                                <Form.Item name={["private", "mail", "host"]} label="SMTP Host">
+                                                <Form.Item name={["private", "mail", "host"]} label="SMTP 服务器">
                                                     <Input placeholder="smtp.example.com" />
                                                 </Form.Item>
                                             </Col>
@@ -1387,7 +1387,7 @@ export default function AdminSettingsPage() {
                                         </Col>
                                     </Row>
                                     <Form.Item name={["private", "aiQueue", "backend"]} label="队列后端" extra="第一版固定使用 database；Redis 为后续 PostgreSQL/MySQL 多实例加速预留。">
-                                        <Segmented options={[{ label: "Database", value: "database" }, { label: "Redis（预留）", value: "redis", disabled: true }]} />
+                                        <Segmented options={[{ label: "数据库", value: "database" }, { label: "Redis（预留）", value: "redis", disabled: true }]} />
                                     </Form.Item>
                                     <Form.List name={["private", "aiQueue", "modelPerMinute"]}>
                                         {(fields, { add, remove }) => (
@@ -1442,20 +1442,20 @@ export default function AdminSettingsPage() {
                                     <Row gutter={16}>
                                         <Col xs={24} md={12}>
                                             <Card size="small" title="Cloudflare Turnstile">
-                                                <Form.Item name={["private", "captcha", "turnstile", "siteKey"]} label="Site Key" extra="选择 Turnstile 时会通过公开设置下发给前端。">
+                                                <Form.Item name={["private", "captcha", "turnstile", "siteKey"]} label="站点密钥" extra="选择 Turnstile 时会通过公开设置下发给前端。">
                                                     <Input placeholder="0x..." />
                                                 </Form.Item>
-                                                <Form.Item name={["private", "captcha", "turnstile", "secretKey"]} label="Secret Key" extra="后台返回时隐藏；留空保存表示沿用已保存密钥。">
+                                                <Form.Item name={["private", "captcha", "turnstile", "secretKey"]} label="私密密钥" extra="后台返回时隐藏；留空保存表示沿用已保存密钥。">
                                                     <Input.Password placeholder="0x..." />
                                                 </Form.Item>
                                             </Card>
                                         </Col>
                                         <Col xs={24} md={12}>
                                             <Card size="small" title="hCaptcha">
-                                                <Form.Item name={["private", "captcha", "hcaptcha", "siteKey"]} label="Site Key" extra="选择 hCaptcha 时会通过公开设置下发给前端。">
+                                                <Form.Item name={["private", "captcha", "hcaptcha", "siteKey"]} label="站点密钥" extra="选择 hCaptcha 时会通过公开设置下发给前端。">
                                                     <Input placeholder="10000000-ffff-ffff-ffff-000000000001" />
                                                 </Form.Item>
-                                                <Form.Item name={["private", "captcha", "hcaptcha", "secretKey"]} label="Secret Key" extra="后台返回时隐藏；留空保存表示沿用已保存密钥。">
+                                                <Form.Item name={["private", "captcha", "hcaptcha", "secretKey"]} label="私密密钥" extra="后台返回时隐藏；留空保存表示沿用已保存密钥。">
                                                     <Input.Password placeholder="0x..." />
                                                 </Form.Item>
                                             </Card>
@@ -1530,7 +1530,7 @@ export default function AdminSettingsPage() {
                                 </Form.Item>
                             </Col>
                             <Col span={24}>
-                                <Form.Item name="apiKey" label="API Key" rules={editingChannelIndex === null ? [{ required: true, message: "请输入 API Key" }] : []}>
+                                <Form.Item name="apiKey" label="API 密钥" rules={editingChannelIndex === null ? [{ required: true, message: "请输入 API Key" }] : []}>
                                     <Input.Password placeholder={editingChannelIndex === null ? "" : "留空则沿用已保存的 API Key"} />
                                 </Form.Item>
                             </Col>
@@ -1936,12 +1936,12 @@ function OAuthProviderFields({ providerKey, currentOrigin }: { providerKey: "lin
                 </Form.Item>
             </Col>
             <Col xs={24} md={12}>
-                <Form.Item name={["private", "auth", providerKey, "clientId"]} label="Client ID">
+                <Form.Item name={["private", "auth", providerKey, "clientId"]} label="客户端 ID">
                     <Input />
                 </Form.Item>
             </Col>
             <Col xs={24} md={12}>
-                <Form.Item name={["private", "auth", providerKey, "clientSecret"]} label="Client Secret">
+                <Form.Item name={["private", "auth", providerKey, "clientSecret"]} label="客户端密钥">
                     <Input.Password placeholder="留空则沿用已保存的密钥" />
                 </Form.Item>
             </Col>
@@ -1961,7 +1961,7 @@ function OAuthProviderFields({ providerKey, currentOrigin }: { providerKey: "lin
                 </Form.Item>
             </Col>
             <Col xs={24} md={12}>
-                <Form.Item name={["private", "auth", providerKey, "scope"]} label="Scope">
+                <Form.Item name={["private", "auth", providerKey, "scope"]} label="授权范围">
                     <Input />
                 </Form.Item>
             </Col>
@@ -2048,12 +2048,12 @@ function CustomProviderFields({ index }: { index: number }) {
                 </Form.Item>
             </Col>
             <Col xs={24} md={12}>
-                <Form.Item name={[...base, "clientId"]} label="Client ID">
+                <Form.Item name={[...base, "clientId"]} label="客户端 ID">
                     <Input />
                 </Form.Item>
             </Col>
             <Col xs={24} md={12}>
-                <Form.Item name={[...base, "clientSecret"]} label="Client Secret">
+                <Form.Item name={[...base, "clientSecret"]} label="客户端密钥">
                     <Input.Password placeholder="留空则沿用已保存的密钥" />
                 </Form.Item>
             </Col>
@@ -2073,7 +2073,7 @@ function CustomProviderFields({ index }: { index: number }) {
                 </Form.Item>
             </Col>
             <Col xs={24} md={12}>
-                <Form.Item name={[...base, "scope"]} label="Scope">
+                <Form.Item name={[...base, "scope"]} label="授权范围">
                     <Input />
                 </Form.Item>
             </Col>

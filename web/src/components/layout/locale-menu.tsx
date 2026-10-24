@@ -14,7 +14,7 @@ export function LocaleMenu({ admin = false }: { admin?: boolean }) {
     return (
         <Dropdown trigger={["click"]} menu={{
             selectedKeys: [locale],
-            items: options.map((value) => ({ key: value, label: <span className="flex min-w-28 items-center justify-between gap-3">{localeLabels[value]}{value === locale ? <Check className="size-3.5" /> : null}</span> })),
+            items: options.map((value) => ({ key: value, label: <span data-i18n-skip className="flex min-w-28 items-center justify-between gap-3">{localeLabels[value]}{value === locale ? <Check className="size-3.5" /> : null}</span> })),
             onClick: ({ key }) => {
                 const next = key as Locale;
                 if (admin) {

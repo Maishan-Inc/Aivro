@@ -22,7 +22,7 @@ function escapeRegExp(value: string) {
 }
 
 function compile(dictionary: Dictionary): CompiledLocale {
-    const entries = Object.entries(dictionary).filter(([key, value]) => key && key !== value);
+    const entries = Object.entries(dictionary).filter(([key]) => key);
     entries.sort((a, b) => b[0].length - a[0].length);
 
     const exact = new Map<string, string>();
@@ -59,7 +59,7 @@ export function createTranslator(dictionaries: LocaleDictionaries) {
 
     return function translate(value: string, locale: Locale): string {
         // Simplified Chinese is the source language, so it needs no lookup.
-        if (locale === "zh-CN" || !value || !hasChinese.test(value)) return value;
+        if (locale === "zh-CN" || !value) return value;
         const table = compiled.get(locale);
         if (!table) return value;
 
@@ -70,6 +70,7 @@ export function createTranslator(dictionaries: LocaleDictionaries) {
 
         const exact = table.exact.get(body);
         if (exact) return `${leading}${exact}${trailing}`;
+        if (!hasChinese.test(body)) return value;
 
         for (const pattern of table.patterns) {
             const match = body.match(pattern.regex);

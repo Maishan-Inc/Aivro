@@ -143,8 +143,12 @@ func FinishGenerationTask(task model.GenerationTask, status model.GenerationTask
 		result := tx.Model(&model.GenerationTask{}).Where("id = ? AND status = ? AND worker_id = ?", task.ID, task.Status, task.WorkerID).Updates(fields)
 		if result.Error != nil || result.RowsAffected == 0 { return result.Error }
 		changed = true
-		if refund == nil || refund.Amount <= 0 { return nil }
-		if err := tx.Model(&model.User{}).Where("id = ?", task.UserID).Updates(map[string]any{"credits": gorm.Expr("credits + ?", refund.Amount), "updated_at": refund.CreatedAt}).Error; err != nil { return err }
+		if refund == nil || refund.Amount == 0 { return nil }
+		creditQuery := tx.Model(&model.User{}).Where("id = ?", task.UserID)
+		if refund.Amount < 0 { creditQuery = creditQuery.Where("credits >= ? AND status = ?", -refund.Amount, model.UserStatusActive) }
+		creditResult := creditQuery.Updates(map[string]any{"credits": gorm.Expr("credits + ?", refund.Amount), "updated_at": refund.CreatedAt})
+		if creditResult.Error != nil { return creditResult.Error }
+		if creditResult.RowsAffected == 0 { return errors.New("用户不存在或算力点不足") }
 		var user model.User
 		if err := tx.Where("id = ?", task.UserID).First(&user).Error; err != nil { return err }
 		refund.Balance = user.Credits

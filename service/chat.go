@@ -31,7 +31,7 @@ func RequestChatCompletion(ctx context.Context, userID string, body []byte, mode
 	if streaming, _ := payload["stream"].(bool); streaming { payload["stream_options"] = map[string]bool{"include_usage": true} }
 	body, _ = json.Marshal(payload)
 	if len(body) > 8<<20 { return nil, safeMessageError{message: "对话内容过大"} }
-	billing, err := ModelBilling(modelName)
+	billing, err := RequestModelBilling(ctx, modelName)
 	if err != nil { return nil, err }
 	routes, err := SelectModelChannelRoutes(modelName)
 	if err != nil { return nil, err }

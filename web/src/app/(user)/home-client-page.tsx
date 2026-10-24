@@ -7,7 +7,7 @@ import localforage from "localforage";
 import { nanoid } from "nanoid";
 import { SiX, SiFacebook, SiDiscord, SiTiktok, SiBilibili } from "@icons-pack/react-simple-icons";
 import Link from "next/link";
-import { ArrowDown, ArrowRight, ArrowUpRight, Box, Check, ChevronRight, ImagePlus, Maximize2, Pause, Play, Plus, Video } from "lucide-react";
+import { ArrowRight, ArrowUpRight, ChevronRight, Code2, KeyRound, Plus, Terminal } from "lucide-react";
 import { FlowBackground } from "@/components/flow-background";
 import { ImagePromptComposer } from "@/components/image-prompt-composer";
 import { CookiePreferences } from "@/components/cookie-preferences";
@@ -16,7 +16,7 @@ import { navigationTools } from "@/constant/navigation-tools";
 import { defaultHomeSettings, homeSocialPlatforms } from "@/constant/home-settings";
 import { useI18n } from "@/hooks/use-i18n";
 import { useLocalizedPath } from "@/hooks/use-localized-path";
-import { promptGallerySources, usePromptGallery } from "@/hooks/use-prompt-gallery";
+import { davidWuPromptSource, usePromptGallery } from "@/hooks/use-prompt-gallery";
 import { questions, toolDescriptions } from "./home-content";
 import { homeWordmarkPaths } from "./home-wordmark";
 import { useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
@@ -26,22 +26,23 @@ import { useHomeScroll } from "./use-home-scroll";
 import { HomeModels } from "./home-models";
 import { HomePlans } from "./home-plans";
 import { HomeNetwork } from "./home-network";
+import { HomeWorkflowDemo } from "./home-workflow-demo";
 import styles from "./home.module.css";
 
-const scenes = [
-    { label: "图像创作", icon: ImagePlus, title: <>一句描述<br />万千种可能</>, text: "用文字勾勒画面，也用参考图传递那些难以描述的细节。在每一次生成中，靠近心里的答案。", route: "/image", points: ["文字生图与参考图编辑", "自由比例与多张生成", "保存作品，继续创作"] },
-    { label: "视频叙事", icon: Video, title: <>让故事<br />从这一帧继续</>, text: "为静态的灵感赋予时间。描述镜头的运动、主体的动作与场景氛围，让想象逐帧展开。", route: "/video", points: ["文字与参考图输入", "镜头、尺寸与时长", "从灵感到动态叙事"] },
-    { label: "空间探索", icon: Box, title: <>多一个维度<br />多一种表达</>, text: "从文字、一张图片或多个视角出发，探索三维形体。让材质与结构，成为表达的一部分。", route: "/model-3d", points: ["文字、图片与多视角", "网格、纹理与 PBR", "生成并下载模型"] },
-];
+const apiExample = `curl "$AIVRO_BASE_URL/images/generations" \\
+  -H "Authorization: Bearer $AIVRO_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "替换为已开放的图片模型",
+    "prompt": "晨光中的山间木屋",
+    "n": 1
+  }'`;
 
 export function HomeClientPage() {
     const router = useRouter();
     const { message } = App.useApp();
     const localizedPath = useLocalizedPath();
     const { locale } = useI18n();
-    const [category, setCategory] = useState("all");
-    const [paused, setPaused] = useState(false);
-    const [visible, setVisible] = useState(true);
     const [sending, setSending] = useState(false);
     const [openQuestion, setOpenQuestion] = useState<string | null>(null);
     const home = useConfigStore((state) => state.publicSettings?.home);
@@ -50,29 +51,17 @@ export function HomeClientPage() {
     const [failedVideoUrl, setFailedVideoUrl] = useState("");
     const videoUrl = home?.videoUrl || defaultHomeSettings.videoUrl;
     const videoEnabled = Boolean(home?.videoEnabled && failedVideoUrl !== videoUrl);
-    const rootRef = useHomeScroll(paused || !visible);
-    const gallery = usePromptGallery();
-    const featured = category === "all" ? gallery.items.slice(0, 12) : gallery.items.filter((item) => item.category === category);
-    const promptLink = (index: number, route = "/image") => localizedPath(gallery.items[index] ? route + "?prompt=" + encodeURIComponent(gallery.items[index].prompt) : route);
-
-    useEffect(() => {
-        const update = () => setVisible(!document.hidden);
-        document.addEventListener("visibilitychange", update);
-        return () => document.removeEventListener("visibilitychange", update);
-    }, []);
+    const rootRef = useHomeScroll();
+    const gallery = usePromptGallery(davidWuPromptSource.id);
 
     useEffect(() => {
         const video = videoRef.current;
         if (!video) return;
-        const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
-        const sync = () => {
-            if (paused || !visible || reduced.matches) video.pause();
-            else void video.play().catch(() => {});
-        };
+        const sync = () => { void video.play().catch(() => {}); };
         sync();
-        reduced.addEventListener("change", sync);
-        return () => reduced.removeEventListener("change", sync);
-    }, [paused, visible, videoEnabled, videoUrl]);
+        video.addEventListener("pause", sync);
+        return () => video.removeEventListener("pause", sync);
+    }, [videoEnabled, videoUrl]);
 
     const startImage = async () => {
         if (sending) return;
@@ -94,8 +83,8 @@ export function HomeClientPage() {
         }
     };
 
-    return <main ref={rootRef} className={styles.home} data-home-scroll data-paused={paused || !visible} id="top">
-        <div className={styles.ambient} aria-hidden="true"><div><FlowBackground /></div></div>
+    return <main ref={rootRef} className={styles.home} data-home-scroll id="top">
+        <div className={styles.ambient} aria-hidden="true"><div><FlowBackground alwaysAnimate /></div></div>
         <div data-home-content className={styles.homeContent}>
             <section className={styles.hero} data-video={videoEnabled}>
                 {videoEnabled ? <div className={styles.heroMedia}><video ref={videoRef} src={videoUrl} autoPlay muted loop playsInline preload="auto" aria-hidden="true" onError={() => setFailedVideoUrl(videoUrl)} /></div> : null}
@@ -110,35 +99,28 @@ export function HomeClientPage() {
             <HomePlans />
             <HomeNetwork />
 
-            <div id="platform" className={styles.platformHeading}>
-                <span className={styles.eyebrow}>一个想法，更多表达。</span>
-                <div className={styles.sceneLinks}>{scenes.map(({ label, icon: Icon }, index) => <a key={label} href={"#scene-" + index}><Icon size={18} />{label}<ArrowDown size={14} /></a>)}</div>
-                <button type="button" className={styles.motionToggle} onClick={() => setPaused((value) => !value)} aria-pressed={paused}>{paused ? <Play size={14} /> : <Pause size={14} />}{paused ? "播放动效" : "暂停动效"}</button>
-            </div>
+            <section id="platform" className={styles.section} aria-labelledby="workflow-title" data-reveal>
+                <div className={styles.sectionHeading}><div><span className={styles.eyebrow}>01 / 工作流使用演示</span><h2 id="workflow-title">让创作过程<br />在画布上发生</h2><p className={styles.sectionIntro}>写下描述，连接参考与生成节点，让创作顺着你的思路展开。</p></div><Link href={localizedPath("/canvas")} className={styles.primary}>体验工作流 <ArrowUpRight size={18} /></Link></div>
+                <HomeWorkflowDemo />
+            </section>
 
-            {scenes.map(({ label, icon: Icon, title, text, route, points }, index) => <section key={label} id={"scene-" + index} className={styles.scene} data-reverse={index % 2 === 1} data-reveal>
-                <div className={styles.sceneCopy}><span className={styles.eyebrow}><Icon size={17} />0{index + 1} / {label}</span><h2>{title}</h2><p>{text}</p><ul>{points.map((point) => <li key={point}><Check size={15} />{point}</li>)}</ul><Link href={localizedPath(route)} className={styles.primary}>开始{label} <ArrowUpRight size={18} /></Link></div>
-                <div className={styles.sceneVisual}>
-                    <Link href={promptLink(index, route)} className={styles.sceneImage}><PromptLibraryImage prompt={gallery.items[index]} className={styles.fillImage} /><span className={styles.imageCaption}><span>灵感参考 / {label}</span><ArrowUpRight size={22} /></span></Link>
-                    <Link href={promptLink(index + 6, route)} className={styles.sceneInset} aria-label={"使用" + label + "灵感"}><PromptLibraryImage prompt={gallery.items[index + 6]} className={styles.fillImage} /></Link>
-                    <span className={styles.sceneNumber} aria-hidden="true">0{index + 1}</span>
+            <section id="api" className={styles.apiSection} aria-labelledby="api-title" data-reveal>
+                <div><span className={styles.eyebrow}><Code2 size={17} />02 / 为你的应用而生</span><h2 id="api-title">通过 API<br />在任意地方使用</h2><p className={styles.sectionIntro}>将图像、视频、对话与 3D 生成接入你的网站、应用和自动化流程。用熟悉的代码，让创作能力随处可用。</p><div className={styles.apiActions}><Link href={localizedPath("/developers")} className={styles.primary}>查看接入文档 <ArrowUpRight size={18} /></Link><Link href={localizedPath("/console/api-keys")} className={styles.textLink}><KeyRound size={16} />创建 API 密钥 <ArrowRight size={16} /></Link></div></div>
+                <div className={styles.apiVisual}>
+                    <div className={styles.apiDestinations}>{["网站", "应用", "自动化"].map((label) => <span key={label}>{label}<span className={styles.apiSignal} aria-hidden="true" /></span>)}</div>
+                    <div className={styles.apiCode}><div className={styles.apiCodeHeader}><Terminal size={16} /><span>Aivro API</span><span className={styles.apiMethod}>POST</span></div><pre data-native-scroll><code>{apiExample}</code></pre><div className={styles.apiCodeFooter}><span className={styles.liveDot} /><span>一个接口，连接你的创作场景</span><ArrowUpRight size={16} /></div></div>
                 </div>
-            </section>)}
-
-            <section className={styles.workflow} data-reveal>
-                <div><span className={styles.eyebrow}><Maximize2 size={17} />04 / 让创作连起来</span><h2>像思考一样<br />自由连接</h2><p>把灵感、参考与生成步骤放到无限画布上。<br />让每一步，都成为下一次创作的起点。</p><Link href={localizedPath("/canvas")} className={styles.textLink}>打开工作流 <ArrowRight size={18} /></Link></div>
-                <div className={styles.workflowImages} aria-label="参考图与创作灵感"><PromptLibraryImage prompt={gallery.items[3]} /><span aria-hidden="true">→</span><PromptLibraryImage prompt={gallery.items[4]} /><span aria-hidden="true">→</span><PromptLibraryImage prompt={gallery.items[5]} /></div>
             </section>
 
             <section id="showcase" className={styles.section} data-reveal>
                 <div className={styles.sectionHeading}><div><span className={styles.eyebrow}>05 / 灵感没有边界</span><h2>先看见<br />再创造你的版本</h2></div><Link href={localizedPath("/prompts")} className={styles.textLink}>探索完整图库 <ArrowUpRight size={18} /></Link></div>
-                <div className={styles.filterTabs} data-native-scroll aria-label="灵感图库分类">{[{ id: "all", label: "全部灵感" }, ...promptGallerySources].map((source) => <button type="button" key={source.id} data-active={category === source.id} aria-pressed={category === source.id} onClick={() => setCategory(source.id)}>{source.label}</button>)}</div>
+                <div className={styles.gallerySource}>{davidWuPromptSource.label}</div>
                 <div className={styles.gallery} aria-busy={gallery.isLoading}>
-                    {featured.map((item) => <Link key={item.id} href={localizedPath("/image?prompt=" + encodeURIComponent(item.prompt))} className={styles.galleryCard}><PromptLibraryImage prompt={item} className={styles.galleryImage} /><div className={styles.galleryCaption}><span><small>{promptGallerySources.find((source) => source.id === item.category)?.label || item.category}</small><strong>{item.title}</strong></span><ArrowUpRight size={20} /></div></Link>)}
-                    {!featured.length && gallery.isLoading ? Array.from({ length: 6 }, (_, index) => <div key={index} className={styles.gallerySkeleton} />) : null}
+                    {gallery.items.map((item) => <Link key={item.id} href={localizedPath("/image?prompt=" + encodeURIComponent(item.prompt))} className={styles.galleryCard}><PromptLibraryImage prompt={item} className={styles.galleryImage} /><div className={styles.galleryCaption}><span><small>{davidWuPromptSource.label}</small><strong>{item.title}</strong></span><ArrowUpRight size={20} /></div></Link>)}
+                    {!gallery.items.length && gallery.isLoading ? Array.from({ length: 6 }, (_, index) => <div key={index} className={styles.gallerySkeleton} />) : null}
                 </div>
-                {!featured.length && !gallery.isLoading ? <p className={styles.sourceNote}>这个分类暂时还没有可展示的作品。</p> : null}
-                {gallery.isError ? <p className={styles.sourceNote}>部分图库暂时未能加载。<button type="button" onClick={() => void gallery.refetch()}>重新加载</button></p> : null}
+                {!gallery.items.length && !gallery.isLoading && !gallery.isError ? <p className={styles.sourceNote}>这个分类暂时还没有可展示的作品。</p> : null}
+                {gallery.isError ? <p className={styles.sourceNote}>图库暂时未能加载。<button type="button" onClick={() => void gallery.refetch()}>重新加载</button></p> : null}
                 <p className={styles.sourceNote}>展示作品来自提示词图库。点击作品，将对应提示词带入创作工作台。</p>
             </section>
 
@@ -159,7 +141,7 @@ export function HomeClientPage() {
                     const Icon = { x: SiX, facebook: SiFacebook, discord: SiDiscord, tiktok: SiTiktok, bilibili: SiBilibili }[id];
                     return link.enabled ? <a key={id} href={link.url || undefined} role="link" aria-label={label} title={label} aria-disabled={!link.url} target={link.url ? "_blank" : undefined} rel={link.url ? "noopener noreferrer" : undefined}><Icon size={18} /></a> : null;
                 })}</div></div><div><strong>创作</strong><Link href={localizedPath("/canvas")}>工作流</Link><Link href={localizedPath("/image")}>图像生成</Link><Link href={localizedPath("/video")}>视频创作</Link><Link href={localizedPath("/model-3d")}>3D 模型</Link></div><div><strong>探索</strong><Link href={localizedPath("/prompts")}>提示词库</Link><Link href={localizedPath("/assets")}>我的素材</Link><Link href={localizedPath("/console/community")}>社区工作流</Link><Link href={localizedPath("/models")}>模型定价</Link><Link href={localizedPath("/pricing")}>套餐</Link></div><div><strong>关于</strong><a href="#faq">常见问题</a><Link href={localizedPath("/privacy")}>隐私政策</Link><Link href={localizedPath("/terms")}>服务条款</Link><a href="#top">回到顶部 ↑</a></div></div>
-                <div className={styles.footerBottom}><span><span className={styles.liveDot} />All systems normal.</span><CookiePreferences /><span className={styles.copyright}>Copyright © 2026 Maishan Inc. All rights reserved Aivro</span></div>
+                <div className={styles.footerBottom}><span><span className={styles.liveDot} />所有系统运行正常。</span><CookiePreferences /><span className={styles.copyright}>© 2026 Maishan Inc. · Aivro 版权所有</span></div>
                 <svg data-wordmark className={styles.footerWordmark} viewBox="0 0 1000 330" aria-label="Aivro" role="img">{homeWordmarkPaths.map((d, index) => <g key={index}><path data-wordmark-base d={d} aria-hidden="true" /><path data-wordmark-trace d={d} /></g>)}</svg>
             </footer>
         </div>

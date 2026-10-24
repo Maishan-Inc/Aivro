@@ -52,6 +52,8 @@ export function MobileNavDrawer({ open, activeToolSlug, onClose }: MobileNavDraw
                     );
                 })}
                 <Link href={withLocalePath("/console/community", locale)} onClick={onClose} className="block rounded-lg px-3 py-3 text-base hover:bg-muted">社区工作流</Link>
+                <Link href={withLocalePath("/models", locale)} onClick={onClose} className="block rounded-lg px-3 py-3 text-base hover:bg-muted">模型定价</Link>
+                <Link href={withLocalePath("/developers", locale)} onClick={onClose} className="block rounded-lg px-3 py-3 text-base hover:bg-muted">开发文档</Link>
             </div>
         </Drawer>
     );

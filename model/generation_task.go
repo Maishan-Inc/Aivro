@@ -21,6 +21,8 @@ type GenerationTask struct {
 	ContentType    string               `json:"contentType"`
 	RequestFileID  string               `json:"requestFileId" gorm:"index"`
 	Credits        int                  `json:"credits"`
+	APIBillingType string               `json:"-"`
+	APIUnitCredits int                  `json:"-"`
 	RequestCount   int                  `json:"requestCount"`
 	Status         GenerationTaskStatus `json:"status" gorm:"index"`
 	QueuePosition  int                  `json:"queuePosition" gorm:"index"`

@@ -4,6 +4,8 @@ import { createZip, readZip } from "@/lib/zip";
 import { getMediaBlob, uploadMediaFile } from "@/services/file-storage";
 import { getImageBlob, uploadImage } from "@/services/image-storage";
 import type { Asset } from "@/stores/use-asset-store";
+import { useLocaleStore } from "@/stores/use-locale-store";
+import { translate } from "@/i18n/runtime-translations";
 
 type AssetExportFile = {
     app: "aivro";
@@ -39,13 +41,13 @@ export async function exportAssets(assets: Asset[]) {
 
     const data: AssetExportFile = { app: "aivro", version: 1, exportedAt: new Date().toISOString(), assets, files };
     const zip = await createZip([{ name: "assets.json", data: JSON.stringify(data, null, 2) }, ...zipFiles]);
-    saveAs(zip, "我的素材.zip");
+    saveAs(zip, translate("我的素材.zip", useLocaleStore.getState().locale));
 }
 
 export async function readAssetPackage(file: File) {
     const zip = await readZip(file);
     const assetFile = zip.get("assets.json");
-    if (!assetFile) throw new Error("missing assets.json");
+    if (!assetFile) throw new Error("素材包缺少 assets.json");
     const data = JSON.parse(await assetFile.text()) as AssetExportFile;
     const uploadedFiles = new Map<string, { url: string; storageKey: string; bytes: number; mimeType: string; width?: number; height?: number }>();
     await Promise.all(

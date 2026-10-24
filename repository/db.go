@@ -40,6 +40,7 @@ var databaseMigrationSources = []string{
 	"repository/db.go",
 	"repository/db_indexes.go",
 	"model/user.go",
+	"model/api_key.go",
 	"model/prompt.go",
 	"model/asset.go",
 	"model/cloud_file.go",
@@ -136,6 +137,7 @@ func DatabaseStatus() (model.DatabaseStatus, error) {
 func migrateModels(db *gorm.DB) error {
 	err := db.AutoMigrate(
 		&model.User{},
+		&model.UserAPIKey{},
 		&model.UserPreference{},
 		&model.RateLimitBucket{},
 		&model.EmailVerification{},
@@ -240,6 +242,7 @@ func databaseMigrationModelItems() []struct {
 		value any
 	}{
 		{"model.User", &model.User{}},
+		{"model.UserAPIKey", &model.UserAPIKey{}},
 		{"model.UserPreference", &model.UserPreference{}},
 		{"model.RateLimitBucket", &model.RateLimitBucket{}},
 		{"model.EmailVerification", &model.EmailVerification{}},

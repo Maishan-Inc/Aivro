@@ -66,8 +66,6 @@ function translateTextNode(node: Text, locale: Locale) {
     if (target !== current) {
         writtenText.set(node, target);
         node.nodeValue = target;
-    } else if (writtenText.has(node)) {
-        writtenText.delete(node);
     }
 }
 

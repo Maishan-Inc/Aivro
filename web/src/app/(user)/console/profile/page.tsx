@@ -80,7 +80,7 @@ export default function ConsoleProfilePage() {
                                 {(userName[0] || "U").toUpperCase()}
                             </Avatar>
                             <div className="min-w-0">
-                                <h2 className="truncate text-lg font-semibold">{userName || "Aivro User"}</h2>
+                                <h2 className="truncate text-lg font-semibold">{userName || "Aivro 用户"}</h2>
                                 <p className="mt-1 truncate text-sm text-stone-500 dark:text-stone-400">@{user?.username}</p>
                                 <div className="mt-2"><AvatarUpload /></div>
                             </div>

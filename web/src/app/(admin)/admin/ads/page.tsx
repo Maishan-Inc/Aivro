@@ -133,7 +133,7 @@ export default function AdminAdsPage() {
                                 </Form.Item>
                                 <Space wrap>
                                     <Tag color={scriptOk ? "success" : "default"}>{scriptOk ? "脚本地址有效" : "未识别 AdSense 脚本"}</Tag>
-                                    {publisherId ? <Tag color="processing">Publisher ID：{publisherId}</Tag> : null}
+                                    {publisherId ? <Tag color="processing">发布商 ID：{publisherId}</Tag> : null}
                                 </Space>
                                 <Alert style={{ marginTop: 16 }} type="info" showIcon title="当前实现加载 Auto Ads 脚本" description="如果你在 AdSense 后台开启自动广告，前台页面加载脚本后会由 Google 自动决定展示位置。" />
                             </Card>

@@ -256,8 +256,8 @@ function CanvasThemeButton({ colorTheme, targetTheme, onThemeChange, children }:
             onThemeChange={onThemeChange}
             className="inline-flex h-8 min-w-0 items-center justify-center gap-1.5 rounded-md px-2 text-sm transition"
             style={active ? activeStyle : { color: theme.toolbar.item }}
-            aria-label={`切换到${targetTheme === "dark" ? "深色" : "浅色"}主题`}
-            title={`切换到${targetTheme === "dark" ? "深色" : "浅色"}主题`}
+            aria-label={targetTheme === "dark" ? "切换到深色主题" : "切换到浅色主题"}
+            title={targetTheme === "dark" ? "切换到深色主题" : "切换到浅色主题"}
         >
             {children}
         </AnimatedThemeToggler>

@@ -440,7 +440,7 @@ function TextContent({ node, theme, isEditingContent, textareaRef, readOnly, onC
                     style={{ fontSize: `${node.metadata?.fontSize || 14}px`, color: theme.node.text }}
                     onWheel={(event) => event.stopPropagation()}
                 >
-                    {node.metadata?.content || <span style={{ color: theme.node.placeholder }}>双击编辑文字</span>}
+                    {node.metadata?.content ? <span data-i18n-skip>{node.metadata.content}</span> : <span style={{ color: theme.node.placeholder }}>双击编辑文字</span>}
                 </div>
             )}
         </div>

@@ -9,6 +9,7 @@ export type SeoPageKey =
     | "home"
     | "pricing"
     | "models"
+    | "developers"
     | "image"
     | "video"
     | "model3d"
@@ -34,6 +35,26 @@ export type SeoPage = {
 };
 
 export const seoPages: Record<SeoPageKey, SeoPage> = {
+    developers: {
+        path: "/developers",
+        index: true,
+        title: {
+            "zh-CN": "开发文档 · API 接入指南 - Aivro",
+            "zh-TW": "開發文件 · API 串接指南 - Aivro",
+            "en-US": "Developer Documentation · API Integration Guide - Aivro",
+            "ja-JP": "開発ドキュメント · API 連携ガイド - Aivro",
+            "ko-KR": "개발 문서 · API 연동 가이드 - Aivro",
+            "fr-FR": "Documentation développeur · Guide d’intégration API - Aivro",
+        },
+        description: {
+            "zh-CN": "Aivro API 开发文档，包含密钥鉴权、模型查询、图片、对话、视频、3D 生成、异步任务、计费与 22 种编程语言的代码示例。",
+            "zh-TW": "Aivro API 開發文件，涵蓋金鑰驗證、模型查詢、圖片、對話、影片、3D 生成、非同步任務、計費與 22 種程式語言範例。",
+            "en-US": "Aivro API documentation covering API keys, models, images, chat, video, 3D generation, asynchronous tasks, billing, and examples in 22 programming languages.",
+            "ja-JP": "API キー認証、モデル検索、画像・対話・動画・3D 生成、非同期タスク、料金、22 言語のコード例を解説する Aivro API ドキュメント。",
+            "ko-KR": "API 키 인증, 모델 조회, 이미지·대화·영상·3D 생성, 비동기 작업, 요금 및 22개 프로그래밍 언어 예제를 다루는 Aivro API 문서입니다.",
+            "fr-FR": "Documentation API Aivro : clés API, modèles, images, conversations, vidéos, génération 3D, tâches asynchrones, facturation et exemples dans 22 langages.",
+        },
+    },
     home: {
         path: "/",
         index: true,

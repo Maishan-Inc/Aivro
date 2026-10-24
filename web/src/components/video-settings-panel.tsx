@@ -17,7 +17,7 @@ const sizeOptions = [
     { value: "1024x1024", label: "方形", width: 1024, height: 1024 },
     { value: "1792x1024", label: "宽屏", width: 1792, height: 1024 },
     { value: "1024x1792", label: "长图", width: 1024, height: 1792 },
-    { value: "auto", label: "auto", width: 0, height: 0 },
+    { value: "auto", label: "自动", width: 0, height: 0 },
 ];
 
 const secondOptions = [6, 10, 12, 16, 20];

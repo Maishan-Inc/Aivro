@@ -48,6 +48,7 @@ export function AppTopNav() {
                         {navigationTools.filter((tool) => tool.slug !== "assets").map((tool) => <Link key={tool.slug} href={tool.external ? tool.href + ("localeAware" in tool && tool.localeAware && locale === "zh-CN" ? "/zh-CN" : "") : localizedPath(`/${tool.slug}`)} target={tool.external ? "_blank" : undefined} rel={tool.external ? "noopener noreferrer" : undefined} className="transition hover:opacity-70">{tool.label}</Link>)}
                         <Link href={localizedPath("/console/community")} className="transition hover:opacity-70">社区工作流</Link>
                         <Link href={localizedPath("/models")} className="transition hover:opacity-70">模型定价</Link>
+                        <Link href={localizedPath("/developers")} className="transition hover:opacity-70">开发文档</Link>
                     </nav>
                 <div className={`flex shrink-0 items-center gap-2 sm:gap-3 ${home && !scrolled && videoEnabled ? "[&_button]:!text-white [&_a]:!text-white" : ""}`}>
                     <LocaleMenu /><UserStatusActions />

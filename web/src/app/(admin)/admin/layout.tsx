@@ -143,7 +143,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                 </Layout.Header>
                 <Layout.Content style={{ minHeight: 0, overflow: "auto" }}>
                     {children}
-                    <div className="px-3 py-3 lg:px-6" style={{ textAlign: "center", color: antToken.colorTextTertiary, fontSize: 12 }}>Copyright © 2026 Maishan Inc. All rights reserved Aivro</div>
+                    <div className="px-3 py-3 lg:px-6" style={{ textAlign: "center", color: antToken.colorTextTertiary, fontSize: 12 }}>© 2026 Maishan Inc. · Aivro 版权所有</div>
                 </Layout.Content>
             </Layout>
             <Drawer title="管理后台" placement="left" width="min(320px, 88vw)" open={menuOpen} onClose={() => setMenuOpen(false)} styles={{ body: { padding: 0 } }}>

@@ -1,0 +1,76 @@
+.demo { margin: 0; min-width: 0; color: var(--demo-text); --duration: 14s; }
+.toolbar { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 20px 24px; border: 1px solid var(--demo-line); border-bottom: 0; border-radius: 12px 12px 0 0; background: var(--demo-panel); font-size: 12px; }
+.toolbar > span { display: inline-flex; align-items: center; gap: 14px; }
+.toolbar > span:last-child { color: var(--demo-muted); font-size: 10px; }
+.logo { width: 18px; height: 18px; background: currentColor; mask: url(/logo.svg) center / contain no-repeat; }
+.toolbarDivider { width: 1px; height: 14px; background: var(--demo-line); }
+.viewport { overflow-x: auto; border: 1px solid var(--demo-line); border-radius: 0 0 12px 12px; background: var(--demo-bg); scrollbar-width: thin; }
+.viewport:focus-visible { outline: 2px solid var(--demo-active); outline-offset: 4px; }
+.stage { position: relative; min-width: 740px; aspect-ratio: 2 / 1; background-image: radial-gradient(var(--demo-dot) .8px, transparent .8px); background-size: 22px 22px; font-size: clamp(10px, .75vw, 14px); }
+.connections { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.mobileConnections { display: none; }
+.connections path { stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.connectionBase { stroke: var(--demo-line); }
+.connection { stroke: var(--demo-active); stroke-dasharray: 1; stroke-dashoffset: 1; animation: connectPrompt var(--duration) linear infinite; }
+.connection[data-step="1"] { animation-name: connectReference; }
+.connection[data-step="2"] { animation-name: connectResult; }
+.node { position: absolute; display: flex; flex-direction: column; border: 1px solid var(--demo-line); border-radius: 7px; background: var(--demo-panel); }
+.nodeHeader { display: flex; align-items: center; gap: 7px; padding: 12px; border-bottom: 1px solid var(--demo-line); font-size: .85em; }
+.nodeHeader > span { margin-left: auto; color: var(--demo-muted); font-size: .8em; font-variant-numeric: tabular-nums; }
+.nodeHeader svg { flex-shrink: 0; }
+.promptNode { left: 7%; top: 13%; width: 24%; height: 24%; }
+.promptText { margin: auto 12px; line-height: 1.9; animation: writePrompt var(--duration) linear infinite; }
+.referenceNode { left: 8.5%; top: 57%; width: 21.5%; height: 33%; }
+.referenceNode img { display: block; flex: 1; min-height: 0; width: 100%; object-fit: cover; border-radius: 0 0 6px 6px; }
+.configNode { left: 42%; top: 30%; width: 22%; height: 40%; animation: activateNode var(--duration) linear infinite; }
+.configRows { display: grid; gap: 12px; margin: auto 12px; color: var(--demo-muted); font-size: .8em; }
+.configRows > span { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.configRows strong { font-weight: 500; color: var(--demo-text); }
+.generate { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 0 12px 12px; padding: 9px 4px; border-radius: 4px; background: var(--demo-active); color: var(--demo-bg); font-size: .85em; animation: runGeneration var(--duration) linear infinite; }
+.inputPort, .outputPort { position: absolute; top: 50%; width: 7px; height: 7px; border: 1px solid var(--demo-active); border-radius: 50%; background: var(--demo-panel); transform: translateY(-50%); }
+.inputPort { left: -4px; }.outputPort { right: -4px; }
+.inputPort[data-port="prompt"] { top: 29%; }.inputPort[data-port="reference"] { top: 72%; }
+.resultNode { left: 74.5%; top: 17%; width: 21.5%; height: 66%; }
+.resultImage { position: relative; flex: 1; min-height: 0; overflow: hidden; background: var(--demo-fill); }
+.generating { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; color: var(--demo-muted); font-size: .8em; }
+.generatingMark { width: 32px; height: 32px; background: var(--demo-text); mask: url(/logo.svg) center / contain no-repeat; animation: generationPulse var(--duration) linear infinite; }
+.progress { width: 45%; height: 2px; background: var(--demo-line); overflow: hidden; }
+.progress > span { display: block; width: 100%; height: 100%; background: var(--demo-active); transform-origin: left; animation: generationProgress var(--duration) linear infinite; }
+.generatedImage { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; animation: showResult var(--duration) linear infinite; }
+.resultFooter { display: flex; align-items: center; justify-content: center; gap: 7px; padding: 10px; font-size: .8em; animation: showResult var(--duration) linear infinite; }
+.cursor { position: absolute; left: 12%; top: 30%; display: flex; align-items: flex-start; gap: 4px; z-index: 2; animation: moveCursor var(--duration) ease-in-out infinite; }
+.cursor > span { margin-top: 18px; padding: 3px 7px; background: var(--demo-active); color: var(--demo-bg); border-radius: 3px; font-size: 10px; }
+.stageNote { position: absolute; left: 42%; bottom: 9%; color: var(--demo-muted); font-size: .8em; }
+.caption { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 26px 0 0; font-size: 12px; }
+.caption > span { display: flex; align-items: center; flex: 1; gap: 12px; }
+.caption small { color: var(--demo-muted); font: 10px monospace; }
+.caption svg { margin-left: auto; color: var(--demo-muted); }
+.note { margin-top: 16px; color: var(--demo-muted); font-size: 10px; }
+@keyframes writePrompt { 0%, 3%, 100% { clip-path: inset(0 100% 0 0); } 14%, 95% { clip-path: inset(0); } }
+@keyframes connectPrompt { 0%, 16%, 100% { stroke-dashoffset: 1; opacity: 0; } 17% { opacity: 1; } 27%, 95% { stroke-dashoffset: 0; opacity: 1; } 98% { stroke-dashoffset: 0; opacity: 0; } }
+@keyframes connectReference { 0%, 29%, 100% { stroke-dashoffset: 1; opacity: 0; } 30% { opacity: 1; } 40%, 95% { stroke-dashoffset: 0; opacity: 1; } 98% { stroke-dashoffset: 0; opacity: 0; } }
+@keyframes connectResult { 0%, 45%, 100% { stroke-dashoffset: 1; opacity: 0; } 46% { opacity: 1; } 55%, 95% { stroke-dashoffset: 0; opacity: 1; } 98% { stroke-dashoffset: 0; opacity: 0; } }
+@keyframes activateNode { 0%, 39%, 97%, 100% { border-color: var(--demo-line); } 42%, 94% { border-color: var(--demo-active); } }
+@keyframes runGeneration { 0%, 42%, 47%, 100% { transform: scale(1); } 44% { transform: scale(.95); } }
+@keyframes generationPulse { 0%, 45%, 75%, 100% { opacity: .15; } 50%, 60%, 70% { opacity: 1; } 55%, 65% { opacity: .25; } }
+@keyframes generationProgress { 0%, 45%, 100% { transform: scaleX(0); } 70%, 95% { transform: scaleX(1); } }
+@keyframes showResult { 0%, 69%, 100% { opacity: 0; transform: translateY(5px); } 75%, 95% { opacity: 1; transform: translateY(0); } }
+@keyframes moveCursor { 0%, 3% { left: 12%; top: 30%; opacity: 0; } 6%, 14% { left: 20%; top: 30%; opacity: 1; } 16% { left: 31%; top: 25%; } 27% { left: 42%; top: 41.6%; } 29% { left: 30%; top: 73.6%; } 40% { left: 42%; top: 58.8%; } 43%, 46% { left: 53%; top: 62%; opacity: 1; } 55% { left: 74.5%; top: 50%; } 65%, 93% { left: 86%; top: 77%; opacity: 1; } 97%, 100% { left: 86%; top: 77%; opacity: 0; } }
+@media (max-width: 1000px) { .nodeHeader { padding: 9px; }.configRows { gap: 9px; }.generate { margin-bottom: 9px; padding-block: 7px; } }
+@media (max-width: 700px) {
+    .toolbar { padding: 16px; font-size: 10px; gap: 8px; }.toolbar > span { gap: 8px; }.toolbar > span:last-child { display: none; }
+    .stage { min-width: 0; aspect-ratio: 1 / 1.7; background-size: 18px 18px; font-size: 10px; }
+    .connections { display: none; }.mobileConnections { display: block; }
+    .promptNode { left: 4%; top: 5%; width: 44%; height: 20%; }
+    .referenceNode { left: 52%; top: 5%; width: 44%; height: 20%; }
+    .configNode { left: 23%; top: 32%; width: 54%; height: 29%; }
+    .resultNode { left: 23%; top: 67%; width: 54%; height: 29%; }
+    .nodeHeader { font-size: 10px; }.configRows { font-size: 10px; }.generate { font-size: 10px; }.resultFooter { font-size: 9px; padding-block: 7px; }
+    .outputPort { top: auto; right: auto; bottom: -4px; left: 50%; transform: translateX(-50%); }
+    .inputPort { top: -4px; left: 50%; transform: translateX(-50%); }
+    .inputPort[data-port="prompt"] { top: -4px; left: 30%; }.inputPort[data-port="reference"] { top: -4px; left: 70%; }
+    .cursor { animation-name: moveCursorMobile; }
+    .stageNote { left: 0; bottom: 1%; width: 100%; text-align: center; font-size: 8px; }
+    .caption { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 24px; font-size: 11px; }.caption svg { display: none; }.note { text-align: center; }
+}
+@keyframes moveCursorMobile { 0%, 3% { left: 16%; top: 14%; opacity: 0; } 6%, 14% { left: 22%; top: 14%; opacity: 1; } 16% { left: 26%; top: 25%; } 27% { left: 39.2%; top: 32%; } 29% { left: 74%; top: 25%; } 40% { left: 60.8%; top: 32%; } 43%, 46% { left: 50%; top: 56%; opacity: 1; } 55% { left: 50%; top: 67%; } 65%, 93% { left: 55%; top: 93%; opacity: 1; } 97%, 100% { left: 55%; top: 93%; opacity: 0; } }

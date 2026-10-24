@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDateTime } from "@/lib/datetime";
 import { CheckCircleOutlined, CloseCircleOutlined, ReloadOutlined } from "@ant-design/icons";
 import { App, Button, Card, Flex, Space, Table, Tag, Typography } from "antd";
 import { useCallback, useEffect, useState } from "react";
@@ -79,7 +80,7 @@ export default function AdminDatabasePage() {
                         <div>
                             <Typography.Text strong>当前连接</Typography.Text>
                             <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-                                <Tag color={status?.driver === "postgres" ? "blue" : status?.driver === "sqlite" ? "gold" : "default"}>{status?.driver || "unknown"}</Tag>
+                                <Tag color={status?.driver === "postgres" ? "blue" : status?.driver === "sqlite" ? "gold" : "default"}>{status?.driver || "未知"}</Tag>
                                 <Typography.Text code copyable={Boolean(status?.dsn)}>
                                     {status?.dsn || "-"}
                                 </Typography.Text>
@@ -136,7 +137,7 @@ export default function AdminDatabasePage() {
                                 title: "执行时间",
                                 dataIndex: "createdAt",
                                 width: 210,
-                                render: (value) => (value ? new Date(value).toLocaleString("zh-CN") : "-"),
+                                render: (value) => (value ? formatDateTime(value) : "-"),
                             },
                             {
                                 title: "状态",

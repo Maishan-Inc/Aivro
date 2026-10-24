@@ -95,7 +95,7 @@ export default function AdminModelPricingPage() {
                                     dataIndex: "billingType",
                                     width: 130,
                                     render: (_: unknown, item) => (
-                                        <Select size="small" value={item.billingType} options={[{ label: "按次", value: "fixed" }, { label: "Token", value: "token" }]} onChange={(value) => updateRow(item.modelId || item.model, { billingType: value })} style={{ width: "100%" }} />
+                                        <Select size="small" value={item.billingType} options={[{ label: "按次", value: "fixed" }, { label: "词元", value: "token" }]} onChange={(value) => updateRow(item.modelId || item.model, { billingType: value })} style={{ width: "100%" }} />
                                     ),
                                 },
                                 {

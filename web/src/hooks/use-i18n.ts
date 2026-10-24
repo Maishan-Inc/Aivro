@@ -13,7 +13,7 @@ export function useI18n() {
     const locale = useEffectiveLocale();
     const setLocale = useLocaleStore((state) => state.setLocale);
     const activeMessages = (messages[locale as keyof typeof messages] || messages["zh-CN"]) as Record<MessageKey, string>;
-    const t = useCallback((key: MessageKey) => activeMessages[key] || messages["zh-CN"][key] || key, [activeMessages]);
+    const t = useCallback((key: MessageKey) => translate(activeMessages[key] || messages["zh-CN"][key] || key, locale), [activeMessages, locale]);
     // `tr` translates a Chinese runtime string (including {0} placeholders) with the
     // active locale, for text that cannot be expressed as a static translation key.
     const tr = useCallback((value: string) => translate(value, locale), [locale]);

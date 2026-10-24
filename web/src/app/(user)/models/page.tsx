@@ -46,6 +46,7 @@ export default function ModelsPage() {
                 <div className={styles.foot}>
                     <span>{tr("价格调整会在保存后立即生效，已完成的请求不重新计算。")}</span>
                     <div className={styles.footLinks}>
+                        <Link href={localizedPath("/developers")}>{tr("开发文档")}<ArrowUpRight className="size-3.5" /></Link>
                         <Link href={localizedPath("/canvas")}>{tr("进入工作空间")}<ArrowUpRight className="size-3.5" /></Link>
                         <Link href={localizedPath("/pricing")}>{tr("查看套餐")}<ArrowRight className="size-3.5" /></Link>
                     </div>

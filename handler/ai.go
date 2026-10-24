@@ -81,7 +81,7 @@ func proxyAIRequest(w http.ResponseWriter, r *http.Request, path string) {
 		FailError(w, err)
 		return
 	}
-	if !service.AIQueueEnabled() || path == "/chat/completions" {
+	if path == "/chat/completions" || (!service.AIQueueEnabled() && !service.IsAPIKeyRequest(r.Context())) {
 		directAIProxyRequest(w, r, user, body, contentType, modelName, path)
 		return
 	}
@@ -117,7 +117,7 @@ func directAIProxyRequest(w http.ResponseWriter, r *http.Request, user model.Aut
 		if err != nil { if !started { FailError(w, err) } else { log.Printf("chat settlement failed: type=%T", err) } }
 		return
 	}
-	credits, err := service.ModelCost(modelName)
+	credits, err := service.RequestModelCost(r.Context(), modelName)
 	if err != nil {
 		log.Printf("AI proxy read model cost failed: model=%s errorType=%T", modelName, err)
 		Fail(w, "AI 接口请求失败")
@@ -199,12 +199,13 @@ func ExecuteAIProxyTask(ctx context.Context, user model.AuthUser, body io.Reader
 			responseBody, err = service.RecordVideoTask(user, route, responseBody)
 			if err != nil { return service.AIProxyResponse{}, err }
 		}
+		usageTokens := service.AIResponseUsageTokens(responseBody)
 		responseBody, header, statusCode, err := rewriteCloudAIResponseBody(ctx, user, path, responseBody, response.Header, response.StatusCode)
 		if err != nil {
 			log.Printf("AI proxy cloud rewrite failed: path=%s errorType=%T", path, err)
 			return service.AIProxyResponse{}, err
 		}
-		return service.AIProxyResponse{StatusCode: statusCode, Header: header, Body: responseBody}, nil
+		return service.AIProxyResponse{StatusCode: statusCode, Header: header, Body: responseBody, UsageTokens: usageTokens}, nil
 	}
 	if lastStatus > 0 {
 		return service.AIProxyResponse{}, service.SafeAIError(fmt.Sprintf("AI 接口请求失败：%d", lastStatus))

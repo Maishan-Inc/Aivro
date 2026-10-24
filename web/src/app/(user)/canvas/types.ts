@@ -89,6 +89,7 @@ export type CanvasAssistantMessage = {
     mode: "ask" | "image";
     text: string;
     isLoading?: boolean;
+    isError?: boolean;
     references?: CanvasAssistantReference[];
     images?: CanvasAssistantImage[];
     agentOps?: import("./utils/canvas-agent-ops").CanvasAgentOp[];

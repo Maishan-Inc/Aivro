@@ -59,11 +59,11 @@ export default function WorkflowSharePage() {
     };
 
     const copyShare = async () => {
-        const slug = await requestWorkflowName({ title: "Fork 工作流", username: user?.username, okText: "继续" });
+        const slug = await requestWorkflowName({ title: "复制工作流", username: user?.username, okText: "继续" });
         if (!slug) return;
         let selectedMode: "detached" | "linked" = "detached";
         modal.confirm({
-            title: "Fork 到我的云端工作流",
+            title: "复制到我的云端工作流",
             width: 560,
             content: (
                 <div className="py-2">
@@ -74,7 +74,7 @@ export default function WorkflowSharePage() {
                     <p className="mt-4 text-sm text-stone-500">开启自动更新后，原作者更新分享时，你的工作流内容会跟随更新并可能被覆盖。</p>
                 </div>
             ),
-            okText: "Fork",
+            okText: "复制",
             cancelText: "取消",
             onOk: async () => {
                 if (!token) return;
@@ -83,7 +83,7 @@ export default function WorkflowSharePage() {
                     await hydrateUser();
                     router.push(localizedPath(`/canvas/${workflow.id}`));
                 } catch (error) {
-                    const text = error instanceof Error ? error.message : "Fork 失败";
+                    const text = error instanceof Error ? error.message : "复制失败";
                     if (text.includes("暂无工作流创建次数")) {
                         Modal.confirm({
                             title: "工作流创建次数不足",
@@ -128,7 +128,7 @@ export default function WorkflowSharePage() {
             <header className="absolute left-0 right-0 top-0 z-50 flex items-center justify-between border-b bg-white/80 px-6 py-4 backdrop-blur dark:bg-stone-950/80">
                 <div className="flex min-w-0 items-center gap-3">
                     <h1 className="truncate text-xl font-semibold">{preview?.title || "分享工作流"}</h1>
-                    <Button type="primary" icon={<Copy className="size-4" />} onClick={() => void copyShare()}>Fork</Button>
+                    <Button type="primary" icon={<Copy className="size-4" />} onClick={() => void copyShare()}>复制</Button>
                     <Tag>只读预览</Tag>
                 </div>
             </header>

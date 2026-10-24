@@ -14,7 +14,7 @@
 - `data`: 业务数据。失败时通常为 `null`。
 - `msg`: 响应消息。成功默认为 `ok`，失败时放错误原因。
 
-前端请求逻辑以 `code` 判断业务是否成功。普通业务失败通常返回 HTTP 200；来源校验失败返回 HTTP 403 并保持相同 JSON 结构。前端同时检查 HTTP 状态与业务 code。
+前端请求逻辑以 `code` 判断业务是否成功。普通业务失败通常返回 HTTP 200；用户 API 密钥鉴权失败返回 HTTP 401，来源校验失败返回 HTTP 403，并保持相同 JSON 结构。前端同时检查 HTTP 状态与业务 code。
 
 接口连接失败、服务不可达、返回体不是约定 JSON 时，前端按网络或接口异常处理。
 
@@ -34,6 +34,17 @@
 - 3D 没有可用渠道或上游未返回真实模型文件时返回失败并走退款，不再返回收费占位结果。
 
 当前模型请求通过本站 Go 后端渠道，密钥保存在后端私有设置；前端不再提供浏览器本地 API Key 直连路径。
+
+## 用户 API 密钥与外部调用
+
+- 登录用户使用 `GET /api/v1/api-keys?page=1&pageSize=20` 查看自己的密钥列表，`data` 为 `{ items, total }`；列表只返回名称、脱敏标识、状态和时间。
+- `POST /api/v1/api-keys` 接收 `{ "name": "我的应用" }`，成功的 `data` 为 `{ item, key }`，其中 `key` 是仅此一次返回的完整随机密钥。名称最多 50 个字符，同账号忽略首尾空格与大小写后不可重复，已撤销名称仍保留。重复创建保持 `{ code: 1, data: null, msg }`。
+- `DELETE /api/v1/api-keys/:id` 永久撤销所属账号的密钥，成功返回 `data: true`；不能恢复，已提交任务继续执行。这三个管理接口只接受网站登录鉴权，用户 API 密钥不能管理密钥、账号、工作流或后台。
+- 使用 `Authorization: Bearer sk-aivro-...` 调用模型、上传/文件内容和生成队列接口。已撤销密钥、无效密钥或所属账号被禁用/删除时返回 HTTP 401 与 `{ code: 1, data: null, msg: "API 密钥无效或已撤销" }`。不支持 URL 参数传密钥；服务端调用沿用现有来源校验，不带 Cookie 和浏览器来源的调用可以使用 Bearer。
+- `GET /api/v1/models` 接受登录会话或用户密钥，`data` 为 `{ id, type, credits, billingType }` 数组，展示已开放且已计费的模型及 API 价格；类型为 `text`、`image`、`video`、`model3d`。
+- API 密钥调用按 `apiCredits`（显式价格优先，否则标准价乘 `apiMultiplier`，默认 2 倍）及 `apiBilling` 扣所属账号算力点。对话按原有预扣/词元结算；图片、视频和 3D 的词元计费有上游用量则按每千词元向上取整，缺少用量则保留提交时预扣。队列的 API 单价和方式在提交时保存，成功结算与任务终态在同一事务中提交。
+- 对话成功继续返回标准 JSON/SSE，图片和视频直接成功保留模型接口响应；图片/视频排队时返回 `{ code: 0, data: { queued: true, taskId, ... }, msg: "ok" }`。使用同一账号的有效密钥查询 `/generation-tasks/:id` 和 `/generation-tasks/:id/result`，任务仍在排队时可 DELETE 取消并退款。
+- 静态中文开发文档入口为 `/developers`（中文路径 `/zh-CN/developers`），包含所有已开放的对外接口说明与 22 种语言示例。具体功能与联调结果记录在 `docs/pending-test.md`。
 
 ## 安全响应与来源校验
 

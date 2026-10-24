@@ -152,7 +152,7 @@ func captchaVerifyURL(provider model.CaptchaProvider) string {
 	return turnstileVerifyURL
 }
 
-var redirectPagePattern = regexp.MustCompile(`^/(assets|asset-library|image|video|model-3d|prompts|pricing(/success)?|terms|privacy|login|forgot-password|metamask-email|profile/setup|canvas(/[A-Za-z0-9_-]+|/community/[A-Za-z0-9_-]+)?|share/workflows/[A-Za-z0-9_-]+|console(/(workflows|wallet|shares|profile|community))?|admin(/(database|workflow-community|settings|credit-logs|users|ads|request-logs|prompts|audit-logs|assets|plans))?)$`)
+var redirectPagePattern = regexp.MustCompile(`^/(assets|asset-library|image|video|model-3d|prompts|models|developers|pricing(/success)?|terms|privacy|login|forgot-password|metamask-email|profile/setup|canvas(/[A-Za-z0-9_-]+|/community/[A-Za-z0-9_-]+)?|share/workflows/[A-Za-z0-9_-]+|console(/(workflows|wallet|shares|profile|community|api-keys))?|admin(/(database|workflow-community|settings|credit-logs|users|ads|request-logs|prompts|audit-logs|assets|plans))?)$`)
 var redirectSharePattern = regexp.MustCompile(`^/[a-z0-9]{3,24}/[a-z0-9]{1,40}$`)
 
 func SafeRedirectPath(redirect string) string {

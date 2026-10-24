@@ -1,6 +1,6 @@
 import { stripLocalePath } from "@/i18n/routing";
 
-const pagePattern = /^\/(assets|asset-library|image|video|model-3d|prompts|pricing(\/success)?|terms|privacy|login|forgot-password|metamask-email|profile\/setup|canvas(\/[A-Za-z0-9_-]+|\/community\/[A-Za-z0-9_-]+)?|share\/workflows\/[A-Za-z0-9_-]+|console(\/(workflows|wallet|shares|profile|community))?|admin(\/(database|workflow-community|settings|credit-logs|users|ads|request-logs|prompts|audit-logs|assets|plans))?)$/;
+const pagePattern = /^\/(assets|asset-library|image|video|model-3d|prompts|models|developers|pricing(\/success)?|terms|privacy|login|forgot-password|metamask-email|profile\/setup|canvas(\/[A-Za-z0-9_-]+|\/community\/[A-Za-z0-9_-]+)?|share\/workflows\/[A-Za-z0-9_-]+|console(\/(workflows|wallet|shares|profile|community|api-keys))?|admin(\/(database|workflow-community|settings|credit-logs|users|ads|request-logs|prompts|audit-logs|assets|plans))?)$/;
 const sharePattern = /^\/[a-z0-9]{3,24}\/[a-z0-9]{1,40}$/;
 
 export function safeRedirect(value: string) {

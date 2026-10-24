@@ -104,7 +104,9 @@
 | `model` | string | 模型名称 |
 | `credits` | number | 每次后端模型接口调用前预扣的算力点 |
 
-用户侧请求统一使用后端 `/api/v1/*` 代理接口，请求会按模型名匹配 `private.value.channels` 中启用且包含该模型的可用渠道。用户侧不提供 Base URL、API Key 或本地直连配置。
+用户侧请求统一使用后端 `/api/v1/*` 代理接口，请求会按模型名匹配 `private.value.channels` 中启用且包含该模型的可用渠道。创作工作台不提供上游渠道的 Base URL、API Key 或本地直连配置。
+
+用户可在「我的空间 → 密钥管理」创建用于调用本站 API 的独立密钥；它与管理员配置的渠道密钥不同，不会返回渠道凭证。完整用户密钥只显示一次，后端仅保存摘要。外部调用与 API 定价说明见网站 `/developers`，联调事项见 `docs/pending-test.md`。
 
 `auth` 字段：
 
