@@ -44,7 +44,11 @@ func SaveGenerationHistory(user model.AuthUser, input GenerationHistoryInput) (m
 		status = "成功"
 	}
 	if expiresAt == "" {
-		expiresAt = defaultTempExpiresAt(historyCloudFileType(input.Type))
+		setting, _, err := CloudStorageEnabled()
+		if err != nil {
+			return model.GenerationHistory{}, err
+		}
+		expiresAt = cloudExpiresAt(setting, historyCloudFileType(input.Type))
 	}
 	item := model.GenerationHistory{
 		ID:         newID("history"),

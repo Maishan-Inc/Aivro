@@ -9,14 +9,25 @@ type RouteContext = {
     params: Promise<{ path: string[] }>;
 };
 
+const clientLocationHeaders = ["cf-ipcountry", "x-vercel-ip-country", "cloudfront-viewer-country"];
+const clientRegionHeaders = ["cf-region", "x-vercel-ip-country-region", "x-region"];
+
 function proxyHeaders(request: NextRequest) {
     const headers = new Headers(request.headers);
-    const trustedHeader = process.env.TRUSTED_CLIENT_IP_HEADER?.toLowerCase();
+    const trustedHeader = process.env.TRUSTED_CLIENT_IP_HEADER?.trim().toLowerCase();
     const clientIP = trustedHeader ? request.headers.get(trustedHeader)?.trim() : "";
-    for (const key of ["host", "content-length", "connection", "forwarded", "x-forwarded-for", "x-forwarded-host", "x-forwarded-proto", "x-real-ip", "cf-connecting-ip", "true-client-ip", "x-client-ip", "x-cluster-client-ip", "x-aivro-client-ip", "cf-ipcountry", "x-vercel-ip-country", "cloudfront-viewer-country", "cf-region", "x-vercel-ip-country-region", "x-region"]) {
+    const trustedCountryHeaders = (process.env.TRUSTED_CLIENT_COUNTRY_HEADERS || clientLocationHeaders.join(",")).toLowerCase().split(",").map((key) => key.trim()).filter(Boolean);
+    const trustedRegionHeaders = (process.env.TRUSTED_CLIENT_REGION_HEADERS || clientRegionHeaders.join(",")).toLowerCase().split(",").map((key) => key.trim()).filter(Boolean);
+    for (const key of ["host", "content-length", "connection", "forwarded", "x-forwarded-for", "x-forwarded-host", "x-forwarded-proto", "x-real-ip", "cf-connecting-ip", "true-client-ip", "x-client-ip", "x-cluster-client-ip", "x-aivro-client-ip", "x-aivro-client-country", "x-aivro-client-region", ...clientLocationHeaders, ...clientRegionHeaders]) {
         headers.delete(key);
     }
-    if (clientIP && isIP(clientIP)) headers.set("x-aivro-client-ip", clientIP);
+    if (clientIP && isIP(clientIP)) {
+        headers.set("x-aivro-client-ip", clientIP);
+        const country = trustedCountryHeaders.map((key) => request.headers.get(key)?.trim()).find(Boolean);
+        const region = trustedRegionHeaders.map((key) => request.headers.get(key)?.trim()).find(Boolean);
+        if (country) headers.set("x-aivro-client-country", country.slice(0, 64));
+        if (region) headers.set("x-aivro-client-region", region.slice(0, 128));
+    }
     headers.set("x-forwarded-host", request.nextUrl.host);
     headers.set("x-forwarded-proto", request.nextUrl.protocol.replace(":", ""));
     return headers;
@@ -34,12 +45,15 @@ function responseHeaders(response: Response, path: string[], method: string) {
     headers.delete("content-length");
     headers.delete("content-encoding");
     headers.delete("transfer-encoding");
-    if (method === "GET" && path.join("/") === "prompts") {
-        headers.set("Cache-Control", "public, s-maxage=300, stale-while-revalidate=600");
-        headers.set("CDN-Cache-Control", "public, s-maxage=300, stale-while-revalidate=600");
+    if (method === "GET" && (path.join("/") === "prompts" || path.join("/") === "settings")) {
+        const maxAge = path[0] === "settings" ? 300 : 0;
+        const value = `public, max-age=${maxAge}, s-maxage=300, stale-while-revalidate=600`;
+        headers.set("Cache-Control", value);
+        headers.set("CDN-Cache-Control", value);
         headers.set("Surrogate-Control", "max-age=300, stale-while-revalidate=600");
         headers.delete("Pragma");
         headers.delete("Expires");
+        headers.set("Vary", "Accept-Encoding");
         return headers;
     }
     headers.set("Cache-Control", "no-store, no-cache, max-age=0, must-revalidate, proxy-revalidate");

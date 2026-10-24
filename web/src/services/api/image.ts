@@ -47,6 +47,7 @@ export type GenerationTaskView = {
 };
 
 export type GenerationQueueUpdate = Pick<GenerationTaskView, "status" | "queuePosition" | "aheadCount"> & { taskId: string };
+type GenerationQueueCallback = (update: GenerationQueueUpdate) => void | Promise<void>;
 
 export type ImageApiResult = {
     id: string;
@@ -210,12 +211,12 @@ function isQueuedEnvelope(payload: ImageApiResponse): payload is ImageApiRespons
     return Boolean(parseQueuedEnvelope(payload));
 }
 
-async function resolveQueuedImages(config: AiConfig, task: GenerationTaskSubmitResult, onQueue?: (update: GenerationQueueUpdate) => void) {
-    onQueue?.({ taskId: task.taskId, status: task.status === "executing" ? "executing" : "queued", queuePosition: task.queuePosition, aheadCount: task.aheadCount });
+async function resolveQueuedImages(config: AiConfig, task: GenerationQueueUpdate, onQueue?: GenerationQueueCallback) {
+    await onQueue?.({ taskId: task.taskId, status: task.status === "executing" ? "executing" : "queued", queuePosition: task.queuePosition, aheadCount: task.aheadCount });
     for (;;) {
         await new Promise((resolve) => setTimeout(resolve, 2000));
         const current = await fetchGenerationTask(config, task.taskId);
-        onQueue?.({ taskId: current.id, status: current.status, queuePosition: current.queuePosition, aheadCount: current.aheadCount });
+        await onQueue?.({ taskId: current.id, status: current.status, queuePosition: current.queuePosition, aheadCount: current.aheadCount });
         if (current.status === "succeeded") {
             const payload = await fetchGenerationTaskResult(config, task.taskId);
             refreshRemoteUser(config);
@@ -228,7 +229,7 @@ async function resolveQueuedImages(config: AiConfig, task: GenerationTaskSubmitR
     }
 }
 
-async function unwrapImageResponse(config: AiConfig, payload: ImageApiResponse, onQueue?: (update: GenerationQueueUpdate) => void) {
+async function unwrapImageResponse(config: AiConfig, payload: ImageApiResponse, onQueue?: GenerationQueueCallback) {
     if (isQueuedEnvelope(payload)) {
         const queuedPayload = await resolveQueuedImages(config, payload.data, onQueue);
         return parseImagePayload(queuedPayload);
@@ -238,7 +239,7 @@ async function unwrapImageResponse(config: AiConfig, payload: ImageApiResponse, 
     return images;
 }
 
-export async function requestGeneration(config: AiConfig, prompt: string, onQueue?: (update: GenerationQueueUpdate) => void) {
+export async function requestGeneration(config: AiConfig, prompt: string, onQueue?: GenerationQueueCallback) {
     const n = Math.max(1, Math.min(15, Math.floor(Math.abs(Number(config.count)) || 1)));
     const quality = normalizeQuality(config.quality);
     const requestSize = resolveRequestSize(quality, config.size);
@@ -264,7 +265,7 @@ export async function requestGeneration(config: AiConfig, prompt: string, onQueu
     }
 }
 
-export async function requestEdit(config: AiConfig, prompt: string, references: ReferenceImage[], onQueue?: (update: GenerationQueueUpdate) => void) {
+export async function requestEdit(config: AiConfig, prompt: string, references: ReferenceImage[], onQueue?: GenerationQueueCallback) {
     const n = Math.max(1, Math.min(15, Math.floor(Math.abs(Number(config.count)) || 1)));
     const quality = normalizeQuality(config.quality);
     const requestSize = resolveRequestSize(quality, config.size);
@@ -295,6 +296,10 @@ export async function fetchGenerationTask(config: AiConfig, id: string) {
     if (typeof response.data.code === "number" && response.data.code !== 0) throw new Error(response.data.msg || "任务查询失败");
     if (!response.data.data) throw new Error("任务不存在");
     return response.data.data;
+}
+
+export async function resumeGenerationTask(config: AiConfig, task: GenerationTaskView, onQueue?: GenerationQueueCallback) {
+    return resolveQueuedImages(config, { taskId: task.id, status: task.status, queuePosition: task.queuePosition, aheadCount: task.aheadCount }, onQueue);
 }
 
 export async function fetchGenerationTaskResult(config: AiConfig, id: string) {

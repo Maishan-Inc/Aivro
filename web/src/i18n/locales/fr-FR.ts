@@ -1277,6 +1277,7 @@ const frFR = {
     "复制示例代码": "Copier l'exemple de code",
     "复制代码": "Copier le code",
     "示例编程语言": "Exemple de langage de programmation",
+    "更多语言": "Plus de langages",
     "{0} · 对话调用示例": "{0} · Exemple d'appel de dialogue",
     "安装 cURL 和 jq。先按快速开始设置三个环境变量。": "Installez cURL et jq. Appuyez d’abord sur Quick Start pour définir trois variables d’environnement.",
     "使用 Go 标准库，将代码保存为 main.go，然后执行 go run main.go。": "Utilisez la bibliothèque standard Go, enregistrez le code sous main.go, puis exécutez go run main.go.",

@@ -1491,15 +1491,7 @@ func sendVerificationMail(setting model.MailSetting, email string, purpose strin
 	if strings.TrimSpace(setting.FromName) != "" {
 		from = fmt.Sprintf("%s <%s>", mimeHeader(setting.FromName), setting.FromEmail)
 	}
-	message := strings.Join([]string{
-		"From: " + from,
-		"To: " + email,
-		"Subject: " + mimeHeader(subject),
-		"MIME-Version: 1.0",
-		"Content-Type: text/plain; charset=UTF-8",
-		"",
-		body,
-	}, "\r\n")
+	message := buildVerificationMailMessage(from, email, subject, body, template.Body, email, purpose, code, setting.CodeExpireMin, context)
 	addr := setting.Host + ":" + strconv.Itoa(setting.Port)
 	var err error
 	if setting.Port == 465 {
@@ -1732,11 +1724,34 @@ func renderMailTemplate(template string, email string, code string, expireMinute
 }
 
 func MailTemplateContextFromRequest(r *http.Request) MailTemplateContext {
+	trusted := trustedForwardPeer(requestHost(r))
 	return normalizeMailTemplateContext(MailTemplateContext{
 		IP:      requestIP(r),
-		Country: firstNonEmpty(r.Header.Get("CF-IPCountry"), r.Header.Get("X-Vercel-IP-Country"), r.Header.Get("CloudFront-Viewer-Country")),
-		Region:  firstNonEmpty(r.Header.Get("CF-Region"), r.Header.Get("X-Vercel-IP-Country-Region"), r.Header.Get("X-Region")),
+		Country: requestLocationHeader(r, trusted, "X-Aivro-Client-Country", "CF-IPCountry", "X-Vercel-IP-Country", "CloudFront-Viewer-Country"),
+		Region:  requestLocationHeader(r, trusted, "X-Aivro-Client-Region", "CF-Region", "X-Vercel-IP-Country-Region", "X-Region"),
 	})
+}
+
+func requestLocationHeader(r *http.Request, trusted bool, internalKey string, externalKeys ...string) string {
+	if trusted {
+		if value := strings.TrimSpace(r.Header.Get(internalKey)); value != "" {
+			return value
+		}
+	}
+	for _, key := range externalKeys {
+		if value := strings.TrimSpace(r.Header.Get(key)); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func requestHost(r *http.Request) string {
+	host, _, err := net.SplitHostPort(strings.TrimSpace(r.RemoteAddr))
+	if err != nil {
+		return strings.TrimSpace(r.RemoteAddr)
+	}
+	return host
 }
 
 func RequestLogMetaFromRequest(r *http.Request) RequestLogMeta {
@@ -1770,10 +1785,7 @@ func normalizeMailTemplateContext(context MailTemplateContext) MailTemplateConte
 }
 
 func requestIP(r *http.Request) string {
-	host, _, err := net.SplitHostPort(strings.TrimSpace(r.RemoteAddr))
-	if err != nil {
-		host = strings.TrimSpace(r.RemoteAddr)
-	}
+	host := requestHost(r)
 	if trustedForwardPeer(host) {
 		if ip := net.ParseIP(strings.TrimSpace(r.Header.Get("X-Aivro-Client-IP"))); ip != nil {
 			return ip.String()

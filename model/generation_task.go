@@ -23,6 +23,8 @@ type GenerationTask struct {
 	Credits        int                  `json:"credits"`
 	APIBillingType string               `json:"-"`
 	APIUnitCredits int                  `json:"-"`
+	IP             string               `json:"-"`
+	Country        string               `json:"-"`
 	RequestCount   int                  `json:"requestCount"`
 	Status         GenerationTaskStatus `json:"status" gorm:"index"`
 	QueuePosition  int                  `json:"queuePosition" gorm:"index"`

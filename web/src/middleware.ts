@@ -13,11 +13,12 @@ export function middleware(request: NextRequest) {
     const csp = pathname.startsWith("/api/") ? apiSecurityHeaders["Content-Security-Policy"] : pageContentSecurityPolicy(nonce);
     requestHeaders.set("x-nonce", nonce);
     requestHeaders.set("Content-Security-Policy", csp);
-    const secureResponse = (response: NextResponse) => {
+    const secureResponse = (response: NextResponse, cacheHome = false) => {
         for (const [key, value] of Object.entries(apiSecurityHeaders)) response.headers.set(key, value);
         response.headers.set("Content-Security-Policy", csp);
         if (request.nextUrl.protocol === "https:") response.headers.set("Strict-Transport-Security", "max-age=31536000");
-        return withNoStore(response);
+        if (pathname.startsWith("/api/")) return response;
+        return cacheHome ? withPublicHomeCache(response) : withNoStore(response);
     };
     if (isUnlocalizedPath(pathname)) return secureResponse(NextResponse.next({ request: { headers: requestHeaders } }));
 
@@ -38,7 +39,18 @@ export function middleware(request: NextRequest) {
     requestHeaders.set("x-aivro-pathname", pathname);
     const response = NextResponse.rewrite(rewriteUrl, { request: { headers: requestHeaders } });
     response.headers.set("x-aivro-locale", locale);
-    return secureResponse(response);
+    return secureResponse(response, stripLocalePath(pathname) === "/");
+}
+
+function withPublicHomeCache(response: NextResponse) {
+    const value = "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400";
+    response.headers.set("Cache-Control", value);
+    response.headers.set("CDN-Cache-Control", value);
+    response.headers.set("Surrogate-Control", "max-age=3600, stale-while-revalidate=86400");
+    response.headers.delete("Pragma");
+    response.headers.delete("Expires");
+    response.headers.set("Vary", "RSC, Next-Router-State-Tree, Next-Router-Prefetch, Accept-Encoding");
+    return response;
 }
 
 function withNoStore(response: NextResponse) {
@@ -52,9 +64,9 @@ function withNoStore(response: NextResponse) {
 }
 
 function isCacheableBuildAsset(pathname: string) {
-    return pathname.startsWith("/_next/static/") || pathname.startsWith("/icons/") || pathname === "/logo.svg" || pathname === "/favicon.ico";
+    return pathname.startsWith("/_next/static/") || pathname.startsWith("/icons/") || pathname.startsWith("/showcase/") || pathname === "/logo.svg" || pathname === "/logo-mail-dark.png" || pathname === "/logo-mail-light.png" || pathname === "/favicon.ico";
 }
 
 export const config = {
-    matcher: ["/((?!_next/static|icons|logo.svg|favicon.ico).*)"],
+    matcher: ["/((?!_next/static|icons|showcase|logo.svg|logo-mail-dark.png|logo-mail-light.png|favicon.ico).*)"],
 };

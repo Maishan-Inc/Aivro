@@ -35,8 +35,16 @@ export default function nextConfig(phase: string): NextConfig {
         async headers() {
             return [
                 {
-                    source: "/((?!_next/static|icons|logo.svg|favicon.ico).*)",
+                    source: "/((?!_next/static|icons|showcase|logo.svg|logo-mail-dark.png|logo-mail-light.png|favicon.ico).*)",
                     headers: [...noStoreHeaders, ...securityHeaders],
+                },
+                {
+                    source: "/showcase/:path*",
+                    headers: [
+                        { key: "Cache-Control", value: "public, max-age=86400, s-maxage=604800, stale-while-revalidate=604800" },
+                        { key: "CDN-Cache-Control", value: "public, max-age=604800, stale-while-revalidate=604800" },
+                        { key: "Surrogate-Control", value: "max-age=604800, stale-while-revalidate=604800" },
+                    ],
                 },
             ];
         },

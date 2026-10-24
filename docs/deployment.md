@@ -36,9 +36,11 @@ admin
 
 Go 只信任 `TRUSTED_PROXY_CIDRS` 指定来源发送的内部 `X-Aivro-Client-IP`，默认仅允许回环地址，适用于 Next 和 Go 在同一容器的部署。分开部署时只填写实际代理地址或网段。
 
-Next 默认删除客户端提交的转发 IP/地区头。只有入口反向代理会覆盖真实 IP 头，且无法绕过该代理直接访问 Next 时，才设置 `TRUSTED_CLIENT_IP_HEADER`。例如 Nginx 使用 `proxy_set_header X-Real-IP $remote_addr`，Next 设置 `TRUSTED_CLIENT_IP_HEADER=x-real-ip`。该头必须只有一个合法 IP，不接受客户端自行提供的列表。
+Next 默认删除客户端提交的转发 IP/地区头。只有入口反向代理会覆盖真实 IP 头，且无法绕过该代理直接访问 Next 时，才设置 `TRUSTED_CLIENT_IP_HEADER`。例如 Nginx 使用 `proxy_set_header X-Real-IP $remote_addr`，Next 设置 `TRUSTED_CLIENT_IP_HEADER=x-real-ip`。该头必须只有一个合法 IP，不接受客户端自行提供的列表。请求日志、登录邮件和人机验证弹窗共用这里解析的真实 IP。
 
-未配置可信 IP 头时，代理请求显示未知 IP，登录仍保留账号限流，不启用未知 IP 的共享入口桶；匿名分享密码验证需要先登录。务必设置实际 HTTPS `APP_ORIGIN`。本轮修复未执行构建或部署验证，Docker 静态资源路径仍需单独确认。
+可信 IP 头有效时，Next 会把入口提供的国家/地区通过内部头传给 Go。默认只采信 Cloudflare 的 `CF-IPCountry` / `CF-Region`、Vercel 的 `X-Vercel-IP-Country` / `X-Vercel-IP-Country-Region`、CloudFront 的 `CloudFront-Viewer-Country`，以及地区用的 `X-Region`。其他反向代理可用 `TRUSTED_CLIENT_COUNTRY_HEADERS` 和 `TRUSTED_CLIENT_REGION_HEADERS` 指定由入口覆盖的对应头名，多个头名用英文逗号分隔；国家建议提供 ISO 3166-1 两位代码。没有配置真实 IP 头时不会信任客户端自报的国家/地区。后台任务的退款和用量结算流水会沿用任务提交时的 IP 与国家/地区。
+
+未配置可信 IP 头时，代理请求显示未知 IP，国家/地区也无法从 Next 链路推断；登录仍保留账号限流，不启用未知 IP 的共享入口桶，匿名分享密码验证需要先登录。务必设置实际 HTTPS `APP_ORIGIN`。本轮修复未执行构建或部署验证，Docker 静态资源路径仍需单独确认。
 
 启动数据库更新包含 `cloud_file_references`、`video_tasks`、任务 worker/lease 字段及可空的 Stripe session ID。修改遵循当前新设计，未添加旧文件绑定关系或浏览器全局素材数据的迁移兼容逻辑。
 
@@ -50,6 +52,10 @@ Next 默认删除客户端提交的转发 IP/地区头。只有入口反向代�
 - 新增限流桶、容量预留和素材归属表，由当前模型自动创建；没有旧数据兼容/清理迁移。多实例限流要求共用同一持久化数据库，独立 SQLite 文件不能合并计数。
 - MAX_USER_STORAGE_BYTES 默认 5368709120（5 GiB），包含未删除的上传、生成和任务文件。需要更高额度时显式调整。
 - 生产 CSP 改用逐请求 nonce，API 添加 sandbox CSP。上线前验证 CAPTCHA、OAuth、广告、媒体上传及下载；具体场景见 [安全审阅记录](security-review.md)。
+
+## 首页与公开资源缓存
+
+带语言前缀的首页 HTML 使用公开缓存：浏览器 5 分钟、CDN 1 小时，并允许过期后台更新；`/api/settings` 使用短期公开缓存，`/showcase/` 图片使用长期缓存。其他页面、认证、工作流、账户和私有生成接口继续保持 `no-store`。CDN 必须按完整 URL 区分语言及演示素材的版本查询参数，并同时缓存响应头和正文，不能只缓存 HTML 而重新生成 CSP 头。发布新版首页或修改公开设置后，如需立即生效，应主动清理对应首页和公开设置缓存。
 
 ## PostgreSQL 验证码唯一索引创建失败
 

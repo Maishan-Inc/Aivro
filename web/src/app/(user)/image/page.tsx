@@ -20,7 +20,7 @@ import { formatDateTime } from "@/lib/datetime";
 import { useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
 import { nanoid } from "nanoid";
 import { formatBytes, formatDuration, getDataUrlByteSize, readImageMeta } from "@/lib/image-utils";
-import { cancelGenerationTask, requestEdit, requestGeneration, type GenerationQueueUpdate } from "@/services/api/image";
+import { cancelGenerationTask, fetchGenerationTask, requestEdit, requestGeneration, resumeGenerationTask, type GenerationQueueUpdate, type GenerationTaskView } from "@/services/api/image";
 import { deleteGenerationHistory, fetchGenerationHistories, saveGenerationHistory, type GenerationHistory, type GenerationHistoryMedia } from "@/services/api/generation-history";
 import { storeGeneratedImage, uploadImage } from "@/services/image-storage";
 import { useAssetStore } from "@/stores/use-asset-store";
@@ -69,8 +69,21 @@ type GenerationLog = {
     status: "生成中" | "成功" | "失败";
     images: GeneratedImage[];
     thumbnails: string[];
+    taskIds?: string[];
     history?: GenerationHistory;
 };
+
+type RecoverableGeneration = {
+    prompt: string;
+    config: GenerationLogConfig;
+    references: ReferenceImage[];
+    userId: string;
+    resultIds: string[];
+    taskIds: Record<string, string>;
+    startedAt: number;
+};
+
+const RECOVERY_KEY = "image-generation-recovery-v1";
 
 type GenerationLogConfig = Pick<AiConfig, "model" | "imageModel" | "quality" | "size" | "count">;
 
@@ -80,6 +93,7 @@ export default function ImagePage() {
     const router = useRouter();
     const localizedPath = useLocalizedPath();
     const autoStarted = useRef(false);
+    const restoring = useRef(false);
     const submittingRef = useRef(false);
     const [draftLoaded, setDraftLoaded] = useState("");
     const [draftConfig, setDraftConfig] = useState<GenerationLogConfig | null>(null);
@@ -88,6 +102,7 @@ export default function ImagePage() {
     const isAiConfigReady = useConfigStore((state) => state.isAiConfigReady);
     const addAsset = useAssetStore((state) => state.addAsset);
     const token = useUserStore((state) => state.token);
+    const userId = useUserStore((state) => state.user?.id || "");
     const userReady = useUserStore((state) => state.isReady);
     const profileCompleted = useUserStore((state) => state.user?.profileCompleted === true);
     const { prompt, references, setPrompt, setReferences } = useImageComposerStore();
@@ -171,18 +186,29 @@ export default function ImagePage() {
         setPreviewLog(null);
         setPendingLog(buildPendingLog({ prompt: text, model: generationModel, config: { ...snapshot.config, count: String(generationCount) }, references: snapshot.references, imageCount: generationCount }));
         const aspectRatio = imagePreviewAspectRatio(snapshot.config.size);
-        setResults(Array.from({ length: generationCount }, () => ({ id: nanoid(), status: "pending", aspectRatio })));
+        const initialResults = Array.from({ length: generationCount }, () => ({ id: nanoid(), status: "pending" as const, aspectRatio }));
+        setResults(initialResults);
+        const recovery: RecoverableGeneration = { prompt: text, config: snapshot.config, references: snapshot.references, userId, resultIds: initialResults.map((item) => item.id), taskIds: {}, startedAt: Date.now() };
+        await localforage.setItem(RECOVERY_KEY, recovery);
         const batchStartedAt = performance.now();
         setStartedAt(batchStartedAt);
 
         const tasks = Array.from({ length: generationCount }, (_, index) => runGenerationSlot(index, snapshot));
 
         const result = await Promise.allSettled(tasks);
+        const failed = result.find((item): item is PromiseRejectedResult => item.status === "rejected");
+        const savedRecovery = await localforage.getItem<RecoverableGeneration>(RECOVERY_KEY);
+        await saveGenerationResults(result, snapshot.text, generationModel, { ...snapshot.config, count: String(generationCount) }, snapshot.references, Object.values(savedRecovery?.taskIds || {}), performance.now() - batchStartedAt, failed?.reason);
+        await localforage.removeItem(RECOVERY_KEY);
+        setPendingLog(null);
+        setRunning(false);
+        submittingRef.current = false;
+    };
+
+    const saveGenerationResults = async (result: PromiseSettledResult<GeneratedImage>[], prompt: string, generationModel: string, config: GenerationLogConfig, references: ReferenceImage[], taskIds: string[], durationMs: number, failure?: unknown) => {
         const successImages = result.filter((item): item is PromiseFulfilledResult<GeneratedImage> => item.status === "fulfilled").map((item) => item.value);
         const successCount = successImages.length;
-        const failCount = generationCount - successCount;
-        const failed = result.find((item): item is PromiseRejectedResult => item.status === "rejected");
-
+        const failCount = result.length - successCount;
         try {
             const logImages = await Promise.all(
                 successImages.map(async (image) => {
@@ -192,26 +218,27 @@ export default function ImagePage() {
             );
             await saveLog(
                 buildLog({
-                    prompt: text,
+                    prompt,
                     model: generationModel,
-                    config: { ...snapshot.config, count: String(generationCount) },
-                    references: snapshot.references,
-                    durationMs: performance.now() - batchStartedAt,
+                    config,
+                    references,
+                    durationMs,
                     successCount,
                     failCount,
                     status: successCount ? "成功" : "失败",
                     images: logImages,
+                    taskIds,
                 }),
             );
-            successCount ? message.success("图片已生成") : message.error(failed?.reason instanceof Error ? failed.reason.message : "生成失败");
+            successCount ? message.success("图片已生成") : message.error(failure instanceof Error ? failure.message : "生成失败");
         } catch (error) {
             message.error(error instanceof Error ? error.message : "生成记录保存失败");
-        } finally {
-            setPendingLog(null);
-            setRunning(false);
-            submittingRef.current = false;
         }
     };
+
+    useEffect(() => {
+        if (userReady && token) void restoreGeneration();
+    }, [token, userReady, userId]);
 
     const cancelQueuedResult = async (result: GenerationResult) => {
         if (!result.taskId) return;
@@ -299,6 +326,7 @@ export default function ImagePage() {
                 quality: log.config.quality || "",
                 size: log.config.size || "",
                 count: log.config.count || "",
+                taskIds: (log.taskIds || []).join(","),
             },
             references: storedReferences.map((item) => ({ name: item.name, type: item.type, url: item.dataUrl, storageKey: item.storageKey || "" })),
             media,
@@ -321,13 +349,85 @@ export default function ImagePage() {
     const previewGenerationLog = async (log: GenerationLog) => {
         setPreviewLog(log);
         setLogsOpen(false);
-        setResults(log.images.map((image) => ({ id: image.id, status: "success", image })));
+        setPrompt(log.prompt);
+        setReferences(log.references || []);
+        useConfigStore.getState().setConfig(log.config, false);
+        setResults(log.images.length ? log.images.map((image) => ({ id: image.id, status: "success", image })) : [{ id: log.id, status: "failed", error: log.history?.error || "生成失败" }]);
+    };
+
+    const updateRecovery = async (update: (recovery: RecoverableGeneration) => void) => {
+        const recovery = await localforage.getItem<RecoverableGeneration>(RECOVERY_KEY);
+        if (!recovery) return;
+        update(recovery);
+        await localforage.setItem(RECOVERY_KEY, recovery);
+    };
+
+    const restoreGeneration = async () => {
+        if (restoring.current || !token) return;
+        restoring.current = true;
+        try {
+            const recovery = await localforage.getItem<RecoverableGeneration>(RECOVERY_KEY);
+            if (!recovery || !Object.keys(recovery.taskIds).length || !Array.isArray(recovery.resultIds)) return;
+            if (recovery.userId !== userId) return;
+            const savedLogs = await fetchGenerationHistories(token, { type: "image", pageSize: 100 });
+            const savedTaskIds = new Set(savedLogs.items.flatMap((item) => (item.config?.taskIds || "").split(",").filter(Boolean)));
+            const pendingEntries = Object.entries(recovery.taskIds).filter(([resultId, taskId]) => recovery.resultIds.includes(resultId) && !savedTaskIds.has(taskId));
+            if (!pendingEntries.length) {
+                await localforage.removeItem(RECOVERY_KEY);
+                await refreshLogs();
+                return;
+            }
+            const tasks = await Promise.all(pendingEntries.map(([, taskId]) => fetchGenerationTask(effectiveConfig, taskId).catch(() => null)));
+            const activeTasks = tasks.filter((task): task is GenerationTaskView => Boolean(task));
+            if (!activeTasks.length) return;
+            setPrompt(recovery.prompt);
+            setReferences(recovery.references);
+            useConfigStore.getState().setConfig(recovery.config, false);
+            const aspectRatio = imagePreviewAspectRatio(recovery.config.size);
+            setResults(recovery.resultIds.map((id) => {
+                const task = activeTasks.find((item) => item.id === recovery.taskIds[id]);
+                return { id, ...taskToResult(task, aspectRatio) };
+            }));
+            const generating = activeTasks.some((task) => task.status === "queued" || task.status === "executing");
+            setRunning(generating);
+            if (generating) setPendingLog(buildPendingLog({ prompt: recovery.prompt, model: recovery.config.imageModel || recovery.config.model, config: recovery.config, references: recovery.references, imageCount: recovery.resultIds.length }));
+            if (generating) setStartedAt(performance.now() - Math.max(0, Date.now() - recovery.startedAt));
+            activeTasks.forEach((task) => {
+                if (task.status === "failed" || task.status === "canceled") {
+                    const resultId = Object.keys(recovery.taskIds).find((id) => recovery.taskIds[id] === task.id) || "";
+                    setResults((value) => updateResultAt(value, recovery.resultIds.indexOf(resultId), { status: "failed", error: task.error || (task.status === "canceled" ? "任务已撤销" : "生成失败") }));
+                }
+            });
+            const result = await Promise.allSettled(activeTasks.map(async (task, index): Promise<GeneratedImage> => {
+                const onQueue = (update: GenerationQueueUpdate) => {
+                    setResults((value) => updateResultAt(value, recovery.resultIds.indexOf(pendingEntries[index][0]), { status: update.status === "queued" || update.status === "executing" ? update.status : update.status === "succeeded" ? "pending" : "failed", error: task.error, taskId: update.taskId, queuePosition: update.queuePosition, aheadCount: update.aheadCount }));
+                };
+                const images = await resumeGenerationTask(effectiveConfig, task, onQueue);
+                const image = images[0];
+                if (!image) throw new Error("接口没有返回图片");
+                const meta = await readImageMeta(image.dataUrl);
+                const nextImage: GeneratedImage = { id: image.id, dataUrl: image.dataUrl, storageKey: image.storageKey, cloudFileId: image.cloudFileId, expiresAt: image.expiresAt, durationMs: Math.max(0, Date.now() - recovery.startedAt), width: meta.width, height: meta.height, bytes: image.bytes ?? getDataUrlByteSize(image.dataUrl), mimeType: image.mimeType };
+                setResults((value) => updateResultAt(value, recovery.resultIds.indexOf(pendingEntries[index][0]), { status: "success", image: nextImage }));
+                return nextImage;
+            }));
+            const failed = result.find((item): item is PromiseRejectedResult => item.status === "rejected");
+            await saveGenerationResults(result, recovery.prompt, recovery.config.imageModel || recovery.config.model, recovery.config, recovery.references, activeTasks.map((task) => task.id), Date.now() - recovery.startedAt, failed?.reason);
+            await localforage.removeItem(RECOVERY_KEY);
+            setPendingLog(null);
+            await refreshLogs();
+        } catch (error) {
+            message.error(error instanceof Error ? error.message : "恢复生成任务失败");
+        } finally {
+            setRunning(false);
+            restoring.current = false;
+        }
     };
 
     const runGenerationSlot = async (index: number, snapshot: { text: string; config: AiConfig; references: ReferenceImage[] }): Promise<GeneratedImage> => {
         const itemStartedAt = performance.now();
         try {
-            const onQueue = (update: GenerationQueueUpdate) => {
+            const onQueue = async (update: GenerationQueueUpdate) => {
+                await updateRecovery((recovery) => { recovery.taskIds[recovery.resultIds[index]] = update.taskId; });
                 setResults((value) =>
                     updateResultAt(value, index, {
                         status: update.status === "queued" ? "queued" : "executing",
@@ -700,6 +800,7 @@ function historyToImageLog(history: GenerationHistory): GenerationLog {
         status: history.status || "成功",
         images,
         thumbnails: images.map((image) => image.dataUrl),
+        taskIds: (history.config?.taskIds || "").split(",").filter(Boolean),
         history,
     };
 }
@@ -717,6 +818,19 @@ function imageToHistoryMedia(image: GeneratedImage): GenerationHistoryMedia | nu
         width: image.width || 0,
         height: image.height || 0,
         expiresAt: image.expiresAt || "",
+    };
+}
+
+function taskToResult(task: GenerationTaskView | undefined, aspectRatio: string): GenerationResult {
+    if (!task) return { id: nanoid(), status: "failed", aspectRatio, error: "任务不存在或已过期" };
+    return {
+        id: task.id,
+        status: task.status === "queued" || task.status === "executing" ? task.status : task.status === "succeeded" ? "pending" : "failed",
+        aspectRatio,
+        error: task.error || (task.status === "canceled" ? "任务已撤销" : undefined),
+        taskId: task.id,
+        queuePosition: task.queuePosition,
+        aheadCount: task.aheadCount,
     };
 }
 
@@ -769,6 +883,7 @@ function buildLog({
     failCount,
     status,
     images,
+    taskIds,
 }: {
     prompt: string;
     model: string;
@@ -779,6 +894,7 @@ function buildLog({
     failCount: number;
     status: Exclude<GenerationLog["status"], "生成中">;
     images: GeneratedImage[];
+    taskIds?: string[];
 }): GenerationLog {
     const logConfig = {
         model: config.model,
@@ -805,5 +921,6 @@ function buildLog({
         status,
         images,
         thumbnails: images.map((image) => image.dataUrl),
+        taskIds,
     };
 }

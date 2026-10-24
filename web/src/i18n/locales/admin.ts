@@ -690,4 +690,6 @@ export const adminTranslations: Record<string, string> = {
     "访问密钥 ID": "Access key ID",
     "访问私密密钥": "Secret access key",
     "存储桶": "Bucket",
+    "邮件预览": "Email preview",
+    "正文按纯文本编辑，发送时自动应用 Aivro 品牌卡片；验证码显示为独立数字格。": "Edit the body as plain text. The Aivro branded card is applied automatically when sent, with the code shown in separate digit boxes.",
 };

@@ -70,6 +70,7 @@ export function authHeader(token?: string): Record<string, string> {
 
 async function apiRequest<T>(config: { url: string; method: "GET" | "POST" | "PUT" | "DELETE"; params?: ApiParams; data?: unknown; headers?: Record<string, string> }) {
     let response;
+    const publicCache = config.method === "GET" && (config.url === "/api/settings" || config.url === "/api/prompts");
     try {
         response = await axios.request<ApiResponse<T>>({
             url: config.url,
@@ -78,11 +79,10 @@ async function apiRequest<T>(config: { url: string; method: "GET" | "POST" | "PU
             paramsSerializer: { serialize: (params) => serializeApiParams(params as ApiParams).toString() },
             data: config.data,
             headers: {
-                "Cache-Control": "no-cache",
-                Pragma: "no-cache",
+                ...(publicCache ? {} : { "Cache-Control": "no-cache", Pragma: "no-cache" }),
                 ...config.headers,
             },
-            withCredentials: true,
+            withCredentials: !publicCache,
             validateStatus: () => true,
         });
     } catch {

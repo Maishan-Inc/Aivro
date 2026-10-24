@@ -109,6 +109,7 @@ func SubmitAITask(ctx context.Context, user model.AuthUser, body []byte, content
 		}
 	}
 	now := time.Now().Format(time.RFC3339)
+	meta = normalizeRequestLogMeta(meta)
 	task := model.GenerationTask{
 		ID:            newID("task"),
 		UserID:        user.ID,
@@ -118,6 +119,8 @@ func SubmitAITask(ctx context.Context, user model.AuthUser, body []byte, content
 		ContentType:   contentType,
 		RequestFileID: requestFile.File.ID,
 		Credits:       credits,
+		IP:            meta.IP,
+		Country:       meta.Country,
 		RequestCount:  requestCount,
 		Status:        model.GenerationTaskQueued,
 		CreatedAt:     now,
@@ -383,7 +386,9 @@ func executeTask(ctx context.Context, user model.AuthUser, task model.Generation
 }
 
 func taskRefundLog(task model.GenerationTask) *model.CreditLog {
-	return &model.CreditLog{ID: newID("credit"), UserID: task.UserID, Type: model.CreditLogTypeAIRefund, Category: creditLogCategory(model.CreditLogTypeAIRefund), Model: task.Model, Path: task.Path, Amount: task.Credits, RelatedID: task.ID, Remark: "生成任务失败或撤销退款", CreatedAt: now()}
+	meta := normalizeRequestLogMeta(RequestLogMeta{IP: task.IP, Country: task.Country})
+	extra, _ := json.Marshal(map[string]string{"model": task.Model, "path": task.Path, "ip": meta.IP, "country": meta.Country})
+	return &model.CreditLog{ID: newID("credit"), UserID: task.UserID, Type: model.CreditLogTypeAIRefund, Category: creditLogCategory(model.CreditLogTypeAIRefund), Model: task.Model, Path: task.Path, Amount: task.Credits, RelatedID: task.ID, Remark: "生成任务失败或撤销退款", IP: meta.IP, Country: meta.Country, Extra: string(extra), CreatedAt: now()}
 }
 
 func failExecutingTask(task model.GenerationTask, message string) (AIProxyResponse, error) {

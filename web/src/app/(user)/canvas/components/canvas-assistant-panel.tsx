@@ -470,7 +470,7 @@ function AssistantComposer({
                     ))}
                 </div>
             ) : null}
-            <div className="rounded-[28px] border px-3 pb-3 pt-3 shadow-lg" style={{ background: theme.toolbar.panel, borderColor: theme.node.stroke }}>
+            <div className="relative rounded-[28px] border px-3 pb-3 pt-3 shadow-lg" style={{ background: theme.toolbar.panel, borderColor: theme.node.stroke }}>
                 <textarea
                     value={prompt}
                     onChange={(event) => onPromptChange(event.target.value)}
@@ -485,11 +485,11 @@ function AssistantComposer({
                         event.preventDefault();
                         void onSubmit();
                     }}
-                    className="thin-scrollbar h-20 w-full resize-none border-0 bg-transparent px-1 py-1 text-sm leading-5 outline-none placeholder:text-stone-400"
+                    className="thin-scrollbar h-20 w-full resize-none border-0 bg-transparent px-1 py-1 pr-12 text-sm leading-5 outline-none placeholder:text-stone-400"
                     style={{ color: theme.node.text }}
                     placeholder={previewing ? "告诉 AI 哪里需要调整" : "描述你想让 AI 如何操作画布"}
                 />
-                <div className="mt-2 flex items-center justify-between gap-2">
+                <div className="mt-2 flex items-center justify-between gap-2 pr-12">
                     <div className="canvas-composer-tools flex min-w-0 flex-1 items-center gap-1">
                         <CanvasPromptLibrary onSelect={onPromptChange} />
                         <Segmented
@@ -505,7 +505,7 @@ function AssistantComposer({
                     </div>
                     <Button
                         type="primary"
-                        className="!h-10 !w-10 !min-w-10 shrink-0 !rounded-full !p-0"
+                        className="absolute bottom-3 right-3 !h-10 !w-10 !min-w-10 shrink-0 !rounded-full !p-0"
                         disabled={isRunning || !prompt.trim()}
                         onClick={() => void onSubmit()}
                         aria-label="发送"

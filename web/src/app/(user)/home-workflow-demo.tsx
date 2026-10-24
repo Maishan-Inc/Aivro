@@ -1,114 +1,169 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { ArrowRight, ArrowUpRight, Box, Check, Clapperboard, GitBranch, ImagePlus, Layers, MousePointer2, ScanLine, Settings2, Sparkles, Type, Video } from "lucide-react";
-import { AivroDrawableLoader } from "@/components/aivro-drawable-loader";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ArrowRight, ArrowUpRight, Box, Clapperboard, ImagePlus, MousePointer2, Sparkles, Video } from "lucide-react";
+import { ConnectionPath } from "@/app/(user)/canvas/components/canvas-connections";
+import { CanvasNode } from "@/app/(user)/canvas/components/canvas-node";
+import { CanvasToolbar } from "@/app/(user)/canvas/components/canvas-toolbar";
+import { CanvasZoomControls } from "@/app/(user)/canvas/components/canvas-zoom-controls";
+import { InfiniteCanvas } from "@/app/(user)/canvas/components/infinite-canvas";
+import { CanvasNodeType, type CanvasConnection, type CanvasNodeData, type ViewportTransform } from "@/app/(user)/canvas/types";
+import { useI18n } from "@/hooks/use-i18n";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { useThemeStore } from "@/stores/use-theme-store";
-import { useI18n } from "@/hooks/use-i18n";
 import { workflowScenes, workflowSteps } from "./home-workflow-scenes";
 import styles from "./home-workflow-demo.module.css";
 
 const icons = [ImagePlus, Box, Sparkles, Clapperboard, Video];
-const connections = [
-    { d: "M285 143 C325 143 320 150 350 150", step: 1 },
-    { d: "M285 398 C320 398 320 150 350 150", step: 1 },
-    { d: "M465 252 L465 320", step: 2 },
-    { d: "M580 418 C625 418 620 166 660 166", step: 2 },
-    { d: "M580 418 C625 418 620 486 660 486", step: 2 },
-    { d: "M930 166 C975 166 965 347 1010 347", step: 3 },
-    { d: "M930 486 C975 486 965 347 1010 347", step: 3 },
-];
-// Each scene walks the same phases. The third phase starts the run and keeps the
-// Aivro loader on screen; result images mount only after the wait, so nothing is
-// fetched or revealed while the canvas is still "generating".
+const asset = (name: string) => `/showcase/workflows/${name}.webp?v=${process.env.NEXT_PUBLIC_APP_VERSION || "dev"}`;
 const phases = [
-    { step: 0, loading: false, duration: 4000 },
-    { step: 1, loading: false, duration: 4000 },
-    { step: 2, loading: false, duration: 2600 },
-    { step: 2, loading: true, duration: 2800 },
-    { step: 3, loading: false, duration: 5200 },
-    { step: 4, loading: false, duration: 8000 },
-];
-const lastPhase = phases.length - 1;
-const asset = (name: string) => `/showcase/workflows/${name}.webp`;
+    { step: 0, duration: 4000, target: "reference" },
+    { step: 1, duration: 4000, target: "config" },
+    { step: 2, duration: 2600, target: "config" },
+    { step: 2, duration: 2800, target: "branch-0", loading: true },
+    { step: 3, duration: 5200, target: "branch-1" },
+    { step: 4, duration: 8000, target: "result" },
+] as const;
+const initialViewport = { x: 24, y: 72, k: 0.82 };
 
-function Generating() {
-    const { tr } = useI18n();
-    return <span className={styles.generating}>
-        <AivroDrawableLoader compact style={{ color: "var(--demo-active)" }} />
-        <span className={styles.progress} aria-hidden="true" />
-        <span className={styles.generatingLabel}>{tr("生成中")}</span>
-    </span>;
+function sceneCanvas(sceneIndex: number, phase: number): { nodes: CanvasNodeData[]; connections: CanvasConnection[] } {
+    const scene = workflowScenes[sceneIndex];
+    const { step } = phases[phase];
+    const loading = "loading" in phases[phase] && phases[phase].loading;
+    const isVideo = "video" in scene;
+    const node = (id: string, type: CanvasNodeType, title: string, x: number, y: number, width: number, height: number, metadata: CanvasNodeData["metadata"] = {}): CanvasNodeData => ({ id: `${scene.id}-${id}`, type, title, position: { x, y }, width, height, metadata });
+    const image = (id: string, title: string, name: string, x: number, y: number, width = 320, height = 250) => node(id, CanvasNodeType.Image, title, x, y, width, height, { content: asset(name), status: "success", naturalWidth: 3, naturalHeight: 2 });
+    const waiting = (id: string, title: string, x: number, y: number, width = 320, height = 250) => node(id, CanvasNodeType.Image, title, x, y, width, height, { content: "", status: loading ? "loading" : "idle" });
+    const nodes = [
+        node("prompt", CanvasNodeType.Text, "创作要求", 40, 40, 300, 230, { content: scene.prompt, prompt: scene.prompt, status: "success", fontSize: 15 }),
+        image("reference", scene.referenceTitle, scene.reference, 40, 350, 300, 220),
+        node("brief", CanvasNodeType.Text, "创意拆解", 430, 55, 280, 215, { content: `${scene.brief}\n\n${scene.constraint}`, status: "success", fontSize: 14 }),
+        node("config", CanvasNodeType.Config, "生成配置", 430, 355, 280, 215, { status: loading ? "loading" : "idle", generationMode: isVideo ? "video" : "image", generationType: "edit", model: isVideo ? "grok-imagine-video" : "gpt-image-2", size: scene.format, count: 2, prompt: step >= 1 ? scene.prompt : "" }),
+        ...scene.outputs.map((name, index) => step >= 3 ? image(`branch-${index}`, scene.branches[index], name, 800, index ? 370 : 40) : waiting(`branch-${index}`, scene.branches[index], 800, index ? 370 : 40)),
+        step >= 3
+            ? isVideo
+                ? node("result", CanvasNodeType.Video, scene.deliverable, 1210, 190, 420, 236, { content: scene.video, status: "success" })
+                : image("result", scene.deliverable, scene.outputs[0], 1210, 175, 400, 270)
+            : waiting("result", scene.deliverable, 1210, 175, 400, 270),
+    ];
+    const links = [["prompt", "config"], ["reference", "config"], ["brief", "config"], ["config", "branch-0"], ["config", "branch-1"], ["branch-0", "result"], ["branch-1", "result"]];
+    return { nodes, connections: links.map(([from, to]) => ({ id: `${scene.id}-${from}-${to}`, fromNodeId: `${scene.id}-${from}`, toNodeId: `${scene.id}-${to}` })) };
 }
 
 export function HomeWorkflowDemo() {
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
     const { tr } = useI18n();
     const [{ scene: selected, phase, branch }, setPlayback] = useState({ scene: 0, phase: 0, branch: 0 });
-    const [videoFailed, setVideoFailed] = useState(false);
-    const videoRef = useRef<HTMLVideoElement>(null);
+    const [viewport, setViewport] = useState<ViewportTransform>(initialViewport);
+    const [cursor, setCursor] = useState({ x: 190, y: 460, clicking: false });
+    const containerRef = useRef<HTMLDivElement>(null);
+    const cursorRef = useRef(cursor);
     const scene = workflowScenes[selected];
     const isVideo = "video" in scene;
-    const { step, loading } = phases[phase];
-    const revealed = step >= 3;
+    const { step } = phases[phase];
+    const loading = "loading" in phases[phase] && phases[phase].loading;
+    const canvas = useMemo(() => sceneCanvas(selected, phase), [selected, phase]);
+    const nodes = useMemo(() => canvas.nodes.map((node) => node.id.endsWith("result") && branch === 1 && !isVideo && step >= 3 ? { ...node, metadata: { ...node.metadata, content: asset(scene.outputs[1]) } } : node), [branch, canvas.nodes, isVideo, scene.outputs, step]);
+    const nodeById = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
+    const selectedId = `${scene.id}-${phases[phase].target}`;
 
     useEffect(() => {
-        const timer = window.setTimeout(() => setPlayback((current) => current.phase === lastPhase
+        const element = containerRef.current;
+        if (!element) return;
+        const fit = () => setViewport({ x: 24, y: 72, k: Math.min(0.95, Math.max(0.45, (element.clientWidth - 48) / 1650)) });
+        fit();
+        const observer = new ResizeObserver(fit);
+        observer.observe(element);
+        return () => observer.disconnect();
+    }, []);
+
+    useEffect(() => {
+        const timer = window.setTimeout(() => setPlayback((current) => current.phase === phases.length - 1
             ? { scene: (current.scene + 1) % workflowScenes.length, phase: 0, branch: 0 }
-            : { ...current, phase: current.phase + 1 }), phases[phase].duration);
+            : { ...current, phase: current.phase + 1, branch: current.phase === 3 ? 1 : current.branch }), phases[phase].duration);
         return () => window.clearTimeout(timer);
     }, [selected, phase, branch]);
 
-    useEffect(() => { setVideoFailed(false); }, [selected]);
     useEffect(() => {
-        const video = videoRef.current;
-        if (!video) return;
-        const play = () => { void video.play().catch(() => {}); };
-        play();
-        video.addEventListener("pause", play);
-        return () => video.removeEventListener("pause", play);
-    }, [selected, videoFailed, revealed]);
-    useEffect(() => {
-        const video = videoRef.current;
-        if (!video || !revealed || !("video" in scene)) return;
-        video.currentTime = scene.frameTimes[branch];
-    }, [branch, revealed, scene]);
+        const target = nodeById.get(selectedId);
+        if (!target) return;
+        const from = cursorRef.current;
+        const to = { x: target.position.x + target.width * 0.55, y: target.position.y + target.height * 0.52 };
+        const started = performance.now();
+        const duration = Math.min(1500, Math.max(750, Math.hypot(to.x - from.x, to.y - from.y) / 0.8)) + (selected * 137 + phase * 83) % 240;
+        const bend = ((selected + phase) % 2 ? 1 : -1) * (18 + phase * 3);
+        let frame = 0;
+        const move = (time: number) => {
+            const progress = Math.min(1, (time - started) / duration);
+            const eased = progress < 0.5 ? 4 * progress ** 3 : 1 - (-2 * progress + 2) ** 3 / 2;
+            const next = {
+                x: from.x + (to.x - from.x) * eased + Math.sin(progress * Math.PI) * bend,
+                y: from.y + (to.y - from.y) * eased - Math.sin(progress * Math.PI) * Math.abs(bend) * 0.45,
+                clicking: progress > 0.88 && progress < 1,
+            };
+            cursorRef.current = next;
+            setCursor(next);
+            if (progress < 1) frame = requestAnimationFrame(move);
+        };
+        frame = requestAnimationFrame(move);
+        return () => cancelAnimationFrame(frame);
+    }, [nodeById, phase, selected, selectedId]);
 
-    return <figure className={styles.demo} style={{
-        "--demo-bg": theme.canvas.background, "--demo-dot": theme.canvas.dot,
-        "--demo-panel": theme.node.panel, "--demo-fill": theme.node.fill,
-        "--demo-line": theme.node.stroke, "--demo-text": theme.node.text,
-        "--demo-muted": theme.node.muted, "--demo-active": theme.node.activeStroke,
-    } as CSSProperties}>
+    useEffect(() => {
+        if (!isVideo || step < 3) return;
+        let video: HTMLVideoElement | null = null;
+        const play = () => {
+            video ||= containerRef.current?.querySelector<HTMLVideoElement>(`[data-node-id="${scene.id}-result"] video`) || null;
+            if (!video) return;
+            void video.play().catch(() => {});
+            video.currentTime = scene.frameTimes[branch];
+        };
+        play();
+        const timer = window.setTimeout(() => {
+            play();
+            if (video) video.currentTime = scene.frameTimes[branch];
+        }, 0);
+        const seek = () => { if (video) video.currentTime = scene.frameTimes[branch]; };
+        video?.addEventListener("loadedmetadata", seek, { once: true });
+        if (video?.readyState) seek();
+        return () => { window.clearTimeout(timer); video?.removeEventListener("loadedmetadata", seek); };
+    }, [branch, isVideo, scene, step]);
+
+    const chooseScene = (index: number) => {
+        setPlayback({ scene: index, phase: 0, branch: 0 });
+        setViewport(initialViewport);
+    };
+    const fitCanvas = () => {
+        const width = containerRef.current?.clientWidth || 1400;
+        setViewport({ x: 24, y: 72, k: Math.min(0.95, Math.max(0.45, (width - 48) / 1650)) });
+    };
+
+    return <figure className={styles.demo}>
         <div className={styles.scenarios} data-native-scroll role="tablist" aria-label={tr("创作场景")}>{workflowScenes.map((item, index) => {
             const Icon = icons[index];
-            return <button key={item.id} id={`workflow-tab-${item.id}`} type="button" role="tab" aria-selected={selected === index} aria-controls="workflow-scene" tabIndex={selected === index ? 0 : -1} onClick={() => setPlayback({ scene: index, phase: 0, branch: 0 })} onKeyDown={(event) => {
+            return <button key={item.id} id={`workflow-tab-${item.id}`} type="button" role="tab" aria-selected={selected === index} aria-controls="workflow-scene" tabIndex={selected === index ? 0 : -1} onClick={() => chooseScene(index)} onKeyDown={(event) => {
                 const next = event.key === "ArrowRight" ? (index + 1) % workflowScenes.length : event.key === "ArrowLeft" ? (index + workflowScenes.length - 1) % workflowScenes.length : event.key === "Home" ? 0 : event.key === "End" ? workflowScenes.length - 1 : null;
-                if (next !== null) { event.preventDefault(); setPlayback({ scene: next, phase: 0, branch: 0 }); document.getElementById(`workflow-tab-${workflowScenes[next].id}`)?.focus(); }
+                if (next !== null) { event.preventDefault(); chooseScene(next); document.getElementById(`workflow-tab-${workflowScenes[next].id}`)?.focus(); }
             }}><Icon size={17} /><span>{tr(item.title)}</span><small>0{index + 1}</small></button>;
         })}</div>
         <div id="workflow-scene" role="tabpanel" aria-labelledby={`workflow-tab-${scene.id}`}>
             <div className={styles.toolbar}><span><span className={styles.logo} />Aivro Studio <span className={styles.toolbarDivider} />{tr(scene.title)}</span><span><span className={styles.statusDot} />{tr(loading ? "生成中" : workflowSteps[step])}<small>0{selected + 1} / 05</small></span></div>
-            <div className={styles.viewport} data-native-scroll tabIndex={0} aria-label={tr("工作流画布，可横向滚动查看全部节点")}>
-                <div key={scene.id} className={styles.stage} data-step={step}>
-                    <svg className={styles.connections} viewBox="0 0 1360 680" fill="none" aria-hidden="true">{connections.map(({ d, step: active }) => <g key={d} data-active={step >= active}><path d={d} className={styles.connectionBase} /><path d={d} className={styles.connection} /></g>)}</svg>
-                    <div className={`${styles.node} ${styles.promptNode}`}><div className={styles.nodeHeader}><Type size={14} />{tr("创作要求")}<small>01</small></div><p>{tr(scene.prompt)}</p><span className={styles.outputPort} /></div>
-                    <div className={`${styles.node} ${styles.referenceNode}`}><div className={styles.nodeHeader}><ImagePlus size={14} />{tr(scene.referenceTitle)}<small>02</small></div><img src={asset(scene.reference)} alt={tr(scene.referenceTitle)} loading="lazy" decoding="async" /><span className={styles.outputPort} /></div>
-                    <div className={`${styles.node} ${styles.planNode}`} data-active={step >= 1}><div className={styles.nodeHeader}><GitBranch size={14} />{tr("创意拆解")}<small>03</small></div><p>{tr(scene.brief)}</p><div className={styles.constraint}><ScanLine size={12} />{tr(scene.constraint)}</div><span className={styles.inputPort} /><span className={styles.bottomPort} /></div>
-                    <div className={`${styles.node} ${styles.configNode}`} data-active={step >= 2}><div className={styles.nodeHeader}><Settings2 size={14} />{tr("生成配置")}<small>04</small></div><div className={styles.configRows}><span>{tr("生成方式")}<strong>{tr(isVideo ? "图生视频" : "参考图编辑")}</strong></span><span>{tr("画面比例")}<strong>{scene.format}</strong></span><span>{tr("输出分支")}<strong>02</strong></span></div><div className={styles.generate}><Sparkles size={13} />{tr(loading ? "生成中" : revealed ? "结果已就绪" : "运行生成")}</div><span className={styles.topPort} /><span className={styles.outputPort} /></div>
-                    {scene.outputs.map((name, index) => <div key={`${scene.id}-${index}`} className={`${styles.node} ${index ? styles.branchSecond : styles.branchFirst}`} data-active={revealed}>
-                        <div className={styles.nodeHeader}>{isVideo ? <Clapperboard size={14} /> : <ImagePlus size={14} />}{tr(scene.branches[index])}<small>0{5 + index}</small></div>
-                        <button type="button" className={styles.resultChoice} disabled={!revealed} aria-label={`${tr(isVideo ? "预览此镜头" : "选用此方案")} · ${tr(scene.branches[index])}`} aria-pressed={step === 4 && branch === index} onClick={() => setPlayback({ scene: selected, phase: lastPhase, branch: index })}>
-                            <span className={styles.resultImage}>{revealed ? <img src={asset(name)} alt={tr(scene.branches[index])} loading="lazy" decoding="async" /> : loading ? <Generating /> : <span className={styles.pending} aria-hidden="true" />}<span className={styles.scan} aria-hidden="true" /></span>
-                            <span className={styles.resultFooter}>{step === 4 && branch === index ? <Check size={12} /> : <ArrowUpRight size={12} />}{tr(loading ? "生成中" : !revealed ? "等待生成" : step === 4 && branch === index ? (isVideo ? "正在预览" : "已选用") : (isVideo ? "预览此镜头" : "选用此方案"))}</span>
-                        </button><span className={styles.inputPort} /><span className={styles.outputPort} />
-                    </div>)}
-                    <div className={`${styles.node} ${styles.resultNode}`} data-active={step >= 4}><div className={styles.nodeHeader}>{isVideo ? <Video size={14} /> : <Layers size={14} />}{tr(scene.deliverable)}<small>07</small></div>
-                        <div className={styles.finalMedia}>{revealed ? (isVideo ? <><video ref={videoRef} src={scene.video} poster={asset(scene.reference)} autoPlay muted loop playsInline preload="metadata" aria-label={tr("视频流程示例片段")} onError={() => setVideoFailed(true)} />{videoFailed ? <div className={styles.videoError}><span>{tr("视频暂不可用")}</span><button type="button" onClick={() => { setVideoFailed(false); videoRef.current?.load(); }}>{tr("重新加载")}</button></div> : null}</> : <img src={asset(scene.outputs[branch])} alt={tr(scene.branches[branch])} loading="lazy" decoding="async" />) : loading ? <Generating /> : <span className={styles.pending} aria-hidden="true" />}</div>
-                        <div className={styles.finalSummary}><strong>{tr(scene.next)}</strong><span>{tr("保留参考，连接下一步创作")}<ArrowRight size={14} /></span></div><span className={styles.inputPort} /></div>
-                    <div className={styles.cursor} aria-hidden="true"><MousePointer2 size={22} fill="var(--demo-panel)" /><span>Aivro</span></div>
-                    <div className={styles.stageNote}><span>01 — 07</span>{tr(scene.subtitle)}</div>
+            <div className={styles.canvas} style={{ background: theme.canvas.background, color: theme.node.text }}>
+                <InfiniteCanvas containerRef={containerRef} viewport={viewport} backgroundMode="lines" onViewportChange={setViewport} onContextMenu={(event) => event.preventDefault()}>
+                    <svg className="absolute left-0 top-0 h-[10000px] w-[10000px] overflow-visible" style={{ pointerEvents: "none", zIndex: 0 }}>
+                        {canvas.connections.map((connection) => {
+                            const from = nodeById.get(connection.fromNodeId);
+                            const to = nodeById.get(connection.toNodeId);
+                            if (!from || !to) return null;
+                            return <ConnectionPath key={connection.id} connection={connection} from={from} to={to} active={step >= 2 && (connection.fromNodeId.endsWith("config") || step >= 3)} onSelect={() => undefined} />;
+                        })}
+                    </svg>
+                    {nodes.map((node) => <CanvasNode key={node.id} data={node} scale={viewport.k} isSelected={node.id === selectedId} isRelated={false} isFocusRelated={false} isConnectionTarget={false} isConnecting={false} showPanel={false} showImageInfo={false} readOnly renderVideo={(videoNode) => <video src={videoNode.metadata?.content} autoPlay muted loop playsInline preload="none" controls aria-label={tr(scene.deliverable)} className="h-full w-full rounded-3xl bg-black object-contain" data-canvas-no-zoom />} onMouseDown={() => undefined} onHoverStart={() => undefined} onHoverEnd={() => undefined} onConnectStart={() => undefined} onResize={() => undefined} onContentChange={() => undefined} onContextMenu={(event) => event.preventDefault()} />)}
+                    <div className={styles.cursor} data-clicking={cursor.clicking} style={{ transform: `translate(${cursor.x}px, ${cursor.y}px)` }} aria-hidden="true"><MousePointer2 size={24} fill={theme.node.panel} /><span>Aivro</span></div>
+                </InfiniteCanvas>
+                <div className={styles.demoTools} inert>
+                    <CanvasToolbar selectedCount={0} canUndo={false} canRedo={false} backgroundMode="lines" showImageInfo={false} onAddImage={() => undefined} onAddVideo={() => undefined} onAddText={() => undefined} onAddConfig={() => undefined} onUndo={() => undefined} onRedo={() => undefined} onUpload={() => undefined} onDelete={() => undefined} onClear={() => undefined} onDeselect={() => undefined} onBackgroundModeChange={() => undefined} onShowImageInfoChange={() => undefined} onOpenAssetLibrary={() => undefined} onOpenMyAssets={() => undefined} />
+                    <CanvasZoomControls scale={viewport.k} onScaleChange={(k) => setViewport((current) => ({ ...current, k }))} onReset={fitCanvas} isMiniMapOpen={false} onToggleMiniMap={() => undefined} />
                 </div>
             </div>
         </div>

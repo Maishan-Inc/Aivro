@@ -1425,6 +1425,7 @@ const enUS = {
     "复制示例代码": "Copy sample code",
     "复制代码": "Copy code",
     "示例编程语言": "Example programming language",
+    "更多语言": "More languages",
     "{0} · 对话调用示例": "{0} · Dialog call example",
     "安装 cURL 和 jq。先按快速开始设置三个环境变量。": "Install cURL and jq. First press Quick Start to set three environment variables.",
     "使用 Go 标准库，将代码保存为 main.go，然后执行 go run main.go。": "Use the Go standard library, save the code as main.go, and then execute go run main.go.",

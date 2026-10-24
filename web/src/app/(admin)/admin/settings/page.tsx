@@ -14,6 +14,7 @@ import { saveAdminAITimeouts, type AdminAITimeoutSettings } from "@/services/api
 import { useUserStore } from "@/stores/use-user-store";
 import { defaultHomeSettings, homeSocialPlatforms } from "@/constant/home-settings";
 import { collectChannelModelColors, collectChannelModels, filterModels, modelCostKey, normalizeModelCost, syncModelCostsWithPublicModels, uniqueModels } from "@/lib/model-pricing";
+import { renderMailPreviewHTML } from "@/lib/mail-preview";
 
 const CodeMirror = dynamic(() => import("@uiw/react-codemirror"), { ssr: false });
 const jsonEditorTheme = EditorView.theme({
@@ -1826,7 +1827,7 @@ function MailTemplateEditorModal({ form, name, onClose, onSave }: { form: any; n
     const expireMinutes = Form.useWatch(["private", "mail", "codeExpireMin"], form) || 10;
     const [subject, setSubject] = useState("");
     const [body, setBody] = useState("");
-    const preview = renderTemplatePreview(`${subject}\n\n${body}`, expireMinutes);
+    const preview = renderMailPreviewHTML(body, activeName, expireMinutes);
     useEffect(() => {
         if (!name) return;
         setSubject(form.getFieldValue(["private", "mail", "templates", activeName, "subject"]) || "");
@@ -1874,7 +1875,8 @@ function MailTemplateEditorModal({ form, name, onClose, onSave }: { form: any; n
                 </Col>
                 <Col xs={24} lg={12}>
                     <Typography.Text strong>实时预览</Typography.Text>
-                    <pre style={{ marginTop: 8, minHeight: 468, whiteSpace: "pre-wrap", wordBreak: "break-word", border: "1px solid var(--ant-color-border)", borderRadius: 6, padding: 12, background: "var(--ant-color-fill-quaternary)" }}>{preview}</pre>
+                    <Typography.Text type="secondary">正文按纯文本编辑，发送时自动应用 Aivro 品牌卡片；验证码显示为独立数字格。</Typography.Text>
+                    <iframe title="邮件预览" sandbox="" srcDoc={preview} style={{ marginTop: 8, width: "100%", minHeight: 560, border: "1px solid var(--ant-color-border)", borderRadius: 8, background: "#f4f4f3" }} />
                 </Col>
             </Row>
         </Modal>
@@ -2152,17 +2154,6 @@ function ProviderTitle({ title, iconUrl }: { title: string; iconUrl?: string }) 
             {title}
         </Space>
     );
-}
-
-function renderTemplatePreview(template: string, expireMinutes: number) {
-    return template
-        .replaceAll("{{code}}", "123456")
-        .replaceAll("{{email}}", "user@example.com")
-        .replaceAll("{{expireMinutes}}", String(expireMinutes))
-        .replaceAll("{{siteName}}", "Aivro")
-        .replaceAll("{{ip}}", "203.0.113.8")
-        .replaceAll("{{country}}", "CN")
-        .replaceAll("{{region}}", "Shanghai");
 }
 
 function normalizeSettingsTab(tab: string | null): SettingsTabKey {

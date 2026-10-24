@@ -27,6 +27,7 @@ type CanvasNodeProps = {
     readOnly?: boolean;
     renderPanel?: (node: CanvasNodeData) => ReactNode;
     renderNodeContent?: (node: CanvasNodeData) => ReactNode;
+    renderVideo?: (node: CanvasNodeData) => ReactNode;
     batchCount?: number;
     batchExpanded?: boolean;
     batchClosing?: boolean;
@@ -57,6 +58,7 @@ type NodeContentRendererProps = {
     batchOpening: boolean;
     batchRecovering: boolean;
     renderNodeContent?: (node: CanvasNodeData) => ReactNode;
+    renderVideo?: (node: CanvasNodeData) => ReactNode;
     readOnly: boolean;
     onContentChange: (nodeId: string, content: string) => void;
     onStopEditing: () => void;
@@ -80,6 +82,7 @@ export const CanvasNode = React.memo(function CanvasNode({
     readOnly = false,
     renderPanel,
     renderNodeContent,
+    renderVideo,
     batchCount = 0,
     batchExpanded = false,
     batchClosing = false,
@@ -313,6 +316,7 @@ export const CanvasNode = React.memo(function CanvasNode({
                         batchOpening={batchOpening}
                         batchRecovering={batchRecovering}
                         renderNodeContent={renderNodeContent}
+                        renderVideo={renderVideo}
                         readOnly={readOnly}
                         onContentChange={readOnly ? () => undefined : onContentChange}
                         onStopEditing={() => setIsEditingContent(false)}
@@ -498,7 +502,8 @@ function EmptyImageContent({ theme, isBatchRoot, batchCount, batchExpanded, batc
     return content;
 }
 
-function VideoNodeContent({ node, theme }: NodeContentRendererProps) {
+function VideoNodeContent({ node, renderVideo }: NodeContentRendererProps) {
+    if (renderVideo) return renderVideo(node);
     if (!node.metadata?.content)
         return (
             <div className="flex h-full w-full flex-col items-center justify-center gap-3" style={{ color: theme.node.placeholder }}>
