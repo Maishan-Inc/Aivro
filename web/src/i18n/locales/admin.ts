@@ -1,5 +1,9 @@
 // Admin-console-only strings (zh/en). These never render on the user-facing site.
 export const adminTranslations: Record<string, string> = {
+    "复制模型 ID": "Copy model ID",
+    "模型 ID 已复制": "Model ID copied",
+    "未单独定价的套餐沿用标准价。": "Plans without their own price use the standard price.",
+    "价格调整会在邮件提醒后的24小时后生效，已完成的请求不重新计算。": "Price changes take effect 24 hours after the email notification. Completed requests are not recalculated.",
     "让想象，": "Let imagination",
     "成为作品。": "become creation.",
     "连接你的灵感与 AI 的可能。": "Connect your ideas with the possibilities of AI.",

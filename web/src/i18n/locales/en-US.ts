@@ -1,5 +1,14 @@
 // Generated translations. Source strings are Simplified Chinese (zh-CN).
 const enUS = {
+    "全部类型": "All types",
+    "搜索模型": "Search models",
+    "复制模型 ID": "Copy model ID",
+    "模型 ID 已复制": "Model ID copied",
+    "未单独定价的套餐沿用标准价。": "Plans without their own price use the standard price.",
+    "价格调整会在邮件提醒后的24小时后生效，已完成的请求不重新计算。": "Price changes take effect 24 hours after the email notification. Completed requests are not recalculated.",
+    "节点详情": "Node details",
+    "输入来源": "Inputs",
+    "时长": "Duration",
     "生成任务已超过执行时限，请核实上游结果后再重试": "The generation task exceeded its time limit. Check the upstream result before retrying.",
     "上游响应超时，请核实生成结果后再重试": "The upstream response timed out. Check the generation result before retrying.",
     "视频响应过大": "The video response is too large.",

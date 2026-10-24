@@ -4,6 +4,7 @@ import { StudioEmptyState } from "@/components/studio-empty-state";
 import { StudioGenerationSettings } from "@/components/studio-generation-settings";
 import { StudioHistorySidebar } from "@/components/studio-history-sidebar";
 import studio from "@/components/studio-layout.module.css";
+import composer from "@/components/image-prompt-composer.module.css";
 
 import { ArrowUp, BookOpen, CheckSquare, ClipboardPaste, Download, FileText, FolderPlus, History, LoaderCircle, Plus, Trash2, Upload, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -79,6 +80,7 @@ export default function VideoPage() {
     const addAsset = useAssetStore((state) => state.addAsset);
     const token = useUserStore((state) => state.token);
     const [prompt, setPrompt] = useState("");
+    const [composerFocused, setComposerFocused] = useState(false);
     const [references, setReferences] = useState<ReferenceImage[]>([]);
     const [results, setResults] = useState<GenerationResult[]>([]);
     const [logs, setLogs] = useState<GenerationLog[]>([]);
@@ -95,6 +97,7 @@ export default function VideoPage() {
 
     const model = effectiveConfig.videoModel || effectiveConfig.model;
     const canGenerate = Boolean(prompt.trim());
+    const composerExpanded = composerFocused || canGenerate || references.length > 0;
 
     useEffect(() => {
         const urlPrompt = searchParams.get("prompt");
@@ -325,14 +328,16 @@ export default function VideoPage() {
                         )}
                     </div>
                     <div className={studio.form}>
-                        <div className={studio.composer}>
-                            {references.length ? <div className={studio.references}>
-                                {references.map((item) => <div key={item.id} className={studio.reference}>
+                        <div className={composer.composer} data-expanded={composerExpanded} onFocus={() => setComposerFocused(true)} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setComposerFocused(false); }}>
+                            {references.length ? <div className={composer.references}>
+                                {references.map((item) => <div key={item.id} className={composer.reference}>
                                     <img src={item.dataUrl} alt={item.name} />
                                     <button type="button" onClick={() => setReferences((value) => value.filter((ref) => ref.id !== item.id))} aria-label="移除参考图"><X size={13} /></button>
                                 </div>)}
                             </div> : null}
-                            <Input.TextArea value={prompt} onChange={(event) => setPrompt(event.target.value)} variant="borderless" autoSize={{ minRows: 3, maxRows: 8 }} aria-label="视频提示词" placeholder="描述你的故事、镜头运动和场景氛围…" onKeyDown={(event) => {
+                            <div className={composer.main}><div className={composer.body}>
+                            <div className={composer.inputRow}>
+                            <Input.TextArea value={prompt} onChange={(event) => setPrompt(event.target.value)} variant="borderless" autoSize={{ minRows: 1 }} disabled={running} aria-label="视频提示词" placeholder="描述你的故事、镜头运动和场景氛围…" onKeyDown={(event) => {
                                 if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
                                     event.preventDefault();
                                     if (canGenerate && !running) void generate();
@@ -341,8 +346,10 @@ export default function VideoPage() {
                                 const files = Array.from(event.clipboardData.files).filter((file) => file.type.startsWith("image/"));
                                 if (files.length) { event.preventDefault(); void addReferences(files); }
                             }} />
-                            <div className={studio.toolbar}>
-                                <Dropdown trigger={["click"]} placement="topLeft" menu={{ items: [
+                            </div>
+                            <div className={composer.controls}><div><div className={composer.toolbar} inert={!composerExpanded}>
+                                <div className={composer.toolbarRow}>
+                                <Dropdown trigger={["click"]} placement="topLeft" disabled={running} menu={{ items: [
                                     { key: "upload", icon: <Upload size={15} />, label: "上传参考图" },
                                     { key: "clipboard", icon: <ClipboardPaste size={15} />, label: "读取剪切板图片" },
                                     { key: "assets", icon: <FolderPlus size={15} />, label: "我的素材" },
@@ -355,8 +362,12 @@ export default function VideoPage() {
                                 } }}>
                                     <Button type="text" shape="circle" icon={<Plus size={19} />} aria-label="添加参考图或选择灵感" />
                                 </Dropdown>
-                                <StudioGenerationSettings kind="video" />
-                                <Button className={studio.send} type="primary" shape="circle" icon={<ArrowUp size={20} />} loading={running} disabled={!canGenerate || running} onClick={() => void generate()} aria-label="开始生成" title="开始生成" />
+                                <StudioGenerationSettings kind="video" part="model" />
+                                </div>
+                                <div className={composer.toolbarRow}><StudioGenerationSettings kind="video" part="settings" /></div>
+                            </div></div></div>
+                            </div>
+                                <Button className={composer.send} type="primary" shape="circle" icon={<ArrowUp size={20} />} loading={running} disabled={!canGenerate || running} onClick={() => void generate()} aria-label="开始生成" title="开始生成" />
                             </div>
                         </div>
                         <p className={studio.composerHint}>Enter 生成 · Shift + Enter 换行 · 最多 7 张参考图</p>

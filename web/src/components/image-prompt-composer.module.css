@@ -30,7 +30,7 @@
     .inputRow :global(textarea.ant-input:not(:placeholder-shown)) { white-space: pre-wrap; }
     /* 第一行放 + 和模型选择，其余控件第二行，两行都居中且间距一致。 */
     .toolbar { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); justify-items: center; gap: 6px; }
-    .toolbarRow { display: flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; }
+    .toolbarRow { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px; min-width: 0; }
     .toolbarRow:first-child { grid-column: 1 / -1; }
     .toolbarRow:last-child { grid-column: 1 / -1; }
     .toolbar :global(.ant-btn) { padding-inline: 7px; }

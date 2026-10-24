@@ -1,5 +1,14 @@
 // Generated translations. Source strings are Simplified Chinese (zh-CN).
 const frFR = {
+    "全部类型": "Tous les types",
+    "搜索模型": "Rechercher un modèle",
+    "复制模型 ID": "Copier l’identifiant du modèle",
+    "模型 ID 已复制": "Identifiant du modèle copié",
+    "未单独定价的套餐沿用标准价。": "Les offres sans tarif propre utilisent le prix standard.",
+    "价格调整会在邮件提醒后的24小时后生效，已完成的请求不重新计算。": "Les changements de tarif prennent effet 24 heures après la notification par e-mail. Les requêtes terminées ne sont pas recalculées.",
+    "节点详情": "Détails du nœud",
+    "输入来源": "Sources d’entrée",
+    "时长": "Durée",
     "生成任务已超过执行时限，请核实上游结果后再重试": "La génération a dépassé le délai autorisé. Vérifiez le résultat du fournisseur avant de réessayer.",
     "上游响应超时，请核实生成结果后再重试": "Le fournisseur n’a pas répondu à temps. Vérifiez le résultat de la génération avant de réessayer.",
     "视频响应过大": "La réponse vidéo est trop volumineuse.",

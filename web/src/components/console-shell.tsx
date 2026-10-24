@@ -95,9 +95,12 @@ function ConsoleNavigation({ collapsed = false, onNavigate }: { collapsed?: bool
             <Link href={localizedPath("/")} onClick={onNavigate} title={collapsed ? "首页" : undefined} className={cn("flex h-9 items-center gap-3 rounded-md px-3 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground", collapsed && "justify-center px-0")}><Home className="size-4 shrink-0" />{!collapsed ? "首页" : null}</Link>
             {groups.map((group) => <div key={group.title}>
                 {!collapsed ? <p className="mb-2 px-3 text-[10px] tracking-wider text-muted-foreground">{group.title}</p> : <div className="mx-3 mb-3 border-t border-border" />}
-                <div className="space-y-1">{group.items.map(({ href, label, icon: Icon, external }) => <Link key={href} href={external ? href : localizedPath(href)} target={external ? "_blank" : undefined} rel={external ? "noopener noreferrer" : undefined} onClick={onNavigate} title={collapsed ? label : undefined} aria-label={collapsed ? label : undefined} aria-current={pathname === href ? "page" : undefined} className={cn("flex h-9 items-center gap-3 rounded-md px-3 text-[13px] transition", collapsed && "justify-center px-0", pathname === href ? "bg-sidebar-accent font-medium text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground")}>
+                <div className="space-y-1">{group.items.map(({ href, label, icon: Icon, external }) => {
+                    const active = !external && (pathname === href || (href !== "/console" && pathname.startsWith(`${href}/`)));
+                    return <Link key={href} href={external ? href : localizedPath(href)} target={external ? "_blank" : undefined} rel={external ? "noopener noreferrer" : undefined} onClick={onNavigate} title={collapsed ? label : undefined} aria-label={collapsed ? label : undefined} aria-current={active ? "page" : undefined} style={active ? { background: "var(--foreground)", color: "var(--background)" } : undefined} className={cn("flex h-9 items-center gap-3 rounded-md px-3 text-[13px] transition", collapsed && "justify-center px-0", active ? "font-medium" : "text-muted-foreground hover:bg-muted hover:text-foreground")}>
                     <Icon className="size-4 shrink-0" />{!collapsed ? <><span className="truncate">{label}</span>{external ? <ArrowUpRight className="ml-auto size-3 opacity-50" /> : null}</> : null}
-                </Link>)}</div>
+                </Link>;
+                })}</div>
             </div>)}
         </nav>
     );

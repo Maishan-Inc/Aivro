@@ -607,7 +607,7 @@ function ImageContent({
 function ImageInfoBar({ node }: { node: CanvasNodeData }) {
     const width = Math.round(node.metadata?.naturalWidth || node.width);
     const height = Math.round(node.metadata?.naturalHeight || node.height);
-    const size = formatBytes(node.metadata?.bytes || 0);
+    const size = node.metadata?.bytes ? formatBytes(node.metadata.bytes) : "";
     return (
         <div className="pointer-events-none absolute bottom-3 right-3 z-40 max-w-[calc(100%-24px)]">
             <span className="max-w-full truncate rounded-md bg-black/55 px-2 py-1 text-[11px] font-medium leading-none text-white backdrop-blur-sm">

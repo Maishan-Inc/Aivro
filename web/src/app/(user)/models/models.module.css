@@ -4,9 +4,7 @@
 .content { position: relative; z-index: 1; width: 77%; max-width: 1000px; margin-inline: auto; padding-bottom: 56px; }
 
 .heading { padding: 76px 0 40px; border-bottom: 1px solid var(--border); }
-.eyebrow { display: inline-flex; align-items: center; gap: 9px; color: var(--muted-foreground); font-size: 11px; letter-spacing: .14em; }
-.heading h1 { margin: 22px 0 18px; font-size: clamp(32px, 4vw, 64px); font-weight: 550; line-height: 1.22; letter-spacing: -.06em; text-wrap: balance; }
-.heading p { max-width: 640px; color: var(--muted-foreground); font-size: 14px; line-height: 2; }
+.heading h1 { margin: 0; font-size: clamp(30px, 3vw, 42px); font-weight: 550; line-height: 1.22; letter-spacing: -.04em; }
 
 .body { padding-top: 32px; }
 
@@ -16,4 +14,4 @@
 .foot a:hover { color: var(--foreground); }
 
 @media (max-width: 1000px) { .content { width: calc(100% - 48px); }.heading { padding-top: 52px; } }
-@media (max-width: 600px) { .content { width: calc(100% - 32px); }.heading { padding: 40px 0 28px; }.heading h1 { font-size: 30px; }.heading p { font-size: 13px; } }
+@media (max-width: 600px) { .content { width: calc(100% - 32px); }.heading { padding: 40px 0 28px; }.heading h1 { font-size: 30px; } }

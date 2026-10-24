@@ -3,6 +3,7 @@
 import { StudioEmptyState } from "@/components/studio-empty-state";
 import { StudioHistorySidebar } from "@/components/studio-history-sidebar";
 import studio from "@/components/studio-layout.module.css";
+import composer from "@/components/image-prompt-composer.module.css";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
@@ -69,6 +70,7 @@ export default function Model3DPage() {
 
     const [mode, setMode] = useState<"image" | "multi_image" | "text">("text");
     const [prompt, setPrompt] = useState("");
+    const [composerFocused, setComposerFocused] = useState(false);
     const [images, setImages] = useState<UploadedReference[]>([]);
     const [textureEnabled, setTextureEnabled] = useState(true);
     const [pbrEnabled, setPbrEnabled] = useState(true);
@@ -226,6 +228,7 @@ export default function Model3DPage() {
     };
 
     const canGenerate = mode === "text" ? Boolean(prompt.trim()) : images.length > 0;
+    const composerExpanded = composerFocused || Boolean(prompt.trim()) || images.length > 0;
     const estimatedEnergy = Math.round(30 * quantity * (meshQuality === "high" ? 1.6 : meshQuality === "ultra" ? 2.5 : 1) * (textureEnabled ? 1.2 : 1) * (pbrEnabled ? 1.3 : 1));
 
     return (
@@ -313,23 +316,29 @@ export default function Model3DPage() {
                         </div> : null}
                     </div>
                     <div className={studio.form}>
-                        <div className={studio.composer}>
-                            {images.length ? <div className={studio.references}>
-                                {images.map((img) => <div key={img.id} className={studio.reference}>
+                        <div className={composer.composer} data-expanded={composerExpanded} onFocus={() => setComposerFocused(true)} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setComposerFocused(false); }}>
+                            {images.length ? <div className={composer.references}>
+                                {images.map((img) => <div key={img.id} className={composer.reference}>
                                     <img src={img.dataUrl} alt={img.name} />
                                     <button type="button" onClick={() => setImages((value) => value.filter((item) => item.id !== img.id))} aria-label="移除参考图"><X size={13} /></button>
-                                    {img.width < 256 || img.height < 256 ? <span>低于 256</span> : null}
+                                    {img.width < 256 || img.height < 256 ? <span className="absolute inset-x-0 bottom-0 bg-background/90 text-center text-[9px] text-foreground">低于 256</span> : null}
                                 </div>)}
                             </div> : null}
-                            <Input.TextArea value={prompt} onChange={(event) => setPrompt(event.target.value)} variant="borderless" autoSize={{ minRows: 3, maxRows: 8 }} aria-label="模型描述" placeholder={mode === "text" ? "描述你想创造的形体、材质和风格…" : "添加参考图，也可以补充模型描述…"} onKeyDown={(event) => {
+                            <div className={composer.main}><div className={composer.body}>
+                            <div className={composer.inputRow}>
+                            <Input.TextArea value={prompt} onChange={(event) => setPrompt(event.target.value)} variant="borderless" autoSize={{ minRows: 1 }} disabled={generating} aria-label="模型描述" placeholder={mode === "text" ? "描述你想创造的形体、材质和风格…" : "添加参考图，也可以补充模型描述…"} onKeyDown={(event) => {
                                 if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
                                     event.preventDefault();
                                     if (canGenerate && !generating) void handleGenerate();
                                 }
                             }} />
-                            <div className={studio.toolbar}>
+                            </div>
+                            <div className={composer.controls}><div><div className={composer.toolbar} inert={!composerExpanded}>
+                                <div className={composer.toolbarRow}>
                                 <Button type="text" shape="circle" icon={<Upload size={17} />} onClick={() => fileInputRef.current?.click()} aria-label="上传参考图" title="上传参考图" />
                                 <ModelPicker config={effectiveConfig} models={effectiveConfig.model3DModels} value={model} onChange={(value) => updateConfig("model3DModel", value)} onMissingConfig={() => message.warning("管理员尚未配置可用3D模型")} />
+                                </div>
+                                <div className={composer.toolbarRow}>
                                 <Dropdown trigger={["click"]} placement="topLeft" menu={{ selectable: true, selectedKeys: [mode], items: [
                                     { key: "text", label: "文字生成" }, { key: "image", label: "图片生成" }, { key: "multi_image", label: "多图生成 Pro" },
                                 ], onClick: ({ key }) => setMode(key as typeof mode) }}>
@@ -344,7 +353,10 @@ export default function Model3DPage() {
                                     <Button type="text">{quantity} 个<ChevronDown size={12} /></Button>
                                 </Dropdown>
                                 <Button type="text" icon={<SlidersHorizontal size={14} />} onClick={() => setSettingsOpen(true)} aria-label="调整材质和面数" title="材质和面数" />
-                                <Button className={studio.send} type="primary" shape="circle" icon={<ArrowUp size={20} />} loading={generating} disabled={!canGenerate || generating} onClick={() => void handleGenerate()} aria-label="生成模型" title="生成模型" />
+                                </div>
+                            </div></div></div>
+                            </div>
+                                <Button className={composer.send} type="primary" shape="circle" icon={<ArrowUp size={20} />} loading={generating} disabled={!canGenerate || generating} onClick={() => void handleGenerate()} aria-label="生成模型" title="生成模型" />
                             </div>
                         </div>
                         <p className={studio.composerHint}><span>Enter 生成 · Shift + Enter 换行</span><span>预计消耗 {estimatedEnergy} 电量</span></p>

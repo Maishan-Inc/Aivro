@@ -2,7 +2,9 @@
 
 .controls { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; }
 .search { flex: 1 1 auto; min-width: 0; max-width: 320px; }
-.select { flex: 0 0 auto; width: 132px; }
+.select { flex: 0 0 auto; width: 160px; }
+.option { display: flex; align-items: center; gap: 8px; }
+.option > :first-child { flex-shrink: 0; }
 
 .table { display: flex; flex-direction: column; border-top: 1px solid var(--border); }
 
@@ -10,13 +12,12 @@
 .head, .row { grid-template-columns: minmax(0, 2.2fr) minmax(0, .9fr) 56px minmax(0, 1.2fr) repeat(4, minmax(0, .7fr)) minmax(0, 1.2fr); }
 .priceHead { text-align: right; }
 .memberGroup { grid-column: span 4; display: flex; flex-direction: column; gap: 4px; }
-.memberLabel { text-align: center; opacity: .8; }
 .memberCodes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; text-align: right; }
 
 .group { border-bottom: 1px solid var(--border); }
 
 .row { display: grid; align-items: center; gap: 10px; width: 100%; padding: 13px 14px; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: background-color .18s ease; }
-.row:hover, .row[aria-expanded="true"] { background: color-mix(in oklab, var(--foreground) 4%, transparent); }
+.row:hover { background: color-mix(in oklab, var(--foreground) 4%, transparent); }
 .row:focus-visible { outline: 2px solid var(--foreground); outline-offset: -2px; }
 
 .model { display: flex; align-items: center; gap: 10px; min-width: 0; }
@@ -29,10 +30,6 @@
 .planPrice { justify-self: end; font-size: 12px; font-variant-numeric: tabular-nums; }
 .planPrice[data-muted="true"] { color: var(--muted-foreground); }
 
-.detail { display: flex; flex-wrap: wrap; gap: 10px 28px; padding: 4px 14px 16px; }
-.detail > div { display: flex; flex-direction: column; gap: 3px; min-width: 78px; }
-.detail span { color: var(--muted-foreground); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
-.detail strong { font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; }
 
 .empty { display: grid; place-items: center; padding: 56px 0; }
 .note { color: var(--muted-foreground); font-size: 11px; line-height: 1.9; }
@@ -42,10 +39,12 @@
     .search { flex: 1 1 100%; width: 100%; max-width: none; }
     .select { flex: 1 1 auto; width: auto; min-width: 118px; }
     .head { display: none; }
-    .row { grid-template-columns: minmax(0, 1fr) auto; row-gap: 6px; padding: 14px; }
+    .row { grid-template-columns: repeat(4, minmax(0, 1fr)); row-gap: 12px; padding: 14px; }
+    .model { grid-column: 1 / -1; }
     .row > span:nth-child(2), .row > span:nth-child(3) { display: none; }
-    .row > span:nth-child(4) { grid-column: 2; grid-row: 1; }
-    .row > span:nth-child(5), .row > span:nth-child(6), .row > span:nth-child(7), .row > span:nth-child(8) { display: none; }
-    .row > span:nth-child(9) { grid-column: 1; grid-row: 2; justify-self: start; }
-    .detail { gap: 10px 20px; }
+    .row > span:nth-child(4) { grid-column: 1 / 3; grid-row: 2; }
+    .row > span:nth-child(9) { grid-column: 3 / 5; grid-row: 2; }
+    .price { justify-content: flex-start; flex-wrap: wrap; }
+    .planPrice { justify-self: start; }
+    .row [data-label]::before { content: attr(data-label); display: block; flex-basis: 100%; color: var(--muted-foreground); font-size: 10px; }
 }

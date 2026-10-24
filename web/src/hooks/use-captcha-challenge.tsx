@@ -124,7 +124,7 @@ function CaptchaChallenge({ open, provider, siteKey, resetKey, error, onVerify, 
                 </div>
             </div>
             {error ? <div className="mt-3 text-center text-sm text-red-500"><p>{error}</p><button type="button" onClick={onRetry} className="mt-2 underline underline-offset-4">重新验证</button></div> : null}
-            <p className="mt-4 text-center text-[11px] leading-5 text-muted-foreground">由 Onward WAF 提供支持 · © 2026 Onward Inc.</p>
+            <p lang="en" data-i18n-skip className="mt-4 text-center text-[11px] leading-5 text-muted-foreground">Powered by Onward WAF · © 2026 Onward Inc.</p>
         </Modal>
     );
 }

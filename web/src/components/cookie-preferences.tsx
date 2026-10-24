@@ -33,7 +33,7 @@ export function CookiePreferences() {
                 {([{ key: "functional", title: "功能性 Cookie", description: "保存偏好设置与基础体验选项" }, { key: "performance", title: "性能 Cookie", description: "用于了解页面性能与访问质量" }, { key: "targeting", title: "定向 Cookie", description: "用于个性化内容与推荐展示" }] as const).map((item) => <div key={item.key} className="flex items-center justify-between gap-4 py-4"><div><strong className="text-sm font-medium">{item.title}</strong><p className="mt-1 text-xs text-muted-foreground">{item.description}</p></div><Switch checked={preferences[item.key]} onChange={(checked) => setPreferences((value) => ({ ...value, [item.key]: checked }))} aria-label={item.title} /></div>)}
             </div>
             <div className="mt-9 flex flex-wrap items-center justify-between gap-x-3 gap-y-4"><Button onClick={() => save()}>保存偏好</Button><Button type="primary" onClick={() => save({ functional: true, performance: true, targeting: true })}>全部接受</Button></div>
-            <p className="mt-16 border-t border-border pt-6 text-center text-[11px] text-muted-foreground">由 Cookie Pro 提供支持 · © 2026 Maishan Inc.</p>
+            <p lang="en" data-i18n-skip className="mt-16 border-t border-transparent pt-6 text-center text-[11px] text-muted-foreground">Powered by Cookie Pro · © 2026 Maishan Inc.</p>
         </Modal>
     </>;
 }

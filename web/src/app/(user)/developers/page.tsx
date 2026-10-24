@@ -69,7 +69,7 @@ $env:AIVRO_API_KEY = 'YOUR_API_KEY'`} /></details>
                     <section id="languages">
                         <h2>{tr("多语言代码示例")}</h2>
                         <p>{tr("选择编程语言与调用场景，查看图片、对话、3D、视频、模型查询和任务管理示例。22 种语言提供 9 类调用；代码注释跟随当前界面语言，协议字段、命令和示例提示词保留原样。")}</p>
-                        <CodeExamples />
+                        <CodeExamples compact />
                         <p>{tr("cURL、C 与 C++ 示例将完整响应直接写入终端，业务错误也会出现在输出中；正式接入时请解析 JSON 并检查 ")}<code>code</code>{tr("。其他示例展示常用的错误判断方式。调用图片等 JSON 接口时，可按接口参考替换路径与请求体；上传文件使用对应语言的 multipart 能力。")}</p>
                         <details className="mt-5 rounded-lg border border-border px-4 py-3"><summary className="flex cursor-pointer items-center gap-2 text-xs font-medium"><Terminal className="size-3.5" />{tr("查看流式对话示例")}</summary><CodeBlock label={tr("cURL · 流式对话")} code={`curl -N "$AIVRO_BASE_URL/chat/completions" \\
   -H "Authorization: Bearer $AIVRO_API_KEY" \\

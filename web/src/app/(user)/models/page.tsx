@@ -26,15 +26,13 @@ export default function ModelsPage() {
             <div className={styles.background} aria-hidden="true"><FlowBackground /></div>
             <div className={styles.content}>
                 <header className={styles.heading}>
-                    <span className={styles.eyebrow}>{tr("模型定价")}</span>
-                    <h1>{tr("每一份算力，都花在看得见的地方。")}</h1>
-                    <p>{tr("查看每个模型在控制台的标准价、各套餐的会员价和 API 单价。价格由站点管理员统一维护，实际扣费以工作台显示为准。")}</p>
+                    <h1>{tr("模型定价")}</h1>
                 </header>
                 <section className={styles.body}>
                     <ModelPricingTable />
                 </section>
                 <div className={styles.foot}>
-                    <span>{tr("价格调整会在保存后立即生效，已完成的请求不重新计算。")}</span>
+                    <span>{tr("价格调整会在邮件提醒后的24小时后生效，已完成的请求不重新计算。")}</span>
                     <div className={styles.footLinks}>
                         <Link href={localizedPath("/developers")}>{tr("开发文档")}<ArrowUpRight className="size-3.5" /></Link>
                         <Link href={localizedPath("/canvas")}>{tr("进入工作空间")}<ArrowUpRight className="size-3.5" /></Link>
