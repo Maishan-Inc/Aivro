@@ -74,12 +74,16 @@ func normalizeModelCostPricing(item model.ModelCost) model.ModelCost {
 
 	if vendor, icon := guessModelVendor(item.Model); vendor != "" {
 		item.Vendor = vendor
-		if strings.TrimSpace(item.Icon) == "" {
-			item.Icon = icon
+		if strings.TrimSpace(item.Icon) == "" && icon != "" {
+			item.Icon = "/icons/" + icon
 		}
 	}
 	item.Vendor = strings.TrimSpace(item.Vendor)
 	item.Icon = strings.TrimSpace(item.Icon)
+	// 图标统一存成可直接访问的路径，内置目录只登记文件名。
+	if item.Icon != "" && !strings.HasPrefix(item.Icon, "/") && !strings.HasPrefix(item.Icon, "http") {
+		item.Icon = "/icons/" + item.Icon
+	}
 
 	if item.APICredits < 0 {
 		item.APICredits = 0

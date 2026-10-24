@@ -10,6 +10,7 @@ import { EditorView } from "@uiw/react-codemirror";
 
 import { fetchAdminSettings, fetchAuthProviderStats, fetchChannelModels, saveAdminSettings, testChannelModel, testCloudStorage, testMailSettings, type AdminCloudStorageSettings, type AdminModelChannel, type AdminModelChannelModel, type AdminModelCost, type AdminPrivateAuthProvider, type AdminPublicAuthProvider, type AdminSettings } from "@/services/api/admin";
 import { useI18n } from "@/hooks/use-i18n";
+import { saveAdminAITimeouts, type AdminAITimeoutSettings } from "@/services/api/admin";
 import { useUserStore } from "@/stores/use-user-store";
 import { defaultHomeSettings, homeSocialPlatforms } from "@/constant/home-settings";
 import { collectChannelModelColors, collectChannelModels, filterModels, modelCostKey, normalizeModelCost, syncModelCostsWithPublicModels, uniqueModels } from "@/lib/model-pricing";
@@ -181,6 +182,7 @@ const emptySettings: AdminSettings = {
         },
         promptSync: { enabled: true, cron: "*/5 * * * *", githubRawProxyEnabled: false },
         aiQueue: { enabled: true, backend: "database", redisUrl: "", defaultPerMinute: 50, modelPerMinute: [], maxQueuedPerUser: 20, taskRetentionHours: 24 },
+        aiTimeouts: { imageMinutes: 10, videoMinutes: 15, model3DMinutes: 30, textMinutes: 5 },
         canvasAssist: { historyRetentionDays: 7 },
         captcha: { enabled: false, provider: "turnstile", turnstile: { siteKey: "", secretKey: "" }, hcaptcha: { siteKey: "", secretKey: "" } },
         turnstile: { enabled: false, siteKey: "", secretKey: "" },
@@ -257,7 +259,7 @@ type AuthProviderEditorState = { type: "oauth"; providerKey: "linuxDo" | "google
 export default function AdminSettingsPage() {
     const token = useUserStore((state) => state.token);
     const { message } = App.useApp();
-    const { t } = useI18n();
+    const { t, tr } = useI18n();
     const router = useRouter();
     const searchParams = useSearchParams();
     const [form] = Form.useForm<AdminSettings>();
@@ -285,6 +287,9 @@ export default function AdminSettingsPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [saveHint, setSaveHint] = useState("手动保存");
+    const [timeoutSaveHint, setTimeoutSaveHint] = useState("自动保存");
+    const timeoutSavingRef = useRef(false);
+    const pendingTimeoutsRef = useRef<AdminAITimeoutSettings | null>(null);
     const [isTestingCloudStorage, setIsTestingCloudStorage] = useState(false);
     const [isSendingTestMail, setIsSendingTestMail] = useState(false);
     const [mailTestEmail, setMailTestEmail] = useState("");
@@ -325,7 +330,7 @@ export default function AdminSettingsPage() {
     }, []);
 
     const saveSettings = useCallback(async () => {
-        if (!token) return;
+        if (!token || timeoutSavingRef.current) return;
         const values = await collectSettings(form, editorMode, jsonTextRef.current, message);
         if (!values) {
             return;
@@ -343,6 +348,7 @@ export default function AdminSettingsPage() {
                 private: JSON.stringify(merged.private, null, 2),
             });
             setSaveHint("已保存");
+            setTimeoutSaveHint("自动保存");
             message.success("已保存");
         } catch (error) {
             setSaveHint("保存失败");
@@ -352,13 +358,49 @@ export default function AdminSettingsPage() {
         }
     }, [editorMode, form, message, token]);
 
-    const handleFormValuesChange = useCallback(() => {
+    const saveTimeouts = useCallback(async () => {
+        if (!token || !settingsLoadedRef.current) return;
+        const values = { ...form.getFieldValue(["private", "aiTimeouts"]) } as AdminAITimeoutSettings;
+        if (Object.values(values).some((value) => !Number.isInteger(value) || value < 1 || value > 120)) {
+            pendingTimeoutsRef.current = null;
+            setTimeoutSaveHint("生成超时必须为 1–120 分钟的整数");
+            return;
+        }
+        pendingTimeoutsRef.current = values;
+        setTimeoutSaveHint("保存中");
+        if (timeoutSavingRef.current) return;
+        timeoutSavingRef.current = true;
+        try {
+            while (pendingTimeoutsRef.current) {
+                const next = pendingTimeoutsRef.current;
+                pendingTimeoutsRef.current = null;
+                try {
+                    const saved = await saveAdminAITimeouts(token, next);
+                    setJsonText((current) => {
+                        try { return { ...current, private: JSON.stringify({ ...JSON.parse(current.private), aiTimeouts: saved }, null, 2) }; }
+                        catch { return current; }
+                    });
+                    if (!pendingTimeoutsRef.current) setTimeoutSaveHint((hint) => hint === "保存中" ? "已保存" : hint);
+                } catch (error) {
+                    if (!pendingTimeoutsRef.current) {
+                        setTimeoutSaveHint("保存失败");
+                        message.error(error instanceof Error ? error.message : "保存失败");
+                    }
+                }
+            }
+        } finally {
+            timeoutSavingRef.current = false;
+        }
+    }, [form, message, token]);
+
+    const handleFormValuesChange = useCallback((changed: Partial<AdminSettings>) => {
+        if (changed.private?.aiTimeouts) { void saveTimeouts(); return; }
         if (editingAuthProvider || editingMailTemplate) return;
         if (settingsLoadedRef.current) setSaveHint("有修改未保存");
-    }, [editingAuthProvider, editingMailTemplate]);
+    }, [editingAuthProvider, editingMailTemplate, saveTimeouts]);
 
     const loadSettings = useCallback(async () => {
-        if (!token) return;
+        if (!token || timeoutSavingRef.current) return;
         settingsLoadedRef.current = false;
         setIsLoading(true);
         try {
@@ -377,6 +419,7 @@ export default function AdminSettingsPage() {
             }
             settingsLoadedRef.current = true;
             setSaveHint("手动保存");
+            setTimeoutSaveHint("自动保存");
         } catch (error) {
             message.error(error instanceof Error ? error.message : "读取设置失败");
         } finally {
@@ -395,7 +438,7 @@ export default function AdminSettingsPage() {
 
     useEffect(() => {
         const refreshSettings = () => {
-            if (document.visibilityState !== "visible" || saveHint === "有修改未保存" || isSaving || editingAuthProvider || editingMailTemplate || isChannelDrawerOpen || isModelSelectorOpen) return;
+            if (document.visibilityState !== "visible" || saveHint === "有修改未保存" || !["自动保存", "已保存"].includes(timeoutSaveHint) || isSaving || editingAuthProvider || editingMailTemplate || isChannelDrawerOpen || isModelSelectorOpen) return;
             void loadSettings();
         };
         window.addEventListener("focus", refreshSettings);
@@ -404,7 +447,7 @@ export default function AdminSettingsPage() {
             window.removeEventListener("focus", refreshSettings);
             document.removeEventListener("visibilitychange", refreshSettings);
         };
-    }, [editingAuthProvider, editingMailTemplate, isChannelDrawerOpen, isModelSelectorOpen, isSaving, loadSettings, saveHint]);
+    }, [editingAuthProvider, editingMailTemplate, isChannelDrawerOpen, isModelSelectorOpen, isSaving, loadSettings, saveHint, timeoutSaveHint]);
 
     const changeTab = (nextTab: SettingsTabKey) => {
         setActiveTab(nextTab);
@@ -416,7 +459,7 @@ export default function AdminSettingsPage() {
     };
 
     const sectionSaveButton = (label = "保存") => (
-        <Button type="primary" size="small" icon={<SaveOutlined />} loading={isSaving} onClick={() => void saveSettings()}>
+        <Button type="primary" size="small" icon={<SaveOutlined />} loading={isSaving} disabled={timeoutSaveHint === "保存中"} onClick={() => void saveSettings()}>
             {label}
         </Button>
     );
@@ -725,7 +768,7 @@ export default function AdminSettingsPage() {
                             <Typography.Text type={saveHint.includes("失败") ? "danger" : "secondary"}>
                                 {isSaving ? <LoadingOutlined /> : saveHint === "已保存" ? <CheckCircleOutlined /> : null} {saveHint}
                             </Typography.Text>
-                            <Button type="primary" icon={<SaveOutlined />} loading={isSaving} onClick={() => void saveSettings()}>
+                            <Button type="primary" icon={<SaveOutlined />} loading={isSaving} disabled={timeoutSaveHint === "保存中"} onClick={() => void saveSettings()}>
                                 保存当前页
                             </Button>
                             <Button icon={<ReloadOutlined />} loading={isLoading} onClick={() => void loadSettings()}>
@@ -1361,6 +1404,18 @@ export default function AdminSettingsPage() {
                                                 <Input placeholder="*/5 * * * *" />
                                             </Form.Item>
                                         </Col>
+                                    </Row>
+                                </Card>
+                                <Card size="small" title={tr("生成超时")} extra={<Space aria-live="polite"><Typography.Text type={timeoutSaveHint === "保存失败" ? "danger" : "secondary"}>{timeoutSaveHint === "保存中" && <LoadingOutlined />} {tr(timeoutSaveHint)}</Typography.Text>{timeoutSaveHint === "保存失败" && <Button size="small" onClick={() => void saveTimeouts()}>{tr("重新保存")}</Button>}</Space>}>
+                                    <Typography.Paragraph type="secondary">{tr("按生成类型设置执行时限，单位为分钟。修改后自动保存，无需重启；新开始执行的任务使用新设置，运行中的任务保持原时限。")}</Typography.Paragraph>
+                                    <Row gutter={16}>
+                                        {([["imageMinutes", "图片生成"], ["videoMinutes", "视频生成"], ["model3DMinutes", "3D 模型生成"], ["textMinutes", "文本与助手"]] as const).map(([key, label]) => (
+                                            <Col xs={24} sm={12} xl={6} key={key}>
+                                                <Form.Item name={["private", "aiTimeouts", key]} label={tr(label)} rules={[{ required: true, type: "integer", min: 1, max: 120, message: tr("生成超时必须为 1–120 分钟的整数") }]}>
+                                                    <InputNumber min={1} max={120} precision={0} suffix={tr("分钟")} disabled={isLoading || isSaving} style={{ width: "100%" }} />
+                                                </Form.Item>
+                                            </Col>
+                                        ))}
                                     </Row>
                                 </Card>
                                 <Card size="small" title="AI 队列 / 按模型限流" extra={sectionSaveButton()}>
@@ -2277,6 +2332,7 @@ function normalizePrivateSetting(setting: Partial<AdminSettings["private"]> = {}
             maxQueuedPerUser: Math.max(1, Number(setting.aiQueue?.maxQueuedPerUser) || 20),
             taskRetentionHours: Math.max(1, Number(setting.aiQueue?.taskRetentionHours) || 24),
         },
+        aiTimeouts: { ...emptySettings.private.aiTimeouts, ...setting.aiTimeouts },
         canvasAssist: {
             historyRetentionDays: Math.max(1, Number(setting.canvasAssist?.historyRetentionDays) || 7),
         },

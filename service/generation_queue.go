@@ -72,6 +72,13 @@ func SubmitAITask(ctx context.Context, user model.AuthUser, body []byte, content
 	if err != nil { return model.GenerationTaskSubmitResult{}, nil, err }
 	if credits < 0 || credits > int(^uint(0)>>1)/requestCount { return model.GenerationTaskSubmitResult{}, nil, safeMessageError{message: "模型计费配置无效"} }
 	credits *= requestCount
+	if path == model3DPath {
+		var input Model3DGenerationInput
+		if err := json.Unmarshal(body, &input); err != nil { return model.GenerationTaskSubmitResult{}, nil, err }
+		credits, err = Model3DCredits(input, billing.Credits)
+		if err != nil { return model.GenerationTaskSubmitResult{}, nil, err }
+		requestCount = input.Quantity
+	}
 	if err := ConsumeUserCreditsWithMeta(user.ID, modelName, credits, path, meta); err != nil {
 		return model.GenerationTaskSubmitResult{}, nil, err
 	}
@@ -125,10 +132,11 @@ func SubmitAITask(ctx context.Context, user model.AuthUser, body []byte, content
 		return model.GenerationTaskSubmitResult{}, nil, err
 	}
 	if !*queue.Enabled || canRun {
+		timeout := aiTimeout(settings.Private.AITimeouts, path)
 		task.Status = model.GenerationTaskExecuting
 		task.StartedAt = now
 		task.WorkerID = queueWorkerID
-		task.LeaseExpiresAt = time.Now().Add(AIRequestTimeout + time.Minute).Format(time.RFC3339)
+		task.LeaseExpiresAt = time.Now().Add(timeout + time.Minute).Format(time.RFC3339)
 		saved, err := repository.SaveGenerationTask(task)
 		queueMu.Unlock()
 		if err != nil {
@@ -136,7 +144,11 @@ func SubmitAITask(ctx context.Context, user model.AuthUser, body []byte, content
 			_ = deleteTaskPayload(requestFile.File.ID)
 			return model.GenerationTaskSubmitResult{}, nil, err
 		}
-		resp, execErr := executeTask(ctx, user, saved)
+		if !IsAPIKeyRequest(ctx) {
+			go runGenerationTask(saved, timeout)
+			return model.GenerationTaskSubmitResult{Queued: true, TaskID: saved.ID, Status: string(saved.Status), Model: modelName, Path: path}, nil, nil
+		}
+		resp, execErr := executeTask(ctx, user, saved, timeout)
 		if execErr != nil {
 			return model.GenerationTaskSubmitResult{}, nil, execErr
 		}
@@ -284,7 +296,8 @@ func dispatchQueuedTasks() error {
 		}
 		for _, task := range items {
 			startedAt := time.Now().Format(time.RFC3339)
-			lease := time.Now().Add(AIRequestTimeout + time.Minute).Format(time.RFC3339)
+			timeout := aiTimeout(settings.Private.AITimeouts, task.Path)
+			lease := time.Now().Add(timeout + time.Minute).Format(time.RFC3339)
 			changed, err := repository.MarkQueuedTaskExecuting(task.ID, startedAt, queueWorkerID, lease)
 			if err != nil {
 				return err
@@ -296,12 +309,7 @@ func dispatchQueuedTasks() error {
 			task.StartedAt = startedAt
 			task.WorkerID, task.LeaseExpiresAt = queueWorkerID, lease
 			task.QueuePosition = 0
-			go func(item model.GenerationTask) {
-				user := model.AuthUser{ID: item.UserID, Username: item.Username}
-				if _, err := executeTask(context.Background(), user, item); err != nil {
-					log.Printf("queued AI task failed: id=%s errorType=%T", item.ID, err)
-				}
-			}(task)
+			go runGenerationTask(task, timeout)
 		}
 		if err := repository.RecalculateGenerationTaskPositions(modelName); err != nil {
 			return err
@@ -310,8 +318,15 @@ func dispatchQueuedTasks() error {
 	return nil
 }
 
-func executeTask(ctx context.Context, user model.AuthUser, task model.GenerationTask) (AIProxyResponse, error) {
-	ctx, cancel := context.WithTimeout(ctx, AIRequestTimeout)
+func runGenerationTask(task model.GenerationTask, timeout time.Duration) {
+	user := model.AuthUser{ID: task.UserID, Username: task.Username}
+	if _, err := executeTask(context.Background(), user, task, timeout); err != nil {
+		log.Printf("queued AI task failed: id=%s errorType=%T", task.ID, err)
+	}
+}
+
+func executeTask(ctx context.Context, user model.AuthUser, task model.GenerationTask, timeout time.Duration) (AIProxyResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	if proxyExecutor == nil {
 		return failExecutingTask(task, "AI 执行器未初始化")
@@ -327,10 +342,20 @@ func executeTask(ctx context.Context, user model.AuthUser, task model.Generation
 		_ = content.Close()
 		return failExecutingTask(task, "AI 请求内容读取失败")
 	}
-	resp, err := proxyExecutor(ctx, user, content, task.ContentType, task.Model, task.Path)
+	var resp AIProxyResponse
+	if task.Path == model3DPath {
+		resp, err = executeModel3DTask(ctx, user, task, content)
+	} else {
+		resp, err = proxyExecutor(ctx, user, content, task.ContentType, task.Model, task.Path)
+		if err == nil && task.Path == "/videos" && task.APIBillingType == "" {
+			resp.Body, err = completeVideoTask(ctx, user, resp.Body)
+		}
+	}
 	_ = content.Close()
 	now := time.Now().Format(time.RFC3339)
 	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded { return failExecutingTask(task, "生成任务已超过执行时限，请核实上游结果后再重试") }
+		if safe, ok := err.(interface{ SafeMessage() string }); ok { return failExecutingTask(task, safe.SafeMessage()) }
 		return failExecutingTask(task, "AI 接口请求失败")
 	}
 	resp.Header = SafeResponseHeaders(resp.Header)

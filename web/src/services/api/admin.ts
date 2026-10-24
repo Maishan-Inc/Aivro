@@ -383,6 +383,7 @@ export type AdminPrivateSettings = {
         githubRawProxyEnabled: boolean;
     };
     aiQueue: AdminAIQueueSettings;
+    aiTimeouts: AdminAITimeoutSettings;
     canvasAssist: AdminCanvasAssistSettings;
     captcha: AdminCaptchaSettings;
     turnstile: AdminTurnstileSettings;
@@ -435,6 +436,13 @@ export type AdminAIQueueSettings = {
 
 export type AdminCanvasAssistSettings = {
     historyRetentionDays: number;
+};
+
+export type AdminAITimeoutSettings = {
+    imageMinutes: number;
+    videoMinutes: number;
+    model3DMinutes: number;
+    textMinutes: number;
 };
 
 export type AdminStripeSettings = {
@@ -544,6 +552,10 @@ export async function fetchAdminSettings(token: string) {
 
 export async function saveAdminSettings(token: string, settings: AdminSettings) {
     return apiPost<AdminSettings>("/api/admin/settings", settings, token);
+}
+
+export async function saveAdminAITimeouts(token: string, settings: AdminAITimeoutSettings) {
+    return apiPost<AdminAITimeoutSettings>("/api/admin/settings/ai-timeouts", settings, token);
 }
 
 export async function updateDatabase(token: string) {

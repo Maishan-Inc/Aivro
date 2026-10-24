@@ -197,6 +197,7 @@ func New() *gin.Engine {
 	admin.GET("/credit-logs", gin.WrapF(handler.AdminCreditLogs))
 	admin.GET("/settings", gin.WrapF(handler.AdminSettings))
 	admin.POST("/settings", gin.WrapF(handler.AdminSaveSettings))
+	admin.POST("/settings/ai-timeouts", gin.WrapF(handler.AdminSaveAITimeouts))
 	admin.GET("/database/status", gin.WrapF(handler.AdminDatabaseStatus))
 	admin.POST("/settings/database-update", gin.WrapF(handler.AdminUpdateDatabase))
 	admin.POST("/settings/channel-models", gin.WrapF(handler.AdminChannelModels))

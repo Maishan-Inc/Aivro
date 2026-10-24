@@ -208,12 +208,14 @@ func storeObject(ctx context.Context, request CloudObjectUpload) (CloudObjectRes
 	if err := hitRateBucket("storage:"+request.User.ID, 60, time.Minute, time.Minute); err != nil { return CloudObjectResult{}, err }
 	size := request.Size
 	if request.Reader == nil { size = int64(len(request.Body)) }
-	reservation := model.StorageReservation{ID: newID("storage"), UserID: request.User.ID, Size: size, ExpiresAt: time.Now().Add(AIRequestTimeout+time.Minute).Unix()}
+	deadline, ok := ctx.Deadline()
+	if !ok { deadline = time.Now().Add(AIRequestTimeout) }
+	reservation := model.StorageReservation{ID: newID("storage"), UserID: request.User.ID, Size: size, ExpiresAt: deadline.Add(time.Minute).Unix()}
 	reserved, err := repository.ReserveStorage(reservation, time.Now().Unix(), config.Cfg.MaxUserStorageBytes)
 	if err != nil { return CloudObjectResult{}, err }
 	if !reserved { return CloudObjectResult{}, safeMessageError{message: "存储空间不足，请删除不再使用的文件后重试"} }
 	defer repository.ReleaseStorageReservation(reservation.ID)
-	ctx, cancel := context.WithTimeout(ctx, AIRequestTimeout)
+	ctx, cancel := context.WithDeadline(ctx, deadline)
 	defer cancel()
 	return storeReservedObject(ctx, request)
 }
@@ -725,7 +727,7 @@ func imageItemBytes(ctx context.Context, item map[string]any) ([]byte, string, s
 			return nil, "", "", errors.New("上游图片地址不安全")
 		}
 		req, _ := http.NewRequestWithContext(ctx, http.MethodGet, value, nil)
-		resp, err := publicHTTPClient().Do(req)
+		resp, err := generationDownloadClient(ctx).Do(req)
 		if err != nil {
 			return nil, "", "", err
 		}

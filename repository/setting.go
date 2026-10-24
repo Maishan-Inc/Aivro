@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/basketikun/aivro/model"
+	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
@@ -26,6 +27,24 @@ func GetSettings() (model.Settings, error) {
 		}
 	}
 	return result, nil
+}
+
+// SaveAITimeouts 只更新生成期限，不覆盖其他配置或私有密钥。
+func SaveAITimeouts(setting model.AITimeoutSetting, now string) error {
+	db, err := DB()
+	if err != nil { return err }
+	return db.Transaction(func(tx *gorm.DB) error {
+		item := model.Setting{Key: model.SettingKeyPrivate, Value: []byte("{}"), CreatedAt: now, UpdatedAt: now}
+		if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&item).Error; err != nil { return err }
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("key = ?", model.SettingKeyPrivate).First(&item).Error; err != nil { return err }
+		var value map[string]json.RawMessage
+		if err := json.Unmarshal(item.Value, &value); err != nil { return err }
+		if value == nil { value = map[string]json.RawMessage{} }
+		value["aiTimeouts"], _ = json.Marshal(setting)
+		body, err := json.Marshal(value)
+		if err != nil { return err }
+		return tx.Model(&model.Setting{}).Where("key = ?", model.SettingKeyPrivate).Updates(model.Setting{Value: body, UpdatedAt: now}).Error
+	})
 }
 
 // SaveSettings 保存 public 和 private 两行配置。

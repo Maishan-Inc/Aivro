@@ -74,6 +74,17 @@ func AdminUpdateDatabase(w http.ResponseWriter, r *http.Request) {
 	OK(w, true)
 }
 
+func AdminSaveAITimeouts(w http.ResponseWriter, r *http.Request) {
+	var input model.AITimeoutSetting
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil { Fail(w, "请求参数错误"); return }
+	result, err := service.SaveAITimeouts(input)
+	if err != nil { FailError(w, err); return }
+	admin, _ := service.UserFromContext(r.Context())
+	meta := service.RequestLogMetaFromRequest(r)
+	_ = service.SaveAuditLog(model.AuditLog{Action: model.AuditLogActionConfigUpdate, Category: "系统配置", ActorID: admin.ID, ActorUsername: admin.Username, TargetType: "settings", TargetID: "aiTimeouts", Remark: "管理员修改生成超时", IP: meta.IP, Country: meta.Country})
+	OK(w, result)
+}
+
 func AdminDatabaseStatus(w http.ResponseWriter, r *http.Request) {
 	status, err := service.AdminDatabaseStatus()
 	if err != nil {

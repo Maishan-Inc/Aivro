@@ -10,7 +10,7 @@ import type { UploadedFile } from "@/services/file-storage";
 
 export type VideoQueueUpdate = { taskId: string; status: "queued" | "executing" | "succeeded" | "failed" | "canceled"; queuePosition: number; aheadCount: number };
 
-type VideoResponse = { id: string; status?: string; error?: { message?: string } };
+type VideoResponse = { id: string; status?: string; file?: UploadedFile; error?: { message?: string } };
 type GenerationTaskSubmitResult = { queued: boolean; taskId: string; status: string; queuePosition: number; aheadCount: number; model: string; path: string };
 type GenerationTaskView = { id: string; status: "queued" | "executing" | "succeeded" | "failed" | "canceled"; queuePosition: number; aheadCount: number; error: string; resultAvailable: boolean };
 type ApiVideoResponse = VideoResponse | GenerationTaskSubmitResult | { code?: number; data?: VideoResponse | GenerationTaskSubmitResult | GenerationTaskView | null; msg?: string };
@@ -42,36 +42,11 @@ export async function requestVideoGeneration(config: AiConfig, prompt: string, r
     try {
         const createdPayload = (await axios.post<ApiVideoResponse>(aiApiUrl(config, "/videos"), body, { headers: aiHeaders(config), withCredentials: true })).data;
         const created = isQueuedVideoEnvelope(createdPayload) ? await waitForQueuedVideo(config, createdPayload.data, onQueue) : unwrapVideoResponse(createdPayload);
-        if (!created.id) throw new Error("视频接口没有返回任务 ID");
-        for (;;) {
-            const video = unwrapVideoResponse((await axios.get<ApiVideoResponse>(aiApiUrl(config, `/videos/${created.id}`), { headers: aiHeaders(config), params: { model }, withCredentials: true })).data);
-            if (video.status === "completed") break;
-            if (video.status === "failed" || video.status === "cancelled") throw new Error(video.error?.message || "视频生成失败");
-            await new Promise((resolve) => setTimeout(resolve, 2500));
-        }
-        const content = await axios.get<Blob>(aiApiUrl(config, `/videos/${created.id}/content`), { headers: aiHeaders(config), params: { model }, responseType: "blob", withCredentials: true });
-        const cloudFile = await readCloudVideoFile(content.data);
-        if (cloudFile) {
-            refreshRemoteUser(config);
-            return cloudFile;
-        }
-        await assertVideoBlob(content.data);
+        if (!created.file?.url) throw new Error("视频接口没有返回生成文件");
         refreshRemoteUser(config);
-        return content.data;
+        return created.file;
     } catch (error) {
         throw new Error(readAxiosError(error, "视频生成失败"));
-    }
-}
-
-async function readCloudVideoFile(blob: Blob): Promise<UploadedFile | null> {
-    if (!blob.type.includes("json")) return null;
-    try {
-        const payload = JSON.parse(await blob.text()) as { code?: number; msg?: string; data?: UploadedFile };
-        if (typeof payload.code === "number" && payload.code !== 0) throw new Error(payload.msg || "视频下载失败");
-        return payload.data?.url ? payload.data : null;
-    } catch (error) {
-        if (error instanceof Error && error.message !== "Unexpected end of JSON input") throw error;
-        return null;
     }
 }
 
@@ -99,7 +74,7 @@ function isQueuedVideoEnvelope(payload: ApiVideoResponse): payload is { code?: n
 }
 
 async function waitForQueuedVideo(config: AiConfig, task: GenerationTaskSubmitResult, onQueue?: (update: VideoQueueUpdate) => void): Promise<VideoResponse> {
-    onQueue?.({ taskId: task.taskId, status: "queued", queuePosition: task.queuePosition, aheadCount: task.aheadCount });
+    onQueue?.({ taskId: task.taskId, status: task.status === "executing" ? "executing" : "queued", queuePosition: task.queuePosition, aheadCount: task.aheadCount });
     for (;;) {
         await new Promise((resolve) => setTimeout(resolve, 2000));
         const current = await fetchGenerationTask(config, task.taskId);
@@ -138,13 +113,3 @@ function readAxiosError(error: unknown, fallback: string) {
     return error instanceof Error ? error.message : fallback;
 }
 
-async function assertVideoBlob(blob: Blob) {
-    if (!blob.type.includes("json")) return;
-    let payload: { code?: number; msg?: string };
-    try {
-        payload = JSON.parse(await blob.text()) as { code?: number; msg?: string };
-    } catch {
-        return;
-    }
-    if (typeof payload.code === "number" && payload.code !== 0) throw new Error(payload.msg || "视频下载失败");
-}

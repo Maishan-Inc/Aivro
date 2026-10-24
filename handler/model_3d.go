@@ -18,12 +18,14 @@ func AIModel3DGenerations(w http.ResponseWriter, r *http.Request) {
 		Fail(w, "请求参数错误")
 		return
 	}
-	result, err := service.CreateModel3DGeneration(r.Context(), user, input, service.RequestLogMetaFromRequest(r))
+	queued, response, err := service.CreateModel3DGeneration(r.Context(), user, input, service.RequestLogMetaFromRequest(r))
 	if err != nil {
 		FailError(w, err)
 		return
 	}
-	OK(w, result)
+	if queued.Queued { OK(w, queued); return }
+	if response == nil { Fail(w, "AI 接口请求失败"); return }
+	writeAIProxyResponse(w, *response)
 }
 
 func AIModel3DGeneration(w http.ResponseWriter, r *http.Request, id string) {
@@ -32,7 +34,7 @@ func AIModel3DGeneration(w http.ResponseWriter, r *http.Request, id string) {
 		Fail(w, "未登录或权限不足")
 		return
 	}
-	result, err := service.GetModel3DGeneration(user, id)
+	result, err := service.GetModel3DGeneration(r.Context(), user, id)
 	if err != nil {
 		FailError(w, err)
 		return

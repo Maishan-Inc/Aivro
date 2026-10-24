@@ -211,7 +211,7 @@ function isQueuedEnvelope(payload: ImageApiResponse): payload is ImageApiRespons
 }
 
 async function resolveQueuedImages(config: AiConfig, task: GenerationTaskSubmitResult, onQueue?: (update: GenerationQueueUpdate) => void) {
-    onQueue?.({ taskId: task.taskId, status: "queued", queuePosition: task.queuePosition, aheadCount: task.aheadCount });
+    onQueue?.({ taskId: task.taskId, status: task.status === "executing" ? "executing" : "queued", queuePosition: task.queuePosition, aheadCount: task.aheadCount });
     for (;;) {
         await new Promise((resolve) => setTimeout(resolve, 2000));
         const current = await fetchGenerationTask(config, task.taskId);

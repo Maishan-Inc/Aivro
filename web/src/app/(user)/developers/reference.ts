@@ -101,7 +101,7 @@ export const endpoints: Endpoint[] = [
     },
     {
         id: "model3d", title: "生成 3D 模型", method: "POST", path: "/model-3d/generations",
-        description: "通过文字或参考图片生成 3D 模型，请求体使用 JSON。当前接口直接返回真实模型文件结果。",
+        description: "通过文字或参考图片生成 3D 模型，请求体使用 JSON。接口返回模型文件结果或本站任务编号。",
         params: [
             ["model", "字符串", "必填", "已开放的 3D 模型名称"],
             ["mode", "字符串", "必填", "text（文字）、image（单图）或 multi_image（多图）"],
@@ -114,7 +114,7 @@ export const endpoints: Endpoint[] = [
         ],
         code: jsonRequest("/model-3d/generations", { model: "AVAILABLE_3D_MODEL", mode: "text", prompt: "A cute rounded ceramic kitten", quantity: 1, meshQuality: "standard", textureEnabled: false, pbrEnabled: false }),
         response: JSON.stringify({ code: 0, data: { id: "GENERATION_ID", status: "completed", energyCost: 10, results: [{ url: "/api/files/MODEL_FILE_ID/content?accessToken=ACCESS_TOKEN", mimeType: "model/gltf-binary" }] }, msg: "ok" }, null, 2),
-        note: "从 data.results 读取模型文件地址，data.energyCost 为实际算力点。按次计费还会按数量、网格质量、贴图、物理材质和面数增加费用。当前不要调用 3D 编号查询接口轮询；该接口尚不提供异步任务查询。",
+        note: "从 data.results 读取模型文件地址，data.energyCost 为实际算力点。按次计费还会按数量、网格质量、贴图、物理材质和面数增加费用。若 data.queued 为 true，使用 data.taskId 查询本站生成队列，成功后读取任务结果；也可通过 GET /model-3d/generations/{id} 查询进度和结果。",
     },
     {
         id: "files", title: "上传参考文件", method: "POST", path: "/files",
@@ -155,7 +155,7 @@ export const queueExample = `import os
 import time
 import requests
 
-base = os.environ["AIVRO_BASE_URL"]
+base = os.environ["AIVRO_BASE_URL"].rstrip("/")
 session = requests.Session()
 session.headers["Authorization"] = "Bearer " + os.environ["AIVRO_API_KEY"]
 
@@ -163,10 +163,10 @@ def read_json(response):
     response.raise_for_status()
     result = response.json()
     if result.get("code", 0) != 0:
-        raise RuntimeError(result.get("msg", "Request failed"))
+        raise RuntimeError(result.get("msg", response.text))
     return result
 
-# Set AIVRO_IMAGE_MODEL to an available image model
+# {{注释:将 AIVRO_IMAGE_MODEL 设置为已开放的图片模型。}}
 result = read_json(session.post(base + "/images/generations", json={
     "model": os.environ["AIVRO_IMAGE_MODEL"],
     "prompt": "A mountain cabin in morning light, realistic photography", "n": 1,
@@ -175,6 +175,7 @@ result = read_json(session.post(base + "/images/generations", json={
 data = result.get("data")
 if isinstance(data, dict) and data.get("queued"):
     task_id = data["taskId"]
+    print("taskId:", task_id)
     deadline = time.monotonic() + 600
     while time.monotonic() < deadline:
         task = read_json(session.get(base + "/generation-tasks/" + task_id, timeout=30))["data"]
@@ -182,10 +183,11 @@ if isinstance(data, dict) and data.get("queued"):
             result = read_json(session.get(base + "/generation-tasks/" + task_id + "/result", timeout=300))
             break
         if task["status"] in ("failed", "canceled"):
-            raise RuntimeError(task.get("error") or "Task failed or canceled")
+            raise RuntimeError(task.get("error") or task["status"])
         time.sleep(3)
     else:
-        raise TimeoutError("Timed out. Save the task ID and query it later. Do not resubmit.")
+        # {{注释:超时仅停止本地等待，请保留编号继续查询，不要重新提交。}}
+        raise TimeoutError(task_id)
 
 print(result)
 session.close()`;

@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { ArrowRight, ArrowUpRight, BookOpen, KeyRound, Terminal } from "lucide-react";
+import { ArrowUpRight, BookOpen, KeyRound, Terminal } from "lucide-react";
 
 import { withLocalePath } from "@/i18n/routing";
 import { translate } from "@/i18n/runtime-translations";
 import { generateLocalizedMetadata, requestLocale } from "@/lib/page-metadata";
 import { CodeBlock, CodeExamples } from "./code-examples";
 import { endpoints, queueExample } from "./reference";
+import { videoWorkflowExample } from "./video-example";
 
 export const generateMetadata = () => generateLocalizedMetadata("developers");
 
@@ -15,6 +16,7 @@ const sections = [
     { id: "languages", title: "多语言代码示例" },
     { id: "reference", title: "接口参考" },
     { id: "queue", title: "异步任务处理" },
+    { id: "video-workflow", title: "从参考图到视频下载" },
     { id: "responses", title: "响应与错误处理" },
     { id: "billing", title: "计费与使用建议" },
 ];
@@ -23,18 +25,17 @@ export default async function DevelopersPage() {
     const locale = await requestLocale();
     const tr = (value: string) => translate(value, locale);
     return <main lang={locale} className="thin-scrollbar h-full overflow-y-auto scroll-smooth bg-background text-foreground">
-        <div className="mx-auto w-[77%] max-w-[1960px] pb-16 max-[1000px]:w-[calc(100%_-_48px)] max-[600px]:w-[calc(100%_-_32px)]">
-            <header className="border-b border-border pb-10 pt-12 sm:pt-16">
-                <div className="mb-6 flex items-center gap-2 text-xs tracking-wider text-muted-foreground"><BookOpen className="size-4" />{tr("开发文档")}<span className="mx-2 text-border">/</span>{tr("接口版本 v1")}</div>
-                <div className="flex flex-wrap items-end justify-between gap-8">
-                    <div><h1 className="text-[clamp(32px,4vw,60px)] font-semibold leading-tight tracking-[-0.05em]">{tr("把创作能力，接入你的应用。")}</h1><p className="mt-5 max-w-2xl text-sm leading-8 text-muted-foreground">{tr("从第一行请求开始，连接本站的对话、图片、视频与 3D 模型。")}<br className="hidden sm:block" />{tr("统一鉴权，按量使用。这里提供接入说明与 22 种编程语言的调用示例。")}</p></div>
-                    <Link href={withLocalePath("/console/api-keys", locale)} className="inline-flex h-10 items-center gap-3 rounded-md bg-foreground px-4 text-sm text-background transition hover:opacity-80"><KeyRound className="size-4" />{tr("创建我的密钥")}<ArrowUpRight className="size-4" /></Link>
-                </div>
-                <div className="mt-8 flex flex-wrap items-center gap-x-7 gap-y-3 text-xs text-muted-foreground"><span>{tr("API 接入指南")}</span><span>{tr("22 种编程语言示例")}</span><span>{tr("本站统一接口")}</span><Link href={withLocalePath("/models", locale)} className="inline-flex items-center gap-1.5 text-foreground hover:opacity-70">{tr("查看模型定价")}<ArrowRight className="size-3.5" /></Link></div>
+        <div className="mx-auto w-full max-w-[1960px] px-6 pb-16 sm:px-8">
+            <header className="border-b border-border pb-10 pt-12 text-center sm:pt-16">
+                <div className="mb-6 flex items-center justify-center gap-2 text-xs tracking-wider text-muted-foreground"><BookOpen className="size-4" />{tr("开发文档")}<span className="mx-2 text-border">/</span>{tr("接口版本 v1")}</div>
+                <h1 className="mx-auto max-w-4xl text-[clamp(32px,4vw,60px)] font-semibold leading-tight tracking-[-0.05em]">{tr("把创作能力，接入你的应用。")}</h1>
+                <p className="mx-auto mt-5 max-w-2xl text-sm leading-8 text-muted-foreground">{tr("从第一行请求开始，连接本站的对话、图片、视频与 3D 模型。")}<br className="hidden sm:block" />{tr("统一鉴权，按量使用。这里提供接入说明与 22 种编程语言的调用示例。")}</p>
+                <div className="mt-8 flex flex-wrap items-center justify-center gap-x-7 gap-y-3 text-xs text-muted-foreground"><span>{tr("API 接入指南")}</span><span>{tr("22 种编程语言示例")}</span><span>{tr("本站统一接口")}</span></div>
             </header>
 
-            <div className="grid items-start gap-10 pt-9 lg:grid-cols-[190px_minmax(0,1fr)] xl:gap-16">
-                <aside className="lg:sticky lg:top-8">
+            <div className="grid items-start gap-10 pt-9 lg:grid-cols-[190px_minmax(0,1fr)] min-[1440px]:grid-cols-[minmax(0,1fr)_minmax(0,960px)_minmax(0,1fr)] min-[1440px]:gap-12">
+                <aside className="lg:sticky lg:top-8 lg:col-start-1 lg:row-start-1 min-[1440px]:w-[190px] min-[1440px]:justify-self-end">
+                    <Link href={withLocalePath("/console/api-keys", locale)} className="mb-8 inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-foreground px-4 text-sm text-background transition hover:opacity-80"><KeyRound className="size-4" />{tr("创建我的密钥")}<ArrowUpRight className="size-4" /></Link>
                     <nav aria-label={tr("开发文档目录")} className="thin-scrollbar max-h-[calc(100dvh-180px)] overflow-y-auto text-sm">
                         <p className="mb-4 text-[11px] text-muted-foreground">{tr("接入指南")}</p>
                         <div className="flex flex-wrap gap-x-5 gap-y-3 lg:flex-col">{sections.map((item, index) => <a key={item.id} href={`#${item.id}`} className="inline-flex items-center gap-3 text-muted-foreground hover:text-foreground"><span className="font-mono text-[10px] opacity-50">{String(index + 1).padStart(2, "0")}</span>{tr(item.title)}</a>)}</div>
@@ -42,20 +43,18 @@ export default async function DevelopersPage() {
                     </nav>
                 </aside>
 
-                <article className="min-w-0 max-w-[1280px] space-y-14 text-sm leading-8 [&_section]:scroll-mt-8 [&_h2]:mb-5 [&_h2]:text-2xl [&_h2]:font-semibold [&_h2]:tracking-tight [&_h3]:mb-3 [&_h3]:font-medium [&_p]:text-muted-foreground">
+                <article className="min-w-0 space-y-14 text-sm leading-8 [&_section]:scroll-mt-8 [&_h2]:mb-5 [&_h2]:text-3xl [&_h2]:font-semibold [&_h2]:tracking-tight [&_h3]:mb-3 [&_h3]:text-base [&_h3]:font-medium [&_p]:text-muted-foreground lg:col-start-2 lg:row-start-1">
                     <section id="quick-start">
                         <h2>{tr("快速开始")}</h2>
                         <ol className="space-y-2 pl-5 marker:text-muted-foreground"><li className="list-decimal">{tr("登录本站，在")}<Link href={withLocalePath("/console/api-keys", locale)} className="mx-1 underline underline-offset-4">{tr("我的空间 → 密钥管理")}</Link>{tr("创建密钥，并保存仅展示一次的完整内容。")}</li><li className="list-decimal">{tr("设置接口地址与密钥，查询已开放模型，并选择对应功能的模型名称。")}</li><li className="list-decimal">{tr("复制下方任一语言示例，发送第一条请求。")}</li></ol>
-                        <CodeBlock label={tr("终端 · 环境变量")} code={`# Keep /api/v1 at the end; replace the origin for your deployment
+                        <CodeBlock label={tr("终端 · 环境变量")} code={`# {{注释:保留 /api/v1 前缀，将域名替换为你的站点地址。}}
 export AIVRO_BASE_URL='https://aivro.org/api/v1'
 export AIVRO_API_KEY='YOUR_API_KEY'
 
-# Query models first and choose a model with type=text
-curl "$AIVRO_BASE_URL/models" -H "Authorization: Bearer $AIVRO_API_KEY"
-export AIVRO_MODEL='AVAILABLE_CHAT_MODEL'`} />
+# {{注释:先查询模型，再将示例中的模型占位值替换为对应类型的可用模型。}}
+curl "$AIVRO_BASE_URL/models" -H "Authorization: Bearer $AIVRO_API_KEY"`} />
                         <details className="rounded-lg border border-border px-4 py-3"><summary className="cursor-pointer text-xs font-medium">{tr("Windows PowerShell 环境变量设置")}</summary><CodeBlock label={tr("PowerShell · 环境变量")} code={`$env:AIVRO_BASE_URL = 'https://aivro.org/api/v1'
-$env:AIVRO_API_KEY = 'YOUR_API_KEY'
-$env:AIVRO_MODEL = 'AVAILABLE_CHAT_MODEL'`} /></details>
+$env:AIVRO_API_KEY = 'YOUR_API_KEY'`} /></details>
                         <p className="mt-4">{tr("接口基础地址为 ")}<code className="text-foreground">SITE_ORIGIN + /api/v1</code>{tr("。例如图片生成的完整地址是 ")}<code className="break-all text-foreground">https://aivro.org/api/v1/images/generations</code>{tr("。下方接口路径均相对于此基础地址。")}</p>
                     </section>
 
@@ -69,7 +68,7 @@ $env:AIVRO_MODEL = 'AVAILABLE_CHAT_MODEL'`} /></details>
 
                     <section id="languages">
                         <h2>{tr("多语言代码示例")}</h2>
-                        <p>{tr("以下 22 种语言使用相同的对话接口与请求参数。先设置快速开始中的环境变量，再选择语言复制代码。示例适用于服务端或本地命令行，协议字段、命令和示例值保持原样。")}</p>
+                        <p>{tr("选择编程语言与调用场景，查看图片、对话、3D、视频、模型查询和任务管理示例。22 种语言提供 9 类调用；代码注释跟随当前界面语言，协议字段、命令和示例提示词保留原样。")}</p>
                         <CodeExamples />
                         <p>{tr("cURL、C 与 C++ 示例将完整响应直接写入终端，业务错误也会出现在输出中；正式接入时请解析 JSON 并检查 ")}<code>code</code>{tr("。其他示例展示常用的错误判断方式。调用图片等 JSON 接口时，可按接口参考替换路径与请求体；上传文件使用对应语言的 multipart 能力。")}</p>
                         <details className="mt-5 rounded-lg border border-border px-4 py-3"><summary className="flex cursor-pointer items-center gap-2 text-xs font-medium"><Terminal className="size-3.5" />{tr("查看流式对话示例")}</summary><CodeBlock label={tr("cURL · 流式对话")} code={`curl -N "$AIVRO_BASE_URL/chat/completions" \\
@@ -102,6 +101,9 @@ $env:AIVRO_MODEL = 'AVAILABLE_CHAT_MODEL'`} /></details>
                         <CodeBlock label={tr("排队响应示例")} code={JSON.stringify({ code: 0, data: { queued: true, taskId: "TASK_ID", status: "queued", queuePosition: 2, aheadCount: 1 }, msg: "ok" }, null, 2)} />
                         <ol className="space-y-2 pl-5"><li className="list-decimal">{tr("每隔约 3 秒请求 ")}<code>/generation-tasks/TASK_ID</code>{tr("。")}</li><li className="list-decimal">{tr("状态为 ")}<code>succeeded</code> {tr(" 且 ")}<code>resultAvailable</code> {tr(" 为 true 时，请求 ")}<code>/generation-tasks/TASK_ID/result</code>{tr("。")}</li><li className="list-decimal">{tr("状态为 ")}<code>failed</code> {tr(" 或 ")}<code>canceled</code> {tr(" 时停止轮询，展示错误并检查退款。")}</li><li className="list-decimal">{tr("视频队列结果是视频创建响应，再使用其中的本站视频编号查询视频进度；3D 当前由创建接口直接返回结果。")}</li></ol>
                         <CodeBlock label={tr("Python · 图片生成与队列轮询")} code={queueExample} />
+                        <h3 id="video-workflow" className="mt-8 scroll-mt-8">{tr("从参考图到视频下载")}</h3>
+                        <p>{tr("以下 Python 示例串联参考图上传、视频创建、本站队列、视频进度和文件下载。先执行 pip install requests，设置 AIVRO_VIDEO_MODEL，并准备 reference.png。状态字段以所选渠道为准。")}</p>
+                        <CodeBlock label={tr("Python · 视频创建、轮询与下载")} code={videoWorkflowExample} />
                         <p>{tr("等待超时只表示客户端停止等待，请保留任务编号稍后查询。本站执行中的任务不能取消；仅排队任务支持取消并退款。生成结果与临时文件存在保留期限，请及时取回。")}</p>
                     </section>
 

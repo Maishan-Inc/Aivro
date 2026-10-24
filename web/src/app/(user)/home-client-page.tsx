@@ -7,7 +7,7 @@ import localforage from "localforage";
 import { nanoid } from "nanoid";
 import { SiX, SiFacebook, SiDiscord, SiTiktok, SiBilibili } from "@icons-pack/react-simple-icons";
 import Link from "next/link";
-import { ArrowRight, ArrowUpRight, ChevronRight, Code2, KeyRound, Plus, Terminal } from "lucide-react";
+import { ArrowRight, ArrowUpRight, ChevronRight, Code2, KeyRound, Plus } from "lucide-react";
 import { FlowBackground } from "@/components/flow-background";
 import { ImagePromptComposer } from "@/components/image-prompt-composer";
 import { CookiePreferences } from "@/components/cookie-preferences";
@@ -27,16 +27,8 @@ import { HomeModels } from "./home-models";
 import { HomePlans } from "./home-plans";
 import { HomeNetwork } from "./home-network";
 import { HomeWorkflowDemo } from "./home-workflow-demo";
+import { CodeExamples } from "./developers/code-examples";
 import styles from "./home.module.css";
-
-const apiExample = `curl "$AIVRO_BASE_URL/images/generations" \\
-  -H "Authorization: Bearer $AIVRO_API_KEY" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "model": "替换为已开放的图片模型",
-    "prompt": "晨光中的山间木屋",
-    "n": 1
-  }'`;
 
 export function HomeClientPage() {
     const router = useRouter();
@@ -100,7 +92,7 @@ export function HomeClientPage() {
             <HomeNetwork />
 
             <section id="platform" className={styles.section} aria-labelledby="workflow-title" data-reveal>
-                <div className={styles.sectionHeading}><div><span className={styles.eyebrow}>01 / 工作流使用演示</span><h2 id="workflow-title">让创作过程<br />在画布上发生</h2><p className={styles.sectionIntro}>写下描述，连接参考与生成节点，让创作顺着你的思路展开。</p></div><Link href={localizedPath("/canvas")} className={styles.primary}>体验工作流 <ArrowUpRight size={18} /></Link></div>
+                <div className={styles.sectionHeading}><div><span className={styles.eyebrow}>01 / 工作流使用演示</span><h2 id="workflow-title">让创作过程<br />在画布上发生</h2><p className={styles.sectionIntro}>从商品广告、动漫手办到游戏与影视，连接参考、分支与结果，在同一张画布上展开完整创意。</p></div><Link href={localizedPath("/canvas")} className={styles.primary}>体验工作流 <ArrowUpRight size={18} /></Link></div>
                 <HomeWorkflowDemo />
             </section>
 
@@ -108,7 +100,7 @@ export function HomeClientPage() {
                 <div><span className={styles.eyebrow}><Code2 size={17} />02 / 为你的应用而生</span><h2 id="api-title">通过 API<br />在任意地方使用</h2><p className={styles.sectionIntro}>将图像、视频、对话与 3D 生成接入你的网站、应用和自动化流程。用熟悉的代码，让创作能力随处可用。</p><div className={styles.apiActions}><Link href={localizedPath("/developers")} className={styles.primary}>查看接入文档 <ArrowUpRight size={18} /></Link><Link href={localizedPath("/console/api-keys")} className={styles.textLink}><KeyRound size={16} />创建 API 密钥 <ArrowRight size={16} /></Link></div></div>
                 <div className={styles.apiVisual}>
                     <div className={styles.apiDestinations}>{["网站", "应用", "自动化"].map((label) => <span key={label}>{label}<span className={styles.apiSignal} aria-hidden="true" /></span>)}</div>
-                    <div className={styles.apiCode}><div className={styles.apiCodeHeader}><Terminal size={16} /><span>Aivro API</span><span className={styles.apiMethod}>POST</span></div><pre data-native-scroll><code>{apiExample}</code></pre><div className={styles.apiCodeFooter}><span className={styles.liveDot} /><span>一个接口，连接你的创作场景</span><ArrowUpRight size={16} /></div></div>
+                    <CodeExamples compact />
                 </div>
             </section>
 

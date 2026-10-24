@@ -156,6 +156,7 @@
 
 ```json
 {
+  "aiTimeouts": { "imageMinutes": 10, "videoMinutes": 15, "model3DMinutes": 30, "textMinutes": 5 },
   "channels": [
     {
       "protocol": "openai",
@@ -241,12 +242,15 @@
 | --- | --- | --- |
 | `channels` | object[] | 模型渠道列表 |
 | `promptSync` | object | GitHub 远程提示词定时同步配置 |
+| `aiTimeouts` | object | 图片、视频、3D 模型、文本/助手的执行期限，单位为分钟 |
 | `captcha` | object | 人机验证私有配置，支持关闭、Turnstile 和 hCaptcha |
 | `auth` | object | OAuth、MetaMask 和自定义登录私有配置 |
 | `mail` | object | SMTP 验证码与邮件模板配置 |
 | `cloudStorage` | object | Cloudflare R2 / S3 兼容云存储配置 |
 | `stripe` | object | Stripe 支付私有配置 |
 | `kyc` | object | Didit KYC 私有配置 |
+
+`aiTimeouts` 包含 `imageMinutes`（默认 10）、`videoMinutes`（默认 15）、`model3DMinutes`（默认 30）、`textMinutes`（默认 5），每项为 1–120 的整数。管理员在“系统设置 → 后台配置 → 生成超时”修改后自动保存，接口只更新该配置，不提交其他未保存表单或密钥；保存失败保留输入并提供重新保存。设置从数据库实时读取，无需重启；已开始执行的任务沿用原期限，排队任务开始执行时读取新设置。站内视频的创建、上游状态轮询及文件转存共用一次执行期限。
 
 `channels` 每项字段：
 

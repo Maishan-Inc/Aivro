@@ -51,6 +51,9 @@ func AIVideoContent(w http.ResponseWriter, r *http.Request, id string) {
 }
 
 func proxyAIGetRequest(w http.ResponseWriter, r *http.Request, path string) {
+	ctx, cancel := context.WithTimeout(r.Context(), service.AIRequestTimeoutForPath(path))
+	defer cancel()
+	r = r.WithContext(ctx)
 	user, _ := service.UserFromContext(r.Context())
 	id := strings.TrimSuffix(strings.TrimPrefix(path, "/videos/"), "/content")
 	task, channel, err := service.UserVideoRoute(user.ID, id)
@@ -81,7 +84,7 @@ func proxyAIRequest(w http.ResponseWriter, r *http.Request, path string) {
 		FailError(w, err)
 		return
 	}
-	if path == "/chat/completions" || (!service.AIQueueEnabled() && !service.IsAPIKeyRequest(r.Context())) {
+	if path == "/chat/completions" {
 		directAIProxyRequest(w, r, user, body, contentType, modelName, path)
 		return
 	}
@@ -176,24 +179,25 @@ func ExecuteAIProxyTask(ctx context.Context, user model.AuthUser, body io.Reader
 		if requestContentType != "" {
 			request.Header.Set("Content-Type", requestContentType)
 		}
-		response, err := service.AIHTTPClient.Do(request)
+		response, err := service.AIHTTPClientForContext(ctx).Do(request)
 		if err != nil {
 			log.Printf("AI proxy request failed: path=%s errorType=%T", request.URL.Path, err)
-			lastErr = err
-			continue
+			return service.AIProxyResponse{}, err
 		}
 		if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
 			_ = response.Body.Close()
 			lastStatus = response.StatusCode
 			log.Printf("AI upstream error: status=%d", response.StatusCode)
+			if response.StatusCode == 408 || response.StatusCode == 504 || response.StatusCode == 524 {
+				return service.AIProxyResponse{}, service.SafeAIError("上游响应超时，请核实生成结果后再重试")
+			}
 			continue
 		}
 		responseBody, err := service.ReadAIProxyResponseBody(response.Body, path)
 		_ = response.Body.Close()
 		if err != nil {
 			log.Printf("AI proxy read response failed: path=%s errorType=%T", path, err)
-			lastErr = err
-			continue
+			return service.AIProxyResponse{}, err
 		}
 		if path == "/videos" {
 			responseBody, err = service.RecordVideoTask(user, route, responseBody)
@@ -243,7 +247,7 @@ type aiProxyContext struct {
 }
 
 func copyAIResponse(w http.ResponseWriter, request *http.Request, onFailure func(), proxyContext aiProxyContext) {
-	response, err := service.AIHTTPClient.Do(request)
+	response, err := service.AIHTTPClientForContext(request.Context()).Do(request)
 	if err != nil {
 		log.Printf("AI proxy request failed: path=%s errorType=%T", request.URL.Path, err)
 		if onFailure != nil {

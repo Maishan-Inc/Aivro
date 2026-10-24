@@ -1,4 +1,5 @@
 import { apiGet, apiPost } from "@/services/api/request";
+import type { GenerationTaskSubmitResult } from "@/services/api/image";
 
 export type Model3DMode = "image" | "multi_image" | "text";
 
@@ -45,7 +46,14 @@ export type Model3DGenerationResult = {
 };
 
 export async function requestModel3DGeneration(token: string, input: Model3DGenerationInput) {
-    return apiPost<Model3DGenerationResult>("/api/v1/model-3d/generations", input, token);
+    const submitted = await apiPost<Model3DGenerationResult | GenerationTaskSubmitResult>("/api/v1/model-3d/generations", input, token);
+    if (!("queued" in submitted)) return submitted;
+    for (;;) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        const current = await getModel3DGeneration(token, submitted.taskId);
+        if (current.status === "completed") return current;
+        if (current.status === "failed" || current.status === "canceled") throw new Error(current.error || "生成失败");
+    }
 }
 
 export async function getModel3DGeneration(token: string, id: string) {

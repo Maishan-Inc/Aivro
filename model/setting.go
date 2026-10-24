@@ -14,6 +14,14 @@ type ModelRateLimit struct {
 	PerMinute int    `json:"perMinute"`
 }
 
+// AITimeoutSetting 按生成类型配置执行期限，单位为分钟。
+type AITimeoutSetting struct {
+	ImageMinutes   int `json:"imageMinutes"`
+	VideoMinutes   int `json:"videoMinutes"`
+	Model3DMinutes int `json:"model3DMinutes"`
+	TextMinutes    int `json:"textMinutes"`
+}
+
 // AIQueueSetting 控制 AI 请求按模型限流和排队。
 type AIQueueSetting struct {
 	Enabled            *bool            `json:"enabled"`
@@ -180,6 +188,7 @@ type PrivateSetting struct {
 	Runtime      RuntimeSetting      `json:"runtime"`
 	PromptSync   PromptSyncSetting   `json:"promptSync"`
 	AIQueue      AIQueueSetting      `json:"aiQueue"`
+	AITimeouts   AITimeoutSetting    `json:"aiTimeouts"`
 	CanvasAssist CanvasAssistSetting `json:"canvasAssist"`
 	Captcha      CaptchaSetting      `json:"captcha"`
 	Turnstile    TurnstileSetting    `json:"turnstile"`

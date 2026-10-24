@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -491,6 +492,7 @@ func normalizePrivateSetting(setting model.PrivateSetting) model.PrivateSetting 
 	setting.Runtime = normalizeRuntimeSetting(setting.Runtime)
 	setting.PromptSync = normalizePromptSyncSetting(setting.PromptSync)
 	setting.AIQueue = normalizeAIQueueSetting(setting.AIQueue)
+	setting.AITimeouts = normalizeAITimeouts(setting.AITimeouts)
 	setting.CanvasAssist = normalizeCanvasAssistSetting(setting.CanvasAssist)
 	setting.Turnstile = normalizeTurnstileSetting(setting.Turnstile)
 	setting.Captcha = normalizeCaptchaSetting(setting.Captcha, setting.Turnstile)
@@ -1232,13 +1234,15 @@ func testAdminChannelModel(channel model.ModelChannel, modelName, capability str
 		return "", safeMessageError{message: "当前仅支持图片和对话模型测试，视频和 3D 模型请在对应工作台验证"}
 	}
 	body, _ := json.Marshal(input)
-	request, err := http.NewRequest(http.MethodPost, BuildModelChannelURL(channel, path), strings.NewReader(string(body)))
+	ctx, cancel := context.WithTimeout(context.Background(), AIRequestTimeoutForPath(path))
+	defer cancel()
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, BuildModelChannelURL(channel, path), strings.NewReader(string(body)))
 	if err != nil {
 		return "", err
 	}
 	request.Header.Set("Authorization", "Bearer "+channel.APIKey)
 	request.Header.Set("Content-Type", "application/json")
-	response, err := AIHTTPClient.Do(request)
+	response, err := AIHTTPClientForContext(ctx).Do(request)
 	if err != nil {
 		return "", err
 	}

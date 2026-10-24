@@ -35,6 +35,15 @@
 
 当前模型请求通过本站 Go 后端渠道，密钥保存在后端私有设置；前端不再提供浏览器本地 API Key 直连路径。
 
+## 生成期限与后台任务
+
+- 管理员使用 `POST /api/admin/settings/ai-timeouts` 保存 `{ imageMinutes, videoMinutes, model3DMinutes, textMinutes }`，单位为分钟，默认分别为 10、15、30、5，允许 1–120 的整数。响应 `data` 为保存后的四项设置；只更新该私有配置并记录审计流水，其他未保存设置不会被提交。无需重启，新开始执行的任务使用最新设置。
+- 登录会话提交图片生成、图片编辑、视频、3D 生成后，返回 `{ code: 0, data: { queued: true, taskId, status, queuePosition, aheadCount, model, path }, msg: "ok" }`。`queued: true` 表示请求交由后台任务接管，`status` 可为 `queued` 或 `executing`；关闭限流队列时仍在后台执行。
+- 使用 `GET /api/v1/generation-tasks/{id}` 查询状态，`succeeded` 后通过 `/result` 获取结果。图片保留 `data[]` 图片格式；站内视频结果为 `{ id, status: "completed", file }`，其中 `file` 包含云端/本地后端文件 URL、storageKey、cloudFileId 等，视频的上游轮询和转存已由后台完成；3D 结果保留 `{ code, data: { results, energyCost, ... }, msg }`。
+- `GET /api/v1/model-3d/generations/{id}` 可查询本站 3D 任务；未完成时 `data.status` 为 `queued`、`executing`、`failed` 或 `canceled`，成功时返回 `status: "completed"` 及模型文件。接口校验当前用户和任务类型。
+- API 密钥调用仍在容量充足时同步返回，在限流时返回任务编号；视频 API 保持“创建编号 → 查询状态 → 获取内容”的调用方式。同步调用仍受部署入口及客户端自身超时限制，后台配置无法调整 CDN 或上游网关的超时。
+- 超时或上游 HTTP 408/504/524 不触发图片/视频创建请求自动重发。失败退款沿用本站任务结算规则，上游计费不会因此自动退还。运行中的后台任务不因浏览器离开而取消，结果保留时间沿用队列配置；各页面刷新后自动恢复任务列表仍待完善。
+
 ## 用户 API 密钥与外部调用
 
 - 登录用户使用 `GET /api/v1/api-keys?page=1&pageSize=20` 查看自己的密钥列表，`data` 为 `{ items, total }`；列表只返回名称、脱敏标识、状态和时间。

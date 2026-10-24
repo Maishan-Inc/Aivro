@@ -37,7 +37,7 @@ func RequestChatCompletion(ctx context.Context, userID string, body []byte, mode
 	if err != nil { return nil, err }
 	reserved := canvasAgentReserveCredits(body, maxTokens, billing)
 	if err := ConsumeUserCreditsWithMeta(userID, modelName, reserved, path, meta); err != nil { return nil, err }
-	ctx, cancel := context.WithTimeout(ctx, AIRequestTimeout)
+	ctx, cancel := context.WithTimeout(ctx, AIRequestTimeoutForPath("/chat/completions"))
 	defer cancel()
 	for _, route := range ModelChannelRouteAttempts(routes) {
 		payload["model"] = route.UpstreamModel
@@ -46,7 +46,7 @@ func RequestChatCompletion(ctx context.Context, userID string, body []byte, mode
 		if err != nil { continue }
 		request.Header.Set("Authorization", "Bearer "+route.Channel.APIKey)
 		request.Header.Set("Content-Type", "application/json")
-		response, err := AIHTTPClient.Do(request)
+		response, err := AIHTTPClientForContext(ctx).Do(request)
 		if err != nil { continue }
 		if response.StatusCode < 200 || response.StatusCode >= 300 { _ = response.Body.Close(); continue }
 		var result []byte

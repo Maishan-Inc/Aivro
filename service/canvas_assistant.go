@@ -396,7 +396,7 @@ func requestCanvasAssistantAnswer(ctx context.Context, userID string, input Canv
 }
 
 func requestCanvasAgentPlan(ctx context.Context, userID string, input CanvasAgentPlanInput, messages []CanvasAssistantMessage, meta RequestLogMeta) (canvasAgentPlanPayload, string, CanvasAgentUsage, error) {
-	ctx, cancel := context.WithTimeout(ctx, AIRequestTimeout)
+	ctx, cancel := context.WithTimeout(ctx, AIRequestTimeoutForPath("/chat/completions"))
 	defer cancel()
 	settings, err := repository.GetSettings()
 	if err != nil {
@@ -454,7 +454,7 @@ func requestCanvasAgentPlan(ctx context.Context, userID string, input CanvasAgen
 		}
 		request.Header.Set("Authorization", "Bearer "+route.Channel.APIKey)
 		request.Header.Set("Content-Type", "application/json")
-		response, err := AIHTTPClient.Do(request)
+		response, err := AIHTTPClientForContext(ctx).Do(request)
 		if err != nil {
 			continue
 		}

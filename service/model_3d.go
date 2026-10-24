@@ -54,6 +54,7 @@ type Model3DGenerationResult struct {
 	Error          string                             `json:"error"`
 	CreatedAt      string                             `json:"createdAt"`
 	CompletedAt    string                             `json:"completedAt"`
+	usageTokens    int
 }
 
 type Model3DGeneratedAsset struct {
@@ -69,35 +70,28 @@ type Model3DGeneratedAsset struct {
 	ExpiresAt    string `json:"expiresAt"`
 }
 
-func CreateModel3DGeneration(ctx context.Context, user model.AuthUser, input Model3DGenerationInput, meta RequestLogMeta) (Model3DGenerationResult, error) {
-	ctx, cancel := context.WithTimeout(ctx, AIRequestTimeout)
-	defer cancel()
+func CreateModel3DGeneration(ctx context.Context, user model.AuthUser, input Model3DGenerationInput, meta RequestLogMeta) (model.GenerationTaskSubmitResult, *AIProxyResponse, error) {
 	input = normalizeModel3DInput(input)
 	if err := validateModel3DInput(input); err != nil {
-		return Model3DGenerationResult{}, err
+		return model.GenerationTaskSubmitResult{}, nil, err
 	}
 	if err := ValidateModelRequest(input.Model, model3DPath); err != nil {
-		return Model3DGenerationResult{}, err
+		return model.GenerationTaskSubmitResult{}, nil, err
 	}
+	body, err := json.Marshal(input)
+	if err != nil { return model.GenerationTaskSubmitResult{}, nil, err }
+	return SubmitAITask(ctx, user, body, "application/json", input.Model, model3DPath, meta)
+}
+
+func executeModel3DTask(ctx context.Context, user model.AuthUser, task model.GenerationTask, content io.Reader) (AIProxyResponse, error) {
+	var input Model3DGenerationInput
+	if err := json.NewDecoder(content).Decode(&input); err != nil { return AIProxyResponse{}, err }
 	started := time.Now()
-	billing, err := RequestModelBilling(ctx, input.Model)
-	if err != nil { return Model3DGenerationResult{}, err }
-	credits, err := Model3DCredits(input, billing.Credits)
-	if err != nil {
-		return Model3DGenerationResult{}, err
-	}
-	if err := ConsumeUserCreditsWithMeta(user.ID, input.Model, credits, model3DPath, meta); err != nil {
-		return Model3DGenerationResult{}, err
-	}
-	result, err := requestHunyuanModel3D(ctx, user, input, credits, billing, meta)
-	if err != nil {
-		_ = RefundUserCreditsWithMeta(user.ID, input.Model, credits, model3DPath, meta)
-		return Model3DGenerationResult{}, err
-	}
-	if result.ID == "" {
-		result.ID = newID("model3d")
-	}
-	result.Status = firstNonEmpty(result.Status, "completed")
+	result, err := requestHunyuanModel3D(ctx, user, input, task.Credits)
+	if err != nil { return AIProxyResponse{}, err }
+	result.ID = task.ID
+	result.Status = "completed"
+	if task.APIBillingType == model.BillingTypeToken { result.EnergyCost = apiUsageCredits(task.APIUnitCredits, task.Credits, result.usageTokens) }
 	result.Model = input.Model
 	result.Mode = input.Mode
 	result.Prompt = input.Prompt
@@ -106,11 +100,23 @@ func CreateModel3DGeneration(ctx context.Context, user model.AuthUser, input Mod
 	result.DurationMs = time.Since(started).Milliseconds()
 	result.CreatedAt = started.Format(time.RFC3339)
 	result.CompletedAt = time.Now().Format(time.RFC3339)
-	return result, nil
+	body, err := json.Marshal(map[string]any{"code": 0, "data": result, "msg": "ok"})
+	return AIProxyResponse{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: body, UsageTokens: result.usageTokens}, err
 }
 
-func GetModel3DGeneration(user model.AuthUser, id string) (Model3DGenerationResult, error) {
-	return Model3DGenerationResult{}, safeMessageError{message: "3D 模型任务已由创建接口直接返回结果，请从生成历史查看"}
+func GetModel3DGeneration(ctx context.Context, user model.AuthUser, id string) (Model3DGenerationResult, error) {
+	task, err := GetGenerationTask(user, id)
+	if err != nil { return Model3DGenerationResult{}, err }
+	if task.Path != model3DPath { return Model3DGenerationResult{}, safeMessageError{message: "任务不存在或无权限访问"} }
+	if task.Status != string(model.GenerationTaskSucceeded) {
+		return Model3DGenerationResult{ID: task.ID, Status: task.Status, Error: task.Error, CreatedAt: task.CreatedAt}, nil
+	}
+	response, err := GetGenerationTaskResult(ctx, user, id)
+	if err != nil { return Model3DGenerationResult{}, err }
+	defer response.Content.Close()
+	var payload struct { Data Model3DGenerationResult `json:"data"` }
+	err = json.NewDecoder(response.Content).Decode(&payload)
+	return payload.Data, err
 }
 
 func Model3DCredits(input Model3DGenerationInput, base int) (int, error) {
@@ -185,7 +191,7 @@ func validateModel3DInput(input Model3DGenerationInput) error {
 	return nil
 }
 
-func requestHunyuanModel3D(ctx context.Context, user model.AuthUser, input Model3DGenerationInput, credits int, billing model.ModelCost, meta RequestLogMeta) (Model3DGenerationResult, error) {
+func requestHunyuanModel3D(ctx context.Context, user model.AuthUser, input Model3DGenerationInput, credits int) (Model3DGenerationResult, error) {
 	route, err := SelectModelChannelRoute(input.Model)
 	if err != nil || strings.TrimSpace(route.Channel.BaseURL) == "" {
 		return Model3DGenerationResult{}, SafeAIError("没有可用的 3D 模型渠道")
@@ -201,7 +207,7 @@ func requestHunyuanModel3D(ctx context.Context, user model.AuthUser, input Model
 	if strings.TrimSpace(route.Channel.APIKey) != "" {
 		request.Header.Set("Authorization", "Bearer "+route.Channel.APIKey)
 	}
-	response, err := AIHTTPClient.Do(request)
+	response, err := AIHTTPClientForContext(ctx).Do(request)
 	if err != nil {
 		return Model3DGenerationResult{}, SafeAIError("腾讯混元 3D 生成请求失败")
 	}
@@ -217,12 +223,7 @@ func requestHunyuanModel3D(ctx context.Context, user model.AuthUser, input Model
 	result, err := normalizeModel3DProviderResponse(ctx, user, input, body)
 	if err != nil { return result, err }
 	result.EnergyCost = credits
-	if IsAPIKeyRequest(ctx) && billing.BillingType == model.BillingTypeToken {
-		actual := apiUsageCredits(billing.Credits, credits, AIResponseUsageTokens(body))
-		if actual > credits { err = ConsumeUserCreditsWithMeta(user.ID, input.Model, actual-credits, model3DPath, meta) } else if actual < credits { err = RefundUserCreditsWithMeta(user.ID, input.Model, credits-actual, model3DPath, meta) }
-		if err != nil { return result, err }
-		result.EnergyCost = actual
-	}
+	result.usageTokens = AIResponseUsageTokens(body)
 	return result, nil
 }
 
@@ -257,7 +258,7 @@ func storeRemoteModel3D(ctx context.Context, user model.AuthUser, rawURL string,
 		return Model3DGeneratedAsset{}, safeMessageError{message: "上游模型地址不安全"}
 	}
 	request, _ := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
-	response, err := publicHTTPClient().Do(request)
+	response, err := generationDownloadClient(ctx).Do(request)
 	if err != nil {
 		return Model3DGeneratedAsset{}, err
 	}
