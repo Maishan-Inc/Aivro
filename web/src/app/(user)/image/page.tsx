@@ -386,7 +386,7 @@ export default function ImagePage() {
             const aspectRatio = imagePreviewAspectRatio(recovery.config.size);
             setResults(recovery.resultIds.map((id) => {
                 const task = activeTasks.find((item) => item.id === recovery.taskIds[id]);
-                return { id, ...taskToResult(task, aspectRatio) };
+                return { ...taskToResult(task, aspectRatio), id };
             }));
             const generating = activeTasks.some((task) => task.status === "queued" || task.status === "executing");
             setRunning(generating);
@@ -821,7 +821,7 @@ function imageToHistoryMedia(image: GeneratedImage): GenerationHistoryMedia | nu
     };
 }
 
-function taskToResult(task: GenerationTaskView | undefined, aspectRatio: string): GenerationResult {
+function taskToResult(task: GenerationTaskView | undefined, aspectRatio?: string): GenerationResult {
     if (!task) return { id: nanoid(), status: "failed", aspectRatio, error: "任务不存在或已过期" };
     return {
         id: task.id,

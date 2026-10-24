@@ -48,6 +48,7 @@ export type GenerationTaskView = {
 
 export type GenerationQueueUpdate = Pick<GenerationTaskView, "status" | "queuePosition" | "aheadCount"> & { taskId: string };
 type GenerationQueueCallback = (update: GenerationQueueUpdate) => void | Promise<void>;
+type QueuedTask = Pick<GenerationTaskSubmitResult, "taskId" | "status" | "queuePosition" | "aheadCount">;
 
 export type ImageApiResult = {
     id: string;
@@ -211,7 +212,7 @@ function isQueuedEnvelope(payload: ImageApiResponse): payload is ImageApiRespons
     return Boolean(parseQueuedEnvelope(payload));
 }
 
-async function resolveQueuedImages(config: AiConfig, task: GenerationQueueUpdate, onQueue?: GenerationQueueCallback) {
+async function resolveQueuedImages(config: AiConfig, task: QueuedTask, onQueue?: GenerationQueueCallback) {
     await onQueue?.({ taskId: task.taskId, status: task.status === "executing" ? "executing" : "queued", queuePosition: task.queuePosition, aheadCount: task.aheadCount });
     for (;;) {
         await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -299,7 +300,8 @@ export async function fetchGenerationTask(config: AiConfig, id: string) {
 }
 
 export async function resumeGenerationTask(config: AiConfig, task: GenerationTaskView, onQueue?: GenerationQueueCallback) {
-    return resolveQueuedImages(config, { taskId: task.id, status: task.status, queuePosition: task.queuePosition, aheadCount: task.aheadCount }, onQueue);
+    const payload = await resolveQueuedImages(config, { taskId: task.id, status: task.status, queuePosition: task.queuePosition, aheadCount: task.aheadCount }, onQueue);
+    return parseImagePayload(payload);
 }
 
 export async function fetchGenerationTaskResult(config: AiConfig, id: string) {
