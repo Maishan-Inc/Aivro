@@ -111,7 +111,7 @@ export function HomeWorkflowDemo() {
 
     useEffect(() => {
         if (!isVideo || step < 3) return;
-        let video: HTMLVideoElement | null = null;
+        let video = null as HTMLVideoElement | null;
         const play = () => {
             video ||= containerRef.current?.querySelector<HTMLVideoElement>(`[data-node-id="${scene.id}-result"] video`) || null;
             if (!video) return;
