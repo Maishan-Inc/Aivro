@@ -502,7 +502,7 @@ function EmptyImageContent({ theme, isBatchRoot, batchCount, batchExpanded, batc
     return content;
 }
 
-function VideoNodeContent({ node, renderVideo }: NodeContentRendererProps) {
+function VideoNodeContent({ node, theme, renderVideo }: NodeContentRendererProps) {
     if (renderVideo) return renderVideo(node);
     if (!node.metadata?.content)
         return (
