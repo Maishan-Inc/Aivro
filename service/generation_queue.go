@@ -551,7 +551,7 @@ func rewriteMultipartModel(body []byte, contentType string, modelName string) ([
 			return nil, contentType, err
 		}
 	}
-	for key, files := range form.File {
+	for _, files := range form.File {
 		for _, fileHeader := range files {
 			src, err := fileHeader.Open()
 			if err != nil {
