@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Modal, Segmented, Tooltip, theme as antdTheme } from "antd";
-import { Camera, Download, FolderPlus, Image as ImageIcon, Info, Lock, LockOpen, Maximize2, MessageSquare, Minus, Pencil, Plus, RefreshCw, Scissors, Settings2, Trash2, Upload, Video } from "lucide-react";
+import { Camera, Download, FolderPlus, Image as ImageIcon, Lock, LockOpen, Maximize2, MessageSquare, Minus, Pencil, Plus, RefreshCw, Scissors, Settings2, Trash2, Upload, Video } from "lucide-react";
 
 import { canvasThemes } from "@/lib/canvas-theme";
 import { formatBytes, getDataUrlByteSize } from "@/lib/image-utils";
@@ -78,22 +78,22 @@ export function CanvasNodeHoverToolbar({
     const hasImage = isImage && Boolean(node.metadata?.content);
     const hasVideo = isVideo && Boolean(node.metadata?.content);
     const isText = node.type === CanvasNodeType.Text;
+    const isCustom = node.type === CanvasNodeType.Custom;
     const isConfig = node.type === CanvasNodeType.Config;
     const canOpenDialog = isText || isImage || isVideo;
     const canRetry = node.metadata?.status === "error";
-    const hasSpecificTools = canRetry || isText || isImage || isVideo || isConfig;
+    const hasSpecificTools = canRetry || isText || isImage || isVideo || isConfig || isCustom;
 
     return (
         <div
             ref={toolbarRef}
-            className="thin-scrollbar absolute z-[70] flex h-12 w-max max-w-[calc(100%-32px)] -translate-x-1/2 -translate-y-full items-center overflow-x-auto rounded-[18px] border text-[15px] shadow-lg"
+            className="absolute z-[70] flex h-12 w-max max-w-[calc(100%-32px)] -translate-x-1/2 -translate-y-full items-center overflow-x-auto overflow-y-hidden rounded-[18px] border text-[15px] shadow-lg [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             style={{ left, top, background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.node.text, "--toolbar-hover": theme.toolbar.itemHover, "--toolbar-active": theme.toolbar.activeBg, "--toolbar-border": theme.toolbar.border, "--toolbar-danger": token.colorError } as CSSProperties}
             onMouseEnter={() => onKeep(node.id)}
             onMouseLeave={onLeave}
             onMouseDown={(event) => event.stopPropagation()}
             onPointerDown={(event) => event.stopPropagation()}
         >
-            <ToolbarAction title="查看节点信息" label="信息" icon={<Info className="size-4" />} onClick={() => onInfo(node)} />
             <ToolbarAction title="移除节点" label="删除" icon={<Trash2 className="size-4" />} onClick={() => onDelete(node)} danger />
             {hasSpecificTools ? <ToolbarDivider /> : null}
             {canRetry ? <ToolbarAction title="重新生成" label="重试" icon={<RefreshCw className="size-4" />} onClick={() => onRetry(node)} /> : null}
@@ -106,6 +106,7 @@ export function CanvasNodeHoverToolbar({
             {isText ? <ToolbarAction title="减小字号" label="缩小" icon={<Minus className="size-4" />} onClick={() => onDecreaseFont(node)} /> : null}
             {isText ? <ToolbarAction title="增大字号" label="放大" icon={<Plus className="size-4" />} onClick={() => onIncreaseFont(node)} /> : null}
             {isImage ? <ToolbarAction title={hasImage ? "替换图片" : "上传图片"} label={hasImage ? "替换图片" : "上传图片"} icon={<Upload className="size-4" />} onClick={() => onUpload(node)} /> : null}
+            {isCustom ? <ToolbarAction title="添加图片" label="添加图片" icon={<Upload className="size-4" />} onClick={() => onUpload(node)} /> : null}
             {isVideo ? <ToolbarAction title={hasVideo ? "替换视频" : "上传视频"} label={hasVideo ? "替换视频" : "上传视频"} icon={<Video className="size-4" />} onClick={() => onUpload(node)} /> : null}
             {hasImage ? (
                 <ToolbarAction
@@ -169,7 +170,7 @@ export function CanvasNodeInfoModal({ node, open, onClose }: { node: CanvasNodeD
                     {view === "info" ? (
                         <div className="thin-scrollbar h-full space-y-3 overflow-auto pr-1">
                             <InfoRow label="ID" value={node.id} />
-                            <InfoRow label="类型" value={node.type === CanvasNodeType.Text ? "文本" : node.type === CanvasNodeType.Image ? "图片" : node.type === CanvasNodeType.Video ? "视频" : "生成配置"} />
+                            <InfoRow label="类型" value={node.type === CanvasNodeType.Custom ? "自定义" : node.type === CanvasNodeType.Text ? "文本" : node.type === CanvasNodeType.Image ? "图片" : node.type === CanvasNodeType.Video ? "视频" : "生成配置"} />
                             <InfoRow label="尺寸" value={`${Math.round(node.width)} x ${Math.round(node.height)}`} />
                             <InfoRow label="位置" value={`${Math.round(node.position.x)}, ${Math.round(node.position.y)}`} />
                             <InfoRow label="状态" value={{ idle: "待生成", loading: "生成中", success: "成功", error: "失败" }[node.metadata?.status || "idle"]} />

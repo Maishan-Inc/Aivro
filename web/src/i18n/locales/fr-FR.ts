@@ -1,5 +1,11 @@
 // Generated translations. Source strings are Simplified Chinese (zh-CN).
 const frFR = {
+    "自定义": "Personnalisé",
+    "添加图片": "Ajouter des images",
+    "输入提示词，或拖入图片，也可以同时添加": "Saisissez un prompt, déposez des images, ou ajoutez les deux",
+    "拖出图片可创建独立节点": "Glissez une image hors du groupe pour créer un nœud indépendant",
+    "拖入图片到此节点": "Déposez des images dans ce nœud",
+    "提示词和图片，自由组合": "Combinez librement prompts et images",
     "定位并高亮参考图": "Localiser et mettre en évidence l’image de référence",
     "连接参考图或输入提示词": "Reliez une image de référence ou saisissez un prompt",
     "画布右键菜单": "Menu contextuel du canevas",

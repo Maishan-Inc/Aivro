@@ -9,6 +9,7 @@ import { canvasThemes } from "@/lib/canvas-theme";
 import { formatBytes } from "@/lib/image-utils";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { CanvasNodeType, type CanvasNodeData, type Position } from "../types";
+import { CanvasCustomNode } from "./canvas-custom-node";
 
 type ResizeCorner = "top-left" | "top-right" | "bottom-left" | "bottom-right";
 const selectionBlue = "#2f80ff";
@@ -25,6 +26,8 @@ type CanvasNodeProps = {
     showPanel: boolean;
     showImageInfo: boolean;
     readOnly?: boolean;
+    groupedImages?: CanvasNodeData[];
+    onUpload?: (node: CanvasNodeData) => void;
     renderPanel?: (node: CanvasNodeData) => ReactNode;
     renderNodeContent?: (node: CanvasNodeData) => ReactNode;
     renderVideo?: (node: CanvasNodeData) => ReactNode;
@@ -80,6 +83,8 @@ export const CanvasNode = React.memo(function CanvasNode({
     showPanel,
     showImageInfo,
     readOnly = false,
+    groupedImages = [],
+    onUpload,
     renderPanel,
     renderNodeContent,
     renderVideo,
@@ -103,12 +108,13 @@ export const CanvasNode = React.memo(function CanvasNode({
 }: CanvasNodeProps) {
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
     const [hovered, setHovered] = useState(false);
+    const [dropTarget, setDropTarget] = useState(false);
     const [isEditingContent, setIsEditingContent] = useState(false);
     const hasImageContent = data.type === CanvasNodeType.Image && Boolean(data.metadata?.content);
     const hasVideoContent = data.type === CanvasNodeType.Video && Boolean(data.metadata?.content);
     const isBatchRoot = data.type === CanvasNodeType.Image && Boolean(data.metadata?.isBatchRoot) && batchCount > 1;
     const isBatchChild = data.type === CanvasNodeType.Image && Boolean(data.metadata?.batchRootId);
-    const isActive = isConnectionTarget || isSelected || isFocusRelated;
+    const isActive = isConnectionTarget || isSelected || isFocusRelated || dropTarget;
     const imageBorderColor = isActive ? selectionBlue : isRelated && !isBatchChild ? theme.node.muted : "transparent";
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const resizeRef = useRef({
@@ -260,6 +266,15 @@ export const CanvasNode = React.memo(function CanvasNode({
                 setHovered(false);
                 onHoverEnd(data.id);
             }}
+            onDragOver={(event) => {
+                if (readOnly || data.type !== CanvasNodeType.Custom) return;
+                event.preventDefault();
+                setDropTarget(true);
+            }}
+            onDragLeave={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropTarget(false);
+            }}
+            onDrop={() => setDropTarget(false)}
             onContextMenu={(event) => {
                 if (readOnly) {
                     event.preventDefault();
@@ -270,7 +285,7 @@ export const CanvasNode = React.memo(function CanvasNode({
             }}
         >
             <div
-                className="relative h-full w-full overflow-visible rounded-3xl border-2"
+                className="relative h-full w-full shrink-0 overflow-visible rounded-3xl border-2"
                 style={{
                     background: hasImageContent || hasVideoContent ? "transparent" : theme.node.fill,
                     borderColor: hasImageContent ? imageBorderColor : isActive ? selectionBlue : isRelated ? theme.node.muted : theme.node.stroke,
@@ -308,7 +323,7 @@ export const CanvasNode = React.memo(function CanvasNode({
                         } as React.CSSProperties
                     }
                 >
-                    <NodeContent
+                    {data.type === CanvasNodeType.Custom ? <CanvasCustomNode node={data} images={groupedImages} readOnly={readOnly} onContentChange={onContentChange} onResize={onResize} onUpload={onUpload} /> : <NodeContent
                         node={data}
                         theme={theme}
                         isEditingContent={isEditingContent}
@@ -327,7 +342,7 @@ export const CanvasNode = React.memo(function CanvasNode({
                         onGenerateImage={readOnly ? undefined : onGenerateImage}
                         onToggleBatch={readOnly ? undefined : () => onToggleBatch?.(data.id)}
                         onSetBatchPrimary={readOnly ? undefined : () => onSetBatchPrimary?.(data)}
-                    />
+                    />}
                 </div>
 
                 {showImageInfo && hasImageContent ? <ImageInfoBar node={data} /> : null}
@@ -351,7 +366,7 @@ export const CanvasNode = React.memo(function CanvasNode({
                 </>
             ) : null}
 
-            {!readOnly && showPanel && renderPanel && data.type !== CanvasNodeType.Config ? <div className="absolute left-1/2 top-full z-[70] w-[600px] -translate-x-1/2 pt-4" style={{ maxWidth: `calc((100vw - 16px) / ${scale})` }}>{renderPanel(data)}</div> : null}
+            {!readOnly && showPanel && renderPanel && data.type !== CanvasNodeType.Config && data.type !== CanvasNodeType.Custom ? <div className="absolute left-1/2 top-full z-[70] w-[600px] -translate-x-1/2 pt-6" style={{ maxWidth: `calc((100vw - 16px) / ${scale})` }}>{renderPanel(data)}</div> : null}
         </div>
     );
 });
@@ -368,6 +383,7 @@ function NodeContent(props: NodeContentRendererProps) {
 
 const nodeContentRenderers = {
     [CanvasNodeType.Text]: TextContent,
+    [CanvasNodeType.Custom]: TextContent,
     [CanvasNodeType.Image]: ImageNodeContent,
     [CanvasNodeType.Config]: ConfigNodeContent,
     [CanvasNodeType.Video]: VideoNodeContent,

@@ -1,6 +1,7 @@
 "use client";
 
-import { Cpu, Image as ImageIcon, Link2 } from "lucide-react";
+import { Image as ImageIcon, Link2 } from "lucide-react";
+import { ModelIcon } from "@/components/model-picker";
 import { imageQualityLabel, imageSizeLabel } from "@/components/image-settings-panel";
 import { useI18n } from "@/hooks/use-i18n";
 import { canvasThemes } from "@/lib/canvas-theme";
@@ -59,7 +60,7 @@ export function CanvasImageDraft({ node, inputs, onHighlight }: NodeInputsProps 
         {prompt ? <p data-i18n-skip className="m-0 line-clamp-3 shrink-0 whitespace-pre-wrap break-words text-sm leading-5">{prompt}</p> : <p className="m-0 leading-5" style={{ color: theme.node.muted }}>{tr("连接参考图或输入提示词")}</p>}
         <CanvasNodeReferences inputs={inputs} onHighlight={onHighlight} />
         <div className="mt-auto space-y-2 border-t pt-3" style={{ borderColor: theme.node.stroke, color: theme.node.muted }}>
-            <div className="flex min-w-0 items-center gap-2"><Cpu className="size-3.5 shrink-0" /><span data-i18n-skip className="truncate" title={model || tr("选择模型")}>{model || tr("选择模型")}</span></div>
+            <div className="flex min-w-0 items-center gap-2"><ModelIcon model={model} /><span data-i18n-skip className="truncate" title={model || tr("选择模型")}>{model || tr("选择模型")}</span></div>
             <div className="flex flex-wrap gap-x-3 gap-y-1"><span>{tr("尺寸")} · {tr(imageSizeLabel(size))}</span><span>{tr("质量")} · {tr(imageQualityLabel(quality))}</span><span>{tr("生成张数")} · {node.metadata?.count || 3}</span></div>
         </div>
     </div>;

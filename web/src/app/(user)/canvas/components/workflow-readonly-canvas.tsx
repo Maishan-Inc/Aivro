@@ -9,7 +9,7 @@ import { ConnectionPath } from "./canvas-connections";
 import { CanvasNode } from "./canvas-node";
 import { CanvasZoomControls } from "./canvas-zoom-controls";
 import { InfiniteCanvas } from "./infinite-canvas";
-import type { ViewportTransform } from "../types";
+import { CanvasNodeType, type ViewportTransform } from "../types";
 
 export function WorkflowReadonlyCanvas({ workflow, overlay }: { workflow?: Pick<CloudWorkflow, "nodes" | "connections" | "backgroundMode" | "viewport" | "showImageInfo"> | null; overlay?: ReactNode }) {
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
@@ -23,6 +23,7 @@ export function WorkflowReadonlyCanvas({ workflow, overlay }: { workflow?: Pick<
     }, [workflow?.viewport]);
 
     const nodeById = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
+    const visibleNodes = nodes.filter((node) => !node.metadata?.batchRootId || nodeById.get(node.metadata.batchRootId)?.type !== CanvasNodeType.Custom);
 
     return (
         <main className="relative h-screen min-h-0 overflow-hidden" style={{ background: theme.canvas.background, color: theme.node.text }}>
@@ -32,14 +33,16 @@ export function WorkflowReadonlyCanvas({ workflow, overlay }: { workflow?: Pick<
                     {connections.map((connection) => {
                         const from = nodeById.get(connection.fromNodeId);
                         const to = nodeById.get(connection.toNodeId);
-                        if (!from || !to) return null;
+                        if (!from || !to || !visibleNodes.includes(from) || !visibleNodes.includes(to)) return null;
                         return <ConnectionPath key={connection.id} connection={connection} from={from} to={to} active={false} onSelect={() => undefined} />;
                     })}
                 </svg>
-                {nodes.map((node) => (
+                {visibleNodes.map((node) => (
                     <div key={node.id} className="workflow-readonly-node">
                         <CanvasNode
                             data={node}
+                            readOnly
+                            groupedImages={node.type === CanvasNodeType.Custom ? (node.metadata?.batchChildIds || []).flatMap((id) => { const image = nodeById.get(id); return image ? [image] : []; }) : undefined}
                             scale={viewport.k}
                             isSelected={false}
                             isRelated={false}

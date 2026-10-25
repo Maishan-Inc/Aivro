@@ -43,7 +43,7 @@ export function CanvasNodePromptPanel({ node, isRunning, inputs, onHighlightInpu
     const isEditingExistingContent = hasTextContent || hasImageContent;
     const [prompt, setPrompt] = useState(isEditingExistingContent ? "" : node.metadata?.prompt || "");
     const credits = requestCreditCost({ modelCosts, model: config.model, count: mode === "image" ? config.count : 1 });
-    const canGenerate = Boolean(prompt.trim() || inputs.some((input) => input.text?.trim()));
+    const canGenerate = Boolean(prompt.trim() || inputs.some((input) => input.text?.trim() || (!hasImageContent && input.image)));
     const warnMissingModel = () => message.warning("管理员尚未配置可用模型");
 
     useEffect(() => {
@@ -64,7 +64,7 @@ export function CanvasNodePromptPanel({ node, isRunning, inputs, onHighlightInpu
     return (
         <div
             data-canvas-prompt-panel
-            className="space-y-3 rounded-2xl border p-4 shadow-2xl backdrop-blur"
+            className="flex flex-col gap-5 rounded-2xl border p-4 shadow-2xl backdrop-blur"
             style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.node.text }}
             onMouseDown={(event) => event.stopPropagation()}
             onPointerDown={(event) => event.stopPropagation()}
@@ -79,13 +79,13 @@ export function CanvasNodePromptPanel({ node, isRunning, inputs, onHighlightInpu
                     event.preventDefault();
                     submit();
                 }}
-                className="thin-scrollbar block h-28 w-full resize-none rounded-xl border px-3 py-2 text-sm leading-5 outline-none"
+                className="thin-scrollbar m-0 block h-28 min-h-28 w-full shrink-0 resize-none rounded-xl border px-3 py-2 text-sm leading-5 outline-none"
                 aria-label={tr("提示词")}
                 style={{ background: theme.node.fill, borderColor: theme.node.stroke, color: theme.node.text }}
                 placeholder={mode === "video" ? "描述要生成的视频内容" : mode === "image" ? (hasImageContent ? "请输入你想要把这张图修改成什么" : "描述要生成的图片内容") : hasTextContent ? "请输入你想要将本段文本修改成什么" : "请输入你想要生成的文本内容"}
             />
 
-            <div className="flex min-w-0 flex-wrap items-center gap-3">
+            <div className="flex min-w-0 shrink-0 flex-wrap items-center gap-3 pt-1">
                 <div className="flex min-w-0 basis-[446px] grow flex-wrap items-center gap-3 [&_.canvas-composer-model-picker]:h-10">
                     {mode === "image" ? (
                         <>

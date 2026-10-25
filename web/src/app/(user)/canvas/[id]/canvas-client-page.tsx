@@ -23,6 +23,7 @@ import { useUserStore } from "@/stores/use-user-store";
 import { createWorkflow, deleteWorkflow, fetchWorkflow, fetchWorkflowActiveShare, revokeWorkflowShare, shareWorkflow, updateWorkflow, type CloudWorkflow } from "@/services/api/workflows";
 import { cropDataUrl } from "../utils/canvas-image-data";
 import { fitNodeSize, nodeSizeFromRatio } from "../utils/canvas-node-size";
+import { CANVAS_IMAGE_DRAG_TYPE, moveCanvasImages } from "../utils/canvas-custom-node";
 import { waitForPlayback, type CanvasPlayback } from "../utils/canvas-playback";
 import { App, Button, Dropdown, Input, Modal, Switch } from "antd";
 import { NODE_DEFAULT_SIZE, getNodeSpec } from "../constants";
@@ -156,7 +157,7 @@ function CanvasRefreshShell() {
     );
 }
 
-function ConnectionCreateMenu({ pending, onCreate, onClose }: { pending: PendingConnectionCreate; onCreate: (type: CanvasNodeType.Image | CanvasNodeType.Text | CanvasNodeType.Config | CanvasNodeType.Video) => void; onClose: () => void }) {
+function ConnectionCreateMenu({ pending, onCreate, onClose }: { pending: PendingConnectionCreate; onCreate: (type: CanvasNodeType) => void; onClose: () => void }) {
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
     return (
         <div
@@ -176,6 +177,7 @@ function ConnectionCreateMenu({ pending, onCreate, onClose }: { pending: Pending
             </div>
             <div className="grid gap-1">
                 <ConnectionCreateOption theme={theme} icon={<List className="size-5" />} title="文本生成" description="脚本、广告词、品牌文案" onClick={() => onCreate(CanvasNodeType.Text)} />
+                <ConnectionCreateOption theme={theme} icon={<Images className="size-5" />} title="自定义" description="提示词和图片，自由组合" onClick={() => onCreate(CanvasNodeType.Custom)} />
                 <ConnectionCreateOption theme={theme} icon={<ImageIcon className="size-5" />} title="图片生成" onClick={() => onCreate(CanvasNodeType.Image)} />
                 <ConnectionCreateOption theme={theme} icon={<Video className="size-5" />} title="视频生成" onClick={() => onCreate(CanvasNodeType.Video)} />
                 <ConnectionCreateOption theme={theme} icon={<Settings2 className="size-5" />} title="配置节点" description="模型、尺寸、数量和输入顺序" onClick={() => onCreate(CanvasNodeType.Config)} />
@@ -502,8 +504,8 @@ export function InfiniteCanvasPage({ playback }: { playback?: CanvasPlayback } =
     const screenToCanvas = useCallback((clientX: number, clientY: number) => {
         const rect = containerRef.current?.getBoundingClientRect();
         const currentViewport = viewportRef.current;
-        const localX = clientX - (rect?.left || 0);
-        const localY = clientY - (rect?.top || 0);
+        const localX = (clientX - (rect?.left || 0)) * (rect?.width ? containerRef.current!.clientWidth / rect.width : 1);
+        const localY = (clientY - (rect?.top || 0)) * (rect?.height ? containerRef.current!.clientHeight / rect.height : 1);
 
         return {
             x: (localX - currentViewport.x) / currentViewport.k,
@@ -570,7 +572,7 @@ export function InfiniteCanvasPage({ playback }: { playback?: CanvasPlayback } =
     );
 
     const createConnectedNode = useCallback(
-        (type: CanvasNodeType.Image | CanvasNodeType.Text | CanvasNodeType.Config | CanvasNodeType.Video, pending: PendingConnectionCreate) => {
+        (type: CanvasNodeType, pending: PendingConnectionCreate) => {
             const metadata = type === CanvasNodeType.Config ? { model: effectiveConfig.imageModel || effectiveConfig.model, size: effectiveConfig.size, count: 3 } : undefined;
             const newNode = createCanvasNode(type, pending.position, metadata);
             const connection = normalizeConnection(pending.connection.nodeId, newNode.id, [...nodesRef.current, newNode], pending.connection.handleType);
@@ -722,6 +724,7 @@ export function InfiniteCanvasPage({ playback }: { playback?: CanvasPlayback } =
                 return next.map((node) => {
                     const childIds = node.metadata?.batchChildIds?.filter((childId) => !allIds.has(childId));
                     if (!node.metadata?.isBatchRoot || childIds?.length === node.metadata.batchChildIds?.length) return node;
+                    if (node.type === CanvasNodeType.Custom) return { ...node, metadata: { ...node.metadata, batchChildIds: childIds } };
                     const primaryImageId = childIds?.includes(node.metadata.primaryImageId || "") ? node.metadata.primaryImageId : childIds?.[0];
                     const primaryNode = next.find((item) => item.id === primaryImageId);
                     return {
@@ -1128,13 +1131,22 @@ export function InfiniteCanvasPage({ playback }: { playback?: CanvasPlayback } =
         nodeDraggingRef.current = false;
         setIsNodeDragging(false);
         if (dragRef.current.hasMoved && clientX != null && clientY != null) {
+            const world = screenToCanvas(clientX, clientY);
+            const target = [...nodesRef.current].reverse().find((node) => node.type === CanvasNodeType.Custom && !initialPositions.has(node.id) && world.x >= node.position.x && world.x <= node.position.x + node.width && world.y >= node.position.y && world.y <= node.position.y + node.height);
+            const imageIds = target ? nodesRef.current.filter((node) => initialPositions.has(node.id) && node.type === CanvasNodeType.Image && node.metadata?.content && !node.metadata?.isBatchRoot && !initialPositions.has(node.metadata?.batchRootId || "")).map((node) => node.id) : [];
+            const detachedConnections = new Set(connectionsRef.current.filter((connection) => imageIds.includes(connection.toNodeId) && connection.fromNodeId === nodesRef.current.find((node) => node.id === connection.toNodeId)?.metadata?.batchRootId).map((connection) => connection.id));
             setNodes((prev) =>
-                prev.map((node) => {
+                moveCanvasImages(prev.map((node) => {
                     const initial = initialPositions.get(node.id);
                     if (!initial) return node;
                     return { ...node, position: { x: initial.x + dx, y: initial.y + dy } };
-                }),
+                }), imageIds, target?.id),
             );
+            if (imageIds.length && target) {
+                setConnections((prev) => prev.filter((connection) => !detachedConnections.has(connection.id)));
+                setSelectedNodeIds(new Set([target.id]));
+                setDialogNodeId(null);
+            }
         }
 
         dragRef.current.isDraggingNode = false;
@@ -1148,7 +1160,7 @@ export function InfiniteCanvasPage({ playback }: { playback?: CanvasPlayback } =
                 setDialogNodeId(clickedNodeId);
             }
         }
-    }, []);
+    }, [screenToCanvas]);
 
     const handleGlobalMouseMove = useCallback(
         (event: MouseEvent) => {
@@ -1281,6 +1293,24 @@ export function InfiniteCanvasPage({ playback }: { playback?: CanvasPlayback } =
         setSelectedConnectionId(null);
         setDialogNodeId(id);
     }, []);
+
+    const addImageFiles = useCallback(async (files: File[], position: Position, targetId?: string) => {
+        const results = await Promise.allSettled(files.map(async (file) => {
+            const image = await uploadImage(file);
+            const imageSize = fitNodeSize(image.width, image.height);
+            return { id: nanoid(), type: CanvasNodeType.Image, title: file.name, position: { x: position.x - imageSize.width / 2, y: position.y - imageSize.height / 2 }, ...imageSize, metadata: imageMetadata(image) } satisfies CanvasNodeData;
+        }));
+        const images = results.flatMap((result) => result.status === "fulfilled" ? [result.value] : []);
+        const failed = results.find((result) => result.status === "rejected");
+        if (failed?.status === "rejected") message.error(failed.reason instanceof Error ? failed.reason.message : tr("上传失败"));
+        if (!images.length || (targetId && !nodesRef.current.some((node) => node.id === targetId))) return;
+        const group = !targetId && images.length > 1 ? createCanvasNode(CanvasNodeType.Custom, position) : undefined;
+        const groupId = targetId || group?.id;
+        setNodes((prev) => moveCanvasImages([...prev, ...(group ? [group] : []), ...images], images.map((node) => node.id), groupId));
+        setSelectedNodeIds(new Set([groupId || images[0].id]));
+        setSelectedConnectionId(null);
+        setDialogNodeId(groupId ? null : images[0].id);
+    }, [message, tr]);
 
     const createVideoFileNode = useCallback(async (file: File, position: Position) => {
         const video = await uploadMediaFile(file, "video");
@@ -1654,87 +1684,119 @@ export function InfiniteCanvasPage({ playback }: { playback?: CanvasPlayback } =
 
     const handleUploadRequest = useCallback((nodeId?: string, position?: Position) => {
         uploadTargetRef.current = { nodeId, position };
-        imageInputRef.current?.click();
+        const input = imageInputRef.current;
+        if (!input) return;
+        const custom = nodesRef.current.find((node) => node.id === nodeId)?.type === CanvasNodeType.Custom;
+        input.multiple = !nodeId || custom;
+        input.accept = custom ? "image/*" : "image/*,video/*";
+        input.click();
     }, []);
 
     const handleImageInputChange = useCallback(
         async (event: ReactChangeEvent<HTMLInputElement>) => {
-            const file = event.target.files?.[0];
+            const files = Array.from(event.target.files || []);
+            const file = files[0];
             event.target.value = "";
             const target = uploadTargetRef.current;
             uploadTargetRef.current = null;
             if (!file || (!file.type.startsWith("image/") && !file.type.startsWith("video/"))) return;
 
-            if (target?.nodeId) {
-                if (file.type.startsWith("video/")) {
-                    const video = await uploadMediaFile(file, "video");
-                    const nextSize = fitNodeSize(video.width || 1280, video.height || 720, VIDEO_NODE_MAX_WIDTH, VIDEO_NODE_MAX_HEIGHT);
-                    setNodes((prev) => prev.map((node) => (node.id === target.nodeId ? { ...node, type: CanvasNodeType.Video, title: file.name, position: { x: node.position.x + node.width / 2 - nextSize.width / 2, y: node.position.y + node.height / 2 - nextSize.height / 2 }, width: nextSize.width, height: nextSize.height, metadata: { ...node.metadata, ...videoMetadata(video), errorDetails: undefined } } : node)));
+            const targetNode = nodesRef.current.find((node) => node.id === target?.nodeId);
+            const imageFiles = files.filter((item) => item.type.startsWith("image/"));
+            if (targetNode?.type === CanvasNodeType.Custom || (!target?.nodeId && imageFiles.length)) {
+                const position = target?.position || getCanvasCenter();
+                await addImageFiles(imageFiles, position, targetNode?.id);
+                if (!targetNode) for (const video of files.filter((item) => item.type.startsWith("video/"))) {
+                    try { await createVideoFileNode(video, position); } catch (error) { message.error(error instanceof Error ? error.message : tr("上传失败")); }
+                }
+                return;
+            }
+
+            try {
+                if (target?.nodeId) {
+                    if (file.type.startsWith("video/")) {
+                        const video = await uploadMediaFile(file, "video");
+                        const nextSize = fitNodeSize(video.width || 1280, video.height || 720, VIDEO_NODE_MAX_WIDTH, VIDEO_NODE_MAX_HEIGHT);
+                        setNodes((prev) => prev.map((node) => (node.id === target.nodeId ? { ...node, type: CanvasNodeType.Video, title: file.name, position: { x: node.position.x + node.width / 2 - nextSize.width / 2, y: node.position.y + node.height / 2 - nextSize.height / 2 }, width: nextSize.width, height: nextSize.height, metadata: { ...node.metadata, ...videoMetadata(video), errorDetails: undefined } } : node)));
+                        setSelectedNodeIds(new Set([target.nodeId]));
+                        setSelectedConnectionId(null);
+                        setDialogNodeId(target.nodeId);
+                        uploadTargetRef.current = null;
+                        event.target.value = "";
+                        return;
+                    }
+                    const image = await uploadImage(file);
+                    const size = fitNodeSize(image.width, image.height);
+                    setNodes((prev) =>
+                        prev.map((node) =>
+                            node.id === target.nodeId
+                                ? {
+                                      ...node,
+                                      type: CanvasNodeType.Image,
+                                      title: file.name,
+                                      width: size.width,
+                                      height: size.height,
+                                      metadata: {
+                                          ...node.metadata,
+                                          ...imageMetadata(image),
+                                          errorDetails: undefined,
+                                          freeResize: false,
+                                          isBatchRoot: undefined,
+                                          batchRootId: undefined,
+                                          batchChildIds: undefined,
+                                          batchUsesReferenceImages: undefined,
+                                          generationType: undefined,
+                                          model: undefined,
+                                          size: undefined,
+                                          quality: undefined,
+                                          count: undefined,
+                                          references: undefined,
+                                          primaryImageId: undefined,
+                                          imageBatchExpanded: undefined,
+                                      },
+                                  }
+                                : node,
+                        ),
+                    );
                     setSelectedNodeIds(new Set([target.nodeId]));
                     setSelectedConnectionId(null);
                     setDialogNodeId(target.nodeId);
-                    uploadTargetRef.current = null;
-                    event.target.value = "";
-                    return;
+                } else {
+                    const position = target?.position || screenToCanvas((containerRef.current?.getBoundingClientRect().left || 0) + size.width / 2, (containerRef.current?.getBoundingClientRect().top || 0) + size.height / 2);
+                    await (file.type.startsWith("video/") ? createVideoFileNode(file, position) : createImageFileNode(file, position));
                 }
-                const image = await uploadImage(file);
-                const size = fitNodeSize(image.width, image.height);
-                setNodes((prev) =>
-                    prev.map((node) =>
-                        node.id === target.nodeId
-                            ? {
-                                  ...node,
-                                  type: CanvasNodeType.Image,
-                                  title: file.name,
-                                  width: size.width,
-                                  height: size.height,
-                                  metadata: {
-                                      ...node.metadata,
-                                      ...imageMetadata(image),
-                                      errorDetails: undefined,
-                                      freeResize: false,
-                                      isBatchRoot: undefined,
-                                      batchRootId: undefined,
-                                      batchChildIds: undefined,
-                                      batchUsesReferenceImages: undefined,
-                                      generationType: undefined,
-                                      model: undefined,
-                                      size: undefined,
-                                      quality: undefined,
-                                      count: undefined,
-                                      references: undefined,
-                                      primaryImageId: undefined,
-                                      imageBatchExpanded: undefined,
-                                  },
-                              }
-                            : node,
-                    ),
-                );
-                setSelectedNodeIds(new Set([target.nodeId]));
-                setSelectedConnectionId(null);
-                setDialogNodeId(target.nodeId);
-            } else {
-                const position = target?.position || screenToCanvas((containerRef.current?.getBoundingClientRect().left || 0) + size.width / 2, (containerRef.current?.getBoundingClientRect().top || 0) + size.height / 2);
-                void (file.type.startsWith("video/") ? createVideoFileNode(file, position) : createImageFileNode(file, position));
-            }
-
-            uploadTargetRef.current = null;
-            event.target.value = "";
+            } catch (error) { message.error(error instanceof Error ? error.message : tr("上传失败")); }
         },
-        [createImageFileNode, createVideoFileNode, screenToCanvas, size.height, size.width],
+        [addImageFiles, createImageFileNode, createVideoFileNode, getCanvasCenter, message, screenToCanvas, size.height, size.width, tr],
     );
 
     const handleDrop = useCallback(
-        (event: ReactDragEvent<HTMLDivElement>) => {
+        async (event: ReactDragEvent<HTMLDivElement>) => {
             event.preventDefault();
             if (agentPreview) return;
-            const file = Array.from(event.dataTransfer.files).find((item) => item.type.startsWith("image/") || item.type.startsWith("video/"));
-            if (!file) return;
-
+            setHoveredNodeId(null);
+            setToolbarNodeId(null);
+            setHighlightedInputNodeId(null);
             const pos = screenToCanvas(event.clientX, event.clientY);
-            void (file.type.startsWith("video/") ? createVideoFileNode(file, pos) : createImageFileNode(file, pos));
+            const targetId = event.target instanceof Element ? event.target.closest("[data-node-type='custom']")?.getAttribute("data-node-id") || undefined : undefined;
+            const imageId = event.dataTransfer.getData(CANVAS_IMAGE_DRAG_TYPE);
+            if (imageId) {
+                const image = nodesRef.current.find((node) => node.id === imageId && node.type === CanvasNodeType.Image);
+                if (!image || image.metadata?.batchRootId === targetId) return;
+                setNodes((prev) => moveCanvasImages(prev, [imageId], targetId, pos));
+                setConnections((prev) => prev.filter((connection) => !(connection.fromNodeId === image.metadata?.batchRootId && connection.toNodeId === imageId)));
+                setSelectedNodeIds(new Set([targetId || imageId]));
+                setDialogNodeId(null);
+                return;
+            }
+            const files = Array.from(event.dataTransfer.files);
+            const images = files.filter((file) => file.type.startsWith("image/"));
+            if (images.length) await addImageFiles(images, pos, targetId);
+            for (const file of files.filter((file) => file.type.startsWith("video/"))) {
+                try { await createVideoFileNode(file, pos); } catch (error) { message.error(error instanceof Error ? error.message : tr("上传失败")); }
+            }
         },
-        [agentPreview, createImageFileNode, createVideoFileNode, screenToCanvas],
+        [addImageFiles, agentPreview, createVideoFileNode, message, screenToCanvas, tr],
     );
 
     const pasteAssistantImage = useCallback(
@@ -1825,8 +1887,10 @@ export function InfiniteCanvasPage({ playback }: { playback?: CanvasPlayback } =
     }, [size.height, size.width]);
 
     const highlightInputNode = useCallback((nodeId: string) => {
-        const node = nodesRef.current.find((item) => item.id === nodeId);
+        let node = nodesRef.current.find((item) => item.id === nodeId);
         if (!node) return;
+        const parent = nodesRef.current.find((item) => item.id === node?.metadata?.batchRootId);
+        if (parent?.type === CanvasNodeType.Custom) { node = parent; nodeId = parent.id; }
         if (isHiddenBatchChild(node, nodesRef.current) && node.metadata?.batchRootId) toggleBatchExpanded(node.metadata.batchRootId);
         setHighlightedInputNodeId(nodeId);
         setHoveredNodeId(null);
@@ -1842,6 +1906,7 @@ export function InfiniteCanvasPage({ playback }: { playback?: CanvasPlayback } =
     const handleGenerateNode = useCallback(
         async (nodeId: string, mode: CanvasNodeGenerationMode, prompt: string) => {
             const sourceNode = nodesRef.current.find((node) => node.id === nodeId);
+            if (sourceNode?.type === CanvasNodeType.Custom) return;
             const generationConfig = buildGenerationConfig(effectiveConfig, sourceNode, mode);
             if (!playback && !isAiConfigReady(generationConfig, generationConfig.model)) {
                 message.warning("管理员尚未配置可用模型");
@@ -2415,6 +2480,8 @@ export function InfiniteCanvasPage({ playback }: { playback?: CanvasPlayback } =
                             editRequestNonce={editingNodeId === node.id ? editRequestNonce : 0}
                             showPanel={dialogNodeId === node.id && !selectionBox}
                             readOnly={Boolean(agentPreview)}
+                            groupedImages={node.type === CanvasNodeType.Custom ? (node.metadata?.batchChildIds || []).flatMap((id) => { const image = nodeById.get(id); return image ? [image] : []; }) : undefined}
+                            onUpload={(node) => handleUploadRequest(node.id)}
                             batchCount={batchChildCountById.get(node.id) || 0}
                             batchExpanded={Boolean(node.metadata?.imageBatchExpanded)}
                             batchClosing={Boolean(node.metadata?.batchRootId && collapsingBatchIds.has(node.metadata.batchRootId))}
@@ -2529,7 +2596,7 @@ export function InfiniteCanvasPage({ playback }: { playback?: CanvasPlayback } =
                     showImageInfo={showImageInfo}
                     onAddImage={() => (agentPreview ? undefined : createNode(CanvasNodeType.Image))}
                     onAddVideo={() => (agentPreview ? undefined : createNode(CanvasNodeType.Video))}
-                    onAddText={() => (agentPreview ? undefined : createNode(CanvasNodeType.Text))}
+                    onAddCustom={() => (agentPreview ? undefined : createNode(CanvasNodeType.Custom))}
                     onAddConfig={() => (agentPreview ? undefined : createNode(CanvasNodeType.Config))}
                     onUndo={agentPreview ? () => undefined : undoCanvas}
                     onRedo={agentPreview ? () => undefined : redoCanvas}
@@ -2549,7 +2616,7 @@ export function InfiniteCanvasPage({ playback }: { playback?: CanvasPlayback } =
                     }}
                 />
 
-                {isMiniMapOpen ? <Minimap nodes={displayNodes} viewport={displayViewport} viewportSize={size} onViewportChange={agentPreview ? () => undefined : setViewport} /> : null}
+                {isMiniMapOpen ? <Minimap nodes={displayNodes.filter((node) => !isHiddenBatchChild(node, displayNodes))} viewport={displayViewport} viewportSize={size} onViewportChange={agentPreview ? () => undefined : setViewport} /> : null}
 
                 <CanvasZoomControls scale={displayViewport.k} onScaleChange={agentPreview ? () => undefined : setZoomScale} onReset={agentPreview ? () => undefined : resetViewport} isMiniMapOpen={isMiniMapOpen} onToggleMiniMap={() => setIsMiniMapOpen((value) => !value)} />
 
@@ -2575,6 +2642,7 @@ export function InfiniteCanvasPage({ playback }: { playback?: CanvasPlayback } =
                         ] : [
                             { key: "image", icon: <ImageIcon className="size-4" />, label: tr("图片节点"), onClick: () => createNode(CanvasNodeType.Image, contextMenu.position) },
                             { key: "text", icon: <MessageSquare className="size-4" />, label: tr("文本节点"), onClick: () => createNode(CanvasNodeType.Text, contextMenu.position) },
+                            { key: "custom", icon: <Images className="size-4" />, label: tr("自定义"), onClick: () => createNode(CanvasNodeType.Custom, contextMenu.position) },
                             { key: "video", icon: <Video className="size-4" />, label: tr("视频节点"), onClick: () => createNode(CanvasNodeType.Video, contextMenu.position) },
                             { key: "config", icon: <Settings2 className="size-4" />, label: tr("配置节点"), onClick: () => createNode(CanvasNodeType.Config, contextMenu.position) },
                             { key: "upload", icon: <Upload className="size-4" />, label: tr("上传图片或视频"), onClick: () => handleUploadRequest(undefined, contextMenu.position) },
@@ -2619,14 +2687,15 @@ export function InfiniteCanvasPage({ playback }: { playback?: CanvasPlayback } =
                     title="清空工作流？"
                     open={clearConfirmOpen}
                     centered
+                    width={520}
                     onCancel={() => setClearConfirmOpen(false)}
                     footer={
-                        <>
+                        <div className="flex flex-row justify-end gap-2 whitespace-nowrap">
                             <Button onClick={() => setClearConfirmOpen(false)}>取消</Button>
                             <Button danger type="primary" onClick={clearCanvas}>
                                 清空
                             </Button>
-                        </>
+                        </div>
                     }
                 >
                     <p className="text-sm opacity-60">这会删除当前工作流上的所有节点和连线。</p>

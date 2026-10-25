@@ -34,13 +34,25 @@ export function buildNodeGenerationContext(nodeId: string, nodes: CanvasNodeData
 }
 
 export function buildNodeGenerationInputs(nodeId: string, nodes: CanvasNodeData[], connections: CanvasConnection[]): NodeGenerationInput[] {
-    return getOrderedUpstreamNodes(nodeId, nodes, connections).flatMap((node): NodeGenerationInput[] => {
+    const inputs = getOrderedUpstreamNodes(nodeId, nodes, connections).flatMap((node): NodeGenerationInput[] => {
+        if (node.type === CanvasNodeType.Custom) {
+            const text = node.metadata?.content || "";
+            const images = (node.metadata?.batchChildIds || []).flatMap((id): NodeGenerationInput[] => {
+                const child = nodes.find((item) => item.id === id);
+                const image = child && readReferenceImage(child);
+                return image ? [{ nodeId: id, type: "image", title: child!.title, image }] : [];
+            });
+            return [...(text.trim() ? [{ nodeId: node.id, type: "text" as const, title: node.title, text }] : []), ...images];
+        }
         const image = readReferenceImage(node);
         if (image) return [{ nodeId: node.id, type: "image" as const, title: node.title, image }];
         const text = readNodeTextInput(node);
         if (text) return [{ nodeId: node.id, type: "text" as const, title: node.title, text }];
         return [];
     });
+    const unique = [...new Map(inputs.map((input) => [input.nodeId, input])).values()];
+    const order = nodes.find((node) => node.id === nodeId)?.metadata?.inputOrder || [];
+    return [...order.flatMap((id) => unique.filter((input) => input.nodeId === id)), ...unique.filter((input) => !order.includes(input.nodeId))];
 }
 
 export function buildNodeChatMessages(context: NodeGenerationContext): ChatCompletionMessage[] {

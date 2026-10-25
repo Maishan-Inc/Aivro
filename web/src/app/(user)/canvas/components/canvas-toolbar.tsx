@@ -15,7 +15,7 @@ export function CanvasToolbar({
     showImageInfo,
     onAddImage,
     onAddVideo,
-    onAddText,
+    onAddCustom,
     onAddConfig,
     onUndo,
     onRedo,
@@ -35,7 +35,7 @@ export function CanvasToolbar({
     showImageInfo: boolean;
     onAddImage: () => void;
     onAddVideo: () => void;
-    onAddText: () => void;
+    onAddCustom: () => void;
     onAddConfig: () => void;
     onUndo: () => void;
     onRedo: () => void;
@@ -75,7 +75,7 @@ export function CanvasToolbar({
                     <Redo2 className="size-4.5" />
                 </ToolbarButton>
                 <Divider theme={theme} />
-                <ToolbarButton id="tool-text" label="文本" hovered={hovered} hoverStyle={hoverStyle} wrapRef={wrapRef} onTipX={setTipX} onHover={setHovered} onClick={onAddText}>
+                <ToolbarButton id="tool-custom" label="自定义" hovered={hovered} hoverStyle={hoverStyle} wrapRef={wrapRef} onTipX={setTipX} onHover={setHovered} onClick={onAddCustom}>
                     <Type className="size-4.5" />
                 </ToolbarButton>
                 <ToolbarButton id="tool-image" label="图片" hovered={hovered} hoverStyle={hoverStyle} wrapRef={wrapRef} onTipX={setTipX} onHover={setHovered} onClick={onAddImage}>
@@ -266,7 +266,7 @@ function CanvasThemeButton({ colorTheme, targetTheme, onThemeChange, children }:
 
 function DockTip({ label, x, theme }: { label: string; x: number; theme: CanvasTheme }) {
     return (
-        <span className="absolute bottom-[calc(100%+8px)] -translate-x-1/2 rounded-md px-2 py-1 text-xs shadow-lg" style={{ left: x, background: theme.node.text, color: theme.node.panel }}>
+        <span className="absolute bottom-[calc(100%+8px)] w-max -translate-x-1/2 whitespace-nowrap rounded-md px-2 py-1 text-xs shadow-lg" style={{ left: x, background: theme.node.text, color: theme.node.panel }}>
             {label}
         </span>
     );
@@ -276,7 +276,7 @@ function toolLabel(id: string) {
     if (id === "tool-hand") return "移动/选择";
     if (id === "tool-undo") return "撤销";
     if (id === "tool-redo") return "重做";
-    if (id === "tool-text") return "文本";
+    if (id === "tool-custom") return "自定义";
     if (id === "tool-image") return "图片";
     if (id === "tool-video") return "视频";
     if (id === "tool-config") return "生成配置";

@@ -12,6 +12,7 @@ export type ViewportTransform = {
 export enum CanvasNodeType {
     Image = "image",
     Text = "text",
+    Custom = "custom",
     Config = "config",
     Video = "video",
 }

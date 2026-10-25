@@ -4,6 +4,7 @@ import type { UploadedFile } from "@/services/file-storage";
 import { NODE_DEFAULT_SIZE } from "../constants";
 import { CanvasNodeType, type CanvasNodeData } from "../types";
 import { fitNodeSize } from "./canvas-node-size";
+import { CANVAS_IMAGE_DRAG_TYPE } from "./canvas-custom-node";
 
 export type CanvasPlayback = {
     workflow: SaveWorkflowInput;
@@ -84,13 +85,13 @@ export async function preloadCanvasPlayback(scene: PlaybackScene, tr: (text: str
     return {
         signal, images: outputs, video,
         workflow: {
-            title: tr(scene.title), backgroundMode: "lines", showImageInfo: false, viewport: { x: 100, y: 100, k: 0.88 },
+            title: tr(scene.title), backgroundMode: "lines", showImageInfo: false, viewport: { x: 80, y: 110, k: 0.88 },
             nodes: [
-                { ...node("reference", CanvasNodeType.Image, scene.referenceTitle, (380 - referenceSize.width) / 2, 130, { content: reference.url, naturalWidth: reference.width, naturalHeight: reference.height, bytes: reference.bytes, mimeType: reference.mimeType, status: "success" }), ...referenceSize },
-                node("brief", CanvasNodeType.Text, "创意拆解", 20, 550, { content: `${tr(scene.brief)}\n\n${tr(scene.constraint)}`, status: "success", fontSize: 16 }),
-                node("config", video ? CanvasNodeType.Config : CanvasNodeType.Image, video ? "生成配置" : "图片节点", 620, 270, { prompt: tr(scene.prompt), generationMode: video ? "video" : "image", model: video ? "grok-imagine-video" : "gpt-image-2", size: scene.format, quality: "high", count: video ? 1 : outputs.length, seconds: "10", vquality: "720", status: "idle" }),
+                { ...node("reference", CanvasNodeType.Image, scene.referenceTitle, 40, 360, { content: reference.url, naturalWidth: reference.width, naturalHeight: reference.height, bytes: reference.bytes, mimeType: reference.mimeType, status: "success", batchRootId: "brief" }), ...referenceSize },
+                node("brief", CanvasNodeType.Custom, "自定义", 20, 240, { content: `${tr(scene.brief)}\n${tr(scene.constraint)}`, status: "success", isBatchRoot: true, batchChildIds: ["reference"] }),
+                node("config", video ? CanvasNodeType.Config : CanvasNodeType.Image, video ? "生成配置" : "图片节点", 650, 170, { prompt: tr(scene.prompt), generationMode: video ? "video" : "image", model: video ? "grok-imagine-video" : "gpt-image-2", size: scene.format, quality: "high", count: video ? 1 : outputs.length, seconds: "10", vquality: "720", status: "idle" }),
             ],
-            connections: ["reference", "brief"].map((id) => ({ id: `${id}-config`, fromNodeId: id, toNodeId: "config" })),
+            connections: [{ id: "brief-config", fromNodeId: "brief", toNodeId: "config" }],
         },
     };
 }
@@ -105,13 +106,10 @@ export async function playCanvasPlayback(canvas: HTMLDivElement, cursor: HTMLDiv
         if (!element) throw new Error("加载失败");
         return element;
     };
-    const click = async (element: HTMLElement) => {
+    const moveCursor = async (x: number, y: number) => {
         signal.throwIfAborted();
-        const rect = element.getBoundingClientRect();
         const stageRect = stage.getBoundingClientRect();
         const scale = stageRect.width / stage.offsetWidth;
-        const x = rect.left + rect.width / 2;
-        const y = rect.top + rect.height / 2;
         const transform = `translate(${(x - stageRect.left) / scale}px, ${(y - stageRect.top) / scale}px)`;
         const animation = cursor.animate([{ transform: cursor.style.transform || "translate(160px, 360px)" }, { transform }], { duration: 850, easing: "ease-in-out", fill: "forwards" });
         const cancel = () => animation.cancel();
@@ -120,6 +118,12 @@ export async function playCanvasPlayback(canvas: HTMLDivElement, cursor: HTMLDiv
         signal.throwIfAborted();
         cursor.style.transform = transform;
         animation.cancel();
+    };
+    const click = async (element: HTMLElement) => {
+        const rect = element.getBoundingClientRect();
+        const x = rect.left + rect.width / 2;
+        const y = rect.top + rect.height / 2;
+        await moveCursor(x, y);
         hovered?.dispatchEvent(new MouseEvent("mouseout", { bubbles: true }));
         element.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
         hovered = element;
@@ -131,8 +135,22 @@ export async function playCanvasPlayback(canvas: HTMLDivElement, cursor: HTMLDiv
         cursor.dataset.clicking = "false";
         await waitForPlayback(350, signal);
     };
+    const dragImage = async (imageId: string, source: HTMLElement, target: HTMLElement, point?: { x: number; y: number }) => {
+        const sourceRect = source.getBoundingClientRect();
+        await moveCursor(sourceRect.left + sourceRect.width / 2, sourceRect.top + sourceRect.height / 2);
+        const rect = target.getBoundingClientRect();
+        const x = point?.x ?? rect.left + rect.width / 2;
+        const y = point?.y ?? rect.top + rect.height / 2;
+        cursor.dataset.clicking = "true";
+        const dataTransfer = new DataTransfer();
+        dataTransfer.setData(CANVAS_IMAGE_DRAG_TYPE, imageId);
+        await moveCursor(x, y);
+        target.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, clientX: x, clientY: y, dataTransfer }));
+        cursor.dataset.clicking = "false";
+        await waitForPlayback(1500, signal);
+    };
     onStep(0);
-    await click(find('[data-node-id="reference"] > div'));
+    await click(find('[data-custom-image-id="reference"]'));
     await waitForPlayback(2200, signal);
     onStep(1);
     await click(find('[data-node-id="brief"] > div'));
@@ -149,9 +167,9 @@ export async function playCanvasPlayback(canvas: HTMLDivElement, cursor: HTMLDiv
     await click(generate);
     while (canvas.querySelector('[data-node-id="config"] [data-canvas-running="true"]')) await waitForPlayback(100, signal);
     onStep(3);
-    const batch = canvas.querySelector<HTMLElement>('[data-batch-root="true"]');
+    const batch = canvas.querySelector<HTMLElement>('[data-node-type="image"][data-batch-root="true"]');
     if (batch) {
-        const toggle = find('[data-batch-root="true"] [data-canvas-action="toggle-batch"]');
+        const toggle = batch.querySelector<HTMLElement>('[data-canvas-action="toggle-batch"]')!;
         await click(toggle);
         await waitForPlayback(1800, signal);
         await click(toggle);
@@ -160,7 +178,12 @@ export async function playCanvasPlayback(canvas: HTMLDivElement, cursor: HTMLDiv
             await waitForPlayback(1800, signal);
         }
         onStep(4);
-        await click(batch.firstElementChild as HTMLElement);
+        const child = find('[data-node-type="image"][data-batch-root-id]');
+        const imageId = child.dataset.nodeId!;
+        await dragImage(imageId, child, find('[data-node-id="brief"]'));
+        const canvasRect = canvas.getBoundingClientRect();
+        await dragImage(imageId, find(`[data-custom-image-id="${imageId}"]`), canvas, { x: canvasRect.left + canvasRect.width * 0.77, y: canvasRect.top + canvasRect.height * 0.72 });
+        await click(find('[data-node-id="brief"] > div'));
     } else {
         await click(find('[data-node-type="video"] > div'));
         const video = canvas.querySelector("video");

@@ -1,5 +1,11 @@
 // Generated translations. Source strings are Simplified Chinese (zh-CN).
 const enUS = {
+    "自定义": "Custom",
+    "添加图片": "Add images",
+    "输入提示词，或拖入图片，也可以同时添加": "Enter a prompt, drop images, or add both",
+    "拖出图片可创建独立节点": "Drag an image out to create a separate node",
+    "拖入图片到此节点": "Drop images into this node",
+    "提示词和图片，自由组合": "Combine prompts and images freely",
     "定位并高亮参考图": "Locate and highlight reference image",
     "连接参考图或输入提示词": "Connect a reference image or enter a prompt",
     "画布右键菜单": "Canvas context menu",

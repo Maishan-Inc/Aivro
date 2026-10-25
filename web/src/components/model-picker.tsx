@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useId, useMemo, useState } from "react";
-import { Cpu } from "lucide-react";
 
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import type { AiConfig } from "@/stores/use-config-store";
+import { useConfigStore, type AiConfig } from "@/stores/use-config-store";
+import { ModelLogo } from "./model-logo";
 
 type ModelPickerProps = {
     config: AiConfig;
@@ -96,9 +96,9 @@ function ModelLabel({ model }: { model: string }) {
     );
 }
 
-function ModelIcon({ model }: { model: string }) {
-    const icon = resolveModelIcon(model);
-    return icon ? <img src={icon} alt="" className="size-4 shrink-0 dark:invert" /> : <Cpu className="size-4 shrink-0 opacity-70" />;
+export function ModelIcon({ model }: { model: string }) {
+    const icon = useConfigStore((state) => state.publicSettings?.modelChannel.modelCosts?.find((item) => item.model === model)?.icon);
+    return <ModelLogo icon={icon || resolveModelIcon(model)} name={model} size={16} />;
 }
 
 function resolveModelIcon(model: string) {
