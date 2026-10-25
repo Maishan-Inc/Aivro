@@ -8,6 +8,7 @@ import { canvasThemes } from "@/lib/canvas-theme";
 import { formatBytes, getDataUrlByteSize } from "@/lib/image-utils";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { CanvasNodeType, type CanvasNodeData, type ViewportTransform } from "../types";
+import { useI18n } from "@/hooks/use-i18n";
 
 type CanvasNodeHoverToolbarProps = {
     node: CanvasNodeData | null;
@@ -52,6 +53,7 @@ export function CanvasNodeHoverToolbar({
     onToggleFreeResize,
     onDelete,
 }: CanvasNodeHoverToolbarProps) {
+    const { tr } = useI18n();
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
     const { token } = antdTheme.useToken();
     const toolbarRef = useRef<HTMLDivElement>(null);
@@ -120,6 +122,7 @@ export function CanvasNodeHoverToolbar({
             {hasImage ? <ToolbarAction title="裁剪并生成新节点" label="裁剪" icon={<Scissors className="size-4" />} onClick={() => onCrop(node)} /> : null}
             {hasImage ? <ToolbarAction title="生成角度" label="多角度" icon={<Camera className="size-4" />} onClick={() => onAngle(node)} /> : null}
             {hasImage ? <ToolbarAction title="查看图片详情" label="查看大图" icon={<Maximize2 className="size-4" />} onClick={() => onViewImage(node)} /> : null}
+            {hasVideo ? <ToolbarAction title={tr("视频详情")} label={tr("预览视频")} icon={<Maximize2 className="size-4" />} onClick={() => onViewImage(node)} /> : null}
         </div>
     );
 }

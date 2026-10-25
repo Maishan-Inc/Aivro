@@ -1,5 +1,11 @@
 // Generated translations. Source strings are Simplified Chinese (zh-CN).
 const frFR = {
+    "预览视频": "Aperçu de la vidéo",
+    "视频详情": "Détails de la vidéo",
+    "拖动视频节点": "Déplacer le nœud vidéo",
+    "视频加载失败，请重试或替换视频": "Impossible de charger la vidéo. Réessayez ou remplacez-la.",
+    "视频生成最多支持 7 张参考图": "La génération vidéo accepte jusqu’à 7 images de référence",
+    "请输入提示词或连接参考图": "Saisissez une consigne ou reliez une image de référence",
     "计费信息加载中": "Chargement des tarifs",
     "计费信息暂不可用": "Tarifs temporairement indisponibles",
     "预计 {0} 点": "Estimation : {0} crédits",
@@ -565,7 +571,6 @@ const frFR = {
     "视频创作台": "Studio vidéo",
     "视频接口没有返回任务 ID": "L'API vidéo n'a pas renvoyé d'ID de tâche",
     "视频节点": "Nœud vidéo",
-    "视频节点(未开发完，请勿使用)": "Nœud vidéo (inachevé, ne pas utiliser)",
     "视频清晰度": "Résolution vidéo",
     "视频任务已撤销": "Tâche vidéo annulée",
     "视频设置": "Paramètres vidéo",

@@ -1,5 +1,11 @@
 // Generated translations. Source strings are Simplified Chinese (zh-CN).
 const enUS = {
+    "预览视频": "Preview video",
+    "视频详情": "Video details",
+    "拖动视频节点": "Drag video node",
+    "视频加载失败，请重试或替换视频": "Video failed to load. Retry or replace it.",
+    "视频生成最多支持 7 张参考图": "Video generation supports up to 7 reference images",
+    "请输入提示词或连接参考图": "Enter a prompt or connect a reference image",
     "计费信息加载中": "Loading pricing",
     "计费信息暂不可用": "Pricing is temporarily unavailable",
     "预计 {0} 点": "Est. {0} credits",
@@ -574,7 +580,6 @@ const enUS = {
     "视频创作台": "Video Studio",
     "视频接口没有返回任务 ID": "The video API did not return a task ID",
     "视频节点": "Video node",
-    "视频节点(未开发完，请勿使用)": "Video node",
     "视频清晰度": "Video resolution",
     "视频任务已撤销": "Video task cancelled",
     "视频设置": "Video settings",

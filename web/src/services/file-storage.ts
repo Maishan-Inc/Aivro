@@ -10,7 +10,7 @@ export type UploadedFile = { url: string; storageKey: string; bytes: number; mim
 type ApiResponse<T> = { code: number; data: T; msg: string };
 
 export async function uploadMediaFile(input: string | Blob | UploadedFile, _prefix = "file"): Promise<UploadedFile> {
-    if (typeof input === "object" && !(input instanceof Blob)) return input;
+    if (typeof input === "object" && !(input instanceof Blob)) return input.mimeType.startsWith("video/") && (!input.width || !input.height) ? { ...input, ...await readVideoMeta(input.url) } : input;
     const blob = typeof input === "string" ? await (await fetch(input)).blob() : input;
     const file = new File([blob], blob.type.startsWith("video/") ? "video.mp4" : "file.bin", { type: blob.type || "application/octet-stream" });
     const uploaded = await uploadFile(file);
@@ -49,11 +49,21 @@ function authHeaders() {
 }
 
 function readVideoMeta(url: string) {
-    return new Promise<{ width: number; height: number }>((resolve) => {
+    return new Promise<{ width?: number; height?: number }>((resolve) => {
         const video = document.createElement("video");
-        const done = () => resolve({ width: video.videoWidth || 1280, height: video.videoHeight || 720 });
+        const done = () => {
+            const meta = video.videoWidth && video.videoHeight ? { width: video.videoWidth, height: video.videoHeight } : {};
+            window.clearTimeout(timeout);
+            video.onloadedmetadata = null;
+            video.onerror = null;
+            video.removeAttribute("src");
+            video.load();
+            resolve(meta);
+        };
+        const timeout = window.setTimeout(done, 15000);
         video.onloadedmetadata = done;
         video.onerror = done;
+        video.preload = "metadata";
         video.src = url;
     });
 }

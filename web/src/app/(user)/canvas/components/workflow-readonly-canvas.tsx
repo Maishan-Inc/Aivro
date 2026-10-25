@@ -67,6 +67,10 @@ export function WorkflowReadonlyCanvas({ workflow, overlay }: { workflow?: Pick<
                 .workflow-readonly-node .node-element * {
                     pointer-events: none !important;
                 }
+                .workflow-readonly-node [data-canvas-video-player],
+                .workflow-readonly-node [data-canvas-video-player] * {
+                    pointer-events: auto !important;
+                }
             `}</style>
             <CanvasZoomControls scale={viewport.k} onScaleChange={(k) => setViewport((current) => ({ ...current, k }))} onReset={() => setViewport(workflow?.viewport || { x: 120, y: 96, k: 0.9 })} isMiniMapOpen={false} onToggleMiniMap={() => undefined} />
             <div className="pointer-events-none absolute inset-x-0 bottom-5 z-40 flex justify-center">

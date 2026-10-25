@@ -61,6 +61,8 @@ type MediaMetadata = {
   bytes?: number;
   naturalWidth?: number;
   naturalHeight?: number;
+  generationPrompt?: string; // 视频重试使用的完整生成提示词，与编辑草稿分开
+  queuePosition?: number;    // 视频当前排队位置，执行或结束后清除
   freeResize?: boolean;
   isBatchRoot?: boolean;
   batchRootId?: string;

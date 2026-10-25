@@ -10,6 +10,8 @@ import { formatBytes } from "@/lib/image-utils";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { CanvasNodeType, type CanvasNodeData, type Position } from "../types";
 import { CanvasCustomNode } from "./canvas-custom-node";
+import { CanvasVideoPlayer } from "./canvas-video-player";
+import { useI18n } from "@/hooks/use-i18n";
 
 type ResizeCorner = "top-left" | "top-right" | "bottom-left" | "bottom-right";
 const selectionBlue = "#2f80ff";
@@ -250,7 +252,7 @@ export const CanvasNode = React.memo(function CanvasNode({
             data-node-type={data.type}
             data-batch-root={data.metadata?.isBatchRoot || undefined}
             data-batch-root-id={data.metadata?.batchRootId}
-            className={`node-element absolute flex select-none flex-col transition-shadow duration-200 ${isSelected ? "z-50" : "z-10"}`}
+            className={`node-element group/node absolute flex select-none flex-col transition-shadow duration-200 ${isSelected ? "z-50" : "z-10"}`}
             style={{
                 transform: `translate(${data.position.x}px, ${data.position.y}px)`,
                 width: data.width,
@@ -374,7 +376,7 @@ export const CanvasNode = React.memo(function CanvasNode({
 function NodeContent(props: NodeContentRendererProps) {
     if (!props.readOnly && props.node.type === CanvasNodeType.Config && props.renderNodeContent) return props.renderNodeContent(props.node);
     if (props.isBatchRoot) return <ImageNodeContent {...props} />;
-    if (props.node.metadata?.status === "loading") return <LoadingContent theme={props.theme} />;
+    if (props.node.metadata?.status === "loading") return <LoadingContent theme={props.theme} node={props.node} />;
     if (props.node.metadata?.status === "error") return <ErrorContent node={props.node} theme={props.theme} onRetry={props.readOnly ? undefined : props.onRetry} />;
 
     const Renderer = nodeContentRenderers[props.node.type];
@@ -389,19 +391,22 @@ const nodeContentRenderers = {
     [CanvasNodeType.Video]: VideoNodeContent,
 } satisfies Record<CanvasNodeType, (props: NodeContentRendererProps) => ReactNode>;
 
-function LoadingContent({ theme }: Pick<NodeContentRendererProps, "theme">) {
+function LoadingContent({ theme, node }: Pick<NodeContentRendererProps, "theme"> & { node?: CanvasNodeData }) {
+    const { tr } = useI18n();
+    const queuePosition = node?.metadata?.queuePosition;
     return (
         <div className="flex h-full w-full flex-col items-center justify-center gap-3" style={{ color: theme.node.activeStroke }}>
             <AivroDrawableLoader compact className="h-10 w-32" style={{ color: theme.node.activeStroke }} />
-            <span className="text-[10px] tracking-[0.2em]">生成中</span>
+            <span role="status" className="text-[10px] tracking-[0.2em]">{queuePosition !== undefined ? `${tr("排队中")} · ${queuePosition}` : tr("生成中")}</span>
         </div>
     );
 }
 
 function ErrorContent({ node, theme, onRetry }: Pick<NodeContentRendererProps, "node" | "theme" | "onRetry">) {
+    const { tr } = useI18n();
     return (
         <div className="flex max-w-[260px] flex-col items-center gap-3 px-5 text-center">
-            <div className="text-xs leading-5 text-red-300">{node.metadata?.errorDetails || "生成失败"}</div>
+            <div role="status" className="text-xs leading-5" style={{ color: theme.node.text }}>{tr(node.metadata?.errorDetails || "生成失败")}</div>
             {onRetry ? (
                 <button
                     type="button"
@@ -414,7 +419,7 @@ function ErrorContent({ node, theme, onRetry }: Pick<NodeContentRendererProps, "
                     onMouseDown={(event) => event.stopPropagation()}
                 >
                     <RefreshCw className="size-3.5" />
-                    重试
+                    {tr("重试")}
                 </button>
             ) : null}
         </div>
@@ -521,16 +526,23 @@ function EmptyImageContent({ node, theme, readOnly, renderNodeContent, isBatchRo
     return content;
 }
 
-function VideoNodeContent({ node, theme, renderVideo }: NodeContentRendererProps) {
+function VideoNodeContent({ node, theme, renderVideo, renderNodeContent, readOnly }: NodeContentRendererProps) {
+    const { tr } = useI18n();
     if (renderVideo) return renderVideo(node);
+    if (!node.metadata?.content && renderNodeContent && !readOnly) return renderNodeContent(node);
     if (!node.metadata?.content)
         return (
             <div className="flex h-full w-full flex-col items-center justify-center gap-3" style={{ color: theme.node.placeholder }}>
                 <Video className="size-7 opacity-35" />
-                <span className="text-sm">视频节点(未开发完，请勿使用)</span>
+                <span className="text-sm">{tr("视频节点")}</span>
             </div>
         );
-    return <video src={node.metadata.content} controls className="h-full w-full rounded-[18px] bg-black object-contain" data-canvas-no-zoom />;
+    return <>
+        <CanvasVideoPlayer src={node.metadata.content} />
+        {!readOnly ? <div className="absolute inset-x-0 top-0 flex h-8 cursor-move items-center gap-2 rounded-t-[18px] px-3 text-xs opacity-0 transition-opacity group-hover/node:opacity-100" style={{ background: theme.toolbar.panel, color: theme.node.text }} title={tr("拖动视频节点")}>
+            <Video className="size-3.5 shrink-0" /><span data-i18n-skip className="truncate">{node.title}</span>
+        </div> : null}
+    </>;
 }
 
 function ConfigNodeContent({ node, theme }: NodeContentRendererProps) {
