@@ -36,6 +36,7 @@ type registerRequest struct {
 type emailCodeRequest struct {
 	Email          string `json:"email"`
 	Purpose        string `json:"purpose"`
+	Locale         string `json:"locale"`
 	CaptchaToken   string `json:"captchaToken"`
 	TurnstileToken string `json:"turnstileToken"`
 }
@@ -145,7 +146,7 @@ func SendEmailCode(w http.ResponseWriter, r *http.Request) {
 		FailError(w, err)
 		return
 	}
-	if err := service.SendEmailCode(request.Email, request.Purpose, service.MailTemplateContextFromRequest(r)); err != nil {
+	if err := service.SendEmailCode(request.Email, request.Purpose, service.MailTemplateContextFromRequest(r, request.Locale)); err != nil {
 		FailError(w, err)
 		return
 	}
@@ -163,7 +164,7 @@ func SendRegisterEmailCode(w http.ResponseWriter, r *http.Request) {
 		FailError(w, err)
 		return
 	}
-	if err := service.SendEmailCode(request.Email, "register", service.MailTemplateContextFromRequest(r)); err != nil {
+	if err := service.SendEmailCode(request.Email, "register", service.MailTemplateContextFromRequest(r, request.Locale)); err != nil {
 		FailError(w, err)
 		return
 	}

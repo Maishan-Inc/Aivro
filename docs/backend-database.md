@@ -428,9 +428,12 @@ MetaMask 私有配置字段：
 | `username` | string | SMTP 用户名 |
 | `password` | string | SMTP 密码，后台返回时隐藏 |
 | `fromEmail` | string | 发件邮箱 |
-| `fromName` | string | 发件名称 |
+| `fromName` | string | 发件名称，默认 `Aivro` |
 | `codeExpireMin` | number | 验证码有效分钟数 |
-| `templates` | object | 注册、找回密码和 MetaMask 邮箱验证模板 |
+| `defaultLocale` | string | 无法匹配请求语言时使用的邮件语言，默认 `zh-CN` |
+| `templates` | object | 按语言组织的模板：`templates[locale][purpose] = { subject, body }` |
+
+邮件语言支持 `zh-CN`、`zh-TW`、`en-US`、`ja-JP`、`ko-KR`、`fr-FR`，每种语言包含 `register`、`reset`、`metamask` 三个场景。标题或正文为空时使用对应语言、场景的内置文案；各语言独立编辑，用户自定义内容不会自动翻译。配置仍保存在 `settings.private.mail`，不新增数据表。
 
 `cloudStorage` 当前字段：
 
@@ -455,6 +458,8 @@ MetaMask 私有配置字段：
 | `pathStyleEndpoint` | bool | 是否使用 Path Style Endpoint |
 
 邮件模板支持变量：`{{code}}`、`{{email}}`、`{{expireMinutes}}`、`{{siteName}}`、`{{ip}}`、`{{country}}`、`{{region}}`。
+
+`body` 为纯文本说明，HTML 输出由 Go `html/template` 转义。验证码、有效期、收件邮箱、请求 IP/地区和场景安全提醒由统一布局自动附加，不必在正文重复填写。HTML 与纯文本邮件均包含安全提醒及固定英文版权 `© <year> Maishan Inc. · Aivro. All rights reserved.`。Logo 使用已配置站点来源下的 `/logo-mail-dark.png`，访问站点链接携带邮件语言前缀；未配置站点来源时保留 Aivro 文字品牌。
 
 后端请求模型时，先按前台模型名筛选启用且包含该模型映射的渠道，并把请求里的 `model` 改写为对应 `upstreamName`。同一前台模型命中多个渠道时先使用权重最高的渠道；明确失败时按更低权重渠道继续尝试，最后一个可用渠道会再重试一次。图片和视频创建遇到传输中断、响应读取失败或 HTTP 408/504/524 时停止重发，避免上游已执行却重复计费。
 

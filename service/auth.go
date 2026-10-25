@@ -49,6 +49,8 @@ type MailTemplateContext struct {
 	IP      string
 	Country string
 	Region  string
+	Locale  string
+	Test    bool
 }
 
 type RequestLogMeta struct {
@@ -1479,21 +1481,16 @@ func sendVerificationMail(setting model.MailSetting, email string, purpose strin
 	if setting.Host == "" || setting.FromEmail == "" {
 		return safeMessageError{message: "SMTP 未配置"}
 	}
-	template := setting.Templates.Register
-	if purpose == "reset" {
-		template = setting.Templates.Reset
-	} else if purpose == "metamask" {
-		template = setting.Templates.MetaMask
+	content, err := renderVerificationMail(setting, email, purpose, code, context)
+	if err != nil {
+		return err
 	}
-	subject := renderMailTemplate(template.Subject, email, code, setting.CodeExpireMin, context)
-	body := renderMailTemplate(template.Body, email, code, setting.CodeExpireMin, context)
 	from := setting.FromEmail
 	if strings.TrimSpace(setting.FromName) != "" {
 		from = fmt.Sprintf("%s <%s>", mimeHeader(setting.FromName), setting.FromEmail)
 	}
-	message := buildVerificationMailMessage(from, email, subject, body, template.Body, email, purpose, code, setting.CodeExpireMin, context)
+	message := buildVerificationMailMessage(from, email, content)
 	addr := setting.Host + ":" + strconv.Itoa(setting.Port)
-	var err error
 	if setting.Port == 465 {
 		err = sendMailTLS(addr, setting.Host, setting.Username, setting.Password, setting.FromEmail, []string{email}, []byte(message))
 	} else {
@@ -1723,13 +1720,14 @@ func renderMailTemplate(template string, email string, code string, expireMinute
 	return replacer.Replace(template)
 }
 
-func MailTemplateContextFromRequest(r *http.Request) MailTemplateContext {
+func MailTemplateContextFromRequest(r *http.Request, locale string) MailTemplateContext {
 	trusted := trustedForwardPeer(requestHost(r))
-	return normalizeMailTemplateContext(MailTemplateContext{
+	return MailTemplateContext{
 		IP:      requestIP(r),
 		Country: requestLocationHeader(r, trusted, "X-Aivro-Client-Country", "CF-IPCountry", "X-Vercel-IP-Country", "CloudFront-Viewer-Country"),
 		Region:  requestLocationHeader(r, trusted, "X-Aivro-Client-Region", "CF-Region", "X-Vercel-IP-Country-Region", "X-Region"),
-	})
+		Locale:  requestedMailLocale(locale, r.Header.Get("Accept-Language")),
+	}
 }
 
 func requestLocationHeader(r *http.Request, trusted bool, internalKey string, externalKeys ...string) string {
@@ -1755,7 +1753,7 @@ func requestHost(r *http.Request) string {
 }
 
 func RequestLogMetaFromRequest(r *http.Request) RequestLogMeta {
-	context := MailTemplateContextFromRequest(r)
+	context := MailTemplateContextFromRequest(r, "")
 	return normalizeRequestLogMeta(RequestLogMeta{IP: context.IP, Country: context.Country})
 }
 
@@ -1772,14 +1770,16 @@ func normalizeRequestLogMeta(meta RequestLogMeta) RequestLogMeta {
 }
 
 func normalizeMailTemplateContext(context MailTemplateContext) MailTemplateContext {
+	context.Locale = resolveMailLocale(context.Locale, "zh-CN")
+	unknown := mailTranslations[context.Locale].Unknown
 	if strings.TrimSpace(context.IP) == "" {
-		context.IP = "未知"
+		context.IP = unknown
 	}
 	if strings.TrimSpace(context.Country) == "" {
-		context.Country = "未知"
+		context.Country = unknown
 	}
 	if strings.TrimSpace(context.Region) == "" {
-		context.Region = "未知"
+		context.Region = unknown
 	}
 	return context
 }

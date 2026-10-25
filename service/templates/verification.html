@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="{{.Context.Locale}}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="supported-color-schemes" content="light dark">
+  <title>{{.Subject}}</title>
+  <style>
+    @media only screen and (max-width:520px) {
+      .mail-root {padding:12px 8px!important;}
+      .mail-pad {padding-left:20px!important;padding-right:20px!important;}
+      .mail-title {font-size:25px!important;}
+      .mail-category {display:none!important;}
+      .mail-code {height:44px!important;font-size:30px!important;line-height:44px!important;}
+      .mail-code-cell {padding:0 2px!important;}
+      .mail-detail-label {width:82px!important;}
+    }
+    @media (prefers-color-scheme:dark) {
+      .mail-root {background:#090909!important;color:#ededed!important;}
+      .mail-card {background:#0d0d0d!important;border-color:#2a2a2a!important;}
+      .mail-text {color:#ededed!important;}
+      .mail-secondary {color:#c4c4c4!important;}
+      .mail-muted {color:#a1a1a1!important;}
+      .mail-soft {background:#171717!important;}
+      .mail-line {border-color:#2a2a2a!important;}
+      .mail-note {border-left-color:#ededed!important;}
+    }
+  </style>
+</head>
+<body style="margin:0;padding:0;">
+<div class="mail-root" style="margin:0;padding:32px 12px;background:#fafafa;font-family:'SF Pro Display','PingFang SC','Microsoft YaHei',Arial,sans-serif;word-break:break-word;color:#171717;">
+  <div style="display:none;max-height:0;overflow:hidden;font-size:1px;line-height:1px;mso-hide:all;">{{.Preheader}}</div>
+  {{.OutlookStart}}
+  <table role="presentation" class="mail-card" width="100%" align="center" cellspacing="0" cellpadding="0" style="width:100%;max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #e5e5e5;border-radius:8px;table-layout:fixed;">
+    <tr><td class="mail-pad" style="padding:32px 40px 0;">
+      <table role="presentation" class="mail-line" width="100%" cellspacing="0" cellpadding="0" style="width:100%;border-bottom:1px solid #ebebeb;">
+        <tr>
+          <td style="padding-bottom:26px;white-space:nowrap;">
+            {{if .SiteURL}}<a href="{{.VisitURL}}" style="text-decoration:none;"><img src="{{.SiteURL}}/logo-mail-dark.png" width="32" height="32" alt="" style="display:inline-block;vertical-align:middle;border:0;border-radius:6px;background:#ffffff;padding:4px;" />{{end}}
+            <span class="mail-text" style="display:inline-block;vertical-align:middle;margin-left:6px;font-size:28px;font-weight:700;line-height:40px;letter-spacing:-1px;color:#171717;">Aivro</span>
+            {{if .SiteURL}}</a>{{end}}
+          </td>
+          <td class="mail-category mail-muted" align="right" style="padding:0 0 26px 12px;text-align:right;font-size:11px;line-height:1.6;color:#737373;">{{.Words.Category}}</td>
+        </tr>
+      </table>
+    </td></tr>
+    <tr><td class="mail-pad" style="padding:32px 40px;">
+      <p class="mail-muted" style="margin:0 0 12px;font-size:11px;line-height:1.7;letter-spacing:1px;color:#737373;">{{.Scene.Eyebrow}}</p>
+      <h1 class="mail-title mail-text" style="margin:0 0 20px;font-size:30px;line-height:1.35;font-weight:700;letter-spacing:-0.5px;color:#171717;">{{.Scene.Title}}</h1>
+      {{range .Body}}
+      {{if .}}<p class="mail-secondary" style="margin:0 0 8px;font-size:14px;line-height:1.9;color:#525252;">{{.}}</p>{{else}}<div style="height:12px;line-height:12px;">&nbsp;</div>{{end}}
+      {{end}}
+      {{if .Context.Test}}<p class="mail-secondary mail-soft mail-line" style="margin:20px 0 0;padding:14px 16px;background:#f5f5f5;border:1px dashed #d4d4d4;border-radius:6px;font-size:12px;line-height:1.85;color:#525252;"><strong>{{.Words.TestLabel}}</strong><br>{{.Words.TestNote}}</p>{{end}}
+      {{if eq .Purpose "reset"}}
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;margin-top:24px;table-layout:fixed;">
+        <tr><td class="mail-secondary mail-line" valign="top" style="padding:12px 8px 0 0;border-top:2px solid #171717;color:#525252;font-size:12px;line-height:1.8;">01 · {{.Words.VerifyStep}}</td><td class="mail-muted mail-line" valign="top" style="padding:12px 0 0 8px;border-top:2px solid #e5e5e5;color:#737373;font-size:12px;line-height:1.8;">02 · {{.Words.PasswordStep}}</td></tr>
+      </table>
+      {{end}}
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;margin-top:28px;">
+        <tr><td class="mail-text" valign="bottom" style="padding-right:12px;font-size:12px;line-height:1.6;font-weight:600;color:#171717;">{{.Words.Code}}</td><td class="mail-muted" align="right" valign="bottom" style="text-align:right;font-size:11px;line-height:1.6;color:#737373;">{{.Expiry}}</td></tr>
+      </table>
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" aria-label="{{.Words.Code}}: {{.Code}}" style="width:100%;margin:14px 0;table-layout:fixed;border-collapse:collapse;">
+        <tr>{{range .Digits}}<td class="mail-code-cell" style="padding:0 4px;"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:separate;"><tr><td class="mail-code mail-soft mail-text mail-line" align="center" height="68" style="height:68px;padding:0;text-align:center;border:1px solid #e5e5e5;border-radius:6px;background:#f5f5f5;color:#171717;font:600 40px/68px Consolas,monospace;">{{.}}</td></tr></table></td>{{end}}</tr>
+      </table>
+      <p class="mail-muted" style="margin:0;font-size:12px;line-height:1.85;color:#737373;">{{.Scene.Hint}}</p>
+      <table role="presentation" class="mail-soft" width="100%" cellspacing="0" cellpadding="0" style="width:100%;margin-top:28px;background:#f5f5f5;border-radius:6px;table-layout:fixed;">
+        <tr><td style="padding:18px 20px;">
+          <p class="mail-text" style="margin:0 0 10px;font-size:12px;font-weight:600;color:#171717;">{{.Words.RequestDetails}}</p>
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;table-layout:fixed;font-size:12px;line-height:1.8;">
+            <tr><td class="mail-muted mail-detail-label" width="110" valign="top" style="width:110px;padding:4px 12px 4px 0;color:#737373;">{{.Words.Recipient}}</td><td class="mail-secondary" style="padding:4px 0;color:#525252;word-break:break-all;">{{.Email}}</td></tr>
+            <tr><td class="mail-muted" valign="top" style="padding:4px 12px 4px 0;color:#737373;">{{.Words.IP}}</td><td class="mail-secondary" style="padding:4px 0;color:#525252;word-break:break-all;">{{.Context.IP}}</td></tr>
+            <tr><td class="mail-muted" valign="top" style="padding:4px 12px 4px 0;color:#737373;">{{.Words.Location}}</td><td class="mail-secondary" style="padding:4px 0;color:#525252;">{{.Context.Country}} / {{.Context.Region}}</td></tr>
+          </table>
+        </td></tr>
+      </table>
+      <div class="mail-note" style="margin-top:26px;padding-left:16px;border-left:2px solid #171717;">
+        <p class="mail-text" style="margin:0 0 6px;font-size:12px;line-height:1.8;font-weight:600;color:#171717;">{{.Words.Safety}}</p>
+        <p class="mail-muted" style="margin:0;font-size:12px;line-height:1.85;color:#737373;">{{.Scene.Note}}</p>
+      </div>
+    </td></tr>
+    <tr><td class="mail-pad mail-line" style="padding:22px 40px 26px;border-top:1px solid #ebebeb;">
+      <p class="mail-muted" style="margin:0 0 10px;font-size:11px;line-height:1.8;color:#737373;">{{.Words.Footer}}</p>
+      {{if .VisitURL}}<p style="margin:0 0 14px;"><a class="mail-text" href="{{.VisitURL}}" style="color:#171717;font-size:12px;line-height:1.8;text-decoration:underline;">{{.Words.Visit}} &rarr;</a></p>{{end}}
+      <p class="mail-muted" lang="en" style="margin:0;font-size:10px;line-height:1.8;color:#737373;">{{.Copyright}}</p>
+    </td></tr>
+  </table>
+  {{.OutlookEnd}}
+</div>
+</body>
+</html>

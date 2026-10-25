@@ -65,6 +65,10 @@
 
 ## 认证与分享接口变更
 
+- `POST /api/auth/register/code` 与 `POST /api/auth/email-code` 接收可选 `locale`，前端自动携带当前界面语言；后者的 `purpose` 仍为 `register`、`reset` 或 `metamask`。语言按有效 `locale`、按权重匹配的 `Accept-Language`、邮件配置 `defaultLocale`、`zh-CN` 的顺序选择。支持简中、繁中、英文、日文、韩文、法文，并将 `en-GB`、`fr-CA` 等同语种标签匹配到对应邮件语言，`zh-HK` / `zh-Hant` 匹配繁中。不根据邮箱地址或请求地区推断语言，返回结构仍为 `{ code, data, msg }`。
+- 管理员 `POST /api/admin/settings/mail-test` 接收 `{ setting, email, purpose, locale }`，使用当前表单的 SMTP 配置和指定语言、场景发送测试邮件；密码为空时沿用已保存密码。测试主题及正文包含对应语言的测试标记，示例验证码 `123456` 不写入验证记录，不能用于验证账号。
+- 管理员 `POST /api/admin/settings/mail-preview` 接收 `{ template: { subject, body }, purpose, locale, codeExpireMin }`，返回 `data: { subject, text, html, locale }`。与实际发送复用同一渲染器，预览使用示例收件人、IP/地区和测试标记；不连接 SMTP、不发送邮件、不保存模板或验证码。后台保存的模板按 `private.mail.templates[locale][purpose]` 组织。
+
 - 删除未使用的 `POST /api/auth/register/check`；注册与重置的发码接口对已注册/未注册邮箱返回相同成功结构，是否真正发送由服务端决定。验证码重新发送后旧码失效。
 - `POST /api/auth/metamask/challenge` 增加 `captchaToken`。签名登录消费服务端的一次性挑战，不重复消费同一个第三方验证码 token。
 - CAPTCHA 已启用但密钥不全时拒绝验证；后台也拒绝保存不完整的启用配置。

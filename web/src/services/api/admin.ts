@@ -2,6 +2,8 @@ import { apiDelete, apiGet, apiPost, apiPut, compactApiParams } from "@/services
 import type { Prompt, PromptListResponse } from "@/services/api/prompts";
 import type { Plan } from "@/services/api/billing";
 import type { WorkflowCommunityListResponse, WorkflowCommunityPost } from "@/services/api/workflows";
+import type { Locale } from "@/i18n/messages";
+import type { EmailCodePurpose } from "@/services/api/auth";
 
 export type AdminPromptCategory = {
     category: string;
@@ -510,11 +512,8 @@ export type AdminMailSettings = {
     fromEmail: string;
     fromName: string;
     codeExpireMin: number;
-    templates: {
-        register: AdminMailTemplate;
-        reset: AdminMailTemplate;
-        metamask: AdminMailTemplate;
-    };
+    defaultLocale: Locale;
+    templates: Partial<Record<Locale, Record<EmailCodePurpose, AdminMailTemplate>>>;
 };
 
 export type AdminMailTemplate = {
@@ -584,6 +583,12 @@ export async function testCloudStorage(token: string, setting: AdminCloudStorage
     return apiPost<string>("/api/admin/settings/cloud-storage-test", { setting }, token);
 }
 
-export async function testMailSettings(token: string, setting: AdminMailSettings, email: string) {
-    return apiPost<boolean>("/api/admin/settings/mail-test", { setting, email }, token);
+export async function testMailSettings(token: string, setting: AdminMailSettings, email: string, purpose: EmailCodePurpose, locale: Locale) {
+    return apiPost<boolean>("/api/admin/settings/mail-test", { setting, email, purpose, locale }, token);
+}
+
+export type AdminMailPreview = { subject: string; text: string; html: string; locale: Locale };
+
+export function previewMailTemplate(token: string, template: AdminMailTemplate, purpose: EmailCodePurpose, locale: Locale, codeExpireMin: number) {
+    return apiPost<AdminMailPreview>("/api/admin/settings/mail-preview", { template, purpose, locale, codeExpireMin }, token);
 }

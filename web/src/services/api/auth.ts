@@ -49,7 +49,8 @@ export async function register(payload: AuthPayload) {
 }
 
 export async function sendRegisterEmailCode(email: string, captchaToken?: string) {
-    return apiPost<boolean>("/api/auth/register/code", { email, captchaToken });
+    const { useLocaleStore } = await import("@/stores/use-locale-store");
+    return apiPost<boolean>("/api/auth/register/code", { email, captchaToken, locale: useLocaleStore.getState().locale });
 }
 
 export async function fetchCurrentUser(token?: string) {
@@ -63,7 +64,8 @@ export function fetchCaptchaSession() {
 }
 
 export async function sendEmailCode(email: string, purpose: EmailCodePurpose, captchaToken?: string) {
-    return apiPost<boolean>("/api/auth/email-code", { email, purpose, captchaToken });
+    const { useLocaleStore } = await import("@/stores/use-locale-store");
+    return apiPost<boolean>("/api/auth/email-code", { email, purpose, captchaToken, locale: useLocaleStore.getState().locale });
 }
 
 export async function resetPassword(payload: { email: string; code: string; password: string; captchaToken?: string; turnstileToken?: string }) {

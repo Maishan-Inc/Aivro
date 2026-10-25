@@ -21,6 +21,8 @@ type adminCloudStorageTestRequest struct {
 type adminMailTestRequest struct {
 	Setting model.MailSetting `json:"setting"`
 	Email   string            `json:"email"`
+	Purpose string            `json:"purpose"`
+	Locale  string            `json:"locale"`
 }
 
 func Settings(w http.ResponseWriter, r *http.Request) {
@@ -129,10 +131,27 @@ func AdminTestCloudStorage(w http.ResponseWriter, r *http.Request) {
 
 func AdminTestMail(w http.ResponseWriter, r *http.Request) {
 	var request adminMailTestRequest
-	_ = json.NewDecoder(r.Body).Decode(&request)
-	if err := service.AdminTestMail(request.Setting, request.Email, service.MailTemplateContextFromRequest(r)); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		Fail(w, "请求参数错误")
+		return
+	}
+	if err := service.AdminTestMail(request.Setting, request.Email, request.Purpose, service.MailTemplateContextFromRequest(r, request.Locale)); err != nil {
 		FailError(w, err)
 		return
 	}
 	OK(w, true)
+}
+
+func AdminPreviewMail(w http.ResponseWriter, r *http.Request) {
+	var request service.MailPreviewInput
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		Fail(w, "请求参数错误")
+		return
+	}
+	preview, err := service.PreviewMail(request)
+	if err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, preview)
 }

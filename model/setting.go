@@ -304,15 +304,16 @@ type PrivateMetaMaskAuthSetting struct {
 }
 
 type MailSetting struct {
-	Enabled       bool          `json:"enabled"`
-	Host          string        `json:"host"`
-	Port          int           `json:"port"`
-	Username      string        `json:"username"`
-	Password      string        `json:"password"`
-	FromEmail     string        `json:"fromEmail"`
-	FromName      string        `json:"fromName"`
-	CodeExpireMin int           `json:"codeExpireMin"`
-	Templates     MailTemplates `json:"templates"`
+	Enabled       bool                     `json:"enabled"`
+	Host          string                   `json:"host"`
+	Port          int                      `json:"port"`
+	Username      string                   `json:"username"`
+	Password      string                   `json:"password"`
+	FromEmail     string                   `json:"fromEmail"`
+	FromName      string                   `json:"fromName"`
+	CodeExpireMin int                      `json:"codeExpireMin"`
+	DefaultLocale string                   `json:"defaultLocale"`
+	Templates     map[string]MailTemplates `json:"templates"`
 }
 
 type MailTemplates struct {

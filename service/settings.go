@@ -158,7 +158,7 @@ func AdminTestChannelModel(index *int, channel model.ModelChannel, modelName str
 	return testAdminChannelModel(resolved, modelName, capability)
 }
 
-func AdminTestMail(setting model.MailSetting, email string, context MailTemplateContext) error {
+func AdminTestMail(setting model.MailSetting, email string, purpose string, context MailTemplateContext) error {
 	email = strings.TrimSpace(strings.ToLower(email))
 	if email == "" {
 		return safeMessageError{message: "请填写测试收件邮箱"}
@@ -171,7 +171,8 @@ func AdminTestMail(setting model.MailSetting, email string, context MailTemplate
 	if strings.TrimSpace(setting.Password) == "" {
 		setting.Password = normalizeMailSetting(settings.Private.Mail).Password
 	}
-	if err := sendVerificationMail(setting, email, "register", "123456", context); err != nil {
+	context.Test = true
+	if err := sendVerificationMail(setting, email, purpose, "123456", context); err != nil {
 		var deliveryErr mailDeliveryError
 		if errors.As(err, &deliveryErr) {
 			return safeMessageError{message: "邮件发送失败：" + deliveryErr.DetailMessage()}
@@ -754,30 +755,30 @@ func normalizeMailSetting(setting model.MailSetting) model.MailSetting {
 	setting.Password = strings.TrimSpace(setting.Password)
 	setting.FromEmail = strings.TrimSpace(setting.FromEmail)
 	setting.FromName = strings.TrimSpace(setting.FromName)
+	if setting.FromName == "" {
+		setting.FromName = "Aivro"
+	}
 	if setting.Port <= 0 {
 		setting.Port = 587
 	}
 	if setting.CodeExpireMin <= 0 {
 		setting.CodeExpireMin = 10
 	}
-	if setting.Templates.Register.Subject == "" {
-		setting.Templates.Register.Subject = "注册验证码：{{code}}"
+	setting.DefaultLocale = resolveMailLocale(setting.DefaultLocale, "zh-CN")
+	templates := make(map[string]model.MailTemplates, len(mailTranslations))
+	for locale, words := range mailTranslations {
+		current := setting.Templates[locale]
+		for purpose, item := range map[string]*model.MailTemplate{"register": &current.Register, "reset": &current.Reset, "metamask": &current.MetaMask} {
+			if strings.TrimSpace(item.Subject) == "" {
+				item.Subject = words.Scenes[purpose].Subject
+			}
+			if strings.TrimSpace(item.Body) == "" {
+				item.Body = words.Scenes[purpose].Body
+			}
+		}
+		templates[locale] = current
 	}
-	if setting.Templates.Register.Body == "" {
-		setting.Templates.Register.Body = "你的注册验证码是 {{code}}，{{expireMinutes}} 分钟内有效。\n请求 IP：{{ip}}\n国家/地区：{{country}} {{region}}"
-	}
-	if setting.Templates.Reset.Subject == "" {
-		setting.Templates.Reset.Subject = "找回密码验证码：{{code}}"
-	}
-	if setting.Templates.Reset.Body == "" {
-		setting.Templates.Reset.Body = "你的找回密码验证码是 {{code}}，{{expireMinutes}} 分钟内有效。\n请求 IP：{{ip}}\n国家/地区：{{country}} {{region}}"
-	}
-	if setting.Templates.MetaMask.Subject == "" {
-		setting.Templates.MetaMask.Subject = "MetaMask 登录邮箱验证码：{{code}}"
-	}
-	if setting.Templates.MetaMask.Body == "" {
-		setting.Templates.MetaMask.Body = "你的 MetaMask 登录邮箱验证码是 {{code}}，{{expireMinutes}} 分钟内有效。\n请求 IP：{{ip}}\n国家/地区：{{country}} {{region}}"
-	}
+	setting.Templates = templates
 	return setting
 }
 

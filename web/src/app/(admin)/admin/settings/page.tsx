@@ -14,7 +14,9 @@ import { saveAdminAITimeouts, type AdminAITimeoutSettings } from "@/services/api
 import { useUserStore } from "@/stores/use-user-store";
 import { defaultHomeSettings, homeSocialPlatforms } from "@/constant/home-settings";
 import { collectChannelModelColors, collectChannelModels, filterModels, modelCostKey, normalizeModelCost, syncModelCostsWithPublicModels, uniqueModels } from "@/lib/model-pricing";
-import { renderMailPreviewHTML } from "@/lib/mail-preview";
+import { previewMailTemplate, type AdminMailPreview } from "@/services/api/admin";
+import { localeLabels, type Locale } from "@/i18n/messages";
+import { locales } from "@/i18n/routing";
 
 const CodeMirror = dynamic(() => import("@uiw/react-codemirror"), { ssr: false });
 const jsonEditorTheme = EditorView.theme({
@@ -203,11 +205,8 @@ const emptySettings: AdminSettings = {
             fromEmail: "",
             fromName: "",
             codeExpireMin: 10,
-            templates: {
-                register: { subject: "注册验证码：{{code}}", body: "你的注册验证码是 {{code}}，{{expireMinutes}} 分钟内有效。\n请求 IP：{{ip}}\n国家/地区：{{country}} {{region}}" },
-                reset: { subject: "找回密码验证码：{{code}}", body: "你的找回密码验证码是 {{code}}，{{expireMinutes}} 分钟内有效。\n请求 IP：{{ip}}\n国家/地区：{{country}} {{region}}" },
-                metamask: { subject: "MetaMask 登录邮箱验证码：{{code}}", body: "你的 MetaMask 登录邮箱验证码是 {{code}}，{{expireMinutes}} 分钟内有效。\n请求 IP：{{ip}}\n国家/地区：{{country}} {{region}}" },
-            },
+            defaultLocale: "zh-CN",
+            templates: {},
         },
         cloudStorage: {
             enabled: false,
@@ -294,6 +293,8 @@ export default function AdminSettingsPage() {
     const [isTestingCloudStorage, setIsTestingCloudStorage] = useState(false);
     const [isSendingTestMail, setIsSendingTestMail] = useState(false);
     const [mailTestEmail, setMailTestEmail] = useState("");
+    const [mailLocale, setMailLocale] = useState<Locale>("zh-CN");
+    const [mailTestPurpose, setMailTestPurpose] = useState<MailTemplateKey>("register");
     const [editingMailTemplate, setEditingMailTemplate] = useState<MailTemplateKey | null>(null);
     const [editingAuthProvider, setEditingAuthProvider] = useState<AuthProviderEditorState | null>(null);
     const [authProviderStats, setAuthProviderStats] = useState<Record<string, number>>({});
@@ -475,7 +476,7 @@ export default function AdminSettingsPage() {
         setIsSendingTestMail(true);
         try {
             const mail = normalizePrivateSetting(form.getFieldValue(["private"]) as Partial<AdminSettings["private"]>).mail;
-            await testMailSettings(token, mail, email);
+            await testMailSettings(token, mail, email, mailTestPurpose, mailLocale);
             message.success("测试邮件已发送");
         } catch (error) {
             message.error(error instanceof Error ? error.message : "测试邮件发送失败");
@@ -1328,6 +1329,11 @@ export default function AdminSettingsPage() {
                                                     <InputNumber min={1} max={60} className="!w-full" />
                                                 </Form.Item>
                                             </Col>
+                                            <Col xs={24} md={8}>
+                                                <Form.Item name={["private", "mail", "defaultLocale"]} label={tr("默认邮件语言")}>
+                                                    <Select options={locales.map((value) => ({ value, label: <span data-i18n-skip>{localeLabels[value]}</span> }))} />
+                                                </Form.Item>
+                                            </Col>
                                             <Col xs={24} md={12}>
                                                 <Form.Item name={["private", "mail", "username"]} label="SMTP 用户名" extra="多数邮箱要求填写完整发件邮箱地址，并与发件邮箱一致。">
                                                     <Input />
@@ -1351,6 +1357,7 @@ export default function AdminSettingsPage() {
                                     </Row>
                                         <div style={{ marginTop: 8, borderTop: "1px solid var(--ant-color-border-secondary)", paddingTop: 16 }}>
                                             <Typography.Text strong>测试发送</Typography.Text>
+                                            <Select className="!mt-2 !w-full" aria-label={tr("测试邮件场景")} value={mailTestPurpose} onChange={setMailTestPurpose} options={Object.entries(mailTemplateTitles).map(([value, label]) => ({ value, label: tr(label) }))} />
                                             <Space.Compact style={{ width: "100%", marginTop: 8 }}>
                                                 <Input value={mailTestEmail} onChange={(event) => setMailTestEmail(event.target.value)} placeholder="填写测试收件邮箱" />
                                                 <Button type="primary" icon={<MailOutlined />} loading={isSendingTestMail} onClick={() => void sendTestMail()}>
@@ -1358,16 +1365,22 @@ export default function AdminSettingsPage() {
                                                 </Button>
                                             </Space.Compact>
                                             <Typography.Paragraph type="secondary" style={{ margin: "8px 0 0" }}>
-                                                测试会使用当前表单中的 SMTP 配置和“绑定邮箱注册模板”发送验证码示例 123456。
+                                                {tr("测试使用当前表单、所选场景和模板语言发送。123456 仅为示例，不能用于验证账号。")}
                                             </Typography.Paragraph>
                                         </div>
                                     </Card>
                                 </Col>
                                 <Col xs={24} lg={12}>
                                     <Flex vertical gap={12}>
-                                        <MailTemplateBlock form={form} name="register" title="绑定邮箱注册模板" onEdit={setEditingMailTemplate} />
-                                        <MailTemplateBlock form={form} name="reset" title="找回密码模板" onEdit={setEditingMailTemplate} />
-                                        <MailTemplateBlock form={form} name="metamask" title="MetaMask 邮箱验证模板" onEdit={setEditingMailTemplate} />
+                                        <Card size="small" title={tr("多语言邮件模板")}>
+                                            <Flex vertical gap={10}>
+                                                <Select aria-label={tr("模板语言")} value={mailLocale} onChange={setMailLocale} options={locales.map((value) => ({ value, label: <span data-i18n-skip>{localeLabels[value]}</span> }))} />
+                                                <Typography.Text type="secondary">{tr("邮件跟随用户当前界面语言；无法匹配请求语言时使用默认邮件语言。各语言模板独立保存，留空使用该语言的内置文案。")}</Typography.Text>
+                                            </Flex>
+                                        </Card>
+                                        <MailTemplateBlock form={form} name="register" locale={mailLocale} onEdit={setEditingMailTemplate} />
+                                        <MailTemplateBlock form={form} name="reset" locale={mailLocale} onEdit={setEditingMailTemplate} />
+                                        <MailTemplateBlock form={form} name="metamask" locale={mailLocale} onEdit={setEditingMailTemplate} />
                                     </Flex>
                                 </Col>
                             </Row>
@@ -1537,7 +1550,7 @@ export default function AdminSettingsPage() {
                         </div>
                     )}
                 </Card>
-                <MailTemplateEditorModal form={form} name={editingMailTemplate} onClose={() => setEditingMailTemplate(null)} onSave={() => void saveSettings()} />
+                {editingMailTemplate && <MailTemplateEditorModal key={`${mailLocale}-${editingMailTemplate}`} form={form} name={editingMailTemplate} locale={mailLocale} onClose={() => setEditingMailTemplate(null)} onSave={() => void saveSettings()} />}
                 <Drawer
                     title={editingChannelIndex === null ? "新增渠道" : "编辑渠道"}
                     open={isChannelDrawerOpen}
@@ -1789,94 +1802,110 @@ export default function AdminSettingsPage() {
     );
 }
 
-function MailTemplateBlock({ form, name, title, onEdit }: { form: any; name: MailTemplateKey; title: string; onEdit: (name: MailTemplateKey) => void }) {
-    const subject = Form.useWatch(["private", "mail", "templates", name, "subject"], form) || "";
-    const body = Form.useWatch(["private", "mail", "templates", name, "body"], form) || "";
-    const expireMinutes = Form.useWatch(["private", "mail", "codeExpireMin"], form) || 10;
+function MailTemplateBlock({ form, name, locale, onEdit }: { form: any; name: MailTemplateKey; locale: Locale; onEdit: (name: MailTemplateKey) => void }) {
+    const { tr } = useI18n();
+    const template = Form.useWatch(["private", "mail", "templates"], { form, preserve: true })?.[locale]?.[name];
+    const subject = template?.subject || "";
+    const body = template?.body || "";
     return (
         <Card
             size="small"
-            title={title}
+            title={tr(mailTemplateTitles[name])}
             extra={
                 <Button size="small" icon={<EditOutlined />} onClick={() => onEdit(name)}>
-                    编辑模板
+                    {tr("编辑模板")}
                 </Button>
             }
         >
             <Flex vertical gap={8}>
-                <Typography.Text strong ellipsis>
-                    {subject || "未配置标题"}
+                <Typography.Text strong ellipsis data-i18n-skip>
+                    {subject || tr("使用内置文案")}
                 </Typography.Text>
-                <Typography.Paragraph type="secondary" ellipsis={{ rows: 2 }} style={{ margin: 0 }}>
-                    {body || "未配置正文模板"}
+                <Typography.Paragraph type="secondary" ellipsis={{ rows: 2 }} style={{ margin: 0 }} data-i18n-skip>
+                    {body || tr("使用内置文案")}
                 </Typography.Paragraph>
                 <Space size={[6, 6]} wrap>
                     {mailTemplateVariables.map((item) => (
                         <Tag key={item}>{item}</Tag>
                     ))}
                 </Space>
-                <Typography.Text type="secondary">当前预览验证码有效期：{expireMinutes} 分钟</Typography.Text>
             </Flex>
         </Card>
     );
 }
 
-function MailTemplateEditorModal({ form, name, onClose, onSave }: { form: any; name: MailTemplateKey | null; onClose: () => void; onSave: () => void }) {
-    const activeName = name || "register";
-    const title = mailTemplateTitles[activeName];
-    const expireMinutes = Form.useWatch(["private", "mail", "codeExpireMin"], form) || 10;
-    const [subject, setSubject] = useState("");
-    const [body, setBody] = useState("");
-    const preview = renderMailPreviewHTML(body, activeName, expireMinutes);
+function MailTemplateEditorModal({ form, name, locale, onClose, onSave }: { form: any; name: MailTemplateKey; locale: Locale; onClose: () => void; onSave: () => void }) {
+    const { tr } = useI18n();
+    const token = useUserStore((state) => state.token);
+    const expireMinutes = Form.useWatch(["private", "mail", "codeExpireMin"], { form, preserve: true }) || 10;
+    const [subject, setSubject] = useState(() => form.getFieldValue(["private", "mail", "templates", locale, name, "subject"]) || "");
+    const [body, setBody] = useState(() => form.getFieldValue(["private", "mail", "templates", locale, name, "body"]) || "");
+    const [preview, setPreview] = useState<AdminMailPreview | null>(null);
+    const [previewError, setPreviewError] = useState("");
+    const [previewMode, setPreviewMode] = useState("desktop");
     useEffect(() => {
-        if (!name) return;
-        setSubject(form.getFieldValue(["private", "mail", "templates", activeName, "subject"]) || "");
-        setBody(form.getFieldValue(["private", "mail", "templates", activeName, "body"]) || "");
-    }, [activeName, form, name]);
-    const setTemplateField = (field: "subject" | "body", value: string) => {
-        if (field === "subject") setSubject(value);
-        else setBody(value);
-    };
+        if (!token) return;
+        let active = true;
+        setPreview(null);
+        setPreviewError("");
+        const timer = window.setTimeout(() => {
+            void previewMailTemplate(token, { subject, body }, name, locale, expireMinutes).then((value) => {
+                if (active) setPreview(value);
+            }).catch((error) => {
+                if (active) setPreviewError(error instanceof Error ? error.message : "邮件预览加载失败");
+            });
+        }, 300);
+        return () => { active = false; window.clearTimeout(timer); };
+    }, [body, expireMinutes, locale, name, subject, token]);
     const saveTemplate = () => {
-        form.setFieldValue(["private", "mail", "templates", activeName, "subject"], subject);
-        form.setFieldValue(["private", "mail", "templates", activeName, "body"], body);
+        form.setFieldValue(["private", "mail", "templates", locale, name, "subject"], subject);
+        form.setFieldValue(["private", "mail", "templates", locale, name, "body"], body);
         onClose();
         onSave();
     };
     return (
         <Modal
-            title={title}
-            open={!!name}
-            width="min(1120px, calc(100vw - 24px))"
+            title={<Space>{tr(mailTemplateTitles[name])}<Tag data-i18n-skip>{localeLabels[locale]}</Tag></Space>}
+            open
+            width="min(1280px, calc(100vw - 24px))"
             onCancel={onClose}
             footer={
                 <Space>
-                    <Button onClick={onClose}>取消</Button>
+                    <Button onClick={onClose}>{tr("取消")}</Button>
                     <Button type="primary" onClick={saveTemplate}>
-                        保存
+                        {tr("保存")}
                     </Button>
                 </Space>
             }
             destroyOnHidden
         >
-            <Row gutter={16}>
-                <Col xs={24} lg={12}>
+            <Row gutter={[20, 20]}>
+                <Col xs={24} lg={10}>
                     <Flex vertical gap={12}>
                         <div>
-                            <Typography.Text strong>标题</Typography.Text>
-                            <Input value={subject} onChange={(event) => setTemplateField("subject", event.target.value)} style={{ marginTop: 8 }} />
+                            <Typography.Text strong>{tr("标题")}</Typography.Text>
+                            <Input aria-label={tr("邮件标题")} value={subject} onChange={(event) => setSubject(event.target.value)} style={{ marginTop: 8 }} />
                         </div>
                         <div>
-                            <Typography.Text strong>正文模板</Typography.Text>
-                            <Input.TextArea value={body} onChange={(event) => setTemplateField("body", event.target.value)} rows={17} style={{ marginTop: 8, fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" }} />
+                            <Typography.Text strong>{tr("正文模板")}</Typography.Text>
+                            <Input.TextArea aria-label={tr("正文模板")} value={body} onChange={(event) => setBody(event.target.value)} rows={12} style={{ marginTop: 8, fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" }} />
                         </div>
-                        <Typography.Text type="secondary">可用变量：{mailTemplateVariables.join("、")}</Typography.Text>
+                        <Typography.Text type="secondary">{tr("可用变量：")}{mailTemplateVariables.join("、")}</Typography.Text>
+                        <Typography.Text type="secondary">{tr("正文按纯文本编辑；验证码、有效期、请求信息和安全提醒自动附加，版权固定为英文。")}</Typography.Text>
+                        <Typography.Text type="secondary">{tr("留空使用当前语言的内置文案；预览与实际发送使用同一模板。")}</Typography.Text>
                     </Flex>
                 </Col>
-                <Col xs={24} lg={12}>
-                    <Typography.Text strong>实时预览</Typography.Text>
-                    <Typography.Text type="secondary">正文按纯文本编辑，发送时自动应用 Aivro 品牌卡片；验证码显示为独立数字格。</Typography.Text>
-                    <iframe title="邮件预览" sandbox="" srcDoc={preview} style={{ marginTop: 8, width: "100%", minHeight: 560, border: "1px solid var(--ant-color-border)", borderRadius: 8, background: "#f4f4f3" }} />
+                <Col xs={24} lg={14}>
+                    <Flex align="center" justify="space-between" gap={8} wrap>
+                        <Typography.Text strong>{tr("实时预览")}</Typography.Text>
+                        <Segmented value={previewMode} onChange={setPreviewMode} options={[{ value: "desktop", label: tr("桌面") }, { value: "mobile", label: tr("手机") }, { value: "text", label: tr("纯文本") }]} />
+                    </Flex>
+                    {previewError ? <Typography.Paragraph type="danger">{tr(previewError)}</Typography.Paragraph> : !preview ? <Typography.Paragraph type="secondary" className="!mt-4"><LoadingOutlined /> {tr("正在加载邮件预览")}</Typography.Paragraph> : (
+                        <div data-i18n-skip>
+                            <Typography.Paragraph className="!my-3">{preview.subject}</Typography.Paragraph>
+                            {previewMode === "text" ? <pre className="max-h-[680px] overflow-auto whitespace-pre-wrap break-words rounded-lg border border-[var(--ant-color-border)] p-4 text-sm">{preview.text}</pre> : <iframe title={tr("邮件预览")} sandbox="" srcDoc={preview.html} style={{ display: "block", margin: "0 auto", width: previewMode === "mobile" ? 320 : "100%", maxWidth: "100%", height: 680, border: "1px solid var(--ant-color-border)", borderRadius: 8 }} />}
+                        </div>
+                    )}
                 </Col>
             </Row>
         </Modal>
@@ -2345,11 +2374,7 @@ function normalizePrivateSetting(setting: Partial<AdminSettings["private"]> = {}
         mail: {
             ...emptySettings.private.mail,
             ...(setting.mail || {}),
-            templates: {
-                register: { ...emptySettings.private.mail.templates.register, ...(setting.mail?.templates?.register || {}) },
-                reset: { ...emptySettings.private.mail.templates.reset, ...(setting.mail?.templates?.reset || {}) },
-                metamask: { ...emptySettings.private.mail.templates.metamask, ...(setting.mail?.templates?.metamask || {}) },
-            },
+            templates: setting.mail?.templates || {},
         },
         cloudStorage: normalizeCloudStorageSetting(setting.cloudStorage),
         stripe: {

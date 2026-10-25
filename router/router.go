@@ -203,6 +203,7 @@ func New() *gin.Engine {
 	admin.POST("/settings/channel-models", gin.WrapF(handler.AdminChannelModels))
 	admin.POST("/settings/channel-test", gin.WrapF(handler.AdminTestChannelModel))
 	admin.POST("/settings/mail-test", gin.WrapF(handler.AdminTestMail))
+	admin.POST("/settings/mail-preview", gin.WrapF(handler.AdminPreviewMail))
 	admin.POST("/settings/cloud-storage-test", gin.WrapF(handler.AdminTestCloudStorage))
 	admin.GET("/plans", gin.WrapF(handler.AdminPlans))
 	admin.POST("/plans", gin.WrapF(handler.AdminSavePlan))
