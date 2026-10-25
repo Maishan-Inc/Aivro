@@ -6,15 +6,14 @@ import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Edit3, Eye, Image as ImageIc
 import { App, Button, Empty, Input, Modal, Segmented } from "antd";
 
 import { ModelPicker } from "@/components/model-picker";
-import { defaultConfig, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
-import { CreditSymbol, requestCreditCost } from "@/constant/credits";
+import { ModelBilling } from "@/components/model-billing";
+import { defaultConfig, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { CanvasImageSettingsPopover } from "./canvas-image-settings-popover";
 import { CanvasVideoSettingsPopover } from "./canvas-video-settings-popover";
 import type { NodeGenerationInput } from "./canvas-node-generation";
 import type { CanvasGenerationMode, CanvasNodeData, CanvasNodeMetadata } from "../types";
-import { formatNumber } from "@/lib/datetime";
 
 type CanvasConfigNodePanelProps = {
     node: CanvasNodeData;
@@ -32,12 +31,9 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, inputs, o
     const [editingTextId, setEditingTextId] = useState<string | null>(null);
     const [editingText, setEditingText] = useState("");
     const globalConfig = useEffectiveConfig();
-    const modelCosts = useConfigStore((state) => state.publicSettings?.modelChannel.modelCosts);
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
     const mode = node.metadata?.generationMode || "image";
     const config = buildNodeConfig(globalConfig, node, mode);
-    const count = Math.max(1, Math.min(15, Math.floor(Math.abs(Number(node.metadata?.count || 3)) || 1)));
-    const credits = requestCreditCost({ modelCosts, model: config.model, count: mode === "image" ? count : 1 });
     const chipStyle = { background: theme.node.fill, borderColor: theme.node.stroke, color: theme.node.text };
     const textInputs = inputs.filter((input) => input.type === "text");
     const imageInputs = inputs.filter((input) => input.type === "image");
@@ -119,7 +115,7 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, inputs, o
             </div>
 
             <div className="mb-3 flex min-w-0 shrink-0 cursor-default flex-wrap items-center gap-2" onMouseDown={(event) => event.stopPropagation()}>
-                <ModelPicker className="canvas-compact-control h-10" config={config} models={modelsForMode(config, mode)} value={config.model} onChange={(model) => onConfigChange(node.id, { model })} onMissingConfig={() => message.warning("管理员尚未配置可用模型")} />
+                <ModelPicker className="canvas-compact-control h-10" config={config} kind={mode} models={modelsForMode(config, mode)} value={config.model} onChange={(model) => onConfigChange(node.id, { model })} onMissingConfig={() => message.warning("管理员尚未配置可用模型")} />
                 {mode === "video" ? (
                     <CanvasVideoSettingsPopover config={config} placement="topRight" buttonClassName="canvas-compact-control !h-10 !w-[148px] !shrink-0 !justify-start !rounded-lg !px-2" onConfigChange={(key, value) => onConfigChange(node.id, key === "videoSeconds" ? { seconds: value } : { [key]: value })} />
                 ) : mode === "image" ? (
@@ -127,6 +123,7 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, inputs, o
                 ) : null}
             </div>
 
+            <ModelBilling model={config.model} kind={mode} count={config.count} className="mb-2 shrink-0" />
             <Button
                 type="primary"
                 data-canvas-action="generate"
@@ -137,10 +134,6 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, inputs, o
                 onClick={() => onGenerate(node.id)}
             >
                 <span className="inline-flex items-center gap-1.5">
-                    <span className="inline-flex items-center gap-1">
-                        <CreditSymbol />
-                        {formatNumber(credits)}
-                    </span>
                     {isRunning ? <LoaderCircle className="size-4 animate-spin" /> : <Play className="size-4" />}
                     <span>开始生成</span>
                 </span>

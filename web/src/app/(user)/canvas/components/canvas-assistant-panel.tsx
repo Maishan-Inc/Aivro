@@ -6,6 +6,7 @@ import { App, Button, Modal, Segmented, Tooltip } from "antd";
 
 import { ImageGenerationPending } from "@/components/image-generation-pending";
 import { ModelPicker } from "@/components/model-picker";
+import { ModelBilling } from "@/components/model-billing";
 import { useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { nanoid } from "nanoid";
@@ -501,7 +502,7 @@ function AssistantComposer({
                                 { label: "对话", value: "chat" },
                             ]}
                         />
-                        <ModelPicker config={config} models={config.textModels} value={model} onChange={onModelChange} placeholder="对话模型" onMissingConfig={() => undefined} />
+                        <ModelPicker config={config} kind="text" models={config.textModels} value={model} onChange={onModelChange} placeholder="对话模型" onMissingConfig={() => undefined} />
                     </div>
                     <Button
                         type="primary"
@@ -513,6 +514,7 @@ function AssistantComposer({
                         {isRunning ? <LoaderCircle className="size-4 animate-spin" /> : <ArrowUp className="size-4" />}
                     </Button>
                 </div>
+                <ModelBilling model={model} kind="text" className="mt-1 pr-12" />
             </div>
         </div>
     );

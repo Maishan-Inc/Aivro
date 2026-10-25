@@ -6,9 +6,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/u
 import { cn } from "@/lib/utils";
 import { useConfigStore, type AiConfig } from "@/stores/use-config-store";
 import { ModelLogo } from "./model-logo";
+import { useI18n } from "@/hooks/use-i18n";
+import { useModelBilling } from "@/hooks/use-model-billing";
+import { billingUnit } from "@/lib/model-pricing";
+import type { GenerationKind } from "@/constant/credits";
 
 type ModelPickerProps = {
     config: AiConfig;
+    kind: GenerationKind;
     value?: string;
     onChange: (model: string) => void;
     models?: string[];
@@ -18,7 +23,8 @@ type ModelPickerProps = {
     onMissingConfig?: () => void;
 };
 
-export function ModelPicker({ config, value, onChange, models, className, fullWidth = false, placeholder = "选择模型", onMissingConfig }: ModelPickerProps) {
+export function ModelPicker({ config, kind, value, onChange, models, className, fullWidth = false, placeholder = "选择模型", onMissingConfig }: ModelPickerProps) {
+    const { tr } = useI18n();
     const pickerId = useId();
     const [open, setOpen] = useState(false);
     const options = useMemo(() => Array.from(new Set((models || config.models).filter(Boolean))), [config.models, models]);
@@ -56,10 +62,11 @@ export function ModelPicker({ config, value, onChange, models, className, fullWi
                 )}
                 onMouseDown={(event) => event.stopPropagation()}
                 onPointerDown={(event) => event.stopPropagation()}
-                title={current || placeholder}
+                data-i18n-skip
+                title={current || tr(placeholder)}
             >
                 <ModelIcon model={current} />
-                <span className="canvas-model-picker-text min-w-0 flex-1 truncate text-left">{current || placeholder}</span>
+                <span className="canvas-model-picker-text min-w-0 flex-1 truncate text-left">{current || tr(placeholder)}</span>
             </SelectTrigger>
             <SelectContent
                 data-canvas-no-zoom
@@ -73,8 +80,8 @@ export function ModelPicker({ config, value, onChange, models, className, fullWi
             >
                 {options.length ? (
                     options.map((model) => (
-                        <SelectItem key={model} value={model} textValue={model}>
-                            <ModelLabel model={model} />
+                        <SelectItem key={model} value={model} textValue={model} className="py-2 [&>span:last-child]:min-w-0 [&>span:last-child]:flex-1">
+                            <ModelLabel model={model} kind={kind} />
                         </SelectItem>
                     ))
                 ) : (
@@ -87,11 +94,16 @@ export function ModelPicker({ config, value, onChange, models, className, fullWi
     );
 }
 
-function ModelLabel({ model }: { model: string }) {
+function ModelLabel({ model, kind }: { model: string; kind: GenerationKind }) {
+    const { cost, billingType, unavailable } = useModelBilling({ model, kind });
+    const { tr, locale } = useI18n();
     return (
-        <span className="flex min-w-0 items-center gap-2">
+        <span className="flex min-w-0 items-center gap-2" data-i18n-skip>
             <ModelIcon model={model} />
-            <span className="truncate">{model}</span>
+            <span className="min-w-0 space-y-0.5">
+                <span className="block truncate" title={model}>{model}</span>
+                <span className="block text-[11px] leading-4 opacity-60">{cost ? `${tr("基础单价")} ${cost.credits.toLocaleString(locale)} ${tr(billingUnit(billingType))}` : tr(unavailable)}</span>
+            </span>
         </span>
     );
 }

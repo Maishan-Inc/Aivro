@@ -16,6 +16,7 @@ import { saveGenerationHistory, deleteGenerationHistory, fetchGenerationHistorie
 import { GenerationHistoryDetailModal } from "@/components/generation-history-detail-modal";
 import { uploadImage } from "@/services/image-storage";
 import { ModelPicker } from "@/components/model-picker";
+import { ModelBilling } from "@/components/model-billing";
 import { useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
 import { formatBytes, formatDuration, readImageMeta } from "@/lib/image-utils";
 import { nanoid } from "nanoid";
@@ -229,7 +230,6 @@ export default function Model3DPage() {
 
     const canGenerate = mode === "text" ? Boolean(prompt.trim()) : images.length > 0;
     const composerExpanded = composerFocused || Boolean(prompt.trim()) || images.length > 0;
-    const estimatedEnergy = Math.round(30 * quantity * (meshQuality === "high" ? 1.6 : meshQuality === "ultra" ? 2.5 : 1) * (textureEnabled ? 1.2 : 1) * (pbrEnabled ? 1.3 : 1));
 
     return (
         <div className={studio.studio}>
@@ -336,7 +336,7 @@ export default function Model3DPage() {
                             <div className={composer.controls}><div><div className={composer.toolbar} inert={!composerExpanded}>
                                 <div className={composer.toolbarRow}>
                                 <Button type="text" shape="circle" icon={<Upload size={17} />} onClick={() => fileInputRef.current?.click()} aria-label="上传参考图" title="上传参考图" />
-                                <ModelPicker config={effectiveConfig} models={effectiveConfig.model3DModels} value={model} onChange={(value) => updateConfig("model3DModel", value)} onMissingConfig={() => message.warning("管理员尚未配置可用3D模型")} />
+                                <ModelPicker config={effectiveConfig} kind="model3d" models={effectiveConfig.model3DModels} value={model} onChange={(value) => updateConfig("model3DModel", value)} onMissingConfig={() => message.warning("管理员尚未配置可用3D模型")} />
                                 </div>
                                 <div className={composer.toolbarRow}>
                                 <Dropdown trigger={["click"]} placement="topLeft" menu={{ selectable: true, selectedKeys: [mode], items: [
@@ -353,13 +353,14 @@ export default function Model3DPage() {
                                     <Button type="text">{quantity} 个<ChevronDown size={12} /></Button>
                                 </Dropdown>
                                 <Button type="text" icon={<SlidersHorizontal size={14} />} onClick={() => setSettingsOpen(true)} aria-label="调整材质和面数" title="材质和面数" />
+                                <ModelBilling model={model} kind="model3d" model3D={{ quantity, meshQuality, textureEnabled, pbrEnabled, targetFaceCount }} />
                                 </div>
                             </div></div></div>
                             </div>
                                 <Button className={composer.send} type="primary" shape="circle" icon={<ArrowUp size={20} />} loading={generating} disabled={!canGenerate || generating} onClick={() => void handleGenerate()} aria-label="生成模型" title="生成模型" />
                             </div>
                         </div>
-                        <p className={studio.composerHint}><span>Enter 生成 · Shift + Enter 换行</span><span>预计消耗 {estimatedEnergy} 电量</span></p>
+                        <p className={studio.composerHint}><span>Enter 生成 · Shift + Enter 换行</span></p>
                     </div>
                 </section>
                 <StudioHistorySidebar items={histories.map((item) => ({ id: item.id, title: item.title, prompt: item.prompt, preview: item.references[0]?.url }))} onSelect={(id) => { const item = histories.find((history) => history.id === id); if (item) setDetailHistory(item); }}>
@@ -388,6 +389,7 @@ export default function Model3DPage() {
                     <label className="space-y-2"><span className="block text-sm">PBR 材质</span><Select className="w-full" value={pbrEnabled ? "on" : "off"} onChange={(value) => setPbrEnabled(value === "on")} options={[{ value: "on", label: "开启 PBR" }, { value: "off", label: "关闭 PBR" }]} /></label>
                     <label className="col-span-2 space-y-2"><span className="block text-sm">目标面数</span><InputNumber value={targetFaceCount} onChange={(value) => setTargetFaceCount(value || 500000)} min={500000} max={1000000} step={50000} className="!w-full" /></label>
                 </div>
+                <ModelBilling model={model} kind="model3d" model3D={{ quantity, meshQuality, textureEnabled, pbrEnabled, targetFaceCount }} />
             </Modal>
             <GenerationHistoryDetailModal open={Boolean(detailHistory)} history={detailHistory} onClose={() => setDetailHistory(null)} />
         </div>

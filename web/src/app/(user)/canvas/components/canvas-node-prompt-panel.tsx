@@ -5,14 +5,13 @@ import { ArrowUp, LoaderCircle } from "lucide-react";
 import { App, Button } from "antd";
 
 import { ModelPicker } from "@/components/model-picker";
-import { defaultConfig, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
-import { CreditSymbol, requestCreditCost } from "@/constant/credits";
+import { ModelBilling } from "@/components/model-billing";
+import { defaultConfig, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { CanvasImageSettingsPopover } from "./canvas-image-settings-popover";
 import { CanvasVideoSettingsPopover } from "./canvas-video-settings-popover";
 import { CanvasNodeType, type CanvasGenerationMode, type CanvasNodeData } from "../types";
-import { formatNumber } from "@/lib/datetime";
 import { useI18n } from "@/hooks/use-i18n";
 import { CanvasNodeReferences } from "./canvas-node-inputs";
 import type { NodeGenerationInput } from "./canvas-node-generation";
@@ -34,7 +33,6 @@ export function CanvasNodePromptPanel({ node, isRunning, inputs, onHighlightInpu
     const { message } = App.useApp();
     const { tr } = useI18n();
     const globalConfig = useEffectiveConfig();
-    const modelCosts = useConfigStore((state) => state.publicSettings?.modelChannel.modelCosts);
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
     const mode = defaultMode(node.type);
     const config = buildNodeConfig(globalConfig, node, mode);
@@ -42,7 +40,6 @@ export function CanvasNodePromptPanel({ node, isRunning, inputs, onHighlightInpu
     const hasImageContent = node.type === CanvasNodeType.Image && Boolean(node.metadata?.content);
     const isEditingExistingContent = hasTextContent || hasImageContent;
     const [prompt, setPrompt] = useState(isEditingExistingContent ? "" : node.metadata?.prompt || "");
-    const credits = requestCreditCost({ modelCosts, model: config.model, count: mode === "image" ? config.count : 1 });
     const canGenerate = Boolean(prompt.trim() || inputs.some((input) => input.text?.trim() || (!hasImageContent && input.image)));
     const warnMissingModel = () => message.warning("管理员尚未配置可用模型");
 
@@ -86,10 +83,10 @@ export function CanvasNodePromptPanel({ node, isRunning, inputs, onHighlightInpu
             />
 
             <div className="flex min-w-0 shrink-0 flex-wrap items-center gap-3 pt-1">
-                <div className="flex min-w-0 basis-[446px] grow flex-wrap items-center gap-3 [&_.canvas-composer-model-picker]:h-10">
+                <div className="flex w-full min-w-0 flex-wrap items-center gap-3 [&_.canvas-composer-model-picker]:h-10">
                     {mode === "image" ? (
                         <>
-                            <ModelPicker config={config} models={config.imageModels} value={config.model} onChange={(model) => onConfigChange(node.id, { model })} onMissingConfig={warnMissingModel} />
+                            <ModelPicker config={config} kind={mode} models={config.imageModels} value={config.model} onChange={(model) => onConfigChange(node.id, { model })} onMissingConfig={warnMissingModel} />
                             <CanvasImageSettingsPopover
                                 config={config}
                                 placement="topLeft"
@@ -101,13 +98,14 @@ export function CanvasNodePromptPanel({ node, isRunning, inputs, onHighlightInpu
                         </>
                     ) : mode === "video" ? (
                         <>
-                            <ModelPicker config={config} models={config.videoModels} value={config.model} onChange={(model) => onConfigChange(node.id, { model })} onMissingConfig={warnMissingModel} />
+                            <ModelPicker config={config} kind={mode} models={config.videoModels} value={config.model} onChange={(model) => onConfigChange(node.id, { model })} onMissingConfig={warnMissingModel} />
                             <CanvasVideoSettingsPopover config={config} buttonClassName="!h-10 !max-w-[170px] !justify-start !rounded-full !px-3" onConfigChange={(key, value) => onConfigChange(node.id, key === "videoSeconds" ? { seconds: value } : { [key]: value })} />
                         </>
                     ) : (
-                        <ModelPicker config={config} models={config.textModels} value={config.model} onChange={(model) => onConfigChange(node.id, { model })} onMissingConfig={warnMissingModel} />
+                        <ModelPicker config={config} kind={mode} models={config.textModels} value={config.model} onChange={(model) => onConfigChange(node.id, { model })} onMissingConfig={warnMissingModel} />
                     )}
                 </div>
+                <ModelBilling model={config.model} kind={mode} count={mode === "image" ? config.count : 1} className="flex-1" />
                 <Button
                     type="primary"
                     className="!ml-auto !h-10 !min-w-16 shrink-0 !rounded-full !px-3"
@@ -118,10 +116,6 @@ export function CanvasNodePromptPanel({ node, isRunning, inputs, onHighlightInpu
                     data-canvas-running={isRunning}
                 >
                     <span className="flex items-center gap-1.5">
-                        <span className="inline-flex items-center gap-1 text-xs font-medium tabular-nums">
-                            <CreditSymbol />
-                            {formatNumber(credits)}
-                        </span>
                         {isRunning ? <LoaderCircle className="size-4 animate-spin" /> : <ArrowUp className="size-4" />}
                     </span>
                 </Button>

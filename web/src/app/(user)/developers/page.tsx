@@ -7,24 +7,14 @@ import { generateLocalizedMetadata, requestLocale } from "@/lib/page-metadata";
 import { CodeBlock, CodeExamples } from "./code-examples";
 import { endpoints, queueExample } from "./reference";
 import { videoWorkflowExample } from "./video-example";
+import { DevelopersToc } from "./developers-toc";
 
 export const generateMetadata = () => generateLocalizedMetadata("developers");
-
-const sections = [
-    { id: "quick-start", title: "快速开始" },
-    { id: "authentication", title: "密钥与鉴权" },
-    { id: "languages", title: "多语言代码示例" },
-    { id: "reference", title: "接口参考" },
-    { id: "queue", title: "异步任务处理" },
-    { id: "video-workflow", title: "从参考图到视频下载" },
-    { id: "responses", title: "响应与错误处理" },
-    { id: "billing", title: "计费与使用建议" },
-];
 
 export default async function DevelopersPage() {
     const locale = await requestLocale();
     const tr = (value: string) => translate(value, locale);
-    return <main lang={locale} className="thin-scrollbar h-full overflow-y-auto scroll-smooth bg-background text-foreground">
+    return <main lang={locale} className="thin-scrollbar h-full overflow-y-auto scroll-smooth bg-background text-foreground motion-reduce:scroll-auto">
         <div className="mx-auto w-full max-w-[1960px] px-6 pb-16 sm:px-8">
             <header className="border-b border-border pb-10 pt-12 text-center sm:pt-16">
                 <div className="mb-6 flex items-center justify-center gap-2 text-xs tracking-wider text-muted-foreground"><BookOpen className="size-4" />{tr("开发文档")}<span className="mx-2 text-border">/</span>{tr("接口版本 v1")}</div>
@@ -36,11 +26,7 @@ export default async function DevelopersPage() {
             <div className="grid items-start gap-10 pt-9 lg:grid-cols-[190px_minmax(0,1fr)] min-[1440px]:grid-cols-[minmax(0,1fr)_minmax(0,960px)_minmax(0,1fr)] min-[1440px]:gap-12">
                 <aside className="lg:sticky lg:top-8 lg:col-start-1 lg:row-start-1 min-[1440px]:w-[190px] min-[1440px]:justify-self-end">
                     <Link href={withLocalePath("/console/api-keys", locale)} className="mb-8 inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-foreground px-4 text-sm text-background transition hover:opacity-80"><KeyRound className="size-4" />{tr("创建我的密钥")}<ArrowUpRight className="size-4" /></Link>
-                    <nav aria-label={tr("开发文档目录")} className="thin-scrollbar max-h-[calc(100dvh-180px)] overflow-y-auto text-sm">
-                        <p className="mb-4 text-[11px] text-muted-foreground">{tr("接入指南")}</p>
-                        <div className="flex flex-wrap gap-x-5 gap-y-3 lg:flex-col">{sections.map((item, index) => <a key={item.id} href={`#${item.id}`} className="inline-flex items-center gap-3 text-muted-foreground hover:text-foreground"><span className="font-mono text-[10px] opacity-50">{String(index + 1).padStart(2, "0")}</span>{tr(item.title)}</a>)}</div>
-                        <div className="mt-7 hidden border-t border-border pt-5 lg:block"><p className="mb-3 text-[11px] text-muted-foreground">{tr("模型与任务接口")}</p><div className="space-y-3">{endpoints.map((item) => <a key={item.id} href={`#${item.id}`} className="block text-xs text-muted-foreground hover:text-foreground">{tr(item.title)}</a>)}</div></div>
-                    </nav>
+                    <DevelopersToc endpoints={endpoints.map(({ id, title }) => ({ id, title }))} />
                 </aside>
 
                 <article className="min-w-0 space-y-14 text-sm leading-8 [&_section]:scroll-mt-8 [&_h2]:mb-5 [&_h2]:text-3xl [&_h2]:font-semibold [&_h2]:tracking-tight [&_h3]:mb-3 [&_h3]:text-base [&_h3]:font-medium [&_p]:text-muted-foreground lg:col-start-2 lg:row-start-1">
