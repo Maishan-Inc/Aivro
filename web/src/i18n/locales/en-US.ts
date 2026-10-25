@@ -1,5 +1,13 @@
 // Generated translations. Source strings are Simplified Chinese (zh-CN).
 const enUS = {
+    "定位并高亮参考图": "Locate and highlight reference image",
+    "连接参考图或输入提示词": "Connect a reference image or enter a prompt",
+    "画布右键菜单": "Canvas context menu",
+    "创建副本": "Create a duplicate",
+    "上传图片或视频": "Upload image or video",
+    "粘贴节点": "Paste nodes",
+    "撤销操作": "Undo",
+    "适应画布": "Fit to canvas",
     "全部类型": "All types",
     "搜索模型": "Search models",
     "复制模型 ID": "Copy model ID",

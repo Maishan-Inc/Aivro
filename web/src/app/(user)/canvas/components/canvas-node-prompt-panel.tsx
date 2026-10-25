@@ -13,20 +13,26 @@ import { CanvasImageSettingsPopover } from "./canvas-image-settings-popover";
 import { CanvasVideoSettingsPopover } from "./canvas-video-settings-popover";
 import { CanvasNodeType, type CanvasGenerationMode, type CanvasNodeData } from "../types";
 import { formatNumber } from "@/lib/datetime";
+import { useI18n } from "@/hooks/use-i18n";
+import { CanvasNodeReferences } from "./canvas-node-inputs";
+import type { NodeGenerationInput } from "./canvas-node-generation";
 
 export type CanvasNodeGenerationMode = CanvasGenerationMode;
 
 type CanvasNodePromptPanelProps = {
     node: CanvasNodeData;
     isRunning: boolean;
+    inputs: NodeGenerationInput[];
+    onHighlightInput: (nodeId: string) => void;
     onPromptChange: (nodeId: string, prompt: string) => void;
     onConfigChange: (nodeId: string, patch: Partial<CanvasNodeData["metadata"]>) => void;
     onGenerate: (nodeId: string, mode: CanvasNodeGenerationMode, prompt: string) => void;
     onImageSettingsOpenChange?: (open: boolean) => void;
 };
 
-export function CanvasNodePromptPanel({ node, isRunning, onPromptChange, onConfigChange, onGenerate, onImageSettingsOpenChange }: CanvasNodePromptPanelProps) {
+export function CanvasNodePromptPanel({ node, isRunning, inputs, onHighlightInput, onPromptChange, onConfigChange, onGenerate, onImageSettingsOpenChange }: CanvasNodePromptPanelProps) {
     const { message } = App.useApp();
+    const { tr } = useI18n();
     const globalConfig = useEffectiveConfig();
     const modelCosts = useConfigStore((state) => state.publicSettings?.modelChannel.modelCosts);
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
@@ -37,6 +43,7 @@ export function CanvasNodePromptPanel({ node, isRunning, onPromptChange, onConfi
     const isEditingExistingContent = hasTextContent || hasImageContent;
     const [prompt, setPrompt] = useState(isEditingExistingContent ? "" : node.metadata?.prompt || "");
     const credits = requestCreditCost({ modelCosts, model: config.model, count: mode === "image" ? config.count : 1 });
+    const canGenerate = Boolean(prompt.trim() || inputs.some((input) => input.text?.trim()));
     const warnMissingModel = () => message.warning("管理员尚未配置可用模型");
 
     useEffect(() => {
@@ -50,34 +57,36 @@ export function CanvasNodePromptPanel({ node, isRunning, onPromptChange, onConfi
 
     const submit = () => {
         const text = prompt.trim();
-        if (!text || isRunning) return;
+        if (!canGenerate || isRunning) return;
         onGenerate(node.id, mode, text);
-        setPrompt("");
     };
 
     return (
         <div
-            className="rounded-2xl border p-3 shadow-2xl backdrop-blur"
+            data-canvas-prompt-panel
+            className="space-y-3 rounded-2xl border p-4 shadow-2xl backdrop-blur"
             style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.node.text }}
             onMouseDown={(event) => event.stopPropagation()}
             onPointerDown={(event) => event.stopPropagation()}
             onWheel={(event) => event.stopPropagation()}
         >
+            <CanvasNodeReferences inputs={inputs} onHighlight={onHighlightInput} />
             <textarea
                 value={prompt}
                 onChange={(event) => updatePrompt(event.target.value)}
                 onKeyDown={(event) => {
-                    if (event.key !== "Enter" || event.ctrlKey || event.metaKey || event.shiftKey) return;
+                    if (event.nativeEvent.isComposing || event.key !== "Enter" || event.ctrlKey || event.metaKey || event.shiftKey) return;
                     event.preventDefault();
                     submit();
                 }}
-                className="thin-scrollbar h-24 w-full resize-none rounded-xl border px-3 py-2 text-sm leading-5 outline-none"
+                className="thin-scrollbar block h-28 w-full resize-none rounded-xl border px-3 py-2 text-sm leading-5 outline-none"
+                aria-label={tr("提示词")}
                 style={{ background: theme.node.fill, borderColor: theme.node.stroke, color: theme.node.text }}
                 placeholder={mode === "video" ? "描述要生成的视频内容" : mode === "image" ? (hasImageContent ? "请输入你想要把这张图修改成什么" : "描述要生成的图片内容") : hasTextContent ? "请输入你想要将本段文本修改成什么" : "请输入你想要生成的文本内容"}
             />
 
-            <div className="mt-2 flex min-w-0 items-center justify-between gap-2">
-                <div className="flex min-w-0 items-center gap-2">
+            <div className="flex min-w-0 flex-wrap items-center gap-3">
+                <div className="flex min-w-0 basis-[446px] grow flex-wrap items-center gap-3 [&_.canvas-composer-model-picker]:h-10">
                     {mode === "image" ? (
                         <>
                             <ModelPicker config={config} models={config.imageModels} value={config.model} onChange={(model) => onConfigChange(node.id, { model })} onMissingConfig={warnMissingModel} />
@@ -101,10 +110,12 @@ export function CanvasNodePromptPanel({ node, isRunning, onPromptChange, onConfi
                 </div>
                 <Button
                     type="primary"
-                    className="!h-10 !min-w-16 shrink-0 !rounded-full !px-3"
-                    disabled={isRunning || !prompt.trim()}
+                    className="!ml-auto !h-10 !min-w-16 shrink-0 !rounded-full !px-3"
+                    disabled={isRunning || !canGenerate}
                     onClick={submit}
                     aria-label="生成"
+                    data-canvas-action="generate"
+                    data-canvas-running={isRunning}
                 >
                     <span className="flex items-center gap-1.5">
                         <span className="inline-flex items-center gap-1 text-xs font-medium tabular-nums">

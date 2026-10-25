@@ -1,5 +1,13 @@
 // Generated translations. Source strings are Simplified Chinese (zh-CN).
 const frFR = {
+    "定位并高亮参考图": "Localiser et mettre en évidence l’image de référence",
+    "连接参考图或输入提示词": "Reliez une image de référence ou saisissez un prompt",
+    "画布右键菜单": "Menu contextuel du canevas",
+    "创建副本": "Créer une copie",
+    "上传图片或视频": "Importer une image ou une vidéo",
+    "粘贴节点": "Coller les nœuds",
+    "撤销操作": "Annuler l’action",
+    "适应画布": "Ajuster au canevas",
     "全部类型": "Tous les types",
     "搜索模型": "Rechercher un modèle",
     "复制模型 ID": "Copier l’identifiant du modèle",

@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Modal, Segmented, Tooltip } from "antd";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { Modal, Segmented, Tooltip, theme as antdTheme } from "antd";
 import { Camera, Download, FolderPlus, Image as ImageIcon, Info, Lock, LockOpen, Maximize2, MessageSquare, Minus, Pencil, Plus, RefreshCw, Scissors, Settings2, Trash2, Upload, Video } from "lucide-react";
 
 import { canvasThemes } from "@/lib/canvas-theme";
@@ -52,24 +52,42 @@ export function CanvasNodeHoverToolbar({
     onToggleFreeResize,
     onDelete,
 }: CanvasNodeHoverToolbarProps) {
+    const theme = canvasThemes[useThemeStore((state) => state.theme)];
+    const { token } = antdTheme.useToken();
+    const toolbarRef = useRef<HTMLDivElement>(null);
+    const left = node ? viewport.x + (node.position.x + node.width / 2) * viewport.k : 0;
+    const top = node ? viewport.y + node.position.y * viewport.k - 14 : 0;
+    useLayoutEffect(() => {
+        const toolbar = toolbarRef.current;
+        const container = toolbar?.offsetParent;
+        if (!toolbar || !(container instanceof HTMLElement)) return;
+        const position = () => {
+            const halfWidth = toolbar.offsetWidth / 2;
+            toolbar.style.left = `${Math.max(halfWidth + 16, Math.min(left, container.clientWidth - halfWidth - 16))}px`;
+            toolbar.style.top = `${Math.max(toolbar.offsetHeight + 64, top)}px`;
+        };
+        position();
+        const observer = new ResizeObserver(position);
+        observer.observe(toolbar);
+        return () => observer.disconnect();
+    }, [left, top, node?.id]);
     if (!node) return null;
 
-    const left = viewport.x + (node.position.x + node.width / 2) * viewport.k;
-    const top = viewport.y + node.position.y * viewport.k - 14;
     const isImage = node.type === CanvasNodeType.Image;
     const isVideo = node.type === CanvasNodeType.Video;
     const hasImage = isImage && Boolean(node.metadata?.content);
     const hasVideo = isVideo && Boolean(node.metadata?.content);
     const isText = node.type === CanvasNodeType.Text;
     const isConfig = node.type === CanvasNodeType.Config;
-    const canOpenDialog = isText || hasImage || isVideo;
+    const canOpenDialog = isText || isImage || isVideo;
     const canRetry = node.metadata?.status === "error";
     const hasSpecificTools = canRetry || isText || isImage || isVideo || isConfig;
 
     return (
         <div
-            className="absolute z-[70] flex h-12 -translate-x-1/2 -translate-y-full items-center overflow-visible rounded-[18px] border border-black/10 bg-white text-[15px] text-[#242529] shadow-[0_8px_28px_rgba(15,23,42,.12)]"
-            style={{ left, top }}
+            ref={toolbarRef}
+            className="thin-scrollbar absolute z-[70] flex h-12 w-max max-w-[calc(100%-32px)] -translate-x-1/2 -translate-y-full items-center overflow-x-auto rounded-[18px] border text-[15px] shadow-lg"
+            style={{ left, top, background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.node.text, "--toolbar-hover": theme.toolbar.itemHover, "--toolbar-active": theme.toolbar.activeBg, "--toolbar-border": theme.toolbar.border, "--toolbar-danger": token.colorError } as CSSProperties}
             onMouseEnter={() => onKeep(node.id)}
             onMouseLeave={onLeave}
             onMouseDown={(event) => event.stopPropagation()}
@@ -178,11 +196,11 @@ export function CanvasNodeInfoModal({ node, open, onClose }: { node: CanvasNodeD
 function ToolbarAction({ title, label, icon, onClick, hint, active = false, danger = false }: { title: string; label: string; icon: ReactNode; onClick?: () => void; hint?: string; active?: boolean; danger?: boolean }) {
     return (
         <Tooltip title={title} placement="top" mouseEnterDelay={0.2}>
-            <button type="button" className={`group relative flex h-12 items-center whitespace-nowrap px-1.5 ${danger ? "text-[#ef4444]" : ""}`} onClick={onClick} aria-label={title}>
-                <span className={`flex h-9 items-center gap-2 rounded-lg px-2.5 transition group-hover:bg-[#f0f0f1] ${active ? "bg-[#eeeeef]" : ""}`}>
+            <button type="button" className={`group relative flex h-12 shrink-0 items-center whitespace-nowrap px-1.5 ${danger ? "text-[var(--toolbar-danger)]" : ""}`} onClick={onClick} aria-label={title}>
+                <span className={`flex h-9 items-center gap-2 rounded-lg px-2.5 transition group-hover:bg-[var(--toolbar-hover)] ${active ? "bg-[var(--toolbar-active)]" : ""}`}>
                     {icon}
                     <span>{label}</span>
-                    {hint ? <span className="text-[#a3a3a3]">{hint}</span> : null}
+                    {hint ? <span className="opacity-60">{hint}</span> : null}
                 </span>
             </button>
         </Tooltip>
@@ -192,15 +210,15 @@ function ToolbarAction({ title, label, icon, onClick, hint, active = false, dang
 function IconAction({ title, icon, onClick }: { title: string; icon: ReactNode; onClick: () => void }) {
     return (
         <Tooltip title={title} placement="top" mouseEnterDelay={0.2}>
-            <button type="button" className="group relative grid h-12 w-12 place-items-center px-1.5" onClick={onClick} aria-label={title}>
-                <span className="grid size-9 place-items-center rounded-lg transition group-hover:bg-[#f0f0f1]">{icon}</span>
+            <button type="button" className="group relative grid h-12 w-12 shrink-0 place-items-center px-1.5" onClick={onClick} aria-label={title}>
+                <span className="grid size-9 place-items-center rounded-lg transition group-hover:bg-[var(--toolbar-hover)]">{icon}</span>
             </button>
         </Tooltip>
     );
 }
 
 function ToolbarDivider() {
-    return <span className="mx-1 h-7 w-px scale-x-50 bg-[#dedee2]" />;
+    return <span className="mx-1 h-7 w-px shrink-0 scale-x-50 bg-[var(--toolbar-border)]" />;
 }
 
 function InfoRow({ label, value }: { label: string; value: ReactNode }) {

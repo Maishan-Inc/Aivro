@@ -67,8 +67,8 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, inputs, o
     };
 
     return (
-        <div className="flex h-full w-full cursor-move flex-col px-3 pb-3 pt-7 text-sm" style={{ color: theme.node.text }} onWheel={(event) => event.stopPropagation()}>
-            <div className="mb-2 flex items-center justify-between gap-3">
+        <div className="thin-scrollbar flex h-full w-full cursor-move flex-col overflow-y-auto px-3 pb-3 pt-7 text-sm" style={{ color: theme.node.text }} onWheel={(event) => event.stopPropagation()}>
+            <div className="mb-2 flex shrink-0 flex-wrap items-center justify-between gap-3">
                 <div className="shrink-0 text-sm font-semibold">生成配置</div>
                 <div className="cursor-default" onMouseDown={(event) => event.stopPropagation()}>
                     <Segmented
@@ -109,7 +109,7 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, inputs, o
                 </div>
             </div>
 
-            <div className="mb-2 flex flex-wrap gap-1.5" onMouseDown={(event) => event.stopPropagation()}>
+            <div className="mb-2 flex shrink-0 flex-wrap gap-1.5" onMouseDown={(event) => event.stopPropagation()}>
                 <InputChip label="提示词" value={`${inputSummary.textCount} 个`} style={chipStyle} />
                 <InputChip label="参考图" value={`${inputSummary.imageCount} 张`} style={chipStyle} />
                 <button type="button" className="inline-flex h-7 cursor-pointer items-center gap-1 rounded-md border px-2 text-[11px]" style={chipStyle} onClick={() => setPreviewOpen(true)}>
@@ -118,19 +118,20 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, inputs, o
                 </button>
             </div>
 
-            <div className={`mb-2 grid min-w-0 cursor-default items-center gap-2 ${mode === "text" ? "grid-cols-1" : "grid-cols-[minmax(0,1fr)_148px]"}`} onMouseDown={(event) => event.stopPropagation()}>
-                <ModelPicker className="canvas-compact-control h-10" config={config} models={modelsForMode(config, mode)} value={config.model} onChange={(model) => onConfigChange(node.id, { model })} onMissingConfig={() => message.warning("管理员尚未配置可用模型")} fullWidth />
+            <div className="mb-3 flex min-w-0 shrink-0 cursor-default flex-wrap items-center gap-2" onMouseDown={(event) => event.stopPropagation()}>
+                <ModelPicker className="canvas-compact-control h-10" config={config} models={modelsForMode(config, mode)} value={config.model} onChange={(model) => onConfigChange(node.id, { model })} onMissingConfig={() => message.warning("管理员尚未配置可用模型")} />
                 {mode === "video" ? (
-                    <CanvasVideoSettingsPopover config={config} placement="topRight" buttonClassName="canvas-compact-control !h-10 !w-full !justify-start !rounded-lg !px-2" onConfigChange={(key, value) => onConfigChange(node.id, key === "videoSeconds" ? { seconds: value } : { [key]: value })} />
+                    <CanvasVideoSettingsPopover config={config} placement="topRight" buttonClassName="canvas-compact-control !h-10 !w-[148px] !shrink-0 !justify-start !rounded-lg !px-2" onConfigChange={(key, value) => onConfigChange(node.id, key === "videoSeconds" ? { seconds: value } : { [key]: value })} />
                 ) : mode === "image" ? (
-                    <CanvasImageSettingsPopover config={config} placement="topRight" autoAdjustOverflow={false} buttonClassName="canvas-compact-control !h-10 !w-full !justify-start !rounded-lg !px-2" onConfigChange={(key, value) => onConfigChange(node.id, key === "count" ? { count: Number(value) || 1 } : { [key]: value })} />
+                    <CanvasImageSettingsPopover config={config} placement="topRight" autoAdjustOverflow={false} buttonClassName="canvas-compact-control !h-10 !w-[148px] !shrink-0 !justify-start !rounded-lg !px-2" onConfigChange={(key, value) => onConfigChange(node.id, key === "count" ? { count: Number(value) || 1 } : { [key]: value })} />
                 ) : null}
             </div>
 
             <Button
                 type="primary"
                 data-canvas-action="generate"
-                className="mt-auto !h-9 !w-full !cursor-pointer !rounded-lg"
+                data-canvas-running={isRunning}
+                className="mt-auto !h-9 !w-full shrink-0 !cursor-pointer !rounded-lg"
                 disabled={isRunning || (!inputSummary.textCount && !inputSummary.imageCount)}
                 onMouseDown={(event) => event.stopPropagation()}
                 onClick={() => onGenerate(node.id)}

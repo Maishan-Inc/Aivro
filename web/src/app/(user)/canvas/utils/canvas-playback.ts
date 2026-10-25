@@ -84,14 +84,13 @@ export async function preloadCanvasPlayback(scene: PlaybackScene, tr: (text: str
     return {
         signal, images: outputs, video,
         workflow: {
-            title: tr(scene.title), backgroundMode: "lines", showImageInfo: false, viewport: { x: 80, y: 120, k: 0.82 },
+            title: tr(scene.title), backgroundMode: "lines", showImageInfo: false, viewport: { x: 100, y: 100, k: 0.88 },
             nodes: [
-                node("prompt", CanvasNodeType.Text, "创作要求", 0, 20, { content: tr(scene.prompt), status: "success", fontSize: 14 }),
-                { ...node("reference", CanvasNodeType.Image, scene.referenceTitle, (340 - referenceSize.width) / 2, 380, { content: reference.url, naturalWidth: reference.width, naturalHeight: reference.height, bytes: reference.bytes, mimeType: reference.mimeType, status: "success" }), ...referenceSize },
-                node("brief", CanvasNodeType.Text, "创意拆解", 450, 20, { content: `${tr(scene.brief)}\n\n${tr(scene.constraint)}`, status: "success", fontSize: 14 }),
-                node("config", CanvasNodeType.Config, "生成配置", 450, 360, { generationMode: video ? "video" : "image", model: video ? "grok-imagine-video" : "gpt-image-2", size: scene.format, quality: "high", count: video ? 1 : outputs.length, seconds: "10", vquality: "720", status: "idle" }),
+                { ...node("reference", CanvasNodeType.Image, scene.referenceTitle, (380 - referenceSize.width) / 2, 130, { content: reference.url, naturalWidth: reference.width, naturalHeight: reference.height, bytes: reference.bytes, mimeType: reference.mimeType, status: "success" }), ...referenceSize },
+                node("brief", CanvasNodeType.Text, "创意拆解", 20, 550, { content: `${tr(scene.brief)}\n\n${tr(scene.constraint)}`, status: "success", fontSize: 16 }),
+                node("config", video ? CanvasNodeType.Config : CanvasNodeType.Image, video ? "生成配置" : "图片节点", 620, 270, { prompt: tr(scene.prompt), generationMode: video ? "video" : "image", model: video ? "grok-imagine-video" : "gpt-image-2", size: scene.format, quality: "high", count: video ? 1 : outputs.length, seconds: "10", vquality: "720", status: "idle" }),
             ],
-            connections: ["prompt", "reference", "brief"].map((id) => ({ id: `${id}-config`, fromNodeId: id, toNodeId: "config" })),
+            connections: ["reference", "brief"].map((id) => ({ id: `${id}-config`, fromNodeId: id, toNodeId: "config" })),
         },
     };
 }
@@ -140,10 +139,15 @@ export async function playCanvasPlayback(canvas: HTMLDivElement, cursor: HTMLDiv
     await waitForPlayback(2600, signal);
     onStep(2);
     await click(find('[data-node-id="config"] > div'));
+    const referenceChip = canvas.querySelector<HTMLElement>('[data-node-id="config"] [data-canvas-prompt-panel] [data-canvas-reference="reference"]');
+    if (referenceChip) {
+        await click(referenceChip);
+        await waitForPlayback(1200, signal);
+    }
     await waitForPlayback(1500, signal);
     const generate = find('[data-node-id="config"] [data-canvas-action="generate"]') as HTMLButtonElement;
     await click(generate);
-    while (generate.disabled) await waitForPlayback(100, signal);
+    while (canvas.querySelector('[data-node-id="config"] [data-canvas-running="true"]')) await waitForPlayback(100, signal);
     onStep(3);
     const batch = canvas.querySelector<HTMLElement>('[data-batch-root="true"]');
     if (batch) {
