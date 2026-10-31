@@ -368,7 +368,7 @@ export const CanvasNode = React.memo(function CanvasNode({
                 </>
             ) : null}
 
-            {!readOnly && showPanel && renderPanel && data.type !== CanvasNodeType.Config && data.type !== CanvasNodeType.Custom ? <div className="absolute left-1/2 top-full z-[70] w-[600px] -translate-x-1/2 pt-6" style={{ maxWidth: `calc((100vw - 16px) / ${scale})` }}>{renderPanel(data)}</div> : null}
+            {!readOnly && showPanel && renderPanel && data.type !== CanvasNodeType.Config && data.type !== CanvasNodeType.Custom ? <div className="absolute left-1/2 top-full z-[70] w-[720px] -translate-x-1/2 pt-6" style={{ maxWidth: `calc((100vw - 16px) / ${scale})` }}>{renderPanel(data)}</div> : null}
         </div>
     );
 });

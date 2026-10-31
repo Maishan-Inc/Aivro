@@ -52,11 +52,11 @@ export function CanvasVideoSettingsPopover({ config, onConfigChange, buttonClass
 
     return (
         <>
-            <span ref={buttonRef} className="inline-flex min-w-0 max-w-full">
-                <Button size="small" type="text" className={cn("!h-auto !min-h-8 !min-w-0 !max-w-full !justify-start !rounded-full !px-2.5 !py-2", buttonClassName)} style={{ background: theme.node.fill, color: theme.node.text }} styles={{ content: { minWidth: 0, whiteSpace: "normal", textAlign: "left" } }} icon={<Settings2 className="size-3.5 shrink-0" />} onClick={() => setOpen((current) => !current)}>
-                    <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-left leading-5">
+            <span ref={buttonRef} className="inline-flex shrink-0">
+                <Button size="small" type="text" className={cn("!h-8 !justify-start !rounded-full !px-2.5", buttonClassName)} style={{ background: theme.node.fill, color: theme.node.text }} icon={<Settings2 className="size-3.5 shrink-0" />} onClick={() => setOpen((current) => !current)}>
+                    <span className="flex items-center gap-2 whitespace-nowrap text-left leading-5">
                         <span>{videoResolutionLabel(config.vquality)}</span>
-                        <span className="min-w-0 break-words">{tr(videoSizeLabel(config.size))}</span>
+                        <span>{tr(videoSizeLabel(config.size))}</span>
                         <span>{videoSecondsLabel(config.videoSeconds)}</span>
                     </span>
                 </Button>

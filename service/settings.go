@@ -218,7 +218,21 @@ func normalizePublicSettingWithChannels(setting model.PublicSetting, channels []
 	}
 	setting.ModelChannel.VideoModels = videoModels
 	setting.ModelChannel.TextModels = normalizeScopedModels(setting.ModelChannel.TextModels, setting.ModelChannel.AvailableModels, collectChannelModelNamesByCapability(channels, "text"))
-	setting.ModelChannel.Model3DModels = normalizeScopedModels(setting.ModelChannel.Model3DModels, setting.ModelChannel.AvailableModels, collectChannelModelNamesByCapability(channels, "model3d"))
+	model3DModels := []string{}
+	for _, name := range collectChannelModelNamesByCapability(channels, "model3d") {
+		if containsModel(setting.ModelChannel.AvailableModels, name) && (setting.ModelChannel.Model3DModels == nil || containsModel(setting.ModelChannel.Model3DModels, name)) {
+			model3DModels = append(model3DModels, name)
+		}
+	}
+	setting.ModelChannel.Model3DModels = model3DModels
+	setting.ModelChannel.Model3DAdapters = map[string]string{}
+	setting.ModelChannel.Model3DCapabilities = map[string]model.Model3DCapabilities{}
+	for _, name := range setting.ModelChannel.Model3DModels {
+		if routes := modelChannelRoutesForModel(channels, name); len(routes) > 0 && routes[0].Adapter != "" {
+			setting.ModelChannel.Model3DAdapters[name] = routes[0].Adapter
+			setting.ModelChannel.Model3DCapabilities[name] = model3DCapabilities(routes[0])
+		}
+	}
 	if setting.ModelChannel.ModelCosts == nil {
 		setting.ModelChannel.ModelCosts = []model.ModelCost{}
 	}
@@ -817,6 +831,7 @@ type ModelChannelRoute struct {
 	PublicModel   string
 	UpstreamModel string
 	Capability    string
+	Adapter       string
 }
 
 func SelectModelChannel(modelName string) (model.ModelChannel, error) {
@@ -844,12 +859,6 @@ func SelectModelChannelRoutes(modelName string) ([]ModelChannelRoute, error) {
 	if len(routes) == 0 {
 		return nil, errors.New("没有可用模型渠道")
 	}
-	sort.SliceStable(routes, func(i int, j int) bool {
-		if routes[i].Channel.Weight == routes[j].Channel.Weight {
-			return routes[i].Channel.Name < routes[j].Channel.Name
-		}
-		return routes[i].Channel.Weight > routes[j].Channel.Weight
-	})
 	return routes, nil
 }
 
@@ -966,6 +975,10 @@ func normalizeModelMappingsWithIDs(items []model.ModelChannelModel, usedIDs map[
 		case "text", "video", "model3d":
 		default:
 			item.Capability = "image"
+		}
+		item.Adapter = strings.TrimSpace(item.Adapter)
+		if item.Capability != "model3d" || !model.IsModel3DAdapter(item.Adapter) {
+			item.Adapter = ""
 		}
 		if seen[item.Name] {
 			continue
@@ -1339,10 +1352,17 @@ func modelChannelRoutesForModel(channels []model.ModelChannel, modelName string)
 					PublicModel:   item.Name,
 					UpstreamModel: item.UpstreamName,
 					Capability:    item.Capability,
+					Adapter:       item.Adapter,
 				})
 				break
 			}
 		}
 	}
+	sort.SliceStable(result, func(i int, j int) bool {
+		if result[i].Channel.Weight == result[j].Channel.Weight {
+			return result[i].Channel.Name < result[j].Channel.Name
+		}
+		return result[i].Channel.Weight > result[j].Channel.Weight
+	})
 	return result
 }

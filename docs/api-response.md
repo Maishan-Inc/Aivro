@@ -41,6 +41,9 @@
 - 登录会话提交图片生成、图片编辑、视频、3D 生成后，返回 `{ code: 0, data: { queued: true, taskId, status, queuePosition, aheadCount, model, path }, msg: "ok" }`。`queued: true` 表示请求交由后台任务接管，`status` 可为 `queued` 或 `executing`；关闭限流队列时仍在后台执行。
 - 使用 `GET /api/v1/generation-tasks/{id}` 查询状态，`succeeded` 后通过 `/result` 获取结果。图片保留 `data[]` 图片格式；站内视频结果为 `{ id, status: "completed", file }`，其中 `file` 包含云端/本地后端文件 URL、storageKey、cloudFileId 等，视频的上游轮询和转存已由后台完成；3D 结果保留 `{ code, data: { results, energyCost, ... }, msg }`。
 - `GET /api/v1/model-3d/generations/{id}` 可查询本站 3D 任务；未完成时 `data.status` 为 `queued`、`executing`、`failed` 或 `canceled`，成功时返回 `status: "completed"` 及模型文件。接口校验当前用户和任务类型。
+- 3D 渠道映射的 `adapter` 留空使用通用 JSON 接口；`hunyuan3d` 使用 GPT.GE 单图提交与查询协议。本站提交接口仍接收 JSON，GPT.GE 适配要求 `mode=image`、一张 `images`、`quantity=1`、`pbrEnabled=false`，`targetFaceCount` 省略或保持默认 500000（不传给上游、不产生面数加价），`prompt` 仅用于记录；不支持的组合在扣费前拒绝。后端读取当前用户可访问的参考文件并以 multipart 上传，按原渠道轮询 `task_id`，识别 `status=success` 与 `output.file_url`，转存后才标记本站任务完成。成功结果的 `providerTaskId` 保留上游编号；提交、查询与下载共用后台任务期限，失败退款沿用本站规则，不自动重发生成请求。
+- 新增 `meshy`、`tripo`、`rodin`、`fal-hunyuan3d`、`fal-trellis` 专用适配，均沿用本站 JSON 请求与任务响应结构、一次生成一个模型。`GET /api/settings` 的 `modelChannel.model3DAdapters` 和 `model3DCapabilities` 按前台模型名派生，不公开渠道凭证。能力含模式、数量、图片大小、质量、纹理/PBR、面数范围及多视图顺序；通用模型无专用条目。目标面数省略时采用对应模型默认值，TRELLIS.2 必须 `textureEnabled=true`、`pbrEnabled=false`，不支持自定义面数。参数不支持时扣费前拒绝，文件读取校验失败走退款。
+- Meshy 文本带纹理时执行 preview 与 refine 两步，`providerTaskId` 为最终任务编号；Tripo 图片先上传取得 token，多视图固定为正面/左侧/背面/右侧，缺少的末尾位置补空对象；Rodin 用订阅编号查询全部子任务，全部 Done 后用创建响应 UUID 下载 GLB；fal 按队列协议查询，再读取结果文件。Meshy 图片描述只在纹理开启时发送，其余专用适配的图片描述仅用于记录。各家模型及完整限制见 [3D API 适配配置](model-3d-adapters.md)。查询可对网络错误、429、5xx 在执行期限内重试并遵守 `Retry-After`；创建不自动重试。全部完成文件转存后才返回本站完成状态。
 - API 密钥调用仍在容量充足时同步返回，在限流时返回任务编号；视频 API 保持“创建编号 → 查询状态 → 获取内容”的调用方式。同步调用仍受部署入口及客户端自身超时限制，后台配置无法调整 CDN 或上游网关的超时。
 - 超时或上游 HTTP 408/504/524 不触发图片/视频创建请求自动重发。失败退款沿用本站任务结算规则，上游计费不会因此自动退还。运行中的后台任务不因浏览器离开而取消，结果保留时间沿用队列配置；各页面刷新后自动恢复任务列表仍待完善。
 

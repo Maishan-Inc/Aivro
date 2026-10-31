@@ -78,6 +78,12 @@ func CreateModel3DGeneration(ctx context.Context, user model.AuthUser, input Mod
 	if err := ValidateModelRequest(input.Model, model3DPath); err != nil {
 		return model.GenerationTaskSubmitResult{}, nil, err
 	}
+	route, err := SelectModelChannelRoute(input.Model)
+	if err != nil { return model.GenerationTaskSubmitResult{}, nil, err }
+	caps := model3DCapabilities(route)
+	if input.TargetFaceCount <= 0 { input.TargetFaceCount = caps.DefaultFaces }
+	if route.Adapter == "" && input.TargetFaceCount > 1000000 { input.TargetFaceCount = 1000000 }
+	if err := validateModel3DAdapterInput(route, input); err != nil { return model.GenerationTaskSubmitResult{}, nil, err }
 	body, err := json.Marshal(input)
 	if err != nil { return model.GenerationTaskSubmitResult{}, nil, err }
 	return SubmitAITask(ctx, user, body, "application/json", input.Model, model3DPath, meta)
@@ -87,7 +93,7 @@ func executeModel3DTask(ctx context.Context, user model.AuthUser, task model.Gen
 	var input Model3DGenerationInput
 	if err := json.NewDecoder(content).Decode(&input); err != nil { return AIProxyResponse{}, err }
 	started := time.Now()
-	result, err := requestHunyuanModel3D(ctx, user, input, task.Credits)
+	result, err := requestModel3D(ctx, user, input, task.Credits)
 	if err != nil { return AIProxyResponse{}, err }
 	result.ID = task.ID
 	result.Status = "completed"
@@ -160,12 +166,6 @@ func normalizeModel3DInput(input Model3DGenerationInput) Model3DGenerationInput 
 	if input.MeshQuality == "" {
 		input.MeshQuality = "standard"
 	}
-	if input.TargetFaceCount <= 0 {
-		input.TargetFaceCount = 500000
-	}
-	if input.TargetFaceCount > 1000000 {
-		input.TargetFaceCount = 1000000
-	}
 	if input.Quantity <= 0 {
 		input.Quantity = 1
 	}
@@ -191,10 +191,23 @@ func validateModel3DInput(input Model3DGenerationInput) error {
 	return nil
 }
 
-func requestHunyuanModel3D(ctx context.Context, user model.AuthUser, input Model3DGenerationInput, credits int) (Model3DGenerationResult, error) {
+func requestModel3D(ctx context.Context, user model.AuthUser, input Model3DGenerationInput, credits int) (Model3DGenerationResult, error) {
 	route, err := SelectModelChannelRoute(input.Model)
 	if err != nil || strings.TrimSpace(route.Channel.BaseURL) == "" {
 		return Model3DGenerationResult{}, SafeAIError("没有可用的 3D 模型渠道")
+	}
+	if err := validateModel3DAdapterInput(route, input); err != nil { return Model3DGenerationResult{}, err }
+	switch route.Adapter {
+	case model.Model3DAdapterHunyuan:
+		return requestHunyuanModel3D(ctx, user, route, input, credits)
+	case model.Model3DAdapterMeshy:
+		return requestMeshyModel3D(ctx, user, route, input, credits)
+	case model.Model3DAdapterTripo:
+		return requestTripoModel3D(ctx, user, route, input, credits)
+	case model.Model3DAdapterRodin:
+		return requestRodinModel3D(ctx, user, route, input, credits)
+	case model.Model3DAdapterFalHunyuan, model.Model3DAdapterFalTrellis:
+		return requestFalModel3D(ctx, user, route, input, credits)
 	}
 	upstreamInput := input
 	upstreamInput.Model = route.UpstreamModel
@@ -209,7 +222,7 @@ func requestHunyuanModel3D(ctx context.Context, user model.AuthUser, input Model
 	}
 	response, err := AIHTTPClientForContext(ctx).Do(request)
 	if err != nil {
-		return Model3DGenerationResult{}, SafeAIError("腾讯混元 3D 生成请求失败")
+		return Model3DGenerationResult{}, SafeAIError("3D 生成请求失败")
 	}
 	defer response.Body.Close()
 	body, err := io.ReadAll(io.LimitReader(response.Body, 4<<20))
@@ -218,7 +231,7 @@ func requestHunyuanModel3D(ctx context.Context, user model.AuthUser, input Model
 	}
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
 		log.Printf("model3d upstream error: status=%d", response.StatusCode)
-		return Model3DGenerationResult{}, SafeAIError("腾讯混元 3D 生成请求失败")
+		return Model3DGenerationResult{}, SafeAIError("3D 生成请求失败")
 	}
 	result, err := normalizeModel3DProviderResponse(ctx, user, input, body)
 	if err != nil { return result, err }

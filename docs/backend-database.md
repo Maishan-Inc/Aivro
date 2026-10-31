@@ -228,6 +228,8 @@ MetaMask 登录服务端签名挑战表。nonce 与钱包地址绑定，短时�
 | `videoModels` | string[] | 视频生成服务可用模型范围 |
 | `textModels` | string[] | 对话、文本和画布助手服务可用模型范围 |
 | `model3DModels` | string[] | 3D 模型服务可用模型范围 |
+| `model3DAdapters` | object | 按公开模型名返回当前优先渠道的 3D 适配方式；后端由私有渠道映射派生，未出现的模型使用通用接口，不包含渠道地址或密钥 |
+| `model3DCapabilities` | object | 同优先渠道派生的能力：`modes`、`maxImages`、`maxQuantity`、`texture`、`pbr`、`alwaysTexture`、`qualities`、`minFaces`、`maxFaces`、`defaultFaces`、`referenceViews`、`promptMaxLength`、`imageMaxBytes`；`maxFaces=0` 表示不支持自定义面数，视角数组为空时无固定顺序 |
 | `modelCosts` | object[] | 模型计费配置       |
 | `defaultModel`    | string   | 兼容字段，保存当前通用默认模型 |
 | `defaultImageModel` | string | 默认图片模型         |
@@ -369,6 +371,7 @@ MetaMask 登录服务端签名挑战表。nonce 与钱包地址绑定，短时�
 | `name` | string | 前台模型名，用于用户选择和公开模型列表 |
 | `upstreamName` | string | 上游模型名，实际请求渠道时写入 `model` 字段 |
 | `capability` | string | 模型能力：`image`、`text`、`video`、`model3d` |
+| `adapter` | string | 3D 适配方式：空字符串为通用 JSON；`hunyuan3d` 为 GPT.GE 单图，另支持 `meshy`、`tripo`、`rodin`、`fal-hunyuan3d`、`fal-trellis`；其他模型类型保存为空。版本及参数见 [3D 适配配置](model-3d-adapters.md) |
 
 `runtime` 字段：
 

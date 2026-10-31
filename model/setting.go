@@ -52,6 +52,40 @@ type ModelChannelModel struct {
 	Name         string `json:"name"`
 	UpstreamName string `json:"upstreamName"`
 	Capability   string `json:"capability"`
+	Adapter      string `json:"adapter"`
+}
+
+const (
+	Model3DAdapterHunyuan = "hunyuan3d"
+	Model3DAdapterMeshy = "meshy"
+	Model3DAdapterTripo = "tripo"
+	Model3DAdapterRodin = "rodin"
+	Model3DAdapterFalHunyuan = "fal-hunyuan3d"
+	Model3DAdapterFalTrellis = "fal-trellis"
+)
+
+func IsModel3DAdapter(adapter string) bool {
+	switch adapter {
+	case Model3DAdapterHunyuan, Model3DAdapterMeshy, Model3DAdapterTripo, Model3DAdapterRodin, Model3DAdapterFalHunyuan, Model3DAdapterFalTrellis:
+		return true
+	}
+	return false
+}
+
+type Model3DCapabilities struct {
+	Modes []string `json:"modes"`
+	MaxImages int `json:"maxImages"`
+	MaxQuantity int `json:"maxQuantity"`
+	Texture bool `json:"texture"`
+	PBR bool `json:"pbr"`
+	AlwaysTexture bool `json:"alwaysTexture"`
+	Qualities []string `json:"qualities"`
+	MinFaces int `json:"minFaces"`
+	MaxFaces int `json:"maxFaces"`
+	DefaultFaces int `json:"defaultFaces"`
+	ReferenceViews []string `json:"referenceViews"`
+	PromptMaxLength int `json:"promptMaxLength"`
+	ImageMaxBytes int64 `json:"imageMaxBytes"`
 }
 
 // ModelCost 模型计费配置。Credits 是控制台标准价，套餐专属价留空时沿用标准价；
@@ -76,6 +110,8 @@ type PublicModelChannelSetting struct {
 	VideoModels       []string    `json:"videoModels"`
 	TextModels        []string    `json:"textModels"`
 	Model3DModels     []string    `json:"model3DModels"`
+	Model3DAdapters   map[string]string `json:"model3DAdapters"`
+	Model3DCapabilities map[string]Model3DCapabilities `json:"model3DCapabilities"`
 	ModelCosts        []ModelCost `json:"modelCosts"`
 	DefaultModel      string      `json:"defaultModel"`
 	DefaultImageModel string      `json:"defaultImageModel"`

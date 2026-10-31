@@ -83,13 +83,13 @@ export function CanvasNodePromptPanel({ node, isRunning, inputs, onHighlightInpu
                 placeholder={tr(mode === "video" ? "描述要生成的视频内容" : mode === "image" ? (hasImageContent ? "请输入你想要把这张图修改成什么" : "描述要生成的图片内容") : hasTextContent ? "请输入你想要将本段文本修改成什么" : "请输入你想要生成的文本内容")}
             />
 
-            <div className="flex min-w-0 shrink-0 flex-wrap items-center gap-3 pt-1 [&_.canvas-composer-model-picker]:min-h-10">
-                <ModelPicker showBilling={false} config={config} kind={mode} models={mode === "image" ? config.imageModels : mode === "video" ? config.videoModels : config.textModels} value={config.model} onChange={(model) => onConfigChange(node.id, { model })} onMissingConfig={warnMissingModel} />
+            <div className="thin-scrollbar flex min-w-0 shrink-0 items-center gap-2 overflow-x-auto py-1 [&_.canvas-composer-model-picker]:min-h-10" data-canvas-no-zoom>
+                <ModelPicker showBilling={false} className="max-w-none" config={config} kind={mode} models={mode === "image" ? config.imageModels : mode === "video" ? config.videoModels : config.textModels} value={config.model} onChange={(model) => onConfigChange(node.id, { model })} onMissingConfig={warnMissingModel} />
                 {mode === "image" ? (
                     <CanvasImageSettingsPopover
                         config={config}
                         placement="topLeft"
-                        buttonClassName="!h-10 !max-w-[170px] !justify-start !rounded-full !px-3"
+                        buttonClassName="!h-10 !justify-start !rounded-full !px-3"
                         onConfigChange={(key, value) => onConfigChange(node.id, key === "count" ? { count: Number(value) || 1 } : { [key]: value })}
                         onMissingConfig={warnMissingModel}
                         onOpenChange={onImageSettingsOpenChange}
@@ -99,14 +99,14 @@ export function CanvasNodePromptPanel({ node, isRunning, inputs, onHighlightInpu
                 ) : null}
                 <Button
                     type="primary"
-                    className="!ml-auto !h-auto !min-h-10 !max-w-full !rounded-full !px-3 !py-2"
+                    className="!ml-auto !h-10 !shrink-0 !rounded-full !px-3"
                     disabled={isRunning || !canGenerate}
                     onClick={submit}
                     aria-label={tr("生成")}
                     data-canvas-action="generate"
                     data-canvas-running={isRunning}
                 >
-                    <ModelBilling summaryOnly model={config.model} kind={mode} count={mode === "image" ? config.count : 1} />
+                    <ModelBilling summaryOnly model={config.model} kind={mode} count={mode === "image" ? config.count : 1} className="shrink-0 [&>span]:whitespace-nowrap" />
                     {isRunning ? <LoaderCircle className="size-4 shrink-0 animate-spin" /> : <ArrowUp className="size-4 shrink-0" />}
                 </Button>
             </div>

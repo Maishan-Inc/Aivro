@@ -8,9 +8,11 @@ import { useModelBilling, type ModelBillingOptions } from "@/hooks/use-model-bil
 import { useI18n } from "@/hooks/use-i18n";
 import { billingUnit } from "@/lib/model-pricing";
 import { cn } from "@/lib/utils";
+import { useConfigStore } from "@/stores/use-config-store";
 
 export function ModelBilling({ className, summaryOnly = false, ...options }: ModelBillingOptions & { className?: string; summaryOnly?: boolean }) {
     const { model, kind, model3D } = options;
+    const adaptedModel3D = useConfigStore((state) => kind === "model3d" && Boolean(state.publicSettings?.modelChannel.model3DAdapters?.[model]));
     const { cost, billingType, quantity, credits, unavailable } = useModelBilling(options);
     const { tr, locale } = useI18n();
     const [open, setOpen] = useState(false);
@@ -33,7 +35,7 @@ export function ModelBilling({ className, summaryOnly = false, ...options }: Mod
                         {model3D ? <div className="flex justify-between gap-3"><dt className="opacity-60">{tr("参数倍率")}</dt><dd className="tabular-nums">× {format(model3DCreditMultiplier(model3D))}</dd></div> : null}
                         {!tokenBilling && credits !== null ? <div className="flex justify-between gap-3 font-medium"><dt>{tr("预计消耗")}</dt><dd>{format(credits)} {tr("算力点")}</dd></div> : null}
                     </dl>
-                    <p className="leading-5 opacity-60">{tr(explanation)}</p>
+                    <p className="leading-5 opacity-60">{tr(adaptedModel3D ? "费用按当前模型的有效参数计算，不支持的选项不参与调整。" : explanation)}</p>
                     <p className="leading-5 opacity-60">{tr("当前站内请求按标准价计费。")}{" "}{tr("实际扣费以生成时的价格和算力流水为准。")}</p>
                 </> : <p className="opacity-60">{tr(unavailable)}</p>}
             </div>

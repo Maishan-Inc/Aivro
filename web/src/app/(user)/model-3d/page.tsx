@@ -21,6 +21,10 @@ import { useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
 import { formatBytes, formatDuration, readImageMeta } from "@/lib/image-utils";
 import { nanoid } from "nanoid";
 import { formatDateTime, formatNumber } from "@/lib/datetime";
+import type { Model3DCapabilities } from "@/services/api/admin";
+
+const genericCapabilities: Model3DCapabilities = { modes: ["text", "image", "multi_image"], maxImages: 0, maxQuantity: 4, texture: true, pbr: true, alwaysTexture: false, qualities: ["standard", "high", "ultra"], minFaces: 500000, maxFaces: 1000000, defaultFaces: 500000, promptMaxLength: 0, imageMaxBytes: 0 };
+const referenceViewLabels: Record<string, string> = { front: "正面", left: "左侧", back: "背面", right: "右侧", top: "顶部", bottom: "底部", left_front: "左前方", right_front: "右前方" };
 
 type ViewMode = "default" | "wireframe" | "white";
 
@@ -33,6 +37,7 @@ type UploadedReference = {
     storageKey: string;
     width: number;
     height: number;
+    bytes: number;
 };
 
 function ModelPreview({ result, mode }: { result: Model3DGenerationResult | null; mode: ViewMode }) {
@@ -61,13 +66,15 @@ function ModelPreview({ result, mode }: { result: Model3DGenerationResult | null
 
 export default function Model3DPage() {
     const searchParams = useSearchParams();
-    const { message } = App.useApp();
+    const { message, modal } = App.useApp();
     const { token } = useUserStore();
     const { addAsset } = useAssetStore();
     const effectiveConfig = useEffectiveConfig();
     const updateConfig = useConfigStore((state) => state.updateConfig);
     const isAiConfigReady = useConfigStore((state) => state.isAiConfigReady);
-    const model = effectiveConfig.model3DModel || effectiveConfig.model;
+    const model = effectiveConfig.model3DModel;
+    const adapter = useConfigStore((state) => state.publicSettings?.modelChannel.model3DAdapters?.[model]);
+    const capabilities = useConfigStore((state) => state.publicSettings?.modelChannel.model3DCapabilities?.[model]) || genericCapabilities;
 
     const [mode, setMode] = useState<"image" | "multi_image" | "text">("text");
     const [prompt, setPrompt] = useState("");
@@ -76,10 +83,24 @@ export default function Model3DPage() {
     const [textureEnabled, setTextureEnabled] = useState(true);
     const [pbrEnabled, setPbrEnabled] = useState(true);
     const [meshQuality, setMeshQuality] = useState<"standard" | "high" | "ultra">("standard");
-    const [targetFaceCount, setTargetFaceCount] = useState(500000);
+    const [targetFaceCounts, setTargetFaceCounts] = useState<Record<string, number>>({});
     const [quantity, setQuantity] = useState(1);
+    const generationMode = capabilities.modes.includes(mode) ? mode : mode !== "text" && capabilities.modes.includes("image") ? "image" : capabilities.modes[0];
+    const effectiveTexture = capabilities.texture ? textureEnabled : capabilities.alwaysTexture;
+    const generationOptions = {
+        quantity: Math.min(quantity, capabilities.maxQuantity),
+        meshQuality: capabilities.qualities.includes(meshQuality) ? meshQuality : capabilities.qualities[0],
+        textureEnabled: effectiveTexture,
+        pbrEnabled: capabilities.pbr && effectiveTexture && pbrEnabled,
+        targetFaceCount: capabilities.maxFaces ? targetFaceCounts[model] ?? capabilities.defaultFaces : capabilities.defaultFaces,
+    };
+    const imageCountValid = !adapter ? images.length > 0 : generationMode === "image" ? images.length === 1 : images.length >= 2 && images.length <= capabilities.maxImages;
+    const recordOnlyPrompt = generationMode !== "text" && Boolean(adapter) && (adapter !== "meshy" || !effectiveTexture);
+    const promptLimit = recordOnlyPrompt ? 0 : capabilities.promptMaxLength;
+    const referenceViews = generationMode === "multi_image" ? capabilities.referenceViews || [] : [];
 
     const [generating, setGenerating] = useState(false);
+    const [uploading, setUploading] = useState(false);
     const [currentResult, setCurrentResult] = useState<Model3DGenerationResult | null>(null);
     const [viewMode, setViewMode] = useState<ViewMode>("default");
 
@@ -101,36 +122,71 @@ export default function Model3DPage() {
 
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(e.target.files || []);
-        if (files.length === 0) return;
-
-        const uploaded = await Promise.all(
-            files.map(async (file) => {
-                const dataUrl = await new Promise<string>((resolve) => {
-                    const reader = new FileReader();
-                    reader.onload = () => resolve(reader.result as string);
-                    reader.readAsDataURL(file);
-                });
-                const meta = await readImageMeta(dataUrl);
-                const result = await uploadImage(dataUrl);
-                return { id: nanoid(), name: file.name, type: file.type, url: result.url, dataUrl, storageKey: result.storageKey, width: meta.width, height: meta.height };
-            }),
-        );
-        setImages((prev) => [...prev, ...uploaded]);
-        setMode(images.length + uploaded.length > 1 ? "multi_image" : "image");
+        if (!files.length || uploading || generating) return;
+        if (capabilities.maxImages && images.length + files.length > capabilities.maxImages) {
+            message.warning(`当前模式的参考图片数量不符合要求（最多 ${capabilities.maxImages} 张）`);
+            return;
+        }
+        if (capabilities.imageMaxBytes && files.some((file) => file.size > capabilities.imageMaxBytes)) {
+            message.warning("参考图片超过当前 3D 接口的大小限制");
+            return;
+        }
+        if (adapter && adapter !== "hunyuan3d" && files.some((file) => !["image/png", "image/jpeg", "image/webp"].includes(file.type))) {
+            message.warning("当前 3D 接口仅支持 PNG、JPEG 或 WebP 图片");
+            return;
+        }
+        setUploading(true);
+        try {
+            const uploaded = await Promise.all(
+                files.map(async (file) => {
+                    const dataUrl = await new Promise<string>((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload = () => resolve(reader.result as string);
+                        reader.onerror = () => reject(new Error("3D 参考图片上传失败"));
+                        reader.readAsDataURL(file);
+                    });
+                    const meta = await readImageMeta(dataUrl);
+                    const result = await uploadImage(dataUrl);
+                    return { id: nanoid(), name: file.name, type: file.type, url: result.url, dataUrl, storageKey: result.storageKey, width: meta.width, height: meta.height, bytes: file.size };
+                }),
+            );
+            setImages((prev) => [...prev, ...uploaded]);
+            setMode(images.length + uploaded.length > 1 ? "multi_image" : "image");
+        } catch (error) {
+            message.error(error instanceof Error ? error.message : "3D 参考图片上传失败");
+        } finally {
+            setUploading(false);
+        }
     };
 
     const handleGenerate = async () => {
-        if (!token) return;
-        if (mode !== "text" && images.length === 0) {
-            Modal.error({ title: "提示", content: "请先上传参考图片" });
+        if (!token || generating || uploading) return;
+        if (generationMode !== "text" && images.length === 0) {
+            modal.error({ title: "提示", content: "请先上传参考图片" });
             return;
         }
-        if (mode === "text" && !prompt.trim()) {
-            Modal.error({ title: "提示", content: "请输入文字描述" });
+        if (generationMode !== "text" && !imageCountValid) {
+            modal.error({ title: "提示", content: `当前模式的参考图片数量不符合要求（最多 ${generationMode === "image" ? 1 : capabilities.maxImages} 张）` });
+            return;
+        }
+        if (promptLimit && Array.from(prompt.trim()).length > promptLimit) {
+            modal.error({ title: "提示", content: `模型描述不能超过 ${promptLimit} 个字符` });
+            return;
+        }
+        if (capabilities.maxFaces && (generationOptions.targetFaceCount < capabilities.minFaces || generationOptions.targetFaceCount > capabilities.maxFaces)) {
+            modal.error({ title: "提示", content: "目标面数超出当前 3D 模型的支持范围" });
+            return;
+        }
+        if (generationMode !== "text" && capabilities.imageMaxBytes && images.some((image) => image.bytes > capabilities.imageMaxBytes)) {
+            modal.error({ title: "提示", content: "参考图片超过当前 3D 接口的大小限制" });
+            return;
+        }
+        if (generationMode === "text" && !prompt.trim()) {
+            modal.error({ title: "提示", content: "请输入文字描述" });
             return;
         }
         if (!isAiConfigReady(effectiveConfig, model)) {
-            Modal.error({ title: "提示", content: "管理员尚未配置可用3D模型" });
+            modal.error({ title: "提示", content: "管理员尚未配置可用3D模型" });
             return;
         }
 
@@ -138,14 +194,10 @@ export default function Model3DPage() {
         try {
             const input: Model3DGenerationInput = {
                 model,
-                mode,
+                mode: generationMode,
                 prompt,
-                images: images.map((img) => ({ name: img.name, type: img.type, url: img.url, storageKey: img.storageKey })),
-                textureEnabled,
-                pbrEnabled,
-                meshQuality,
-                targetFaceCount,
-                quantity,
+                images: generationMode === "text" ? [] : images.map((img) => ({ name: img.name, type: img.type, url: img.url, storageKey: img.storageKey })),
+                ...generationOptions,
             };
 
             const result = await requestModel3DGeneration(token, input);
@@ -177,7 +229,7 @@ export default function Model3DPage() {
                 await handleLoadHistory();
             }
         } catch (err) {
-            Modal.error({ title: "生成失败", content: err instanceof Error ? err.message : "生成失败，请重试" });
+            modal.error({ title: "生成失败", content: err instanceof Error ? err.message : "生成失败，请重试" });
         } finally {
             setGenerating(false);
         }
@@ -228,7 +280,7 @@ export default function Model3DPage() {
         }
     };
 
-    const canGenerate = mode === "text" ? Boolean(prompt.trim()) : images.length > 0;
+    const canGenerate = !uploading && (generationMode === "text" ? Boolean(prompt.trim()) : imageCountValid);
     const composerExpanded = composerFocused || Boolean(prompt.trim()) || images.length > 0;
 
     return (
@@ -264,12 +316,12 @@ export default function Model3DPage() {
                             <div className="rounded-lg border border-stone-200 bg-background p-3 dark:border-stone-800">
                                 <div className="mb-2 flex items-center justify-between gap-3">
                                     <h3 className="text-sm font-semibold">内容信息</h3>
-                                    {currentResult ? <Tag className="m-0">{currentResult.status}</Tag> : null}
+                                    {currentResult ? <Tag className="m-0">{currentResult.status === "completed" ? "已完成" : currentResult.status}</Tag> : null}
                                 </div>
                                 {currentResult ? (
                                     <div className="space-y-1 text-xs text-stone-500 dark:text-stone-400">
                                         <div>时间：{formatDateTime(currentResult.createdAt)}</div>
-                                        <div>模型：{currentResult.model}</div>
+                                        <div>模型：<span data-i18n-skip>{currentResult.model}</span></div>
                                         <div>耗时：{formatDuration(currentResult.durationMs)}</div>
                                     </div>
                                 ) : (
@@ -318,15 +370,15 @@ export default function Model3DPage() {
                     <div className={studio.form}>
                         <div className={composer.composer} data-expanded={composerExpanded} onFocus={() => setComposerFocused(true)} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setComposerFocused(false); }}>
                             {images.length ? <div className={composer.references}>
-                                {images.map((img) => <div key={img.id} className={composer.reference}>
-                                    <img src={img.dataUrl} alt={img.name} />
+                                {images.map((img, index) => <div key={img.id} className={composer.reference}>
+                                    <img src={img.dataUrl} alt={img.name} data-i18n-skip />
                                     <button type="button" onClick={() => setImages((value) => value.filter((item) => item.id !== img.id))} aria-label="移除参考图"><X size={13} /></button>
-                                    {img.width < 256 || img.height < 256 ? <span className="absolute inset-x-0 bottom-0 bg-background/90 text-center text-[9px] text-foreground">低于 256</span> : null}
+                                    {referenceViews[index] ? <span className="absolute inset-x-0 bottom-0 bg-background/90 text-center text-[9px] text-foreground">{referenceViewLabels[referenceViews[index]]}</span> : img.width < 256 || img.height < 256 ? <span className="absolute inset-x-0 bottom-0 bg-background/90 text-center text-[9px] text-foreground">低于 256</span> : null}
                                 </div>)}
                             </div> : null}
                             <div className={composer.main}><div className={composer.body}>
                             <div className={composer.inputRow}>
-                            <Input.TextArea value={prompt} onChange={(event) => setPrompt(event.target.value)} variant="borderless" autoSize={{ minRows: 1 }} disabled={generating} aria-label="模型描述" placeholder={mode === "text" ? "描述你想创造的形体、材质和风格…" : "添加参考图，也可以补充模型描述…"} onKeyDown={(event) => {
+                            <Input.TextArea value={prompt} onChange={(event) => setPrompt(event.target.value)} variant="borderless" autoSize={{ minRows: 1 }} disabled={generating} aria-label="模型描述" placeholder={recordOnlyPrompt ? "上传参考图，描述仅用于记录…" : generationMode === "text" ? "描述你想创造的形体、材质和风格…" : "添加参考图，也可以补充模型描述…"} onKeyDown={(event) => {
                                 if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
                                     event.preventDefault();
                                     if (canGenerate && !generating) void handleGenerate();
@@ -335,22 +387,22 @@ export default function Model3DPage() {
                             </div>
                             <div className={composer.controls}><div><div className={composer.toolbar} inert={!composerExpanded}>
                                 <div className={composer.toolbarRow}>
-                                <Button type="text" shape="circle" icon={<Upload size={17} />} onClick={() => fileInputRef.current?.click()} aria-label="上传参考图" title="上传参考图" />
-                                <ModelPicker config={effectiveConfig} kind="model3d" model3D={{ quantity, meshQuality, textureEnabled, pbrEnabled, targetFaceCount }} models={effectiveConfig.model3DModels} value={model} onChange={(value) => updateConfig("model3DModel", value)} onMissingConfig={() => message.warning("管理员尚未配置可用3D模型")} />
+                                <Button type="text" shape="circle" icon={<Upload size={17} />} loading={uploading} disabled={generating} onClick={() => fileInputRef.current?.click()} aria-label="上传参考图" title="上传参考图" />
+                                <ModelPicker config={effectiveConfig} kind="model3d" model3D={generationOptions} models={effectiveConfig.model3DModels} value={model} onChange={(value) => updateConfig("model3DModel", value)} onMissingConfig={() => message.warning("管理员尚未配置可用3D模型")} />
                                 </div>
                                 <div className={composer.toolbarRow}>
-                                <Dropdown trigger={["click"]} placement="topLeft" menu={{ selectable: true, selectedKeys: [mode], items: [
-                                    { key: "text", label: "文字生成" }, { key: "image", label: "图片生成" }, { key: "multi_image", label: "多图生成 Pro" },
+                                <Dropdown trigger={["click"]} placement="topLeft" menu={{ selectable: true, selectedKeys: [generationMode], items: [
+                                    { key: "text", label: "文字生成", disabled: !capabilities.modes.includes("text") }, { key: "image", label: "图片生成", disabled: !capabilities.modes.includes("image") }, { key: "multi_image", label: "多图生成", disabled: !capabilities.modes.includes("multi_image") },
                                 ], onClick: ({ key }) => setMode(key as typeof mode) }}>
-                                    <Button type="text">{mode === "text" ? "文字生成" : mode === "image" ? "图片生成" : "多图生成"}<ChevronDown size={12} /></Button>
+                                    <Button type="text">{generationMode === "text" ? "文字生成" : generationMode === "image" ? "图片生成" : "多图生成"}<ChevronDown size={12} /></Button>
                                 </Dropdown>
-                                <Dropdown trigger={["click"]} placement="topLeft" menu={{ selectable: true, selectedKeys: [meshQuality], items: [
-                                    { key: "standard", label: "标准网格" }, { key: "high", label: "高质量网格" }, { key: "ultra", label: "超高质量网格" },
+                                <Dropdown trigger={["click"]} placement="topLeft" menu={{ selectable: true, selectedKeys: [generationOptions.meshQuality], items: [
+                                    { key: "standard", label: "标准网格" }, { key: "high", label: "高质量网格", disabled: !capabilities.qualities.includes("high") }, { key: "ultra", label: "超高质量网格", disabled: !capabilities.qualities.includes("ultra") },
                                 ], onClick: ({ key }) => setMeshQuality(key as typeof meshQuality) }}>
-                                    <Button type="text">{meshQuality === "standard" ? "标准" : meshQuality === "high" ? "高质量" : "超高质量"}<ChevronDown size={12} /></Button>
+                                    <Button type="text" disabled={capabilities.qualities.length === 1}>{generationOptions.meshQuality === "standard" ? "标准" : generationOptions.meshQuality === "high" ? "高质量" : "超高质量"}<ChevronDown size={12} /></Button>
                                 </Dropdown>
-                                <Dropdown trigger={["click"]} placement="topLeft" menu={{ selectable: true, selectedKeys: [String(quantity)], items: [1, 2, 3, 4].map((value) => ({ key: String(value), label: value > 1 ? `${value} 个 Pro` : "1 个" })), onClick: ({ key }) => setQuantity(Number(key)) }}>
-                                    <Button type="text">{quantity} 个<ChevronDown size={12} /></Button>
+                                <Dropdown trigger={["click"]} placement="topLeft" menu={{ selectable: true, selectedKeys: [String(generationOptions.quantity)], items: [1, 2, 3, 4].map((value) => ({ key: String(value), label: value > 1 ? `${value} 个 Pro` : "1 个", disabled: value > capabilities.maxQuantity })), onClick: ({ key }) => setQuantity(Number(key)) }}>
+                                    <Button type="text">{generationOptions.quantity} 个<ChevronDown size={12} /></Button>
                                 </Dropdown>
                                 <Button type="text" icon={<SlidersHorizontal size={14} />} onClick={() => setSettingsOpen(true)} aria-label="调整材质和面数" title="材质和面数" />
                                 </div>
@@ -360,6 +412,10 @@ export default function Model3DPage() {
                             </div>
                         </div>
                         <p className={studio.composerHint}><span>Enter 生成 · Shift + Enter 换行</span></p>
+                        {capabilities.modes.length === 1 && capabilities.maxImages === 1 ? <p className={studio.composerHint}>当前接口仅支持单张图片；描述仅用于记录。</p> : null}
+                        {referenceViews.length ? <p className={studio.composerHint}><span>请按顺序上传同一物体的视图，缺少的末尾视图可省略：</span>{referenceViews.map((view, index) => <span key={view}>{index > 0 ? " → " : ""}<span>{referenceViewLabels[view]}</span></span>)}</p> : null}
+                        {generationMode !== "text" && capabilities.maxImages > 0 ? <p className={studio.composerHint}><span>最多 {generationMode === "image" ? 1 : capabilities.maxImages} 张参考图</span>{capabilities.imageMaxBytes ? <> · <span>单张不超过 {capabilities.imageMaxBytes / 1024 / 1024} MB</span></> : null}</p> : null}
+                        {generationMode !== "text" && images.length > 0 && !imageCountValid ? <p className={studio.composerHint}>请调整参考图数量或切换生成模式。</p> : null}
                     </div>
                 </section>
                 <StudioHistorySidebar items={histories.map((item) => ({ id: item.id, title: item.title, prompt: item.prompt, preview: item.references[0]?.url }))} onSelect={(id) => { const item = histories.find((history) => history.id === id); if (item) setDetailHistory(item); }}>
@@ -370,8 +426,9 @@ export default function Model3DPage() {
             <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*"
-                multiple
+                accept={adapter && adapter !== "hunyuan3d" ? "image/png,image/jpeg,image/webp" : "image/*"}
+                multiple={capabilities.maxImages !== 1}
+                disabled={uploading || generating}
                 className="hidden"
                 onChange={(event) => {
                     void handleImageUpload(event);
@@ -384,11 +441,11 @@ export default function Model3DPage() {
             </Drawer>
             <Modal centered title="模型生成参数" open={settingsOpen} onCancel={() => setSettingsOpen(false)} footer={<Button type="primary" onClick={() => setSettingsOpen(false)}>完成</Button>} width={500}>
                 <div className="grid grid-cols-2 gap-5 py-4">
-                    <label className="space-y-2"><span className="block text-sm">纹理</span><Select className="w-full" value={textureEnabled ? "on" : "off"} onChange={(value) => setTextureEnabled(value === "on")} options={[{ value: "on", label: "生成纹理" }, { value: "off", label: "关闭纹理" }]} /></label>
-                    <label className="space-y-2"><span className="block text-sm">PBR 材质</span><Select className="w-full" value={pbrEnabled ? "on" : "off"} onChange={(value) => setPbrEnabled(value === "on")} options={[{ value: "on", label: "开启 PBR" }, { value: "off", label: "关闭 PBR" }]} /></label>
-                    <label className="col-span-2 space-y-2"><span className="block text-sm">目标面数</span><InputNumber value={targetFaceCount} onChange={(value) => setTargetFaceCount(value || 500000)} min={500000} max={1000000} step={50000} className="!w-full" /></label>
+                    <label className="space-y-2"><span className="block text-sm">纹理</span><Select className="w-full" disabled={!capabilities.texture} value={generationOptions.textureEnabled ? "on" : "off"} onChange={(value) => setTextureEnabled(value === "on")} options={[{ value: "on", label: "生成纹理" }, { value: "off", label: "关闭纹理" }]} /></label>
+                    <label className="space-y-2"><span className="block text-sm">PBR 材质</span><Select className="w-full" disabled={!capabilities.pbr || !generationOptions.textureEnabled} value={generationOptions.pbrEnabled ? "on" : "off"} onChange={(value) => setPbrEnabled(value === "on")} options={[{ value: "on", label: "开启 PBR" }, { value: "off", label: "关闭 PBR" }]} /></label>
+                    <label className="col-span-2 space-y-2"><span className="block text-sm">目标面数</span><InputNumber disabled={!capabilities.maxFaces} value={capabilities.maxFaces ? generationOptions.targetFaceCount : null} placeholder={!capabilities.maxFaces ? "当前接口不支持" : undefined} onChange={(value) => setTargetFaceCounts((values) => ({ ...values, [model]: value ?? capabilities.defaultFaces }))} min={capabilities.minFaces} max={capabilities.maxFaces} precision={0} step={capabilities.minFaces < 1000 ? 100 : 5000} className="!w-full" /></label>
                 </div>
-                <ModelBilling model={model} kind="model3d" model3D={{ quantity, meshQuality, textureEnabled, pbrEnabled, targetFaceCount }} />
+                <ModelBilling model={model} kind="model3d" model3D={generationOptions} />
             </Modal>
             <GenerationHistoryDetailModal open={Boolean(detailHistory)} history={detailHistory} onClose={() => setDetailHistory(null)} />
         </div>
@@ -415,8 +472,8 @@ function HistoryPanel({ histories, loading, token, onRefresh, onOpenDetail }: { 
                 <div className="space-y-3">
                     {histories.map((history) => (
                         <div key={history.id} className="cursor-pointer rounded-lg border border-stone-200 bg-background p-3 transition hover:bg-stone-50 dark:border-stone-800 dark:hover:bg-stone-900" onDoubleClick={() => onOpenDetail(history)}>
-                            <div className="truncate text-sm font-semibold">{history.title}</div>
-                            <div className="mt-1 line-clamp-2 whitespace-pre-wrap break-words text-xs leading-4 text-stone-500 dark:text-stone-400">{history.prompt || "无提示词"}</div>
+                            <div className="truncate text-sm font-semibold" data-i18n-skip={history.title !== "3D 模型" || Boolean(history.prompt) || undefined}>{history.title}</div>
+                            <div className="mt-1 line-clamp-2 whitespace-pre-wrap break-words text-xs leading-4 text-stone-500 dark:text-stone-400">{history.prompt ? <span data-i18n-skip>{history.prompt}</span> : "无提示词"}</div>
                             <div className="mt-1 text-xs text-stone-500 dark:text-stone-400">{formatDateTime(history.createdAt)}</div>
                             <div className="mt-3 flex gap-2">
                                 <Button size="small" icon={<Download className="size-3.5" />} onClick={() => history.media[0] && window.open(history.media[0].url, "_blank")}>

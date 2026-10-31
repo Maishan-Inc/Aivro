@@ -19,6 +19,14 @@ import { localeLabels, type Locale } from "@/i18n/messages";
 import { locales } from "@/i18n/routing";
 
 const CodeMirror = dynamic(() => import("@uiw/react-codemirror"), { ssr: false });
+const model3DAdapterOptions = [
+    { value: "hunyuan3d", label: "GPT.GE（单图接口）", baseUrl: "https://api.gpt.ge", models: "Hunyuan3D-2 / Hi3DGen / Step1X-3D" },
+    { value: "meshy", label: "Meshy", baseUrl: "https://api.meshy.ai", models: "meshy-7.1 / meshy-6 / meshy-6-lite / meshy-t2 / meshy-t2.5 / latest" },
+    { value: "tripo", label: "Tripo", baseUrl: "https://api.tripo3d.ai", models: "v3.1-20260211 / v3.0-20250812 / P1-20260311" },
+    { value: "rodin", label: "Rodin Gen-2.5", baseUrl: "https://api.hyper3d.com", models: "Gen-2.5-Extreme-Low / Gen-2.5-Low / Gen-2.5-Medium / Gen-2.5-High / Gen-2.5-Extreme-High" },
+    { value: "fal-hunyuan3d", label: "Hunyuan 3D 3.1 Pro（fal）", baseUrl: "https://queue.fal.run", models: "fal-ai/hunyuan-3d/v3.1/pro" },
+    { value: "fal-trellis", label: "TRELLIS.2（fal）", baseUrl: "https://queue.fal.run", models: "fal-ai/trellis-2" },
+];
 const jsonEditorTheme = EditorView.theme({
     "&": { backgroundColor: "var(--ant-color-bg-container)", color: "var(--ant-color-text)" },
     ".cm-content": { caretColor: "var(--ant-color-text)", padding: "12px 0" },
@@ -1633,6 +1641,7 @@ export default function AdminSettingsPage() {
                                                         <Col xs={20} md={6}>
                                                             <Form.Item {...field} name={[field.name, "capability"]} style={{ marginBottom: 0 }}>
                                                                 <Select
+                                                                    onChange={() => channelForm.setFieldValue(["modelMappings", field.name, "adapter"], "")}
                                                                     options={[
                                                                         { label: "图片", value: "image" },
                                                                         { label: "对话", value: "text" },
@@ -1645,6 +1654,20 @@ export default function AdminSettingsPage() {
                                                         <Col xs={4} md={2}>
                                                             <Button danger type="text" icon={<DeleteOutlined />} onClick={() => remove(field.name)} />
                                                         </Col>
+                                                        <Form.Item noStyle shouldUpdate={(previous, current) => previous.modelMappings?.[field.name] !== current.modelMappings?.[field.name]}>
+                                                            {() => {
+                                                                const mapping = channelForm.getFieldValue(["modelMappings", field.name]);
+                                                                const adapter = model3DAdapterOptions.find((option) => option.value === mapping?.adapter);
+                                                                return mapping?.capability === "model3d" ? <Col span={24}>
+                                                                <Form.Item name={[field.name, "adapter"]} label="适配方式" extra={<>
+                                                                    <div>留空使用通用 3D 接口；选择适配后，请填写对应渠道地址、密钥和上游模型名。</div>
+                                                                    {adapter ? <div className="break-all"><span>参考地址：</span><span data-i18n-skip>{adapter.baseUrl}</span><br /><span>支持的上游模型：</span><span data-i18n-skip>{adapter.models}</span></div> : null}
+                                                                </>} style={{ marginBottom: 0 }}>
+                                                                    <Select allowClear placeholder="通用" options={model3DAdapterOptions} />
+                                                                </Form.Item>
+                                                            </Col> : null;
+                                                            }}
+                                                        </Form.Item>
                                                     </Row>
                                                 ))}
                                             </Flex>
@@ -2466,6 +2489,7 @@ function normalizeChannelMappings(items: Partial<AdminModelChannelModel>[] = [])
             name: (item.name || "").trim(),
             upstreamName: (item.upstreamName || item.name || "").trim(),
             capability: item.capability === "text" || item.capability === "video" || item.capability === "model3d" ? item.capability : "image",
+            adapter: item.capability === "model3d" && model3DAdapterOptions.some((option) => option.value === item.adapter) ? item.adapter : "",
         }))
         .filter((item) => {
             if (!item.name || !item.upstreamName || seen.has(item.name)) return false;

@@ -14,7 +14,8 @@
 .toolbarRow { display: contents; }
 .toolbar > *, .toolbarRow > * { flex-shrink: 0; max-width: 100%; }
 .toolbar :global(.ant-btn) { font-size: 12px; }
-.toolbar :global(.canvas-composer-model-picker) { max-width: 100%; box-shadow: none; font-size: 12px; }
+.toolbar :global(.canvas-composer-model-picker) { width: 296px; max-width: 100%; height: 32.84px !important; min-height: 32.84px; gap: 6px; padding: 0 8px; box-shadow: none; font-size: 12px; }
+.toolbar :global([data-model-billing] > span:last-child) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .references { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 10px 10px; }
 .reference { position: relative; width: 60px; height: 60px; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
 .reference > img { width: 100%; height: 100%; object-fit: cover; }

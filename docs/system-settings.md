@@ -89,6 +89,8 @@
 | `videoModels` | string[] | 视频生成服务可用模型范围；空数组表示该服务不开放模型 |
 | `textModels` | string[] | 对话、文本和画布助手服务可用模型范围；空数组表示该服务不开放模型 |
 | `model3DModels` | string[] | 3D 模型服务可用模型范围；空数组表示该服务不开放模型 |
+| `model3DAdapters` | object | 按模型名派生的专用 3D 适配标识，无条目时使用通用接口 |
+| `model3DCapabilities` | object | 按模型名派生的生成模式、数量、质量、材质、面数和参考图限制，供参数控制与计费使用 |
 | `modelCosts` | object[] | 模型算力点配置，后端模型接口调用前按模型预扣，上游失败时返还；未配置默认不扣除 |
 | `defaultModel` | string | 兼容字段，保存当前通用默认模型 |
 | `defaultImageModel` | string | 默认图片模型，从 `imageModels` 中选择 |
@@ -266,6 +268,12 @@
 | `remark` | string | 备注 |
 
 后端调用模型时，会从已启用、已配置 `baseUrl` 和 `apiKey`、且 `models` 包含目标模型的渠道中选择一个。
+
+3D 模型可在“渠道可用模型”中先选择 `3D` 类型，再选择“适配方式”。留空采用通用 `/v1/model-3d/generations` JSON 接口；选择“GPT.GE（单图接口）”后，模型映射保存 `adapter: "hunyuan3d"`，上游模型名应填写文档规定的 `Hunyuan3D-2`（同接口另支持 `Hi3DGen`、`Step1X-3D`）。另支持 Meshy、Tripo、Rodin Gen-2.5、fal 混元 3.1 Pro 和 TRELLIS.2；后台选项展示对应地址和支持的名称，具体版本、参数与协议见 [3D API 适配配置](model-3d-adapters.md)。切换为其他类型时清空适配方式，不根据模型名称自动启用。
+
+GPT.GE 适配使用 `POST /task/gi/image-to-3d` 上传图片，随后在同一渠道调用 `GET /task/{task_id}`，成功后转存 `output.file_url`。基础地址可含 `/v1`，该适配会移除末尾 `/v1`，自定义前缀保留。该渠道接口只接受单张图片、一次一个模型，不支持文字、多图、PBR 开关和目标面数；描述仅保留为生成记录。网格质量的标准/高/超高分别对应迭代次数 5/20/50、八叉树分辨率 128/256/400，纹理开关传入 `texture`，输出固定 GLB。公开配置 `modelChannel.model3DAdapters` 和 `model3DCapabilities` 按执行时相同的渠道优先级派生，供工作台限制参数与计算费用，不含渠道凭证。
+
+接口依据：[提交图片转 3D 任务](https://api-gpt-ge.apifox.cn/283324667e0)、[查询结果](https://api-gpt-ge.apifox.cn/283376526e0)。这些限制属于该渠道接口；[腾讯官方 Hunyuan3D-2](https://github.com/Tencent-Hunyuan/Hunyuan3D-2) 另有 `Hunyuan3D-2mv` 多视图模型，文字生成需要前置文字生图流程。
 
 `cloudStorage` 字段：
 

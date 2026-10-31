@@ -21,7 +21,7 @@ export type Model3DPricing = Pick<Model3DGenerationInput, "quantity" | "meshQual
 export function model3DCreditMultiplier(input: Model3DPricing, base = 1) {
     const quality = input.meshQuality === "high" ? 1.6 : input.meshQuality === "ultra" ? 2.5 : 1;
     const material = 1 + (input.textureEnabled ? 0.2 : 0) + (input.pbrEnabled ? 0.3 : 0);
-    const faces = Math.min(1000000, input.targetFaceCount > 0 ? input.targetFaceCount : 500000);
+    const faces = input.targetFaceCount > 0 ? input.targetFaceCount : 500000;
     return base * quality * material * (1 + Math.max(0, faces - 500000) / 1000000);
 }
 

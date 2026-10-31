@@ -257,11 +257,30 @@ export type AdminModelChannel = {
     remark: string;
 };
 
+export type Model3DAdapter = "" | "hunyuan3d" | "meshy" | "tripo" | "rodin" | "fal-hunyuan3d" | "fal-trellis";
+
+export type Model3DCapabilities = {
+    modes: ("text" | "image" | "multi_image")[];
+    maxImages: number;
+    maxQuantity: number;
+    texture: boolean;
+    pbr: boolean;
+    alwaysTexture: boolean;
+    qualities: ("standard" | "high" | "ultra")[];
+    minFaces: number;
+    maxFaces: number;
+    defaultFaces: number;
+    referenceViews?: string[] | null;
+    promptMaxLength: number;
+    imageMaxBytes: number;
+};
+
 export type AdminModelChannelModel = {
     id: string;
     name: string;
     upstreamName: string;
     capability: "image" | "text" | "video" | "model3d";
+    adapter?: Model3DAdapter;
 };
 
 export type AdminPublicModelChannelSettings = {
@@ -270,6 +289,8 @@ export type AdminPublicModelChannelSettings = {
     videoModels: string[];
     textModels: string[];
     model3DModels: string[];
+    model3DAdapters?: Record<string, Model3DAdapter>;
+    model3DCapabilities?: Record<string, Model3DCapabilities>;
     modelCosts: AdminModelCost[];
     defaultModel: string;
     defaultImageModel: string;

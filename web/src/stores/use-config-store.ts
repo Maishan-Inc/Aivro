@@ -61,12 +61,12 @@ function resolveEffectiveConfig(config: AiConfig, modelChannel: AdminPublicSetti
     const imageModels = scopedModels(modelChannel?.imageModels, models);
     const videoModels = (modelChannel?.videoModels || []).filter((model) => models.includes(model));
     const textModels = scopedModels(modelChannel?.textModels, models);
-    const model3DModels = scopedModels(modelChannel?.model3DModels, models);
+    const model3DModels = (modelChannel?.model3DModels || []).filter((model) => models.includes(model));
     const fallbackModel = defaultAllowedModel(models, modelChannel?.defaultModel);
     const fallbackImageModel = defaultAllowedModel(imageModels, modelChannel?.defaultImageModel) || defaultAllowedModel(imageModels) || fallbackModel;
     const fallbackVideoModel = defaultAllowedModel(videoModels, modelChannel?.defaultVideoModel);
     const fallbackTextModel = defaultAllowedModel(textModels, modelChannel?.defaultTextModel) || defaultAllowedModel(textModels) || fallbackModel;
-    const fallbackModel3D = defaultAllowedModel(model3DModels, modelChannel?.defaultModel3D) || defaultAllowedModel(model3DModels) || fallbackModel;
+    const fallbackModel3D = defaultAllowedModel(model3DModels, modelChannel?.defaultModel3D);
     return {
         ...config,
         models,

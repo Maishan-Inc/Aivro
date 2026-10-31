@@ -116,28 +116,27 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, inputs, o
                 </button>
             </div>
 
-            <div className="mb-3 flex min-w-0 shrink-0 cursor-default flex-wrap items-center gap-2" onMouseDown={(event) => event.stopPropagation()}>
-                <ModelPicker showBilling={false} className="canvas-compact-control min-h-10" config={config} kind={mode} models={modelsForMode(config, mode)} value={config.model} onChange={(model) => onConfigChange(node.id, { model })} onMissingConfig={() => message.warning("管理员尚未配置可用模型")} />
+            <div className="thin-scrollbar mt-auto flex min-w-0 shrink-0 cursor-default items-center gap-2 overflow-x-auto py-1" data-canvas-no-zoom onMouseDown={(event) => event.stopPropagation()}>
+                <ModelPicker showBilling={false} className="canvas-compact-control min-h-10 max-w-none" config={config} kind={mode} models={modelsForMode(config, mode)} value={config.model} onChange={(model) => onConfigChange(node.id, { model })} onMissingConfig={() => message.warning("管理员尚未配置可用模型")} />
                 {mode === "video" ? (
                     <CanvasVideoSettingsPopover config={config} placement="topRight" buttonClassName="canvas-compact-control !min-h-10 !rounded-lg !px-2" onConfigChange={(key, value) => onConfigChange(node.id, key === "videoSeconds" ? { seconds: value } : { [key]: value })} />
                 ) : mode === "image" ? (
-                    <CanvasImageSettingsPopover config={config} placement="topRight" autoAdjustOverflow={false} buttonClassName="canvas-compact-control !h-10 !w-[148px] !shrink-0 !justify-start !rounded-lg !px-2" onConfigChange={(key, value) => onConfigChange(node.id, key === "count" ? { count: Number(value) || 1 } : { [key]: value })} />
+                    <CanvasImageSettingsPopover config={config} placement="topRight" autoAdjustOverflow={false} buttonClassName="canvas-compact-control !h-10 !justify-start !rounded-lg !px-2" onConfigChange={(key, value) => onConfigChange(node.id, key === "count" ? { count: Number(value) || 1 } : { [key]: value })} />
                 ) : null}
+                <Button
+                    type="primary"
+                    data-canvas-action="generate"
+                    data-canvas-running={isRunning}
+                    className="!ml-auto !h-10 !shrink-0 !cursor-pointer !rounded-lg !px-3"
+                    aria-label={tr("开始生成")}
+                    disabled={isRunning || (!inputSummary.textCount && !inputSummary.imageCount)}
+                    onMouseDown={(event) => event.stopPropagation()}
+                    onClick={() => onGenerate(node.id)}
+                >
+                    <ModelBilling summaryOnly model={config.model} kind={mode} count={config.count} className="shrink-0 [&>span]:whitespace-nowrap" />
+                    {isRunning ? <LoaderCircle className="size-4 shrink-0 animate-spin" /> : <ArrowUp className="size-4 shrink-0" />}
+                </Button>
             </div>
-
-            <Button
-                type="primary"
-                data-canvas-action="generate"
-                data-canvas-running={isRunning}
-                className="mt-auto !h-auto !min-h-9 !w-full shrink-0 !cursor-pointer !rounded-lg !py-2"
-                aria-label={tr("开始生成")}
-                disabled={isRunning || (!inputSummary.textCount && !inputSummary.imageCount)}
-                onMouseDown={(event) => event.stopPropagation()}
-                onClick={() => onGenerate(node.id)}
-            >
-                <ModelBilling summaryOnly model={config.model} kind={mode} count={config.count} />
-                {isRunning ? <LoaderCircle className="size-4 shrink-0 animate-spin" /> : <ArrowUp className="size-4 shrink-0" />}
-            </Button>
             <Modal
                 title="输入预览"
                 open={previewOpen}

@@ -1,5 +1,9 @@
 // Admin-console-only strings (zh/en). These never render on the user-facing site.
 export const adminTranslations: Record<string, string> = {
+    "GPT.GE（单图接口）": "GPT.GE (single-image API)",
+    "留空使用通用 3D 接口；选择适配后，请填写对应渠道地址、密钥和上游模型名。": "Leave blank to use the generic 3D API. After choosing an adapter, enter the matching provider URL, API key and upstream model name.",
+    "参考地址：": "Reference URL: ",
+    "支持的上游模型：": "Supported upstream models: ",
     "复制模型 ID": "Copy model ID",
     "模型 ID 已复制": "Model ID copied",
     "未单独定价的套餐沿用标准价。": "Plans without their own price use the standard price.",
@@ -709,4 +713,8 @@ export const adminTranslations: Record<string, string> = {
     "桌面": "Desktop",
     "手机": "Mobile",
     "纯文本": "Plain text",
+    "适配方式": "Adapter",
+    "通用": "Generic",
+    "Hunyuan3D-2（GPT.GE 单图接口）": "Hunyuan3D-2 (GPT.GE single-image API)",
+    "留空使用通用 3D 接口；GPT.GE 单图适配使用图片上传与任务查询，不支持文字、多图、PBR 或目标面数。": "Leave blank to use the generic 3D API. The GPT.GE single-image adapter uploads an image and polls the task; text, multiple images, PBR and target face counts are unsupported.",
 };
