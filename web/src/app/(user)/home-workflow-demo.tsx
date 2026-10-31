@@ -12,7 +12,7 @@ import { workflowScenes, workflowSteps } from "./home-workflow-scenes";
 import styles from "./home-workflow-demo.module.css";
 
 const CanvasEditor = dynamic(() => import("./canvas/[id]/canvas-client-page").then((module) => module.InfiniteCanvasPage), { ssr: false, loading: () => <div className="grid h-full place-items-center"><AivroDrawableLoader /></div> });
-const icons = [ImagePlus, Box, Sparkles, Clapperboard, Video];
+const icons = [ImagePlus, Box, Sparkles, Clapperboard, Video, Box];
 
 export function HomeWorkflowDemo() {
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
@@ -95,6 +95,6 @@ export function HomeWorkflowDemo() {
             </div>
         </div>
         <figcaption className={styles.caption}>{workflowSteps.map((label, index) => <span key={label} data-active={step === index}><small>0{index + 1}</small>{tr(label)}{index < 4 ? <ArrowRight size={14} aria-hidden="true" /> : null}</span>)}</figcaption>
-        <div className={styles.note}><span>{tr("video" in scene ? "参考帧取自同一视频；片段用于演示视频创作流程。" : "图片由 AI 生成，并基于对应参考图编辑；画布为流程演示。")}</span>{"video" in scene ? <span><a href={scene.source} target="_blank" rel="noopener noreferrer">{scene.credit}<ArrowUpRight size={12} /></a>{" · "}<a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener noreferrer">CC BY 3.0</a></span> : null}</div>
+        <div className={styles.note}><span>{tr("model3D" in scene ? "3D 模型与参考图来自公开示例，仅用于演示工作流。" : "video" in scene ? "参考帧取自同一视频；片段用于演示视频创作流程。" : "图片由 AI 生成，并基于对应参考图编辑；画布为流程演示。")}</span>{"model3D" in scene ? <span><a href="https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/ToyCar" target="_blank" rel="noopener noreferrer">ToyCar · Khronos glTF Sample Assets · CC0<ArrowUpRight size={12} /></a></span> : null}{"video" in scene ? <span><a href={scene.source} target="_blank" rel="noopener noreferrer">{scene.credit}<ArrowUpRight size={12} /></a>{" · "}<a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener noreferrer">CC BY 3.0</a></span> : null}</div>
     </figure>;
 }

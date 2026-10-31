@@ -1,6 +1,7 @@
 "use client";
 
-import { Image as ImageIcon, Link2, Video } from "lucide-react";
+import { Box, Image as ImageIcon, Link2, Video } from "lucide-react";
+import { resolveCanvasModel3D } from "../utils/canvas-model-3d";
 import { ModelIcon } from "@/components/model-picker";
 import { imageQualityLabel, imageSizeLabel } from "@/components/image-settings-panel";
 import { videoResolutionLabel, videoSecondsLabel, videoSizeLabel } from "@/components/video-settings-panel";
@@ -84,5 +85,18 @@ export function CanvasVideoDraft({ node, inputs, onHighlight }: NodeInputsProps 
             <div className="flex min-w-0 items-start gap-2"><ModelIcon model={model} /><span data-i18n-skip className="min-w-0 break-all">{model || tr("选择模型")}</span></div>
             <div className="flex flex-wrap gap-x-3 gap-y-1 break-words"><span>{tr(videoSizeLabel(video.size))}</span><span>{videoResolutionLabel(video.vquality)}</span><span>{videoSecondsLabel(video.videoSeconds)}</span><span>{tr(video.videoBillingType === "second" ? "按秒计费" : "按次计费")}</span></div>
         </div>
+    </div>;
+}
+
+export function CanvasModel3DDraft({ node, inputs, onHighlight }: NodeInputsProps & { node: CanvasNodeData }) {
+    const theme = canvasThemes[useThemeStore((state) => state.theme)];
+    const { tr } = useI18n();
+    const { model } = resolveCanvasModel3D(useEffectiveConfig(), node);
+    const prompt = [node.metadata?.prompt, ...inputs.map((input) => input.text)].filter(Boolean).join("\n\n");
+    return <div className="thin-scrollbar flex h-full w-full flex-col gap-3 overflow-y-auto p-4 text-xs" data-canvas-no-zoom style={{ color: theme.node.text }} onWheel={(event) => event.stopPropagation()}>
+        <div className="flex items-center justify-between gap-2"><span className="flex items-center gap-2 font-medium"><Box size={16} />{tr("3D 节点")}</span><span style={{ color: theme.node.muted }}>{tr("待生成")}</span></div>
+        {prompt ? <p data-i18n-skip className="m-0 line-clamp-3 shrink-0 whitespace-pre-wrap break-words leading-5">{prompt}</p> : <p className="m-0 leading-5" style={{ color: theme.node.muted }}>{tr("连接参考图或输入提示词")}</p>}
+        <CanvasNodeReferences inputs={inputs} onHighlight={onHighlight} />
+        <div className="mt-auto flex items-center gap-2 border-t pt-3" style={{ borderColor: theme.node.stroke, color: theme.node.muted }}><ModelIcon model={model} /><span data-i18n-skip className="min-w-0 break-all">{model || tr("选择模型")}</span></div>
     </div>;
 }

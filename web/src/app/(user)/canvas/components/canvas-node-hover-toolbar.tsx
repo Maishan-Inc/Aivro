@@ -77,14 +77,16 @@ export function CanvasNodeHoverToolbar({
 
     const isImage = node.type === CanvasNodeType.Image;
     const isVideo = node.type === CanvasNodeType.Video;
+    const isModel3D = node.type === CanvasNodeType.Model3D;
+    const hasModel3D = isModel3D && Boolean(node.metadata?.content);
     const hasImage = isImage && Boolean(node.metadata?.content);
     const hasVideo = isVideo && Boolean(node.metadata?.content);
     const isText = node.type === CanvasNodeType.Text;
     const isCustom = node.type === CanvasNodeType.Custom;
     const isConfig = node.type === CanvasNodeType.Config;
-    const canOpenDialog = isText || isImage || isVideo;
+    const canOpenDialog = isText || isImage || isVideo || isModel3D;
     const canRetry = node.metadata?.status === "error";
-    const hasSpecificTools = canRetry || isText || isImage || isVideo || isConfig || isCustom;
+    const hasSpecificTools = canRetry || isText || isImage || isVideo || isModel3D || isConfig || isCustom;
 
     return (
         <div
@@ -99,8 +101,8 @@ export function CanvasNodeHoverToolbar({
             <ToolbarAction title="移除节点" label="删除" icon={<Trash2 className="size-4" />} onClick={() => onDelete(node)} danger />
             {hasSpecificTools ? <ToolbarDivider /> : null}
             {canRetry ? <ToolbarAction title="重新生成" label="重试" icon={<RefreshCw className="size-4" />} onClick={() => onRetry(node)} /> : null}
-            {hasImage || hasVideo || isText ? <ToolbarAction title="加入我的素材" label="存素材" icon={<FolderPlus className="size-4" />} onClick={() => onSaveAsset(node)} /> : null}
-            {hasImage || hasVideo ? <IconAction title={hasVideo ? "下载视频" : "下载图片"} icon={<Download className="size-5" />} onClick={() => onDownload(node)} /> : null}
+            {hasImage || hasVideo || hasModel3D || isText ? <ToolbarAction title="加入我的素材" label="存素材" icon={<FolderPlus className="size-4" />} onClick={() => onSaveAsset(node)} /> : null}
+            {hasImage || hasVideo || hasModel3D ? <IconAction title={hasModel3D ? "下载模型文件" : hasVideo ? "下载视频" : "下载图片"} icon={<Download className="size-5" />} onClick={() => onDownload(node)} /> : null}
             {canOpenDialog ? <ToolbarAction title="编辑" label="编辑" icon={<MessageSquare className="size-4" />} onClick={() => onToggleDialog(node)} /> : null}
             {isText ? <ToolbarAction title="编辑文本" label="编辑文字" icon={<Pencil className="size-4" />} onClick={() => onEditText(node)} /> : null}
             {isText ? <ToolbarAction title="用文本生图" label="生图" icon={<ImageIcon className="size-4" />} onClick={() => onGenerateImage(node)} /> : null}
@@ -122,6 +124,7 @@ export function CanvasNodeHoverToolbar({
             {hasImage ? <ToolbarAction title="裁剪并生成新节点" label="裁剪" icon={<Scissors className="size-4" />} onClick={() => onCrop(node)} /> : null}
             {hasImage ? <ToolbarAction title="生成角度" label="多角度" icon={<Camera className="size-4" />} onClick={() => onAngle(node)} /> : null}
             {hasImage ? <ToolbarAction title="查看图片详情" label="查看大图" icon={<Maximize2 className="size-4" />} onClick={() => onViewImage(node)} /> : null}
+            {hasModel3D ? <ToolbarAction title="3D 模型预览" label="预览" icon={<Maximize2 className="size-4" />} onClick={() => onViewImage(node)} /> : null}
             {hasVideo ? <ToolbarAction title={tr("视频详情")} label={tr("预览视频")} icon={<Maximize2 className="size-4" />} onClick={() => onViewImage(node)} /> : null}
         </div>
     );
@@ -173,7 +176,7 @@ export function CanvasNodeInfoModal({ node, open, onClose }: { node: CanvasNodeD
                     {view === "info" ? (
                         <div className="thin-scrollbar h-full space-y-3 overflow-auto pr-1">
                             <InfoRow label="ID" value={node.id} />
-                            <InfoRow label="类型" value={node.type === CanvasNodeType.Custom ? "自定义" : node.type === CanvasNodeType.Text ? "文本" : node.type === CanvasNodeType.Image ? "图片" : node.type === CanvasNodeType.Video ? "视频" : "生成配置"} />
+                            <InfoRow label="类型" value={node.type === CanvasNodeType.Model3D ? "3D 模型" : node.type === CanvasNodeType.Custom ? "自定义" : node.type === CanvasNodeType.Text ? "文本" : node.type === CanvasNodeType.Image ? "图片" : node.type === CanvasNodeType.Video ? "视频" : "生成配置"} />
                             <InfoRow label="尺寸" value={`${Math.round(node.width)} x ${Math.round(node.height)}`} />
                             <InfoRow label="位置" value={`${Math.round(node.position.x)}, ${Math.round(node.position.y)}`} />
                             <InfoRow label="状态" value={{ idle: "待生成", loading: "生成中", success: "成功", error: "失败" }[node.metadata?.status || "idle"]} />

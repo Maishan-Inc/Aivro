@@ -1,5 +1,5 @@
 .demo { margin: 0; min-width: 0; }
-.scenarios { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; margin-bottom: 24px; }
+.scenarios { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; margin-bottom: 24px; }
 .scenarios button { display: flex; align-items: center; gap: 12px; padding: 16px 14px; border: 0; border-bottom: 1px solid var(--border); background: none; color: var(--muted-foreground); font-size: 13px; text-align: left; cursor: pointer; transition: color .2s, border-color .2s; }
 .scenarios button[aria-selected="true"] { color: var(--foreground); border-color: var(--foreground); }
 .scenarios button:hover { color: var(--foreground); background: var(--muted); }
@@ -17,7 +17,7 @@
 .caption svg { margin-left: auto; }
 .note { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; margin-top: 20px; color: var(--muted-foreground); font-size: 10px; line-height: 1.8; }
 .note a { display: inline-flex; align-items: center; gap: 4px; text-decoration: underline; text-underline-offset: 3px; }
-@media (max-width: 700px) {
+@media (max-width: 1000px) {
     .scenarios { display: flex; overflow-x: auto; scrollbar-width: thin; margin-bottom: 18px; }
     .scenarios button { flex-shrink: 0; padding: 13px 12px; font-size: 12px; gap: 8px; }
     .scenarios button small { display: none; }

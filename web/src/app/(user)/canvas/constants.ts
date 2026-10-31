@@ -14,6 +14,7 @@ export const NODE_DEFAULT_SIZE = {
     [CanvasNodeType.Custom]: { width: 420, height: 320, title: "自定义" },
     [CanvasNodeType.Config]: { width: 720, height: 280, title: "生成配置" },
     [CanvasNodeType.Video]: { width: 420, height: 236, title: "视频" },
+    [CanvasNodeType.Model3D]: { width: 420, height: 340, title: "3D 模型" },
 } satisfies Record<CanvasNodeType, { width: number; height: number; title: string }>;
 
 export const NODE_SPECS = {
@@ -36,6 +37,10 @@ export const NODE_SPECS = {
     [CanvasNodeType.Video]: {
         ...NODE_DEFAULT_SIZE[CanvasNodeType.Video],
         metadata: { content: "", status: "idle" },
+    },
+    [CanvasNodeType.Model3D]: {
+        ...NODE_DEFAULT_SIZE[CanvasNodeType.Model3D],
+        metadata: { content: "", status: "idle", generationMode: "model3d" },
     },
 } satisfies Record<CanvasNodeType, CanvasNodeSpec>;
 

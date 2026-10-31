@@ -10,11 +10,11 @@ import { cn } from "@/lib/utils";
 import { useAssetStore, type Asset } from "@/stores/use-asset-store";
 import { fetchAssetLibrary, type AssetLibraryItem } from "@/services/api/assets";
 
-type SupportedAsset = Extract<Asset, { kind: "text" | "image" | "video" }>;
+type SupportedAsset = Extract<Asset, { kind: "text" | "image" | "video" | "model3d" }>;
 
 export type AssetPickerTab = "my-assets" | "library";
 
-export type InsertAssetPayload = { kind: "text"; content: string; title: string } | { kind: "image"; dataUrl: string; title: string; storageKey?: string } | { kind: "video"; url: string; title: string; storageKey?: string; width?: number; height?: number; mimeType?: string; bytes?: number };
+export type InsertAssetPayload = { kind: "model3d"; url: string; title: string; storageKey?: string; mimeType: string; bytes: number } | { kind: "text"; content: string; title: string } | { kind: "image"; dataUrl: string; title: string; storageKey?: string } | { kind: "video"; url: string; title: string; storageKey?: string; width?: number; height?: number; mimeType?: string; bytes?: number };
 
 type Props = {
     open: boolean;
@@ -51,6 +51,7 @@ const kindOptions = [
     { label: "文本", value: "text" },
     { label: "图片", value: "image" },
     { label: "视频", value: "video" },
+    { label: "3D 模型", value: "model3d" },
 ];
 
 function LibraryTab({ onInsert }: { onInsert: (payload: InsertAssetPayload) => void }) {
@@ -160,7 +161,7 @@ function PickerCard({ title, kind, cover, loading, onClick }: { title: string; k
             <div className="p-2.5">
                 <div className="flex items-center justify-between gap-2">
                     <span className="line-clamp-1 text-xs font-medium text-stone-800 dark:text-stone-200">{title}</span>
-                    <Tag className="m-0 shrink-0 text-[10px]">{kind === "image" ? "图片" : kind === "video" ? "视频" : "文本"}</Tag>
+                    <Tag className="m-0 shrink-0 text-[10px]">{kind === "model3d" ? "3D 模型" : kind === "image" ? "图片" : kind === "video" ? "视频" : "文本"}</Tag>
                 </div>
             </div>
             {loading && (
@@ -185,7 +186,7 @@ async function remoteImageToDataUrl(url: string) {
 }
 
 function isSupportedAsset(asset: Asset): asset is SupportedAsset {
-    return asset.kind === "text" || asset.kind === "image" || asset.kind === "video";
+    return asset.kind === "text" || asset.kind === "image" || asset.kind === "video" || asset.kind === "model3d";
 }
 
 function MyAssetsTab({ onInsert }: { onInsert: (payload: InsertAssetPayload) => void }) {
@@ -212,6 +213,8 @@ function MyAssetsTab({ onInsert }: { onInsert: (payload: InsertAssetPayload) => 
     const handleInsert = (asset: SupportedAsset) => {
         if (asset.kind === "text") {
             onInsert({ kind: "text", content: asset.data.content, title: asset.title });
+        } else if (asset.kind === "model3d") {
+            onInsert({ kind: "model3d", url: asset.data.url, storageKey: asset.data.storageKey, title: asset.title, mimeType: asset.data.mimeType, bytes: asset.data.bytes });
         } else if (asset.kind === "video") {
             onInsert({ kind: "video", url: asset.data.url, storageKey: asset.data.storageKey, title: asset.title, width: asset.data.width, height: asset.data.height, mimeType: asset.data.mimeType, bytes: asset.data.bytes });
         } else {

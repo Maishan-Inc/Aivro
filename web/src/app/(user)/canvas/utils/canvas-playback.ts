@@ -10,6 +10,7 @@ export type CanvasPlayback = {
     workflow: SaveWorkflowInput;
     images: UploadedImage[];
     video?: UploadedFile;
+    model3D?: UploadedFile;
     signal: AbortSignal;
     onReady: (canvas: HTMLDivElement) => void;
 };
@@ -24,6 +25,7 @@ type PlaybackScene = {
     outputs: readonly string[];
     format: string;
     video?: string;
+    model3D?: string;
 };
 
 export function waitForPlayback(duration: number, signal: AbortSignal) {
@@ -37,7 +39,7 @@ export function waitForPlayback(duration: number, signal: AbortSignal) {
 
 export async function preloadCanvasPlayback(scene: PlaybackScene, tr: (text: string) => string, signal: AbortSignal): Promise<Omit<CanvasPlayback, "onReady">> {
     const loadImage = async (name: string): Promise<UploadedImage> => {
-        const response = await fetch(`/showcase/workflows/${name}.webp?v=${process.env.NEXT_PUBLIC_APP_VERSION || "dev"}`, { signal });
+        const response = await fetch(name.startsWith("/") ? name : `/showcase/workflows/${name}.webp?v=${process.env.NEXT_PUBLIC_APP_VERSION || "dev"}`, { signal });
         if (!response.ok) throw new Error("加载失败");
         const blob = await response.blob();
         signal.throwIfAborted();
@@ -75,7 +77,17 @@ export async function preloadCanvasPlayback(scene: PlaybackScene, tr: (text: str
         signal.addEventListener("abort", abort, { once: true });
         video.src = scene.video;
     });
-    const [images, video] = await Promise.all([Promise.all([scene.reference, ...(scene.video ? [] : scene.outputs)].map(loadImage)), loadVideo()]);
+    const loadModel3D = async (): Promise<UploadedFile | undefined> => {
+        if (!scene.model3D) return;
+        const response = await fetch(scene.model3D, { signal });
+        if (!response.ok) throw new Error("加载失败");
+        const blob = await response.blob();
+        signal.throwIfAborted();
+        const url = URL.createObjectURL(blob);
+        signal.addEventListener("abort", () => URL.revokeObjectURL(url), { once: true });
+        return { url, storageKey: "", mimeType: "model/gltf-binary", bytes: blob.size };
+    };
+    const [images, video, model3D] = await Promise.all([Promise.all([scene.reference, ...(scene.video ? [] : scene.outputs)].map(loadImage)), loadVideo(), loadModel3D()]);
     signal.throwIfAborted();
     const [reference, ...outputs] = images;
     const node = (id: string, type: CanvasNodeType, title: string, x: number, y: number, metadata: CanvasNodeData["metadata"]): CanvasNodeData => ({
@@ -83,13 +95,13 @@ export async function preloadCanvasPlayback(scene: PlaybackScene, tr: (text: str
     });
     const referenceSize = fitNodeSize(reference.width, reference.height, NODE_DEFAULT_SIZE.image.width, NODE_DEFAULT_SIZE.image.height);
     return {
-        signal, images: outputs, video,
+        signal, images: outputs, video, model3D,
         workflow: {
             title: tr(scene.title), backgroundMode: "lines", showImageInfo: false, viewport: { x: 80, y: 110, k: 0.88 },
             nodes: [
                 { ...node("reference", CanvasNodeType.Image, scene.referenceTitle, 40, 360, { content: reference.url, naturalWidth: reference.width, naturalHeight: reference.height, bytes: reference.bytes, mimeType: reference.mimeType, status: "success", batchRootId: "brief" }), ...referenceSize },
                 node("brief", CanvasNodeType.Custom, "自定义", 20, 240, { content: `${tr(scene.brief)}\n${tr(scene.constraint)}`, status: "success", isBatchRoot: true, batchChildIds: ["reference"] }),
-                node("config", video ? CanvasNodeType.Video : CanvasNodeType.Image, video ? "视频节点" : "图片节点", 680, 100, { prompt: tr(scene.prompt), generationMode: video ? "video" : "image", model: video ? undefined : "gpt-image-2", size: scene.format, quality: "high", count: video ? 1 : outputs.length, seconds: "10", vquality: "720p", videoBillingType: "fixed", status: "idle" }),
+                node("config", model3D ? CanvasNodeType.Model3D : video ? CanvasNodeType.Video : CanvasNodeType.Image, model3D ? "3D 节点" : video ? "视频节点" : "图片节点", 720, model3D ? 60 : 100, { prompt: tr(scene.prompt), generationMode: model3D ? "model3d" : video ? "video" : "image", model: video || model3D ? undefined : "gpt-image-2", size: scene.format, quality: "high", count: video ? 1 : outputs.length, seconds: "10", vquality: "720p", videoBillingType: "fixed", status: "idle" }),
             ],
             connections: [{ id: "brief-config", fromNodeId: "brief", toNodeId: "config" }],
         },
@@ -186,6 +198,15 @@ export async function playCanvasPlayback(canvas: HTMLDivElement, cursor: HTMLDiv
         const canvasRect = canvas.getBoundingClientRect();
         await dragImage(imageId, find(`[data-custom-image-id="${imageId}"]`), canvas, { x: canvasRect.left + canvasRect.width * 0.77, y: canvasRect.top + canvasRect.height * 0.72 });
         await click(find('[data-node-id="brief"] > div'));
+    } else if (canvas.querySelector('[data-node-type="model3d"]')) {
+        const viewer = find('[data-node-type="model3d"] [data-model3d-state]');
+        while (viewer.dataset.model3dState === "loading") await waitForPlayback(100, signal);
+        if (viewer.dataset.model3dState === "error") throw new Error("加载失败");
+        for (const mode of ["white", "wireframe", "default"]) {
+            await click(find(`[data-model3d-mode="${mode}"]`));
+            await waitForPlayback(1800, signal);
+        }
+        onStep(4);
     } else {
         await click(find('[data-node-type="video"] > div'));
         const video = canvas.querySelector("video");

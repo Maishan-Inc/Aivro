@@ -36,6 +36,14 @@ export const workflowScenes = [
         video: "https://www.w3schools.com/html/mov_bbb.mp4",
         frameTimes: [1, 6], source: "https://peach.blender.org/", credit: "Big Buck Bunny · Blender Foundation",
     },
+    {
+        id: "model3d", title: "3D 模型", subtitle: "从参考图到可旋转的模型",
+        prompt: "参考玩具跑车的轮廓与材质，生成可旋转查看的 3D 模型。",
+        brief: "保留车身比例，检查材质和网格。", constraint: "生成后切换贴图、白模和线框预览",
+        reference: "/workflow/model3d/toy-car.jpg", referenceTitle: "模型参考图", branches: ["3D 模型"],
+        outputs: [], next: "旋转模型并检查网格", format: "1:1", deliverable: "3D 模型",
+        model3D: "/workflow/model3d/toy-car.glb",
+    },
 ] as const;
 
 export const workflowSteps = ["整理参考", "拆解创意", "分支生成", "对比结果", "继续创作"];

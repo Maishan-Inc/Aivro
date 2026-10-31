@@ -1,11 +1,14 @@
 "use client";
 
+import { buildCanvasModel3DRequest, resolveCanvasModel3D } from "../utils/canvas-model-3d";
+import { requestModel3DGeneration } from "@/services/api/model-3d";
+import { Model3DPreview } from "@/components/model-3d-preview";
 import { resolveVideoConfig } from "@/lib/video-models";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent as ReactChangeEvent, DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { CheckSquare, ClipboardPaste, Copy, Home, ImageIcon, Images, Info, List, Maximize2, Menu, MessageSquare, Plus, Redo2, Settings2, Share2, Trash2, Undo2, Upload, Video } from "lucide-react";
+import { Box, CheckSquare, ClipboardPaste, Copy, Home, ImageIcon, Images, Info, List, Maximize2, Menu, MessageSquare, Plus, Redo2, Settings2, Share2, Trash2, Undo2, Upload, Video } from "lucide-react";
 import { saveAs } from "file-saver";
 
 import { requestEdit, requestGeneration, requestImageQuestion } from "@/services/api/image";
@@ -33,7 +36,7 @@ import { ActiveConnectionPath, ConnectionPath } from "../components/canvas-conne
 import { CanvasConfigNodePanel } from "../components/canvas-config-node-panel";
 import { CanvasAssistantPanel } from "../components/canvas-assistant-panel";
 import { CanvasContextMenu } from "../components/canvas-context-menu";
-import { CanvasImageDraft, CanvasVideoDraft } from "../components/canvas-node-inputs";
+import { CanvasImageDraft, CanvasVideoDraft, CanvasModel3DDraft } from "../components/canvas-node-inputs";
 import { CanvasVideoPlayer } from "../components/canvas-video-player";
 import { CanvasNodeAngleDialog, type CanvasImageAngleParams } from "../components/canvas-node-angle-dialog";
 import { CanvasNodeCropDialog, type CanvasImageCropRect } from "../components/canvas-node-crop-dialog";
@@ -182,6 +185,7 @@ function ConnectionCreateMenu({ pending, onCreate, onClose }: { pending: Pending
                 <ConnectionCreateOption theme={theme} icon={<List className="size-5" />} title="文本生成" description="脚本、广告词、品牌文案" onClick={() => onCreate(CanvasNodeType.Text)} />
                 <ConnectionCreateOption theme={theme} icon={<Images className="size-5" />} title="自定义" description="提示词和图片，自由组合" onClick={() => onCreate(CanvasNodeType.Custom)} />
                 <ConnectionCreateOption theme={theme} icon={<ImageIcon className="size-5" />} title="图片生成" onClick={() => onCreate(CanvasNodeType.Image)} />
+                <ConnectionCreateOption theme={theme} icon={<Box className="size-5" />} title="3D 生成" onClick={() => onCreate(CanvasNodeType.Model3D)} />
                 <ConnectionCreateOption theme={theme} icon={<Video className="size-5" />} title="视频生成" onClick={() => onCreate(CanvasNodeType.Video)} />
                 <ConnectionCreateOption theme={theme} icon={<Settings2 className="size-5" />} title="配置节点" description="模型、尺寸、数量和输入顺序" onClick={() => onCreate(CanvasNodeType.Config)} />
             </div>
@@ -681,7 +685,7 @@ export function InfiniteCanvasPage({ playback }: { playback?: CanvasPlayback } =
     const nodeInputsById = useMemo(() => {
         const map = new Map<string, NodeGenerationInput[]>();
         displayNodes.forEach((node) => {
-            if (node.type !== CanvasNodeType.Config && !((node.type === CanvasNodeType.Image || node.type === CanvasNodeType.Video) && !node.metadata?.content) && node.id !== dialogNodeId) return;
+            if (node.type !== CanvasNodeType.Config && !((node.type === CanvasNodeType.Image || node.type === CanvasNodeType.Video || node.type === CanvasNodeType.Model3D) && !node.metadata?.content) && node.id !== dialogNodeId) return;
             map.set(node.id, buildNodeGenerationInputs(node.id, displayNodes, displayConnections));
         });
         return map;
@@ -1562,8 +1566,8 @@ export function InfiniteCanvasPage({ playback }: { playback?: CanvasPlayback } =
     }, []);
 
     const downloadNodeImage = useCallback((node: CanvasNodeData) => {
-        if ((node.type !== CanvasNodeType.Image && node.type !== CanvasNodeType.Video) || !node.metadata?.content) return;
-        const extension = node.type === CanvasNodeType.Video ? (node.metadata.mimeType === "video/webm" ? "webm" : node.metadata.mimeType === "video/quicktime" ? "mov" : "mp4") : imageExtension(node.metadata.content);
+        if ((node.type !== CanvasNodeType.Image && node.type !== CanvasNodeType.Video && node.type !== CanvasNodeType.Model3D) || !node.metadata?.content) return;
+        const extension = node.type === CanvasNodeType.Model3D ? "glb" : node.type === CanvasNodeType.Video ? (node.metadata.mimeType === "video/webm" ? "webm" : node.metadata.mimeType === "video/quicktime" ? "mov" : "mp4") : imageExtension(node.metadata.content);
         saveAs(node.metadata.content, `canvas-${node.type}-${node.id}.${extension}`);
     }, []);
 
@@ -1574,6 +1578,12 @@ export function InfiniteCanvasPage({ playback }: { playback?: CanvasPlayback } =
                     const content = node.metadata?.content?.trim();
                     if (!content) return message.error("没有可保存的文本");
                     await addAsset({ kind: "text", title: node.metadata?.prompt?.slice(0, 24) || "画布文本", coverUrl: "", tags: [], source: "Canvas", data: { content }, metadata: { source: "canvas", nodeId: node.id } });
+                    message.success("已加入我的素材");
+                    return;
+                }
+                if (node.type === CanvasNodeType.Model3D) {
+                    if (!node.metadata?.content) return;
+                    await addAsset({ kind: "model3d", title: node.title, coverUrl: "", tags: [], source: "Canvas", data: { url: node.metadata.content, storageKey: node.metadata.storageKey, bytes: node.metadata.bytes || 0, mimeType: node.metadata.mimeType || "model/gltf-binary" }, metadata: { source: "canvas", nodeId: node.id, prompt: node.metadata.generationPrompt || node.metadata.prompt } });
                     message.success("已加入我的素材");
                     return;
                 }
@@ -1917,7 +1927,7 @@ export function InfiniteCanvasPage({ playback }: { playback?: CanvasPlayback } =
     }, []);
 
     const handleGenerateNode = useCallback(
-        async (nodeId: string, mode: CanvasNodeGenerationMode, prompt: string) => {
+        async (nodeId: string, mode: CanvasNodeGenerationMode, prompt: string, retry = false) => {
             const sourceNode = nodesRef.current.find((node) => node.id === nodeId);
             if (!sourceNode || sourceNode.type === CanvasNodeType.Custom || runningNodeIdsRef.current.has(nodeId)) return;
             const generationConfig = buildGenerationConfig(effectiveConfig, sourceNode, mode);
@@ -1932,14 +1942,14 @@ export function InfiniteCanvasPage({ playback }: { playback?: CanvasPlayback } =
             const editingTextNode = mode === "text" && Boolean(sourceTextContent);
             const context = buildNodeGenerationContext(nodeId, nodesRef.current, connectionsRef.current, editingTextNode ? `请根据要求修改以下文本。\n\n原文：\n${sourceTextContent}\n\n修改要求：\n${prompt}` : prompt);
             const effectivePrompt = context.prompt.trim();
-            const markSourceStatus = sourceNode.type !== CanvasNodeType.Image && !(sourceNode.type === CanvasNodeType.Video && sourceNode.metadata?.content) && !editingTextNode;
+            const markSourceStatus = sourceNode.type !== CanvasNodeType.Image && !((sourceNode.type === CanvasNodeType.Video || sourceNode.type === CanvasNodeType.Model3D) && sourceNode.metadata?.content) && !editingTextNode;
             let pendingChildIds: string[] = [];
             if (markSourceStatus) setNodes((prev) => prev.map((node) => (node.id === nodeId ? { ...node, metadata: { ...node.metadata, prompt, status: NODE_STATUS_LOADING, queuePosition: undefined, errorDetails: undefined } } : node)));
 
             try {
-                if (!effectivePrompt && !context.referenceImages.length) throw new Error("请输入提示词或连接参考图");
+                if (!(retry && sourceNode.metadata?.model3DRequest) && !effectivePrompt && !context.referenceImages.length) throw new Error("请输入提示词或连接参考图");
                 if (mode === "video" && context.referenceImages.length > 7) throw new Error("视频生成最多支持 7 张参考图");
-                const generationContext = playback ? context : await hydrateNodeGenerationContext(context);
+                const generationContext = playback || mode === "model3d" ? context : await hydrateNodeGenerationContext(context);
                 if (mode === "image") {
                     const count = getGenerationCount(generationConfig.count);
                     const isConfigNode = sourceNode?.type === CanvasNodeType.Config;
@@ -2098,6 +2108,31 @@ export function InfiniteCanvasPage({ playback }: { playback?: CanvasPlayback } =
                     return;
                 }
 
+                if (mode === "model3d") {
+                    if (playback && !playback.model3D) return;
+                    const input = playback ? { model: generationConfig.model, mode: "image" as const, prompt: effectivePrompt, images: [], ...resolveCanvasModel3D(effectiveConfig, sourceNode).options } : retry && sourceNode.metadata?.model3DRequest
+                        ? { ...sourceNode.metadata.model3DRequest, model: generationConfig.model, ...resolveCanvasModel3D(effectiveConfig, sourceNode).options }
+                        : await buildCanvasModel3DRequest(effectiveConfig, sourceNode, context);
+                    const inPlace = sourceNode.type === CanvasNodeType.Model3D && !sourceNode.metadata?.content;
+                    const id = inPlace ? nodeId : nanoid();
+                    const spec = NODE_DEFAULT_SIZE[CanvasNodeType.Model3D];
+                    const resultNode: CanvasNodeData = {
+                        id, type: CanvasNodeType.Model3D, title: input.prompt.slice(0, 32) || "3D 模型",
+                        position: inPlace ? sourceNode.position : { x: sourceNode.position.x + sourceNode.width + 160, y: sourceNode.position.y },
+                        width: inPlace ? sourceNode.width : spec.width, height: inPlace ? sourceNode.height : spec.height,
+                        metadata: { inputOrder: inPlace ? sourceNode.metadata?.inputOrder : undefined, prompt: inPlace ? prompt : input.prompt, generationPrompt: input.prompt, model: input.model, model3D: resolveCanvasModel3D(effectiveConfig, sourceNode).options, model3DRequest: input, status: NODE_STATUS_LOADING },
+                    };
+                    pendingChildIds = [id];
+                    runningNodeIdsRef.current.add(id);
+                    setNodes((prev) => inPlace ? prev.map((node) => node.id === id ? resultNode : node) : [...prev, resultNode]);
+                    if (!inPlace) setConnections((prev) => [...prev, { id: nanoid(), fromNodeId: nodeId, toNodeId: id }]);
+                    const result = playback ? await waitForPlayback(3400, playback.signal).then(() => ({ status: "completed", results: [playback.model3D!], error: "" })) : await requestModel3DGeneration(useUserStore.getState().token, input);
+                    const asset = result.results[0];
+                    if (result.status !== "completed" || !asset?.url) throw new Error(result.error || "生成失败");
+                    setNodes((prev) => prev.map((node) => node.id === id ? { ...node, metadata: { ...node.metadata, content: asset.url, storageKey: asset.storageKey, mimeType: asset.mimeType, bytes: asset.bytes, status: NODE_STATUS_SUCCESS } } : node.id === nodeId && markSourceStatus ? { ...node, metadata: { ...node.metadata, status: NODE_STATUS_SUCCESS } } : node));
+                    return;
+                }
+
                 if (mode === "video") {
                     const spec = nodeSizeFromRatio(generationConfig.size, VIDEO_NODE_MAX_WIDTH, VIDEO_NODE_MAX_HEIGHT) || NODE_DEFAULT_SIZE[CanvasNodeType.Video];
                     const isEmptyVideoNode = sourceNode?.type === CanvasNodeType.Video && !sourceNode.metadata?.content;
@@ -2195,6 +2230,7 @@ export function InfiniteCanvasPage({ playback }: { playback?: CanvasPlayback } =
 
     const handleRetryNode = useCallback(
         async (node: CanvasNodeData) => {
+            if (node.type === CanvasNodeType.Model3D || node.type === CanvasNodeType.Config && node.metadata?.generationMode === "model3d") return handleGenerateNode(node.id, "model3d", node.metadata?.prompt || "", true);
             if (node.type === CanvasNodeType.Video) {
                 if (runningNodeIdsRef.current.has(node.id)) return;
                 const config = buildGenerationConfig(effectiveConfig, node, "video");
@@ -2303,7 +2339,7 @@ export function InfiniteCanvasPage({ playback }: { playback?: CanvasPlayback } =
                 setRunningNodeId(null);
             }
         },
-        [effectiveConfig, isAiConfigReady, message, tr, updateVideoQueue],
+        [handleGenerateNode, effectiveConfig, isAiConfigReady, message, tr, updateVideoQueue],
     );
 
     const generateImageFromTextNode = useCallback(
@@ -2387,6 +2423,12 @@ export function InfiniteCanvasPage({ playback }: { playback?: CanvasPlayback } =
         (payload: InsertAssetPayload) => {
             if (payload.kind === "text") {
                 insertAssistantText(payload.content);
+            } else if (payload.kind === "model3d") {
+                const spec = NODE_DEFAULT_SIZE[CanvasNodeType.Model3D];
+                const center = screenToCanvas((containerRef.current?.getBoundingClientRect().left || 0) + size.width / 2, (containerRef.current?.getBoundingClientRect().top || 0) + size.height / 2);
+                const id = nanoid();
+                setNodes((prev) => [...prev, { id, type: CanvasNodeType.Model3D, title: payload.title, position: { x: center.x - spec.width / 2, y: center.y - spec.height / 2 }, width: spec.width, height: spec.height, metadata: { content: payload.url, storageKey: payload.storageKey, mimeType: payload.mimeType, bytes: payload.bytes, status: NODE_STATUS_SUCCESS } }]);
+                setSelectedNodeIds(new Set([id]));
             } else if (payload.kind === "video") {
                 const spec = NODE_DEFAULT_SIZE[CanvasNodeType.Video];
                 const center = screenToCanvas((containerRef.current?.getBoundingClientRect().left || 0) + size.width / 2, (containerRef.current?.getBoundingClientRect().top || 0) + size.height / 2);
@@ -2544,6 +2586,8 @@ export function InfiniteCanvasPage({ playback }: { playback?: CanvasPlayback } =
                             )}
                             renderNodeContent={(contentNode) => contentNode.type === CanvasNodeType.Image ? (
                                 <CanvasImageDraft node={contentNode} inputs={nodeInputsById.get(contentNode.id) || []} onHighlight={highlightInputNode} />
+                            ) : contentNode.type === CanvasNodeType.Model3D ? (
+                                <CanvasModel3DDraft node={contentNode} inputs={nodeInputsById.get(contentNode.id) || []} onHighlight={highlightInputNode} />
                             ) : contentNode.type === CanvasNodeType.Video ? (
                                 <CanvasVideoDraft node={contentNode} inputs={nodeInputsById.get(contentNode.id) || []} onHighlight={highlightInputNode} />
                             ) : (
@@ -2639,6 +2683,7 @@ export function InfiniteCanvasPage({ playback }: { playback?: CanvasPlayback } =
                     showImageInfo={showImageInfo}
                     onAddImage={() => (agentPreview ? undefined : createNode(CanvasNodeType.Image))}
                     onAddVideo={() => (agentPreview ? undefined : createNode(CanvasNodeType.Video))}
+                    onAddModel3D={() => (agentPreview ? undefined : createNode(CanvasNodeType.Model3D))}
                     onAddCustom={() => (agentPreview ? undefined : createNode(CanvasNodeType.Custom))}
                     onAddConfig={() => (agentPreview ? undefined : createNode(CanvasNodeType.Config))}
                     onUndo={agentPreview ? () => undefined : undoCanvas}
@@ -2686,6 +2731,7 @@ export function InfiniteCanvasPage({ playback }: { playback?: CanvasPlayback } =
                             { key: "image", icon: <ImageIcon className="size-4" />, label: tr("图片节点"), onClick: () => createNode(CanvasNodeType.Image, contextMenu.position) },
                             { key: "text", icon: <MessageSquare className="size-4" />, label: tr("文本节点"), onClick: () => createNode(CanvasNodeType.Text, contextMenu.position) },
                             { key: "custom", icon: <Images className="size-4" />, label: tr("自定义"), onClick: () => createNode(CanvasNodeType.Custom, contextMenu.position) },
+                            { key: "model3d", icon: <Box className="size-4" />, label: tr("3D 节点"), onClick: () => createNode(CanvasNodeType.Model3D, contextMenu.position) },
                             { key: "video", icon: <Video className="size-4" />, label: tr("视频节点"), onClick: () => createNode(CanvasNodeType.Video, contextMenu.position) },
                             { key: "config", icon: <Settings2 className="size-4" />, label: tr("配置节点"), onClick: () => createNode(CanvasNodeType.Config, contextMenu.position) },
                             { key: "upload", icon: <Upload className="size-4" />, label: tr("上传图片或视频"), onClick: () => handleUploadRequest(undefined, contextMenu.position) },
@@ -2709,16 +2755,16 @@ export function InfiniteCanvasPage({ playback }: { playback?: CanvasPlayback } =
                 {angleNode?.metadata?.content ? <CanvasNodeAngleDialog dataUrl={angleNode.metadata.content} open={Boolean(angleNode)} onClose={() => setAngleNodeId(null)} onConfirm={(params) => void generateAngleNode(angleNode!, params)} /> : null}
 
                 <Modal
-                    title={tr(previewNode?.type === CanvasNodeType.Video ? "视频详情" : "图片详情")}
+                    title={tr(previewNode?.type === CanvasNodeType.Model3D ? "3D 模型预览" : previewNode?.type === CanvasNodeType.Video ? "视频详情" : "图片详情")}
                     open={Boolean(previewNode?.metadata?.content)}
                     centered
                     destroyOnHidden
                     onCancel={() => setPreviewNodeId(null)}
                     footer={null}
-                    width={previewNode?.type === CanvasNodeType.Video ? 960 : "auto"}
+                    width={previewNode?.type === CanvasNodeType.Video || previewNode?.type === CanvasNodeType.Model3D ? 960 : "auto"}
                     styles={{ body: { padding: 0, display: "flex", justifyContent: "center", alignItems: "center", maxHeight: "80vh" } }}
                 >
-                    {previewNode?.metadata?.content ? previewNode.type === CanvasNodeType.Video ? (
+                    {previewNode?.metadata?.content ? previewNode.type === CanvasNodeType.Model3D ? <div className="h-[60vh] w-full"><Model3DPreview url={previewNode.metadata.content} /></div> : previewNode.type === CanvasNodeType.Video ? (
                         <CanvasVideoPlayer src={previewNode.metadata.content} className="w-full" />
                     ) : (
                         <img
@@ -3034,7 +3080,7 @@ async function hydrateCanvasImages(nodes: CanvasNodeData[]) {
     return Promise.all(
         nodes.map(async (node) => {
             const content = node.metadata?.content;
-            if (node.type === CanvasNodeType.Video && node.metadata?.storageKey) return { ...node, metadata: { ...node.metadata, content: await resolveMediaUrl(node.metadata.storageKey, content) } };
+            if ((node.type === CanvasNodeType.Video || node.type === CanvasNodeType.Model3D) && node.metadata?.storageKey) return { ...node, metadata: { ...node.metadata, content: await resolveMediaUrl(node.metadata.storageKey, content) } };
             if (node.type !== CanvasNodeType.Image || !content) return node;
             if (node.metadata?.storageKey) return { ...node, metadata: { ...node.metadata, content: await resolveImageUrl(node.metadata.storageKey, content) } };
             if (!content.startsWith("data:image/")) return node;
@@ -3093,7 +3139,7 @@ function buildGenerationConfig(config: AiConfig, node: CanvasNodeData | undefine
     const defaultModel = mode === "image" ? config.imageModel : mode === "video" ? config.videoModel : config.textModel;
     const result: AiConfig = {
         ...config,
-        model: mode === "video" ? resolveVideoModel(config, node?.metadata?.model) : node?.metadata?.model || defaultModel || config.model || defaultConfig.model,
+        model: mode === "model3d" ? resolveCanvasModel3D(config, node).model : mode === "video" ? resolveVideoModel(config, node?.metadata?.model) : node?.metadata?.model || defaultModel || config.model || defaultConfig.model,
         quality: node?.metadata?.quality || config.quality || defaultConfig.quality,
         size: node?.metadata?.size || config.size || defaultConfig.size,
         videoBillingType: node?.metadata?.videoBillingType || config.videoBillingType,

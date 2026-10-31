@@ -188,6 +188,7 @@ function previewNodeTypeLabel(type: CanvasNodeData["type"]) {
     if (type === "image") return "图片节点";
     if (type === "text") return "文本节点";
     if (type === "video") return "视频节点";
+    if (type === "model3d") return "3D 节点";
     return "配置节点";
 }
 

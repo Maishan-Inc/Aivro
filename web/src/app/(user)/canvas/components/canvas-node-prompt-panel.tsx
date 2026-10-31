@@ -1,5 +1,7 @@
 "use client";
 
+import { resolveCanvasModel3D } from "../utils/canvas-model-3d";
+import { CanvasModel3DSettings } from "./canvas-model-3d-settings";
 import { resolveVideoConfig } from "@/lib/video-models";
 
 import { useEffect, useState } from "react";
@@ -38,6 +40,7 @@ export function CanvasNodePromptPanel({ node, isRunning, inputs, onHighlightInpu
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
     const mode = defaultMode(node.type);
     const config = buildNodeConfig(globalConfig, node, mode);
+    const model3D = resolveCanvasModel3D(globalConfig, node);
     const hasTextContent = node.type === CanvasNodeType.Text && Boolean(node.metadata?.content?.trim());
     const hasImageContent = node.type === CanvasNodeType.Image && Boolean(node.metadata?.content);
     const isEditingExistingContent = hasTextContent || hasImageContent;
@@ -82,12 +85,12 @@ export function CanvasNodePromptPanel({ node, isRunning, inputs, onHighlightInpu
                 className="thin-scrollbar m-0 block h-28 min-h-28 w-full shrink-0 resize-none rounded-xl border px-3 py-2 text-sm leading-5 outline-none"
                 aria-label={tr("提示词")}
                 style={{ background: theme.node.fill, borderColor: theme.node.stroke, color: theme.node.text }}
-                placeholder={tr(mode === "video" ? "描述要生成的视频内容" : mode === "image" ? (hasImageContent ? "请输入你想要把这张图修改成什么" : "描述要生成的图片内容") : hasTextContent ? "请输入你想要将本段文本修改成什么" : "请输入你想要生成的文本内容")}
+                placeholder={tr(mode === "model3d" ? "描述你想创造的形体、材质和风格…" : mode === "video" ? "描述要生成的视频内容" : mode === "image" ? (hasImageContent ? "请输入你想要把这张图修改成什么" : "描述要生成的图片内容") : hasTextContent ? "请输入你想要将本段文本修改成什么" : "请输入你想要生成的文本内容")}
             />
 
             <div className="thin-scrollbar flex min-w-0 shrink-0 items-center gap-2 overflow-x-auto py-1 [&_.canvas-composer-model-picker]:min-h-10" data-canvas-no-zoom>
-                <ModelPicker showBilling={false} className="max-w-none" config={config} kind={mode} models={mode === "image" ? config.imageModels : mode === "video" ? config.videoModels : config.textModels} value={config.model} onChange={(model) => onConfigChange(node.id, { model })} onMissingConfig={warnMissingModel} />
-                {mode === "image" ? (
+                <ModelPicker showBilling={false} className="max-w-none" config={config} kind={mode} model3D={mode === "model3d" ? model3D.options : undefined} models={mode === "model3d" ? config.model3DModels : mode === "image" ? config.imageModels : mode === "video" ? config.videoModels : config.textModels} value={config.model} onChange={(model) => onConfigChange(node.id, { model })} onMissingConfig={warnMissingModel} />
+                {mode === "model3d" ? <CanvasModel3DSettings node={node} onChange={(patch) => onConfigChange(node.id, patch)} /> : mode === "image" ? (
                     <CanvasImageSettingsPopover
                         config={config}
                         placement="topLeft"
@@ -108,7 +111,7 @@ export function CanvasNodePromptPanel({ node, isRunning, inputs, onHighlightInpu
                     data-canvas-action="generate"
                     data-canvas-running={isRunning}
                 >
-                    <ModelBilling summaryOnly video={config} model={config.model} kind={mode} count={mode === "image" ? config.count : 1} className="shrink-0 [&>span]:whitespace-nowrap" />
+                    <ModelBilling summaryOnly model3D={mode === "model3d" ? model3D.options : undefined} video={config} model={config.model} kind={mode} count={mode === "image" ? config.count : 1} className="shrink-0 [&>span]:whitespace-nowrap" />
                     {isRunning ? <LoaderCircle className="size-4 shrink-0 animate-spin" /> : <ArrowUp className="size-4 shrink-0" />}
                 </Button>
             </div>
@@ -117,14 +120,14 @@ export function CanvasNodePromptPanel({ node, isRunning, inputs, onHighlightInpu
 }
 
 function defaultMode(type: CanvasNodeData["type"]): CanvasNodeGenerationMode {
-    return type === CanvasNodeType.Text ? "text" : type === CanvasNodeType.Video ? "video" : "image";
+    return type === CanvasNodeType.Model3D ? "model3d" : type === CanvasNodeType.Text ? "text" : type === CanvasNodeType.Video ? "video" : "image";
 }
 
 function buildNodeConfig(globalConfig: AiConfig, node: CanvasNodeData, mode: CanvasNodeGenerationMode): AiConfig {
     const defaultModel = mode === "image" ? globalConfig.imageModel : mode === "video" ? globalConfig.videoModel : globalConfig.textModel;
     const result: AiConfig = {
         ...globalConfig,
-        model: mode === "video" ? resolveVideoModel(globalConfig, node.metadata?.model) : node.metadata?.model || defaultModel || globalConfig.model || defaultConfig.model,
+        model: mode === "model3d" ? resolveCanvasModel3D(globalConfig, node).model : mode === "video" ? resolveVideoModel(globalConfig, node.metadata?.model) : node.metadata?.model || defaultModel || globalConfig.model || defaultConfig.model,
         quality: node.metadata?.quality || globalConfig.quality || defaultConfig.quality,
         size: node.metadata?.size || globalConfig.size || defaultConfig.size,
         videoBillingType: node.metadata?.videoBillingType || globalConfig.videoBillingType,

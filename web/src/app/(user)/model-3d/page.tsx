@@ -1,5 +1,8 @@
 "use client";
 
+import { Model3DPreview, type Model3DViewMode } from "@/components/model-3d-preview";
+import { Model3DLoading } from "@/components/model-3d-loading";
+import { useI18n } from "@/hooks/use-i18n";
 import { StudioEmptyState } from "@/components/studio-empty-state";
 import { StudioHistorySidebar } from "@/components/studio-history-sidebar";
 import studio from "@/components/studio-layout.module.css";
@@ -26,8 +29,6 @@ import type { Model3DCapabilities } from "@/services/api/admin";
 const genericCapabilities: Model3DCapabilities = { modes: ["text", "image", "multi_image"], maxImages: 0, maxQuantity: 4, texture: true, pbr: true, alwaysTexture: false, qualities: ["standard", "high", "ultra"], minFaces: 500000, maxFaces: 1000000, defaultFaces: 500000, promptMaxLength: 0, imageMaxBytes: 0 };
 const referenceViewLabels: Record<string, string> = { front: "正面", left: "左侧", back: "背面", right: "右侧", top: "顶部", bottom: "底部", left_front: "左前方", right_front: "右前方" };
 
-type ViewMode = "default" | "wireframe" | "white";
-
 type UploadedReference = {
     id: string;
     name: string;
@@ -40,32 +41,9 @@ type UploadedReference = {
     bytes: number;
 };
 
-function ModelPreview({ result, mode }: { result: Model3DGenerationResult | null; mode: ViewMode }) {
-    const file = result?.results[0];
-    return (
-        <div className="flex min-h-[320px] w-full flex-col items-center justify-center rounded-lg border border-dashed border-stone-300 bg-stone-50 p-6 text-center dark:border-stone-700 dark:bg-stone-900 lg:min-h-[520px]">
-            <div className="relative mb-8 h-56 w-56 [perspective:800px]">
-                <div
-                    className={`absolute inset-8 rotate-45 rounded-2xl border ${mode === "wireframe" ? "border-foreground bg-transparent" : mode === "white" ? "border-stone-300 bg-white dark:border-stone-500 dark:bg-stone-100" : "border-border bg-gradient-to-br from-muted to-background"} [transform:rotateX(55deg)_rotateZ(45deg)]`}
-                />
-                <div
-                    className={`absolute inset-16 rounded-xl border ${mode === "wireframe" ? "border-foreground/60 bg-transparent" : mode === "white" ? "border-stone-200 bg-stone-100" : "border-border bg-gradient-to-br from-background to-muted"} [transform:rotateX(55deg)_rotateZ(45deg)_translateZ(70px)]`}
-                />
-            </div>
-            <div className="rounded-lg border border-stone-200 bg-background px-4 py-2 text-sm text-stone-600 shadow-sm dark:border-stone-800 dark:text-stone-300">
-                {file?.url ? "模型已生成，可下载查看" : "上传图片或输入文字后生成 3D 模型"}
-            </div>
-            {file?.url ? (
-                <Button className="mt-4" icon={<Download className="size-4" />} onClick={() => window.open(file.url, "_blank")}>
-                    下载模型文件
-                </Button>
-            ) : null}
-        </div>
-    );
-}
-
 export default function Model3DPage() {
     const searchParams = useSearchParams();
+    const { tr } = useI18n();
     const { message, modal } = App.useApp();
     const { token } = useUserStore();
     const { addAsset } = useAssetStore();
@@ -101,8 +79,11 @@ export default function Model3DPage() {
 
     const [generating, setGenerating] = useState(false);
     const [uploading, setUploading] = useState(false);
+    const [dragging, setDragging] = useState(false);
+    const [previewIndex, setPreviewIndex] = useState(0);
+    const uploadLock = useRef(false);
     const [currentResult, setCurrentResult] = useState<Model3DGenerationResult | null>(null);
-    const [viewMode, setViewMode] = useState<ViewMode>("default");
+    const [viewMode, setViewMode] = useState<Model3DViewMode>("default");
 
     const [historyOpen, setHistoryOpen] = useState(false);
     const [settingsOpen, setSettingsOpen] = useState(false);
@@ -120,9 +101,16 @@ export default function Model3DPage() {
         }
     }, [searchParams]);
 
-    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const files = Array.from(e.target.files || []);
-        if (!files.length || uploading || generating) return;
+    const handleImageUpload = async (files: File[]) => {
+        if (!files.length || uploadLock.current || generating) return;
+        if (files.some((file) => !file.type.startsWith("image/"))) {
+            message.warning(tr("请上传图片文件"));
+            return;
+        }
+        if (!capabilities.modes.some((mode) => mode !== "text")) {
+            message.warning(tr("当前模型不支持图片生成"));
+            return;
+        }
         if (capabilities.maxImages && images.length + files.length > capabilities.maxImages) {
             message.warning(`当前模式的参考图片数量不符合要求（最多 ${capabilities.maxImages} 张）`);
             return;
@@ -135,6 +123,7 @@ export default function Model3DPage() {
             message.warning("当前 3D 接口仅支持 PNG、JPEG 或 WebP 图片");
             return;
         }
+        uploadLock.current = true;
         setUploading(true);
         try {
             const uploaded = await Promise.all(
@@ -155,6 +144,7 @@ export default function Model3DPage() {
         } catch (error) {
             message.error(error instanceof Error ? error.message : "3D 参考图片上传失败");
         } finally {
+            uploadLock.current = false;
             setUploading(false);
         }
     };
@@ -202,6 +192,7 @@ export default function Model3DPage() {
 
             const result = await requestModel3DGeneration(token, input);
             setCurrentResult(result);
+            setPreviewIndex(0);
 
             if (result.status === "completed" && result.results.length > 0 && result.results[0].url) {
                 await saveGenerationHistory(token, {
@@ -281,7 +272,7 @@ export default function Model3DPage() {
     };
 
     const canGenerate = !uploading && (generationMode === "text" ? Boolean(prompt.trim()) : imageCountValid);
-    const composerExpanded = composerFocused || Boolean(prompt.trim()) || images.length > 0;
+    const composerExpanded = dragging || composerFocused || Boolean(prompt.trim()) || images.length > 0;
 
     return (
         <div className={studio.studio}>
@@ -290,7 +281,7 @@ export default function Model3DPage() {
                     <header className={studio.header}>
                         <div><h1>3D 模型工作台</h1><p>从平面灵感，探索三维世界。</p></div>
                         <div className={studio.headerActions}>
-                            <Button type="text" icon={<Plus size={15} />} disabled={generating} onClick={createSession}>新建</Button>
+                            <Button type="text" icon={<Plus size={15} />} disabled={generating || uploading} onClick={createSession}>新建</Button>
                             <div className={studio.historyActions}><Button type="text" icon={<History size={15} />} onClick={openHistory}>记录</Button></div>
                         </div>
                     </header>
@@ -310,13 +301,13 @@ export default function Model3DPage() {
                             </div>
                         </div>
 
-                        {currentResult ? <ModelPreview result={currentResult} mode={viewMode} /> : <StudioEmptyState kind="model-3d" onUsePrompt={(value) => { setPrompt(value); setMode("text"); }} />}
+                        {generating ? <div className="h-[min(58vh,520px)] min-h-80 rounded-2xl border border-border bg-muted/20"><Model3DLoading /></div> : currentResult?.results[previewIndex]?.url ? <div className="h-[min(58vh,520px)] min-h-80 rounded-2xl border border-border bg-muted/20"><Model3DPreview key={currentResult.results[previewIndex].url} url={currentResult.results[previewIndex].url} mode={viewMode} /></div> : <StudioEmptyState kind="model-3d" onUsePrompt={(value) => { setPrompt(value); setMode("text"); }} />}
 
                         {currentResult ? <div className="mt-4 grid gap-3 xl:grid-cols-2">
                             <div className="rounded-lg border border-stone-200 bg-background p-3 dark:border-stone-800">
                                 <div className="mb-2 flex items-center justify-between gap-3">
                                     <h3 className="text-sm font-semibold">内容信息</h3>
-                                    {currentResult ? <Tag className="m-0">{currentResult.status === "completed" ? "已完成" : currentResult.status}</Tag> : null}
+                                    {currentResult ? <Tag className="m-0">{tr(({ completed: "已完成", queued: "排队中", executing: "生成中", failed: "生成失败", canceled: "已取消" } as Record<string, string>)[currentResult.status] || "生成中")}</Tag> : null}
                                 </div>
                                 {currentResult ? (
                                     <div className="space-y-1 text-xs text-stone-500 dark:text-stone-400">
@@ -332,7 +323,7 @@ export default function Model3DPage() {
                             <div className="rounded-lg border border-stone-200 bg-background p-3 dark:border-stone-800">
                                 <div className="mb-2 flex items-center justify-between gap-3">
                                     <h3 className="text-sm font-semibold">模型文件</h3>
-                                    <Button size="small" icon={<Plus className="size-3.5" />} onClick={createSession}>
+                                    <Button size="small" icon={<Plus className="size-3.5" />} disabled={generating || uploading} onClick={createSession}>
                                         新建
                                     </Button>
                                 </div>
@@ -349,6 +340,7 @@ export default function Model3DPage() {
                                                     <span>网格面：{formatNumber(asset.faces)}</span>
                                                 </div>
                                                 <div className="flex flex-wrap gap-2">
+                                                    <Button size="small" type={previewIndex === index ? "primary" : "default"} disabled={generating} onClick={() => setPreviewIndex(index)}>{tr("预览")}</Button>
                                                     <Button size="small" icon={<FolderPlus className="size-3.5" />} onClick={() => saveAsset(asset)}>
                                                         添加到素材
                                                     </Button>
@@ -368,11 +360,16 @@ export default function Model3DPage() {
                         </div> : null}
                     </div>
                     <div className={studio.form}>
-                        <div className={composer.composer} data-expanded={composerExpanded} onFocus={() => setComposerFocused(true)} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setComposerFocused(false); }}>
+                        <div className={composer.composer} data-expanded={composerExpanded} data-dragging={dragging}
+                            onDragOver={(event) => { if (event.dataTransfer.types.includes("Files")) { event.preventDefault(); event.dataTransfer.dropEffect = generating || uploading ? "none" : "copy"; if (!generating && !uploading) setDragging(true); } }}
+                            onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false); }}
+                            onDrop={(event) => { event.preventDefault(); setDragging(false); void handleImageUpload(Array.from(event.dataTransfer.files)); }}
+                            onFocus={() => setComposerFocused(true)} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setComposerFocused(false); }}>
+                            {dragging ? <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-[inherit] border-2 border-dashed border-foreground bg-background/95 text-sm">{tr("松开以上传参考图")}</div> : null}
                             {images.length ? <div className={composer.references}>
                                 {images.map((img, index) => <div key={img.id} className={composer.reference}>
                                     <img src={img.dataUrl} alt={img.name} data-i18n-skip />
-                                    <button type="button" onClick={() => setImages((value) => value.filter((item) => item.id !== img.id))} aria-label="移除参考图"><X size={13} /></button>
+                                    <button type="button" disabled={generating || uploading} onClick={() => setImages((value) => value.filter((item) => item.id !== img.id))} aria-label="移除参考图"><X size={13} /></button>
                                     {referenceViews[index] ? <span className="absolute inset-x-0 bottom-0 bg-background/90 text-center text-[9px] text-foreground">{referenceViewLabels[referenceViews[index]]}</span> : img.width < 256 || img.height < 256 ? <span className="absolute inset-x-0 bottom-0 bg-background/90 text-center text-[9px] text-foreground">低于 256</span> : null}
                                 </div>)}
                             </div> : null}
@@ -431,7 +428,7 @@ export default function Model3DPage() {
                 disabled={uploading || generating}
                 className="hidden"
                 onChange={(event) => {
-                    void handleImageUpload(event);
+                    void handleImageUpload(Array.from(event.target.files || []));
                     event.target.value = "";
                 }}
             />

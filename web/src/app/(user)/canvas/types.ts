@@ -15,10 +15,11 @@ export enum CanvasNodeType {
     Custom = "custom",
     Config = "config",
     Video = "video",
+    Model3D = "model3d",
 }
 
 export type CanvasNodeStatus = "idle" | "success" | "loading" | "error";
-export type CanvasGenerationMode = "text" | "image" | "video";
+export type CanvasGenerationMode = "text" | "image" | "video" | "model3d";
 export type CanvasImageGenerationType = "generation" | "edit";
 
 export type CanvasNodeMetadata = {
@@ -53,6 +54,8 @@ export type CanvasNodeMetadata = {
     storageKey?: string;
     mimeType?: string;
     bytes?: number;
+    model3D?: Partial<Pick<import("@/services/api/model-3d").Model3DGenerationInput, "meshQuality" | "textureEnabled" | "pbrEnabled" | "targetFaceCount">>;
+    model3DRequest?: import("@/services/api/model-3d").Model3DGenerationInput;
 };
 
 export type CanvasNodeData = {

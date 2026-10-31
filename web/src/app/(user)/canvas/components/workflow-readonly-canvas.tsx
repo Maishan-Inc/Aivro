@@ -67,6 +67,8 @@ export function WorkflowReadonlyCanvas({ workflow, overlay }: { workflow?: Pick<
                 .workflow-readonly-node .node-element * {
                     pointer-events: none !important;
                 }
+                .workflow-readonly-node [data-canvas-model3d],
+                .workflow-readonly-node [data-canvas-model3d] *,
                 .workflow-readonly-node [data-canvas-video-player],
                 .workflow-readonly-node [data-canvas-video-player] * {
                     pointer-events: auto !important;

@@ -138,7 +138,7 @@ function sanitizeMetadata(nodeType: CanvasNodeType, metadata?: CanvasNodeMetadat
         const value = metadata[key];
         if (value !== undefined) (result as Record<string, unknown>)[key] = typeof value === "string" ? limitText(value, textLimit) : value;
     });
-    if (nodeType === CanvasNodeType.Image || nodeType === CanvasNodeType.Video) delete result.content;
+    if (nodeType === CanvasNodeType.Image || nodeType === CanvasNodeType.Video || nodeType === CanvasNodeType.Model3D) delete result.content;
     if (nodeType === CanvasNodeType.Custom) {
         result.isBatchRoot = true;
         result.batchChildIds = metadata.batchChildIds;

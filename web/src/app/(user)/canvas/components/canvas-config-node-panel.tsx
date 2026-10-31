@@ -1,5 +1,7 @@
 "use client";
 
+import { resolveCanvasModel3D } from "../utils/canvas-model-3d";
+import { CanvasModel3DSettings } from "./canvas-model-3d-settings";
 import { resolveVideoConfig } from "@/lib/video-models";
 
 import type { CSSProperties } from "react";
@@ -38,6 +40,7 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, inputs, o
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
     const mode = node.metadata?.generationMode || "image";
     const config = buildNodeConfig(globalConfig, node, mode);
+    const model3D = resolveCanvasModel3D(globalConfig, node);
     const chipStyle = { background: theme.node.fill, borderColor: theme.node.stroke, color: theme.node.text };
     const textInputs = inputs.filter((input) => input.type === "text");
     const imageInputs = inputs.filter((input) => input.type === "image");
@@ -75,8 +78,9 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, inputs, o
                         size="small"
                         className="canvas-config-mode !rounded-md !p-0.5"
                         value={mode}
-                        onChange={(value) => onConfigChange(node.id, { generationMode: value as CanvasGenerationMode, model: value === "video" ? globalConfig.videoModel : value === "image" ? globalConfig.imageModel : globalConfig.textModel })}
+                        onChange={(value) => onConfigChange(node.id, { generationMode: value as CanvasGenerationMode, model: value === "model3d" ? globalConfig.model3DModel : value === "video" ? globalConfig.videoModel : value === "image" ? globalConfig.imageModel : globalConfig.textModel })}
                         options={[
+                            { value: "model3d", label: "3D" },
                             {
                                 value: "image",
                                 label: (
@@ -119,8 +123,8 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, inputs, o
             </div>
 
             <div className="thin-scrollbar mt-auto flex min-w-0 shrink-0 cursor-default items-center gap-2 overflow-x-auto py-1" data-canvas-no-zoom onMouseDown={(event) => event.stopPropagation()}>
-                <ModelPicker showBilling={false} className="canvas-compact-control min-h-10 max-w-none" config={config} kind={mode} models={modelsForMode(config, mode)} value={config.model} onChange={(model) => onConfigChange(node.id, { model })} onMissingConfig={() => message.warning("管理员尚未配置可用模型")} />
-                {mode === "video" ? (
+                <ModelPicker showBilling={false} className="canvas-compact-control min-h-10 max-w-none" config={config} kind={mode} model3D={mode === "model3d" ? model3D.options : undefined} models={modelsForMode(config, mode)} value={config.model} onChange={(model) => onConfigChange(node.id, { model })} onMissingConfig={() => message.warning("管理员尚未配置可用模型")} />
+                {mode === "model3d" ? <CanvasModel3DSettings node={node} onChange={(patch) => onConfigChange(node.id, patch)} /> : mode === "video" ? (
                     <CanvasVideoSettingsPopover config={config} placement="topRight" buttonClassName="canvas-compact-control !min-h-10 !rounded-lg !px-2" onConfigChange={(key, value) => onConfigChange(node.id, key === "videoSeconds" ? { seconds: value } : { [key]: value })} />
                 ) : mode === "image" ? (
                     <CanvasImageSettingsPopover config={config} placement="topRight" autoAdjustOverflow={false} buttonClassName="canvas-compact-control !h-10 !justify-start !rounded-lg !px-2" onConfigChange={(key, value) => onConfigChange(node.id, key === "count" ? { count: Number(value) || 1 } : { [key]: value })} />
@@ -135,7 +139,7 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, inputs, o
                     onMouseDown={(event) => event.stopPropagation()}
                     onClick={() => onGenerate(node.id)}
                 >
-                    <ModelBilling summaryOnly video={config} model={config.model} kind={mode} count={config.count} className="shrink-0 [&>span]:whitespace-nowrap" />
+                    <ModelBilling summaryOnly model3D={mode === "model3d" ? model3D.options : undefined} video={config} model={config.model} kind={mode} count={config.count} className="shrink-0 [&>span]:whitespace-nowrap" />
                     {isRunning ? <LoaderCircle className="size-4 shrink-0 animate-spin" /> : <ArrowUp className="size-4 shrink-0" />}
                 </Button>
             </div>
@@ -315,7 +319,7 @@ function buildNodeConfig(globalConfig: AiConfig, node: CanvasNodeData, mode: Can
     const defaultModel = mode === "image" ? globalConfig.imageModel : mode === "video" ? globalConfig.videoModel : globalConfig.textModel;
     const result: AiConfig = {
         ...globalConfig,
-        model: mode === "video" ? resolveVideoModel(globalConfig, node.metadata?.model) : node.metadata?.model || defaultModel || globalConfig.model || defaultConfig.model,
+        model: mode === "model3d" ? resolveCanvasModel3D(globalConfig, node).model : mode === "video" ? resolveVideoModel(globalConfig, node.metadata?.model) : node.metadata?.model || defaultModel || globalConfig.model || defaultConfig.model,
         quality: node.metadata?.quality || globalConfig.quality || defaultConfig.quality,
         size: node.metadata?.size || globalConfig.size || defaultConfig.size,
         videoBillingType: node.metadata?.videoBillingType || globalConfig.videoBillingType,
@@ -328,6 +332,7 @@ function buildNodeConfig(globalConfig: AiConfig, node: CanvasNodeData, mode: Can
 
 function modelsForMode(config: AiConfig, mode: CanvasGenerationMode) {
     if (mode === "image") return config.imageModels;
+    if (mode === "model3d") return config.model3DModels;
     if (mode === "video") return config.videoModels;
     return config.textModels;
 }

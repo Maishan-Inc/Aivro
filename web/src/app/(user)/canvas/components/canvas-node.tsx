@@ -2,8 +2,10 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { ChevronRight, Image as ImageIcon, RefreshCw, Settings2, Star, Video } from "lucide-react";
+import { Box, ChevronRight, Image as ImageIcon, RefreshCw, Settings2, Star, Video } from "lucide-react";
 
+import { Model3DPreview, type Model3DViewMode } from "@/components/model-3d-preview";
+import { Model3DLoading } from "@/components/model-3d-loading";
 import { AivroDrawableLoader } from "@/components/aivro-drawable-loader";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { formatBytes } from "@/lib/image-utils";
@@ -389,11 +391,13 @@ const nodeContentRenderers = {
     [CanvasNodeType.Image]: ImageNodeContent,
     [CanvasNodeType.Config]: ConfigNodeContent,
     [CanvasNodeType.Video]: VideoNodeContent,
+    [CanvasNodeType.Model3D]: Model3DNodeContent,
 } satisfies Record<CanvasNodeType, (props: NodeContentRendererProps) => ReactNode>;
 
 function LoadingContent({ theme, node }: Pick<NodeContentRendererProps, "theme"> & { node?: CanvasNodeData }) {
     const { tr } = useI18n();
     const queuePosition = node?.metadata?.queuePosition;
+    if (node?.type === CanvasNodeType.Model3D || node?.metadata?.generationMode === "model3d") return <Model3DLoading />;
     return (
         <div className="flex h-full w-full flex-col items-center justify-center gap-3" style={{ color: theme.node.activeStroke }}>
             <AivroDrawableLoader compact className="h-10 w-32" style={{ color: theme.node.activeStroke }} />
@@ -545,16 +549,32 @@ function VideoNodeContent({ node, theme, renderVideo, renderNodeContent, readOnl
     </>;
 }
 
+function Model3DNodeContent({ node, theme, readOnly, renderNodeContent }: NodeContentRendererProps) {
+    const { tr } = useI18n();
+    const [mode, setMode] = useState<Model3DViewMode>("default");
+    if (!node.metadata?.content) return !readOnly && renderNodeContent ? renderNodeContent(node) : <div className="flex h-full w-full flex-col items-center justify-center gap-3" style={{ color: theme.node.muted }}><Box className="size-7" /><span>{tr("3D 节点")}</span></div>;
+    return <div data-canvas-model3d className="flex h-full w-full flex-col overflow-hidden rounded-[22px]" style={{ color: theme.node.text }}>
+        <div className="flex h-9 shrink-0 cursor-move items-center justify-between gap-2 px-3" style={{ background: theme.toolbar.panel }} title={tr("拖动 3D 节点")}>
+            <span className="flex min-w-0 items-center gap-2 text-xs"><Box size={14} /><span data-i18n-skip className="truncate">{node.title === "3D 模型" && !node.metadata?.prompt ? tr("3D 模型") : node.title}</span></span>
+            <div className="flex shrink-0 gap-1" onMouseDown={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()}>
+                {(["default", "white", "wireframe"] as const).map((value) => <button type="button" data-model3d-mode={value} key={value} className="rounded px-1.5 py-1 text-[10px]" style={{ background: mode === value ? theme.toolbar.activeBg : undefined, color: mode === value ? theme.toolbar.activeText : theme.node.muted }} aria-pressed={mode === value} onClick={() => setMode(value)}>{tr(value === "default" ? "贴图" : value === "white" ? "白模" : "线框")}</button>)}
+            </div>
+        </div>
+        <div className="min-h-0 flex-1"><Model3DPreview url={node.metadata.content} mode={mode} /></div>
+    </div>;
+}
+
 function ConfigNodeContent({ node, theme }: NodeContentRendererProps) {
-    const mode = node.metadata?.generationMode === "text" ? "文本" : node.metadata?.generationMode === "video" ? "视频" : "生图";
-    const details = [node.metadata?.model, node.metadata?.size, node.metadata?.count ? `${node.metadata.count} 张` : ""].filter(Boolean).join(" · ");
+    const { tr } = useI18n();
+    const mode = node.metadata?.generationMode === "model3d" ? "3D" : node.metadata?.generationMode === "text" ? "文本" : node.metadata?.generationMode === "video" ? "视频" : "生图";
+    const details = mode === "3D" ? node.metadata?.model : [node.metadata?.model, node.metadata?.size, node.metadata?.count ? `${node.metadata.count} 张` : ""].filter(Boolean).join(" · ");
 
     return (
         <div className="flex h-full w-full flex-col justify-between overflow-hidden px-4 py-5" style={{ color: theme.node.text }}>
             <div>
                 <div className="mb-3 inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium" style={{ background: theme.toolbar.activeBg, color: theme.toolbar.activeText }}>
                     <Settings2 className="size-3.5" />
-                    {mode}配置
+                    {mode === "3D" ? tr("3D 配置") : `${mode}配置`}
                 </div>
                 <div className="line-clamp-4 whitespace-pre-wrap break-words text-sm leading-5 opacity-80">{node.metadata?.prompt || node.metadata?.composerContent || "等待提示词输入"}</div>
             </div>
