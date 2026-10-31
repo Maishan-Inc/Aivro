@@ -336,7 +336,7 @@ export default function Model3DPage() {
                             <div className={composer.controls}><div><div className={composer.toolbar} inert={!composerExpanded}>
                                 <div className={composer.toolbarRow}>
                                 <Button type="text" shape="circle" icon={<Upload size={17} />} onClick={() => fileInputRef.current?.click()} aria-label="上传参考图" title="上传参考图" />
-                                <ModelPicker config={effectiveConfig} kind="model3d" models={effectiveConfig.model3DModels} value={model} onChange={(value) => updateConfig("model3DModel", value)} onMissingConfig={() => message.warning("管理员尚未配置可用3D模型")} />
+                                <ModelPicker config={effectiveConfig} kind="model3d" model3D={{ quantity, meshQuality, textureEnabled, pbrEnabled, targetFaceCount }} models={effectiveConfig.model3DModels} value={model} onChange={(value) => updateConfig("model3DModel", value)} onMissingConfig={() => message.warning("管理员尚未配置可用3D模型")} />
                                 </div>
                                 <div className={composer.toolbarRow}>
                                 <Dropdown trigger={["click"]} placement="topLeft" menu={{ selectable: true, selectedKeys: [mode], items: [
@@ -353,7 +353,6 @@ export default function Model3DPage() {
                                     <Button type="text">{quantity} 个<ChevronDown size={12} /></Button>
                                 </Dropdown>
                                 <Button type="text" icon={<SlidersHorizontal size={14} />} onClick={() => setSettingsOpen(true)} aria-label="调整材质和面数" title="材质和面数" />
-                                <ModelBilling model={model} kind="model3d" model3D={{ quantity, meshQuality, textureEnabled, pbrEnabled, targetFaceCount }} />
                                 </div>
                             </div></div></div>
                             </div>

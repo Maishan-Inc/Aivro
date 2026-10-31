@@ -9,7 +9,7 @@ import { saveAs } from "file-saver";
 import { requestEdit, requestGeneration, requestImageQuestion } from "@/services/api/image";
 import { requestVideoGeneration, type VideoQueueUpdate } from "@/services/api/video";
 import { normalizeVideoSizeValue } from "@/components/video-settings-panel";
-import { defaultConfig, type AiConfig, useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
+import { defaultConfig, resolveVideoModel, type AiConfig, useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
 import { isCloudStorageKey, resolveImageUrl, storeGeneratedImage, uploadImage, type UploadedImage } from "@/services/image-storage";
 import { resolveMediaUrl, uploadMediaFile, type UploadedFile } from "@/services/file-storage";
 import { nanoid } from "nanoid";
@@ -3093,7 +3093,7 @@ function buildGenerationConfig(config: AiConfig, node: CanvasNodeData | undefine
     const defaultModel = mode === "image" ? config.imageModel : mode === "video" ? config.videoModel : config.textModel;
     return {
         ...config,
-        model: node?.metadata?.model || defaultModel || config.model || defaultConfig.model,
+        model: mode === "video" ? resolveVideoModel(config, node?.metadata?.model) : node?.metadata?.model || defaultModel || config.model || defaultConfig.model,
         quality: node?.metadata?.quality || config.quality || defaultConfig.quality,
         size: node?.metadata?.size || config.size || defaultConfig.size,
         videoSeconds: node?.metadata?.seconds || config.videoSeconds || defaultConfig.videoSeconds,

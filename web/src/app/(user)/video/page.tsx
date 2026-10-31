@@ -95,7 +95,7 @@ export default function VideoPage() {
     const [detailHistory, setDetailHistory] = useState<GenerationHistory | null>(null);
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
-    const model = effectiveConfig.videoModel || effectiveConfig.model;
+    const model = effectiveConfig.videoModel;
     const canGenerate = Boolean(prompt.trim());
     const composerExpanded = composerFocused || canGenerate || references.length > 0;
 

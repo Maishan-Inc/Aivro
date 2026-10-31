@@ -486,12 +486,12 @@ function AssistantComposer({
                         event.preventDefault();
                         void onSubmit();
                     }}
-                    className="thin-scrollbar h-20 w-full resize-none border-0 bg-transparent px-1 py-1 pr-12 text-sm leading-5 outline-none placeholder:text-stone-400"
+                    className="thin-scrollbar h-20 w-full resize-none border-0 bg-transparent px-1 py-1 text-sm leading-5 outline-none placeholder:text-stone-400"
                     style={{ color: theme.node.text }}
                     placeholder={previewing ? "告诉 AI 哪里需要调整" : "描述你想让 AI 如何操作画布"}
                 />
-                <div className="mt-2 flex items-center justify-between gap-2 pr-12">
-                    <div className="canvas-composer-tools flex min-w-0 flex-1 items-center gap-1">
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <div className="canvas-composer-tools flex w-full min-w-0 flex-wrap items-center gap-1">
                         <CanvasPromptLibrary onSelect={onPromptChange} />
                         <Segmented
                             size="small"
@@ -502,19 +502,19 @@ function AssistantComposer({
                                 { label: "对话", value: "chat" },
                             ]}
                         />
-                        <ModelPicker config={config} kind="text" models={config.textModels} value={model} onChange={onModelChange} placeholder="对话模型" onMissingConfig={() => undefined} />
+                        <ModelPicker showBilling={false} config={config} kind="text" models={config.textModels} value={model} onChange={onModelChange} placeholder="对话模型" onMissingConfig={() => undefined} />
                     </div>
                     <Button
                         type="primary"
-                        className="absolute bottom-3 right-3 !h-10 !w-10 !min-w-10 shrink-0 !rounded-full !p-0"
+                        className="!ml-auto !h-auto !min-h-10 !max-w-full !rounded-full !px-3 !py-2"
                         disabled={isRunning || !prompt.trim()}
                         onClick={() => void onSubmit()}
                         aria-label="发送"
                     >
-                        {isRunning ? <LoaderCircle className="size-4 animate-spin" /> : <ArrowUp className="size-4" />}
+                        <ModelBilling summaryOnly model={model} kind="text" />
+                        {isRunning ? <LoaderCircle className="size-4 shrink-0 animate-spin" /> : <ArrowUp className="size-4 shrink-0" />}
                     </Button>
                 </div>
-                <ModelBilling model={model} kind="text" className="mt-1 pr-12" />
             </div>
         </div>
     );

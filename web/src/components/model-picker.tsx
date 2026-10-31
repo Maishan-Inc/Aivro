@@ -6,24 +6,28 @@ import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/u
 import { cn } from "@/lib/utils";
 import { useConfigStore, type AiConfig } from "@/stores/use-config-store";
 import { ModelLogo } from "./model-logo";
+import { ModelBilling } from "./model-billing";
 import { useI18n } from "@/hooks/use-i18n";
-import { useModelBilling } from "@/hooks/use-model-billing";
+import { useModelBilling, type ModelBillingOptions } from "@/hooks/use-model-billing";
 import { billingUnit } from "@/lib/model-pricing";
 import type { GenerationKind } from "@/constant/credits";
 
 type ModelPickerProps = {
     config: AiConfig;
     kind: GenerationKind;
+    count?: ModelBillingOptions["count"];
+    model3D?: ModelBillingOptions["model3D"];
     value?: string;
     onChange: (model: string) => void;
     models?: string[];
     className?: string;
     fullWidth?: boolean;
+    showBilling?: boolean;
     placeholder?: string;
     onMissingConfig?: () => void;
 };
 
-export function ModelPicker({ config, kind, value, onChange, models, className, fullWidth = false, placeholder = "选择模型", onMissingConfig }: ModelPickerProps) {
+export function ModelPicker({ config, kind, count, model3D, value, onChange, models, className, fullWidth = false, showBilling = true, placeholder = "选择模型", onMissingConfig }: ModelPickerProps) {
     const { tr } = useI18n();
     const pickerId = useId();
     const [open, setOpen] = useState(false);
@@ -54,9 +58,8 @@ export function ModelPicker({ config, kind, value, onChange, models, className, 
         >
             <SelectTrigger
                 className={cn(
-                    "canvas-composer-model-picker h-8 w-fit max-w-full gap-2 rounded-full border border-input bg-transparent px-3 text-sm font-normal shadow-sm transition-colors",
-                    // 190px for the name, plus icons, gaps, padding and borders.
-                    fullWidth ? "w-full min-w-0 justify-start" : "w-[264px] min-w-0 shrink-0 justify-start",
+                    "canvas-composer-model-picker min-h-8 min-w-0 max-w-full shrink-0 justify-start gap-2 rounded-full border border-input bg-transparent px-3 py-1.5 text-sm font-normal shadow-sm transition-colors data-[size=default]:h-auto",
+                    fullWidth ? "w-full" : "w-max",
                     "data-[state=open]:border-ring data-[state=open]:ring-2 data-[state=open]:ring-ring/20",
                     className,
                 )}
@@ -66,11 +69,12 @@ export function ModelPicker({ config, kind, value, onChange, models, className, 
                 title={current || tr(placeholder)}
             >
                 <ModelIcon model={current} />
-                <span className="canvas-model-picker-text min-w-0 flex-1 truncate text-left">{current || tr(placeholder)}</span>
+                <span className="canvas-model-picker-text w-[190px] min-w-0 flex-auto truncate text-left">{current || tr(placeholder)}</span>
+                {showBilling ? <ModelBilling summaryOnly model={current} kind={kind} count={count} model3D={model3D} className="max-w-[calc(100%_-_72px)] shrink-0 opacity-70" /> : null}
             </SelectTrigger>
             <SelectContent
                 data-canvas-no-zoom
-                className="z-[1200] w-80 max-w-[calc(100vw-24px)] rounded-xl border border-border/70 bg-popover p-1 shadow-xl"
+                className="z-[1200] w-[max(20rem,var(--radix-select-trigger-width))] max-w-[calc(100vw-24px)] rounded-xl border border-border/70 bg-popover p-1 shadow-xl [&_[data-position=popper]]:!min-w-0"
                 position="popper"
                 align="start"
                 side="bottom"

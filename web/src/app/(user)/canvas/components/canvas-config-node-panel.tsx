@@ -2,12 +2,13 @@
 
 import type { CSSProperties } from "react";
 import { useState } from "react";
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Edit3, Eye, Image as ImageIcon, LoaderCircle, MessageSquare, Play, Video } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Edit3, Eye, Image as ImageIcon, LoaderCircle, MessageSquare, Video } from "lucide-react";
 import { App, Button, Empty, Input, Modal, Segmented } from "antd";
 
 import { ModelPicker } from "@/components/model-picker";
 import { ModelBilling } from "@/components/model-billing";
-import { defaultConfig, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
+import { useI18n } from "@/hooks/use-i18n";
+import { defaultConfig, resolveVideoModel, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { CanvasImageSettingsPopover } from "./canvas-image-settings-popover";
@@ -27,6 +28,7 @@ type CanvasConfigNodePanelProps = {
 
 export function CanvasConfigNodePanel({ node, isRunning, inputSummary, inputs, onConfigChange, onTextInputChange, onGenerate }: CanvasConfigNodePanelProps) {
     const { message } = App.useApp();
+    const { tr } = useI18n();
     const [previewOpen, setPreviewOpen] = useState(false);
     const [editingTextId, setEditingTextId] = useState<string | null>(null);
     const [editingText, setEditingText] = useState("");
@@ -71,7 +73,7 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, inputs, o
                         size="small"
                         className="canvas-config-mode !rounded-md !p-0.5"
                         value={mode}
-                        onChange={(value) => onConfigChange(node.id, { generationMode: value as CanvasGenerationMode })}
+                        onChange={(value) => onConfigChange(node.id, { generationMode: value as CanvasGenerationMode, model: value === "video" ? globalConfig.videoModel : value === "image" ? globalConfig.imageModel : globalConfig.textModel })}
                         options={[
                             {
                                 value: "image",
@@ -115,28 +117,26 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, inputs, o
             </div>
 
             <div className="mb-3 flex min-w-0 shrink-0 cursor-default flex-wrap items-center gap-2" onMouseDown={(event) => event.stopPropagation()}>
-                <ModelPicker className="canvas-compact-control h-10" config={config} kind={mode} models={modelsForMode(config, mode)} value={config.model} onChange={(model) => onConfigChange(node.id, { model })} onMissingConfig={() => message.warning("管理员尚未配置可用模型")} />
+                <ModelPicker showBilling={false} className="canvas-compact-control min-h-10" config={config} kind={mode} models={modelsForMode(config, mode)} value={config.model} onChange={(model) => onConfigChange(node.id, { model })} onMissingConfig={() => message.warning("管理员尚未配置可用模型")} />
                 {mode === "video" ? (
-                    <CanvasVideoSettingsPopover config={config} placement="topRight" buttonClassName="canvas-compact-control !h-10 !w-[148px] !shrink-0 !justify-start !rounded-lg !px-2" onConfigChange={(key, value) => onConfigChange(node.id, key === "videoSeconds" ? { seconds: value } : { [key]: value })} />
+                    <CanvasVideoSettingsPopover config={config} placement="topRight" buttonClassName="canvas-compact-control !min-h-10 !rounded-lg !px-2" onConfigChange={(key, value) => onConfigChange(node.id, key === "videoSeconds" ? { seconds: value } : { [key]: value })} />
                 ) : mode === "image" ? (
                     <CanvasImageSettingsPopover config={config} placement="topRight" autoAdjustOverflow={false} buttonClassName="canvas-compact-control !h-10 !w-[148px] !shrink-0 !justify-start !rounded-lg !px-2" onConfigChange={(key, value) => onConfigChange(node.id, key === "count" ? { count: Number(value) || 1 } : { [key]: value })} />
                 ) : null}
             </div>
 
-            <ModelBilling model={config.model} kind={mode} count={config.count} className="mb-2 shrink-0" />
             <Button
                 type="primary"
                 data-canvas-action="generate"
                 data-canvas-running={isRunning}
-                className="mt-auto !h-9 !w-full shrink-0 !cursor-pointer !rounded-lg"
+                className="mt-auto !h-auto !min-h-9 !w-full shrink-0 !cursor-pointer !rounded-lg !py-2"
+                aria-label={tr("开始生成")}
                 disabled={isRunning || (!inputSummary.textCount && !inputSummary.imageCount)}
                 onMouseDown={(event) => event.stopPropagation()}
                 onClick={() => onGenerate(node.id)}
             >
-                <span className="inline-flex items-center gap-1.5">
-                    {isRunning ? <LoaderCircle className="size-4 animate-spin" /> : <Play className="size-4" />}
-                    <span>开始生成</span>
-                </span>
+                <ModelBilling summaryOnly model={config.model} kind={mode} count={config.count} />
+                {isRunning ? <LoaderCircle className="size-4 shrink-0 animate-spin" /> : <ArrowUp className="size-4 shrink-0" />}
             </Button>
             <Modal
                 title="输入预览"
@@ -314,7 +314,7 @@ function buildNodeConfig(globalConfig: AiConfig, node: CanvasNodeData, mode: Can
     const defaultModel = mode === "image" ? globalConfig.imageModel : mode === "video" ? globalConfig.videoModel : globalConfig.textModel;
     return {
         ...globalConfig,
-        model: node.metadata?.model || defaultModel || globalConfig.model || defaultConfig.model,
+        model: mode === "video" ? resolveVideoModel(globalConfig, node.metadata?.model) : node.metadata?.model || defaultModel || globalConfig.model || defaultConfig.model,
         quality: node.metadata?.quality || globalConfig.quality || defaultConfig.quality,
         size: node.metadata?.size || globalConfig.size || defaultConfig.size,
         videoSeconds: node.metadata?.seconds || globalConfig.videoSeconds || defaultConfig.videoSeconds,

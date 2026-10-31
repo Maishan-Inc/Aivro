@@ -59,12 +59,12 @@ type ConfigStore = {
 function resolveEffectiveConfig(config: AiConfig, modelChannel: AdminPublicSettings["modelChannel"] | null) {
     const models = modelChannel?.availableModels || [];
     const imageModels = scopedModels(modelChannel?.imageModels, models);
-    const videoModels = scopedModels(modelChannel?.videoModels, models);
+    const videoModels = (modelChannel?.videoModels || []).filter((model) => models.includes(model));
     const textModels = scopedModels(modelChannel?.textModels, models);
     const model3DModels = scopedModels(modelChannel?.model3DModels, models);
     const fallbackModel = defaultAllowedModel(models, modelChannel?.defaultModel);
     const fallbackImageModel = defaultAllowedModel(imageModels, modelChannel?.defaultImageModel) || defaultAllowedModel(imageModels) || fallbackModel;
-    const fallbackVideoModel = defaultAllowedModel(videoModels, modelChannel?.defaultVideoModel) || defaultAllowedModel(videoModels) || fallbackModel;
+    const fallbackVideoModel = defaultAllowedModel(videoModels, modelChannel?.defaultVideoModel);
     const fallbackTextModel = defaultAllowedModel(textModels, modelChannel?.defaultTextModel) || defaultAllowedModel(textModels) || fallbackModel;
     const fallbackModel3D = defaultAllowedModel(model3DModels, modelChannel?.defaultModel3D) || defaultAllowedModel(model3DModels) || fallbackModel;
     return {
@@ -89,6 +89,10 @@ function isAiConfigReady(config: AiConfig, model: string) {
 
 function defaultAllowedModel(models: string[], model?: string) {
     return model && models.includes(model) ? model : models[0] || "";
+}
+
+export function resolveVideoModel(config: AiConfig, model?: string) {
+    return defaultAllowedModel(config.videoModels, model && config.videoModels.includes(model) ? model : config.videoModel);
 }
 
 function scopedModels(models: string[] | undefined, availableModels: string[]) {

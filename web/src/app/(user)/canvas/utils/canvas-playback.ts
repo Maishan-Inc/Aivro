@@ -89,7 +89,7 @@ export async function preloadCanvasPlayback(scene: PlaybackScene, tr: (text: str
             nodes: [
                 { ...node("reference", CanvasNodeType.Image, scene.referenceTitle, 40, 360, { content: reference.url, naturalWidth: reference.width, naturalHeight: reference.height, bytes: reference.bytes, mimeType: reference.mimeType, status: "success", batchRootId: "brief" }), ...referenceSize },
                 node("brief", CanvasNodeType.Custom, "自定义", 20, 240, { content: `${tr(scene.brief)}\n${tr(scene.constraint)}`, status: "success", isBatchRoot: true, batchChildIds: ["reference"] }),
-                node("config", video ? CanvasNodeType.Video : CanvasNodeType.Image, video ? "视频节点" : "图片节点", 650, 100, { prompt: tr(scene.prompt), generationMode: video ? "video" : "image", model: video ? "grok-imagine-video" : "gpt-image-2", size: scene.format, quality: "high", count: video ? 1 : outputs.length, seconds: "10", vquality: "720", status: "idle" }),
+                node("config", video ? CanvasNodeType.Video : CanvasNodeType.Image, video ? "视频节点" : "图片节点", 650, 100, { prompt: tr(scene.prompt), generationMode: video ? "video" : "image", model: video ? undefined : "gpt-image-2", size: scene.format, quality: "high", count: video ? 1 : outputs.length, seconds: "10", vquality: "720", status: "idle" }),
             ],
             connections: [{ id: "brief-config", fromNodeId: "brief", toNodeId: "config" }],
         },
@@ -162,11 +162,11 @@ export async function playCanvasPlayback(canvas: HTMLDivElement, cursor: HTMLDiv
         await click(referenceChip);
         await waitForPlayback(1200, signal);
     }
-    const billing = find('[data-node-id="config"] [data-model-billing]').getBoundingClientRect();
-    await moveCursor(billing.left + billing.width / 2, billing.top + billing.height / 2);
+    const billing = find('[data-node-id="config"] [data-canvas-action="generate"] [data-model-billing]');
+    const billingRect = billing.getBoundingClientRect();
+    await moveCursor(billingRect.left + billingRect.width / 2, billingRect.top + billingRect.height / 2);
     await waitForPlayback(1800, signal);
-    const generate = find('[data-node-id="config"] [data-canvas-action="generate"]') as HTMLButtonElement;
-    await click(generate);
+    await click(billing);
     while (canvas.querySelector('[data-node-id="config"] [data-canvas-running="true"]')) await waitForPlayback(100, signal);
     onStep(3);
     const batch = canvas.querySelector<HTMLElement>('[data-node-type="image"][data-batch-root="true"]');

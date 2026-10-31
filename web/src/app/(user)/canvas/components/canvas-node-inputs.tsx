@@ -6,7 +6,7 @@ import { imageQualityLabel, imageSizeLabel } from "@/components/image-settings-p
 import { videoResolutionLabel, videoSecondsLabel, videoSizeLabel } from "@/components/video-settings-panel";
 import { useI18n } from "@/hooks/use-i18n";
 import { canvasThemes } from "@/lib/canvas-theme";
-import { useEffectiveConfig } from "@/stores/use-config-store";
+import { resolveVideoModel, useEffectiveConfig } from "@/stores/use-config-store";
 import { useThemeStore } from "@/stores/use-theme-store";
 import type { CanvasNodeData } from "../types";
 import type { NodeGenerationInput } from "./canvas-node-generation";
@@ -72,15 +72,15 @@ export function CanvasVideoDraft({ node, inputs, onHighlight }: NodeInputsProps 
     const config = useEffectiveConfig();
     const { tr } = useI18n();
     const prompt = [node.metadata?.prompt, ...inputs.map((input) => input.text)].filter(Boolean).join("\n\n");
-    const model = node.metadata?.model || config.videoModel;
+    const model = resolveVideoModel(config, node.metadata?.model);
 
     return <div className="thin-scrollbar flex h-full w-full flex-col gap-3 overflow-y-auto p-4 text-xs" data-canvas-no-zoom style={{ color: theme.node.text }} onWheel={(event) => event.stopPropagation()}>
         <div className="flex items-center justify-between gap-2"><span className="flex items-center gap-2 font-medium"><Video className="size-4" />{tr("视频节点")}</span><span style={{ color: theme.node.muted }}>{tr("待生成")}</span></div>
         {prompt ? <p data-i18n-skip className="m-0 line-clamp-2 shrink-0 whitespace-pre-wrap break-words leading-5">{prompt}</p> : <p className="m-0 leading-5" style={{ color: theme.node.muted }}>{tr("连接参考图或输入提示词")}</p>}
         <CanvasNodeReferences inputs={inputs} onHighlight={onHighlight} />
-        <div className="mt-auto space-y-2 border-t pt-2" style={{ borderColor: theme.node.stroke, color: theme.node.muted }}>
-            <div className="flex min-w-0 items-center gap-2"><ModelIcon model={model} /><span data-i18n-skip className="truncate">{model || tr("选择模型")}</span></div>
-            <div className="flex flex-wrap gap-x-3 gap-y-1"><span>{tr(videoSizeLabel(node.metadata?.size || config.size))}</span><span>{videoResolutionLabel(node.metadata?.vquality || config.vquality)}</span><span>{videoSecondsLabel(node.metadata?.seconds || config.videoSeconds)}</span></div>
+        <div className="mt-auto shrink-0 space-y-2 border-t pt-2" style={{ borderColor: theme.node.stroke, color: theme.node.muted }}>
+            <div className="flex min-w-0 items-start gap-2"><ModelIcon model={model} /><span data-i18n-skip className="min-w-0 break-all">{model || tr("选择模型")}</span></div>
+            <div className="flex flex-wrap gap-x-3 gap-y-1 break-words"><span>{tr(videoSizeLabel(node.metadata?.size || config.size))}</span><span>{videoResolutionLabel(node.metadata?.vquality || config.vquality)}</span><span>{videoSecondsLabel(node.metadata?.seconds || config.videoSeconds)}</span></div>
         </div>
     </div>;
 }

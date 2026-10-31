@@ -10,6 +10,7 @@ import { canvasThemes } from "@/lib/canvas-theme";
 import { useThemeStore } from "@/stores/use-theme-store";
 import type { AiConfig } from "@/stores/use-config-store";
 import { useI18n } from "@/hooks/use-i18n";
+import { cn } from "@/lib/utils";
 
 type CanvasVideoSettingsPopoverProps = {
     config: AiConfig;
@@ -51,10 +52,12 @@ export function CanvasVideoSettingsPopover({ config, onConfigChange, buttonClass
 
     return (
         <>
-            <span ref={buttonRef} className="inline-flex min-w-0">
-                <Button size="small" type="text" className={buttonClassName || "!h-8 !max-w-[170px] !justify-start !rounded-full !px-2.5"} style={{ background: theme.node.fill, color: theme.node.text }} icon={<Settings2 className="size-3.5" />} onClick={() => setOpen((current) => !current)}>
-                    <span className="truncate">
-                        {videoResolutionLabel(config.vquality)} · {tr(videoSizeLabel(config.size))} · {videoSecondsLabel(config.videoSeconds)}
+            <span ref={buttonRef} className="inline-flex min-w-0 max-w-full">
+                <Button size="small" type="text" className={cn("!h-auto !min-h-8 !min-w-0 !max-w-full !justify-start !rounded-full !px-2.5 !py-2", buttonClassName)} style={{ background: theme.node.fill, color: theme.node.text }} styles={{ content: { minWidth: 0, whiteSpace: "normal", textAlign: "left" } }} icon={<Settings2 className="size-3.5 shrink-0" />} onClick={() => setOpen((current) => !current)}>
+                    <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-left leading-5">
+                        <span>{videoResolutionLabel(config.vquality)}</span>
+                        <span className="min-w-0 break-words">{tr(videoSizeLabel(config.size))}</span>
+                        <span>{videoSecondsLabel(config.videoSeconds)}</span>
                     </span>
                 </Button>
             </span>

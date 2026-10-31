@@ -210,7 +210,13 @@ func normalizePublicSettingWithChannels(setting model.PublicSetting, channels []
 	}
 	setting.ModelChannel.AvailableModels = filterModels(setting.ModelChannel.AvailableModels, collectChannelModelNames(channels))
 	setting.ModelChannel.ImageModels = normalizeScopedModels(setting.ModelChannel.ImageModels, setting.ModelChannel.AvailableModels, collectChannelModelNamesByCapability(channels, "image"))
-	setting.ModelChannel.VideoModels = normalizeScopedModels(setting.ModelChannel.VideoModels, setting.ModelChannel.AvailableModels, collectChannelModelNamesByCapability(channels, "video"))
+	videoModels := []string{}
+	for _, name := range collectChannelModelNamesByCapability(channels, "video") {
+		if containsModel(setting.ModelChannel.AvailableModels, name) && (setting.ModelChannel.VideoModels == nil || containsModel(setting.ModelChannel.VideoModels, name)) {
+			videoModels = append(videoModels, name)
+		}
+	}
+	setting.ModelChannel.VideoModels = videoModels
 	setting.ModelChannel.TextModels = normalizeScopedModels(setting.ModelChannel.TextModels, setting.ModelChannel.AvailableModels, collectChannelModelNamesByCapability(channels, "text"))
 	setting.ModelChannel.Model3DModels = normalizeScopedModels(setting.ModelChannel.Model3DModels, setting.ModelChannel.AvailableModels, collectChannelModelNamesByCapability(channels, "model3d"))
 	if setting.ModelChannel.ModelCosts == nil {

@@ -6,7 +6,7 @@ import { App, Button } from "antd";
 
 import { ModelPicker } from "@/components/model-picker";
 import { ModelBilling } from "@/components/model-billing";
-import { defaultConfig, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
+import { defaultConfig, resolveVideoModel, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { CanvasImageSettingsPopover } from "./canvas-image-settings-popover";
@@ -83,42 +83,31 @@ export function CanvasNodePromptPanel({ node, isRunning, inputs, onHighlightInpu
                 placeholder={tr(mode === "video" ? "描述要生成的视频内容" : mode === "image" ? (hasImageContent ? "请输入你想要把这张图修改成什么" : "描述要生成的图片内容") : hasTextContent ? "请输入你想要将本段文本修改成什么" : "请输入你想要生成的文本内容")}
             />
 
-            <div className="flex min-w-0 shrink-0 flex-wrap items-center gap-3 pt-1">
-                <div className="flex w-full min-w-0 flex-wrap items-center gap-3 [&_.canvas-composer-model-picker]:h-10">
-                    {mode === "image" ? (
-                        <>
-                            <ModelPicker config={config} kind={mode} models={config.imageModels} value={config.model} onChange={(model) => onConfigChange(node.id, { model })} onMissingConfig={warnMissingModel} />
-                            <CanvasImageSettingsPopover
-                                config={config}
-                                placement="topLeft"
-                                buttonClassName="!h-10 !max-w-[170px] !justify-start !rounded-full !px-3"
-                                onConfigChange={(key, value) => onConfigChange(node.id, key === "count" ? { count: Number(value) || 1 } : { [key]: value })}
-                                onMissingConfig={warnMissingModel}
-                                onOpenChange={onImageSettingsOpenChange}
-                            />
-                        </>
-                    ) : mode === "video" ? (
-                        <>
-                            <ModelPicker config={config} kind={mode} models={config.videoModels} value={config.model} onChange={(model) => onConfigChange(node.id, { model })} onMissingConfig={warnMissingModel} />
-                            <CanvasVideoSettingsPopover config={config} buttonClassName="!h-10 !max-w-[170px] !justify-start !rounded-full !px-3" onConfigChange={(key, value) => onConfigChange(node.id, key === "videoSeconds" ? { seconds: value } : { [key]: value })} />
-                        </>
-                    ) : (
-                        <ModelPicker config={config} kind={mode} models={config.textModels} value={config.model} onChange={(model) => onConfigChange(node.id, { model })} onMissingConfig={warnMissingModel} />
-                    )}
-                </div>
-                <ModelBilling model={config.model} kind={mode} count={mode === "image" ? config.count : 1} className="flex-1" />
+            <div className="flex min-w-0 shrink-0 flex-wrap items-center gap-3 pt-1 [&_.canvas-composer-model-picker]:min-h-10">
+                <ModelPicker showBilling={false} config={config} kind={mode} models={mode === "image" ? config.imageModels : mode === "video" ? config.videoModels : config.textModels} value={config.model} onChange={(model) => onConfigChange(node.id, { model })} onMissingConfig={warnMissingModel} />
+                {mode === "image" ? (
+                    <CanvasImageSettingsPopover
+                        config={config}
+                        placement="topLeft"
+                        buttonClassName="!h-10 !max-w-[170px] !justify-start !rounded-full !px-3"
+                        onConfigChange={(key, value) => onConfigChange(node.id, key === "count" ? { count: Number(value) || 1 } : { [key]: value })}
+                        onMissingConfig={warnMissingModel}
+                        onOpenChange={onImageSettingsOpenChange}
+                    />
+                ) : mode === "video" ? (
+                    <CanvasVideoSettingsPopover config={config} buttonClassName="!min-h-10 !rounded-full !px-3" onConfigChange={(key, value) => onConfigChange(node.id, key === "videoSeconds" ? { seconds: value } : { [key]: value })} />
+                ) : null}
                 <Button
                     type="primary"
-                    className="!ml-auto !h-10 !min-w-16 shrink-0 !rounded-full !px-3"
+                    className="!ml-auto !h-auto !min-h-10 !max-w-full !rounded-full !px-3 !py-2"
                     disabled={isRunning || !canGenerate}
                     onClick={submit}
                     aria-label={tr("生成")}
                     data-canvas-action="generate"
                     data-canvas-running={isRunning}
                 >
-                    <span className="flex items-center gap-1.5">
-                        {isRunning ? <LoaderCircle className="size-4 animate-spin" /> : <ArrowUp className="size-4" />}
-                    </span>
+                    <ModelBilling summaryOnly model={config.model} kind={mode} count={mode === "image" ? config.count : 1} />
+                    {isRunning ? <LoaderCircle className="size-4 shrink-0 animate-spin" /> : <ArrowUp className="size-4 shrink-0" />}
                 </Button>
             </div>
         </div>
@@ -133,7 +122,7 @@ function buildNodeConfig(globalConfig: AiConfig, node: CanvasNodeData, mode: Can
     const defaultModel = mode === "image" ? globalConfig.imageModel : mode === "video" ? globalConfig.videoModel : globalConfig.textModel;
     return {
         ...globalConfig,
-        model: node.metadata?.model || defaultModel || globalConfig.model || defaultConfig.model,
+        model: mode === "video" ? resolveVideoModel(globalConfig, node.metadata?.model) : node.metadata?.model || defaultModel || globalConfig.model || defaultConfig.model,
         quality: node.metadata?.quality || globalConfig.quality || defaultConfig.quality,
         size: node.metadata?.size || globalConfig.size || defaultConfig.size,
         videoSeconds: node.metadata?.seconds || globalConfig.videoSeconds || defaultConfig.videoSeconds,

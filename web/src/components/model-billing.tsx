@@ -9,7 +9,7 @@ import { useI18n } from "@/hooks/use-i18n";
 import { billingUnit } from "@/lib/model-pricing";
 import { cn } from "@/lib/utils";
 
-export function ModelBilling({ className, ...options }: ModelBillingOptions & { className?: string }) {
+export function ModelBilling({ className, summaryOnly = false, ...options }: ModelBillingOptions & { className?: string; summaryOnly?: boolean }) {
     const { model, kind, model3D } = options;
     const { cost, billingType, quantity, credits, unavailable } = useModelBilling(options);
     const { tr, locale } = useI18n();
@@ -18,6 +18,7 @@ export function ModelBilling({ className, ...options }: ModelBillingOptions & { 
     const format = (value: number) => value.toLocaleString(locale);
     const unitPrice = cost ? `${format(cost.credits)} ${tr(billingUnit(billingType))}` : tr(unavailable);
     const summary = credits === null ? tr(unavailable) : tokenBilling ? unitPrice : tr("预计 {0} 点").replace("{0}", format(credits));
+    if (summaryOnly) return <span data-model-billing data-i18n-skip className={cn("inline-flex min-w-0 items-center gap-1.5 text-xs", className)}><CreditSymbol aria-hidden="true" className="shrink-0" /><span className="min-w-0 whitespace-normal break-words text-left tabular-nums" aria-live="polite">{summary}</span></span>;
     const explanation = tokenBilling ? "先预扣额度，完成后按输入和输出词元结算；未返回用量时按估算结算。" : kind === "image" ? "按生成张数计费，尺寸和质量不影响当前费用。" : kind === "video" ? "按次计费，时长和清晰度不影响当前费用。" : kind === "model3d" ? "费用包含数量、网格质量、纹理、PBR 材质和目标面数，最终向下取整。" : "每次请求按固定算力点计费。";
 
     return <span className={cn("inline-flex min-w-0 max-w-full items-center text-xs", className)} data-i18n-skip data-canvas-no-zoom onMouseDown={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()} onKeyDown={(event) => { if (event.key === "Escape") { setOpen(false); event.stopPropagation(); } }}>

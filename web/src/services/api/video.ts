@@ -3,7 +3,7 @@ import axios from "axios";
 import { dataUrlToFile } from "@/lib/image-utils";
 import { imageToDataUrl } from "@/services/image-storage";
 import { authHeader } from "@/services/api/request";
-import type { AiConfig } from "@/stores/use-config-store";
+import { resolveVideoModel, type AiConfig } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
 import type { ReferenceImage } from "@/types/image";
 import type { UploadedFile } from "@/services/file-storage";
@@ -29,7 +29,8 @@ function refreshRemoteUser(_config: AiConfig) {
 }
 
 export async function requestVideoGeneration(config: AiConfig, prompt: string, references: ReferenceImage[] = [], onQueue?: (update: VideoQueueUpdate) => void): Promise<Blob | UploadedFile> {
-    const model = config.model || config.videoModel;
+    const model = resolveVideoModel(config, config.model);
+    if (!model) throw new Error("管理员尚未配置可用模型");
     const body = new FormData();
     body.append("model", model);
     body.append("prompt", prompt);
