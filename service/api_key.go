@@ -138,7 +138,13 @@ func ListAPIModels() ([]model.APIModel, error) {
 		} else if containsModel(settings.ModelChannel.Model3DModels, name) {
 			kind = "model3d"
 		}
-		items = append(items, model.APIModel{ID: name, Type: kind, Credits: billing.Credits, BillingType: billing.BillingType})
+		item := model.APIModel{ID: name, Type: kind, Credits: billing.Credits, BillingType: billing.BillingType}
+		if kind == "video" {
+			item.BillingType = model.BillingTypeFixed
+			item.VideoPrices = map[string]int{model.BillingTypeFixed: billing.Credits}
+			if second, err := videoModelBilling(WithAPIKey(context.Background(), "catalog"), name, model.BillingTypeSecond); err == nil { item.VideoPrices[model.BillingTypeSecond] = second.Credits }
+		}
+		items = append(items, item)
 	}
 	return items, nil
 }

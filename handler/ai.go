@@ -43,27 +43,23 @@ func AIVideos(w http.ResponseWriter, r *http.Request) {
 }
 
 func AIVideo(w http.ResponseWriter, r *http.Request, id string) {
-	proxyAIGetRequest(w, r, "/videos/"+id)
+	user, _ := service.UserFromContext(r.Context())
+	result, err := service.GetVideoGeneration(user, id)
+	if err != nil { FailError(w, err); return }
+	OK(w, result)
 }
 
 func AIVideoContent(w http.ResponseWriter, r *http.Request, id string) {
-	proxyAIGetRequest(w, r, "/videos/"+id+"/content")
-}
-
-func proxyAIGetRequest(w http.ResponseWriter, r *http.Request, path string) {
-	ctx, cancel := context.WithTimeout(r.Context(), service.AIRequestTimeoutForPath(path))
+	ctx, cancel := context.WithTimeout(r.Context(), service.AIRequestTimeoutForPath("/videos"))
 	defer cancel()
-	r = r.WithContext(ctx)
-	user, _ := service.UserFromContext(r.Context())
-	id := strings.TrimSuffix(strings.TrimPrefix(path, "/videos/"), "/content")
-	task, channel, err := service.UserVideoRoute(user.ID, id)
+	user, _ := service.UserFromContext(ctx)
+	file, content, err := service.GetVideoGenerationContent(ctx, user, id)
 	if err != nil { FailError(w, err); return }
-	upstreamPath := "/videos/" + task.ProviderID
-	if strings.HasSuffix(path, "/content") { upstreamPath += "/content" }
-	request, err := http.NewRequestWithContext(r.Context(), http.MethodGet, service.BuildModelChannelURL(channel, upstreamPath), nil)
-	if err != nil { Fail(w, "AI 接口请求失败"); return }
-	request.Header.Set("Authorization", "Bearer "+channel.APIKey)
-	copyAIResponse(w, request, nil, aiProxyContext{Request: r, User: user, Path: path})
+	defer content.Close()
+	copyResponseHeaders(w, http.Header{"Content-Type": []string{file.ContentType}})
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	_, _ = io.Copy(w, content)
 }
 
 func proxyAIRequest(w http.ResponseWriter, r *http.Request, path string) {

@@ -7,6 +7,7 @@ var PlanPricingCodes = []string{"go", "plus", "pro", "max"}
 
 const (
 	BillingTypeFixed = "fixed"
+	BillingTypeSecond = "second"
 	BillingTypeToken = "token"
 	// DefaultAPIMultiplier 是 API 价相对控制台标准价的默认倍数。
 	DefaultAPIMultiplier = 2

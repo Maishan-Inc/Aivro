@@ -1,5 +1,8 @@
 // Admin-console-only strings (zh/en). These never render on the user-facing site.
 export const adminTranslations: Record<string, string> = {
+    "同时开放按秒计费": "Also enable per-second billing",
+    "按次价格保留在主行；按秒费用为请求秒数乘以单价，API 未传 billingType 时默认按次。": "The main row retains the per-request price. Per-second cost is the requested duration multiplied by the unit price. API requests default to per-request billing when billingType is omitted.",
+    "留空使用通用视频接口；选择适配后，请填写对应渠道地址、密钥和上游模型名。": "Leave blank to use the generic video API. After choosing an adapter, enter the matching provider URL, API key and upstream model name.",
     "GPT.GE（单图接口）": "GPT.GE (single-image API)",
     "留空使用通用 3D 接口；选择适配后，请填写对应渠道地址、密钥和上游模型名。": "Leave blank to use the generic 3D API. After choosing an adapter, enter the matching provider URL, API key and upstream model name.",
     "参考地址：": "Reference URL: ",

@@ -134,7 +134,7 @@ function clampNumber(value: number, min: number, max: number) {
 function sanitizeMetadata(nodeType: CanvasNodeType, metadata?: CanvasNodeMetadata, textLimit = 4000) {
     if (!metadata) return metadata;
     const result: CanvasNodeMetadata = {};
-    (["content", "prompt", "composerContent", "status", "errorDetails", "fontSize", "generationMode", "generationType", "model", "size", "quality", "count", "seconds", "vquality", "freeResize"] as const).forEach((key) => {
+    (["content", "prompt", "composerContent", "status", "errorDetails", "fontSize", "generationMode", "generationType", "model", "size", "quality", "count", "seconds", "vquality", "videoBillingType", "freeResize"] as const).forEach((key) => {
         const value = metadata[key];
         if (value !== undefined) (result as Record<string, unknown>)[key] = typeof value === "string" ? limitText(value, textLimit) : value;
     });

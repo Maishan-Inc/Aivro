@@ -89,6 +89,12 @@ export function ModelPricingTable({ preview }: { preview?: PricingRow[] }) {
                                     {planPricingCodes.map((code) => <span key={code} className={styles.planPrice} data-label={code.toUpperCase()} data-muted={planCostOf(item, code) === item.credits}>{formatCost(planCostOf(item, code))}</span>)}
                                     <span className={styles.price} data-label={tr("API 价")}>{formatCost(apiCostOf(item))}<small>{tr(billingUnit(item.apiBilling))}</small></span>
                                 </button>
+                                {item.capability === "video" && item.videoSecondPrice ? <div className={styles.row}>
+                                    <span className={styles.model}>{tr("按秒计费")}</span><span /><span />
+                                    <span className={styles.price} data-label={tr("标准价")}>{formatCost(item.videoSecondPrice.credits)}<small>{tr("点/秒")}</small></span>
+                                    {planPricingCodes.map((code) => <span key={code} className={styles.planPrice} data-label={code.toUpperCase()}>{formatCost(planCostOf(item.videoSecondPrice!, code))}</span>)}
+                                    <span className={styles.price} data-label={tr("API 价")}>{formatCost(apiCostOf({ ...item.videoSecondPrice, apiMultiplier: item.apiMultiplier }))}<small>{tr("点/秒")}</small></span>
+                                </div> : null}
                             </div>
                         );
                     })}

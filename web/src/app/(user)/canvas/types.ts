@@ -37,6 +37,7 @@ export type CanvasNodeMetadata = {
     quality?: string;
     count?: number;
     seconds?: string;
+    videoBillingType?: "fixed" | "second";
     vquality?: string;
     references?: string[];
     naturalWidth?: number;

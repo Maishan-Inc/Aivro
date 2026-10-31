@@ -1,5 +1,7 @@
 "use client";
 
+import { resolveVideoConfig } from "@/lib/video-models";
+
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent as ReactChangeEvent, DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -8,7 +10,6 @@ import { saveAs } from "file-saver";
 
 import { requestEdit, requestGeneration, requestImageQuestion } from "@/services/api/image";
 import { requestVideoGeneration, type VideoQueueUpdate } from "@/services/api/video";
-import { normalizeVideoSizeValue } from "@/components/video-settings-panel";
 import { defaultConfig, resolveVideoModel, type AiConfig, useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
 import { isCloudStorageKey, resolveImageUrl, storeGeneratedImage, uploadImage, type UploadedImage } from "@/services/image-storage";
 import { resolveMediaUrl, uploadMediaFile, type UploadedFile } from "@/services/file-storage";
@@ -2098,7 +2099,6 @@ export function InfiniteCanvasPage({ playback }: { playback?: CanvasPlayback } =
                 }
 
                 if (mode === "video") {
-                    generationConfig.size = normalizeVideoSizeValue(generationConfig.size);
                     const spec = nodeSizeFromRatio(generationConfig.size, VIDEO_NODE_MAX_WIDTH, VIDEO_NODE_MAX_HEIGHT) || NODE_DEFAULT_SIZE[CanvasNodeType.Video];
                     const isEmptyVideoNode = sourceNode?.type === CanvasNodeType.Video && !sourceNode.metadata?.content;
                     const videoId = isEmptyVideoNode ? nodeId : nanoid();
@@ -2110,7 +2110,7 @@ export function InfiniteCanvasPage({ playback }: { playback?: CanvasPlayback } =
                         position: isEmptyVideoNode ? { x: parent.x + sourceNode.width / 2 - spec.width / 2, y: parent.y + sourceNode.height / 2 - spec.height / 2 } : { x: parent.x + sourceNode.width + 160, y: parent.y },
                         width: spec.width,
                         height: spec.height,
-                        metadata: { inputOrder: isEmptyVideoNode ? sourceNode.metadata?.inputOrder : undefined, prompt: isEmptyVideoNode ? prompt : effectivePrompt, generationPrompt: effectivePrompt, status: NODE_STATUS_LOADING, model: generationConfig.model, size: generationConfig.size, seconds: generationConfig.videoSeconds, vquality: generationConfig.vquality, references: generationContext.referenceImages.map(videoReferenceUrl).filter((url): url is string => Boolean(url)) },
+                        metadata: { inputOrder: isEmptyVideoNode ? sourceNode.metadata?.inputOrder : undefined, prompt: isEmptyVideoNode ? prompt : effectivePrompt, generationPrompt: effectivePrompt, status: NODE_STATUS_LOADING, model: generationConfig.model, size: generationConfig.size, seconds: generationConfig.videoSeconds, videoBillingType: generationConfig.videoBillingType, vquality: generationConfig.vquality, references: generationContext.referenceImages.map(videoReferenceUrl).filter((url): url is string => Boolean(url)) },
                     };
                     pendingChildIds = [videoId];
                     runningNodeIdsRef.current.add(videoId);
@@ -2210,7 +2210,7 @@ export function InfiniteCanvasPage({ playback }: { playback?: CanvasPlayback } =
                     if (!references) throw new Error("参考图片已丢失，无法继续重试");
                     if (!prompt && !references.length) throw new Error("请输入提示词或连接参考图");
                     if (references.length > 7) throw new Error("视频生成最多支持 7 张参考图");
-                    const metadata = { generationPrompt: prompt, model: config.model, size: config.size, seconds: config.videoSeconds, vquality: config.vquality, references: references.map(videoReferenceUrl).filter((url): url is string => Boolean(url)) };
+                    const metadata = { generationPrompt: prompt, model: config.model, size: config.size, seconds: config.videoSeconds, videoBillingType: config.videoBillingType, vquality: config.vquality, references: references.map(videoReferenceUrl).filter((url): url is string => Boolean(url)) };
                     setNodes((prev) => prev.map((item) => item.id === node.id ? { ...item, metadata: { ...item.metadata, ...metadata } } : item));
                     const video = await uploadMediaFile(await requestVideoGeneration(config, prompt, references, (update) => updateVideoQueue(node.id, update)), "video");
                     const videoSize = fitNodeSize(video.width || node.width, video.height || node.height, VIDEO_NODE_MAX_WIDTH, VIDEO_NODE_MAX_HEIGHT);
@@ -3091,15 +3091,17 @@ function copyNodeMetadata(metadata: CanvasNodeMetadata | undefined, idMap: Map<s
 
 function buildGenerationConfig(config: AiConfig, node: CanvasNodeData | undefined, mode: CanvasNodeGenerationMode): AiConfig {
     const defaultModel = mode === "image" ? config.imageModel : mode === "video" ? config.videoModel : config.textModel;
-    return {
+    const result: AiConfig = {
         ...config,
         model: mode === "video" ? resolveVideoModel(config, node?.metadata?.model) : node?.metadata?.model || defaultModel || config.model || defaultConfig.model,
         quality: node?.metadata?.quality || config.quality || defaultConfig.quality,
         size: node?.metadata?.size || config.size || defaultConfig.size,
+        videoBillingType: node?.metadata?.videoBillingType || config.videoBillingType,
         videoSeconds: node?.metadata?.seconds || config.videoSeconds || defaultConfig.videoSeconds,
         vquality: node?.metadata?.vquality || config.vquality || defaultConfig.vquality,
         count: String(node?.metadata?.count || (mode === "image" ? 3 : config.count) || defaultConfig.count),
     };
+    return mode === "video" ? resolveVideoConfig(result) : result;
 }
 
 function resetInterruptedGeneration(nodes: CanvasNodeData[]) {

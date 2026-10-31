@@ -39,12 +39,12 @@
 
 - 管理员使用 `POST /api/admin/settings/ai-timeouts` 保存 `{ imageMinutes, videoMinutes, model3DMinutes, textMinutes }`，单位为分钟，默认分别为 10、15、30、5，允许 1–120 的整数。响应 `data` 为保存后的四项设置；只更新该私有配置并记录审计流水，其他未保存设置不会被提交。无需重启，新开始执行的任务使用最新设置。
 - 登录会话提交图片生成、图片编辑、视频、3D 生成后，返回 `{ code: 0, data: { queued: true, taskId, status, queuePosition, aheadCount, model, path }, msg: "ok" }`。`queued: true` 表示请求交由后台任务接管，`status` 可为 `queued` 或 `executing`；关闭限流队列时仍在后台执行。
-- 使用 `GET /api/v1/generation-tasks/{id}` 查询状态，`succeeded` 后通过 `/result` 获取结果。图片保留 `data[]` 图片格式；站内视频结果为 `{ id, status: "completed", file }`，其中 `file` 包含云端/本地后端文件 URL、storageKey、cloudFileId 等，视频的上游轮询和转存已由后台完成；3D 结果保留 `{ code, data: { results, energyCost, ... }, msg }`。
+- 使用 `GET /api/v1/generation-tasks/{id}` 查询状态，`succeeded` 后通过 `/result` 获取结果。图片保留 `data[]` 图片格式；视频结果为 `{ id, status: "completed", file, billingType, seconds, unitCredits, energyCost }`，其中 `file` 包含云端/本地后端文件 URL、storageKey、cloudFileId 等，视频的上游轮询和转存已由后台完成；3D 结果保留 `{ code, data: { results, energyCost, ... }, msg }`。
 - `GET /api/v1/model-3d/generations/{id}` 可查询本站 3D 任务；未完成时 `data.status` 为 `queued`、`executing`、`failed` 或 `canceled`，成功时返回 `status: "completed"` 及模型文件。接口校验当前用户和任务类型。
 - 3D 渠道映射的 `adapter` 留空使用通用 JSON 接口；`hunyuan3d` 使用 GPT.GE 单图提交与查询协议。本站提交接口仍接收 JSON，GPT.GE 适配要求 `mode=image`、一张 `images`、`quantity=1`、`pbrEnabled=false`，`targetFaceCount` 省略或保持默认 500000（不传给上游、不产生面数加价），`prompt` 仅用于记录；不支持的组合在扣费前拒绝。后端读取当前用户可访问的参考文件并以 multipart 上传，按原渠道轮询 `task_id`，识别 `status=success` 与 `output.file_url`，转存后才标记本站任务完成。成功结果的 `providerTaskId` 保留上游编号；提交、查询与下载共用后台任务期限，失败退款沿用本站规则，不自动重发生成请求。
 - 新增 `meshy`、`tripo`、`rodin`、`fal-hunyuan3d`、`fal-trellis` 专用适配，均沿用本站 JSON 请求与任务响应结构、一次生成一个模型。`GET /api/settings` 的 `modelChannel.model3DAdapters` 和 `model3DCapabilities` 按前台模型名派生，不公开渠道凭证。能力含模式、数量、图片大小、质量、纹理/PBR、面数范围及多视图顺序；通用模型无专用条目。目标面数省略时采用对应模型默认值，TRELLIS.2 必须 `textureEnabled=true`、`pbrEnabled=false`，不支持自定义面数。参数不支持时扣费前拒绝，文件读取校验失败走退款。
 - Meshy 文本带纹理时执行 preview 与 refine 两步，`providerTaskId` 为最终任务编号；Tripo 图片先上传取得 token，多视图固定为正面/左侧/背面/右侧，缺少的末尾位置补空对象；Rodin 用订阅编号查询全部子任务，全部 Done 后用创建响应 UUID 下载 GLB；fal 按队列协议查询，再读取结果文件。Meshy 图片描述只在纹理开启时发送，其余专用适配的图片描述仅用于记录。各家模型及完整限制见 [3D API 适配配置](model-3d-adapters.md)。查询可对网络错误、429、5xx 在执行期限内重试并遵守 `Retry-After`；创建不自动重试。全部完成文件转存后才返回本站完成状态。
-- API 密钥调用仍在容量充足时同步返回，在限流时返回任务编号；视频 API 保持“创建编号 → 查询状态 → 获取内容”的调用方式。同步调用仍受部署入口及客户端自身超时限制，后台配置无法调整 CDN 或上游网关的超时。
+- 视频 API 与登录会话均返回后台任务编号，按“创建任务 → 查询本站状态 → 下载已转存文件”处理。其他 API 密钥生成调用仍在容量充足时同步返回，在限流时返回任务编号。同步调用仍受部署入口及客户端自身超时限制，后台配置无法调整 CDN 或上游网关的超时。
 - 超时或上游 HTTP 408/504/524 不触发图片/视频创建请求自动重发。失败退款沿用本站任务结算规则，上游计费不会因此自动退还。运行中的后台任务不因浏览器离开而取消，结果保留时间沿用队列配置；各页面刷新后自动恢复任务列表仍待完善。
 
 ## 用户 API 密钥与外部调用
@@ -53,9 +53,9 @@
 - `POST /api/v1/api-keys` 接收 `{ "name": "我的应用" }`，成功的 `data` 为 `{ item, key }`，其中 `key` 是仅此一次返回的完整随机密钥。名称最多 50 个字符，同账号忽略首尾空格与大小写后不可重复，已撤销名称仍保留。重复创建保持 `{ code: 1, data: null, msg }`。
 - `DELETE /api/v1/api-keys/:id` 永久撤销所属账号的密钥，成功返回 `data: true`；不能恢复，已提交任务继续执行。这三个管理接口只接受网站登录鉴权，用户 API 密钥不能管理密钥、账号、工作流或后台。
 - 使用 `Authorization: Bearer sk-aivro-...` 调用模型、上传/文件内容和生成队列接口。已撤销密钥、无效密钥或所属账号被禁用/删除时返回 HTTP 401 与 `{ code: 1, data: null, msg: "API 密钥无效或已撤销" }`。不支持 URL 参数传密钥；服务端调用沿用现有来源校验，不带 Cookie 和浏览器来源的调用可以使用 Bearer。
-- `GET /api/v1/models` 接受登录会话或用户密钥，`data` 为 `{ id, type, credits, billingType }` 数组，展示已开放且已计费的模型及 API 价格；类型为 `text`、`image`、`video`、`model3d`。
-- API 密钥调用按 `apiCredits`（显式价格优先，否则标准价乘 `apiMultiplier`，默认 2 倍）及 `apiBilling` 扣所属账号算力点。对话按原有预扣/词元结算；图片、视频和 3D 的词元计费有上游用量则按每千词元向上取整，缺少用量则保留提交时预扣。队列的 API 单价和方式在提交时保存，成功结算与任务终态在同一事务中提交。
-- 对话成功继续返回标准 JSON/SSE，图片和视频直接成功保留模型接口响应；图片/视频排队时返回 `{ code: 0, data: { queued: true, taskId, ... }, msg: "ok" }`。使用同一账号的有效密钥查询 `/generation-tasks/:id` 和 `/generation-tasks/:id/result`，任务仍在排队时可 DELETE 取消并退款。
+- `GET /api/v1/models` 接受登录会话或用户密钥，`data` 为 `{ id, type, credits, billingType }` 数组，展示已开放且已计费的模型及 API 价格；类型为 `text`、`image`、`video`、`model3d`。视频额外返回 `videoPrices: { fixed, second? }`，单位分别为点/次、点/秒。
+- API 密钥调用按 `apiCredits`（显式价格优先，否则标准价乘 `apiMultiplier`，默认 2 倍）及 `apiBilling` 扣所属账号算力点。对话按原有预扣/词元结算；图片和 3D 的词元计费有上游用量则按每千词元向上取整，缺少用量则保留提交时预扣。队列的 API 单价和方式在提交时保存，成功结算与任务终态在同一事务中提交。
+- 对话成功继续返回标准 JSON/SSE，图片直接成功保留模型接口响应；视频始终后台执行，图片限流排队时也返回 `{ code: 0, data: { queued: true, taskId, ... }, msg: "ok" }`。使用同一账号的有效密钥查询 `/generation-tasks/:id` 和 `/generation-tasks/:id/result`，任务仍在排队时可 DELETE 取消并退款。
 - 静态中文开发文档入口为 `/developers`（中文路径 `/zh-CN/developers`），包含所有已开放的对外接口说明与 22 种语言示例。具体功能与联调结果记录在 `docs/pending-test.md`。
 
 ## 安全响应与来源校验
@@ -80,3 +80,10 @@
 - `POST /api/v1/workflow-shares/:token/revoke` 由分享所有者调用。撤销阻止后续预览和 Fork，并释放分享引用；已 Fork 的独立数据仍归复制者，不回收对方有效文件引用。
 - 下线管理端算力流水的 POST/DELETE 接口；只保留列表读取和原有业务余额调整接口。
 - 页面跳转前后端使用相同路由范围，拒绝跨站地址、反斜杠、控制字符、嵌套编码路径及 API/构建资源路径，非法值回退首页。
+
+## 视频适配与双计费
+
+- `POST /api/v1/videos` 支持 JSON 或 multipart。字段为 `model`、`prompt`、`seconds`、`size`、`resolution_name`、`billingType`；JSON 用 `images:[{url,storageKey?}]`，multipart 用 `input_reference[]` 或 `input_reference`（不混用）。上传图片每张最大 10 MiB，一次生成一个视频，不接受 `n`、`duration`、`preset` 或客户端单价。按模型能力检查参数、参考图数量、正整数时长与计费方式后扣费。
+- `billingType` 接受 `fixed`（按次）或 `second`（按秒），省略默认 `fixed`。按秒要求配置 `videoSecondPrice` 并显式传入 `seconds`；费用为请求秒数乘以对应后端单价，不按实际成片时长结算。按次省略秒数时采用模型默认时长。视频不参与词元结算。
+- 创建响应 `data` 包含 `queued:true`、`taskId`、`status`、`billingType`、`seconds`、`unitCredits`、`energyCost`，费用与时长随任务保存。`GET /api/v1/videos/{taskId}` 返回本站任务视图，包含 `billingType`、`seconds`、`unitCredits`、`credits`；状态为 `succeeded` 时文件已转存。`GET /api/v1/videos/{taskId}/content` 读取当前账号已保存的视频文件，成功为文件流、失败为业务错误 JSON。`/generation-tasks/{taskId}/result` 返回带 `file` 的视频结果。
+- 渠道类型为视频时可选择专用 `adapter`，留空使用通用接口。公开配置派生 `videoAdapters` 与 `videoCapabilities`，不返回密钥；模型、地址、参数范围及官方来源见 [视频适配配置](video-adapters.md)。创建不自动重试，专用查询在执行期限内重试网络错误、429、5xx；后台完成下载和转存后才标记成功，失败沿用任务退款。

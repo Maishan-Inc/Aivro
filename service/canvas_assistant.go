@@ -587,7 +587,7 @@ func compactCanvasAgentMetadata(nodeType string, metadata map[string]any) map[st
 	if len(metadata) == 0 {
 		return nil
 	}
-	allowed := []string{"content", "prompt", "composerContent", "status", "generationMode", "model", "size", "quality", "count", "seconds", "vquality"}
+	allowed := []string{"content", "prompt", "composerContent", "status", "generationMode", "model", "size", "quality", "count", "seconds", "vquality", "videoBillingType"}
 	result := map[string]any{}
 	for _, key := range allowed {
 		value, ok := metadata[key]
@@ -825,7 +825,7 @@ func sanitizeCanvasAgentMetadata(nodeType string, metadata map[string]any) map[s
 	allowed := map[string]bool{
 		"content": true, "prompt": true, "composerContent": true, "status": true, "errorDetails": true, "fontSize": true,
 		"generationMode": true, "generationType": true, "model": true, "size": true, "quality": true, "count": true,
-		"seconds": true, "vquality": true, "freeResize": true,
+		"seconds": true, "vquality": true, "videoBillingType": true, "freeResize": true,
 	}
 	result := map[string]any{}
 	for key, value := range metadata {

@@ -58,6 +58,7 @@ export function CanvasVideoSettingsPopover({ config, onConfigChange, buttonClass
                         <span>{videoResolutionLabel(config.vquality)}</span>
                         <span>{tr(videoSizeLabel(config.size))}</span>
                         <span>{videoSecondsLabel(config.videoSeconds)}</span>
+                        <span>{tr(config.videoBillingType === "second" ? "按秒计费" : "按次计费")}</span>
                     </span>
                 </Button>
             </span>

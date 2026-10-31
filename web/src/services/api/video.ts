@@ -1,9 +1,10 @@
 import axios from "axios";
+import { getVideoCapabilities, resolveVideoConfig } from "@/lib/video-models";
 
 import { dataUrlToFile } from "@/lib/image-utils";
 import { imageToDataUrl } from "@/services/image-storage";
 import { authHeader } from "@/services/api/request";
-import { resolveVideoModel, type AiConfig } from "@/stores/use-config-store";
+import { type AiConfig } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
 import type { ReferenceImage } from "@/types/image";
 import type { UploadedFile } from "@/services/file-storage";
@@ -29,16 +30,19 @@ function refreshRemoteUser(_config: AiConfig) {
 }
 
 export async function requestVideoGeneration(config: AiConfig, prompt: string, references: ReferenceImage[] = [], onQueue?: (update: VideoQueueUpdate) => void): Promise<Blob | UploadedFile> {
-    const model = resolveVideoModel(config, config.model);
+    config = resolveVideoConfig(config);
+    const model = config.model;
     if (!model) throw new Error("管理员尚未配置可用模型");
+    const caps = getVideoCapabilities(model);
+    if (references.length < caps.minImages || references.length > caps.maxImages) throw new Error("参考图数量不符合当前视频模型要求");
     const body = new FormData();
     body.append("model", model);
     body.append("prompt", prompt);
-    body.append("seconds", normalizeVideoSeconds(config.videoSeconds));
-    if (normalizeVideoSize(config.size)) body.append("size", normalizeVideoSize(config.size)!);
-    body.append("resolution_name", normalizeVideoResolution(config.vquality));
-    body.append("preset", "normal");
-    const files = await Promise.all(references.slice(0, 7).map(async (image) => dataUrlToFile({ ...image, dataUrl: await imageToDataUrl(image) })));
+    body.append("seconds", config.videoSeconds);
+    body.append("size", config.size);
+    body.append("resolution_name", config.vquality);
+    body.append("billingType", config.videoBillingType);
+    const files = await Promise.all(references.map(async (image) => dataUrlToFile({ ...image, dataUrl: await imageToDataUrl(image) })));
     files.forEach((file) => body.append("input_reference[]", file));
     try {
         const createdPayload = (await axios.post<ApiVideoResponse>(aiApiUrl(config, "/videos"), body, { headers: aiHeaders(config), withCredentials: true })).data;
@@ -49,25 +53,6 @@ export async function requestVideoGeneration(config: AiConfig, prompt: string, r
     } catch (error) {
         throw new Error(readAxiosError(error, "视频生成失败"));
     }
-}
-
-function normalizeVideoSeconds(value: string) {
-    const seconds = Math.floor(Number(value) || 6);
-    return String(Math.max(1, Math.min(20, seconds)));
-}
-
-function normalizeVideoSize(value: string) {
-    if (value === "auto") return null;
-    const size = value || "1280x720";
-    if (/^\d+x\d+$/.test(size)) return size;
-    return ["9:16", "2:3", "3:4"].includes(size) ? "720x1280" : "1280x720";
-}
-
-function normalizeVideoResolution(value: string) {
-    if (value === "low") return "480p";
-    if (value === "auto" || value === "high" || value === "medium") return "720p";
-    const resolution = value.replace(/p$/i, "") || "720";
-    return `${resolution}p`;
 }
 
 function isQueuedVideoEnvelope(payload: ApiVideoResponse): payload is { code?: number; data: GenerationTaskSubmitResult; msg?: string } {

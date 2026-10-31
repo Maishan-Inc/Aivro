@@ -71,6 +71,11 @@ func normalizeModelCostPricing(item model.ModelCost) model.ModelCost {
 		}
 	}
 	item.PlanCredits = plans
+	if price := item.VideoSecondPrice; price != nil {
+		secondPlans := map[string]int{}
+		for _, code := range model.PlanPricingCodes { if value := price.PlanCredits[code]; value > 0 { secondPlans[code] = value } }
+		item.VideoSecondPrice = &model.VideoSecondPrice{Credits: max(0, price.Credits), APICredits: max(0, price.APICredits), PlanCredits: secondPlans}
+	}
 
 	if vendor, icon := guessModelVendor(item.Model); vendor != "" {
 		item.Vendor = vendor

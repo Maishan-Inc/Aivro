@@ -89,7 +89,7 @@ export async function preloadCanvasPlayback(scene: PlaybackScene, tr: (text: str
             nodes: [
                 { ...node("reference", CanvasNodeType.Image, scene.referenceTitle, 40, 360, { content: reference.url, naturalWidth: reference.width, naturalHeight: reference.height, bytes: reference.bytes, mimeType: reference.mimeType, status: "success", batchRootId: "brief" }), ...referenceSize },
                 node("brief", CanvasNodeType.Custom, "自定义", 20, 240, { content: `${tr(scene.brief)}\n${tr(scene.constraint)}`, status: "success", isBatchRoot: true, batchChildIds: ["reference"] }),
-                node("config", video ? CanvasNodeType.Video : CanvasNodeType.Image, video ? "视频节点" : "图片节点", 680, 100, { prompt: tr(scene.prompt), generationMode: video ? "video" : "image", model: video ? undefined : "gpt-image-2", size: scene.format, quality: "high", count: video ? 1 : outputs.length, seconds: "10", vquality: "720", status: "idle" }),
+                node("config", video ? CanvasNodeType.Video : CanvasNodeType.Image, video ? "视频节点" : "图片节点", 680, 100, { prompt: tr(scene.prompt), generationMode: video ? "video" : "image", model: video ? undefined : "gpt-image-2", size: scene.format, quality: "high", count: video ? 1 : outputs.length, seconds: "10", vquality: "720p", videoBillingType: "fixed", status: "idle" }),
             ],
             connections: [{ id: "brief-config", fromNodeId: "brief", toNodeId: "config" }],
         },

@@ -27,6 +27,19 @@ const model3DAdapterOptions = [
     { value: "fal-hunyuan3d", label: "Hunyuan 3D 3.1 Pro（fal）", baseUrl: "https://queue.fal.run", models: "fal-ai/hunyuan-3d/v3.1/pro" },
     { value: "fal-trellis", label: "TRELLIS.2（fal）", baseUrl: "https://queue.fal.run", models: "fal-ai/trellis-2" },
 ];
+const videoAdapterOptions = [
+    { value: "gptge-kling", label: "Kling（GPT.GE）", baseUrl: "https://api.gpt.ge", models: "kling-v1-5 / kling-v1-6" },
+    { value: "gptge-jimeng", label: "Jimeng 3.0（GPT.GE）", baseUrl: "https://api.gpt.ge", models: "jimeng_t2v_v30 / jimeng_i2v_first_v30 / jimeng_i2v_first_tail_v30" },
+    { value: "gptge-bailian", label: "HappyHorse 1.1（GPT.GE）", baseUrl: "https://api.gpt.ge", models: "happyhorse-1.1-t2v / happyhorse-1.1-i2v / happyhorse-1.1-r2v" },
+    { value: "gptge-vidu", label: "Vidu（GPT.GE）", baseUrl: "https://api.gpt.ge", models: "vidu1.5 / vidu2.0 / viduq3-pro" },
+    { value: "gptge-seedance", label: "Seedance 1.5 Pro（GPT.GE）", baseUrl: "https://api.gpt.ge", models: "doubao-seedance-1-5-pro-251215" },
+    { value: "gptge-hailuo", label: "MiniMax Hailuo 02（GPT.GE）", baseUrl: "https://api.gpt.ge", models: "MiniMax-Hailuo-02" },
+    { value: "ark-seedance", label: "Seedance 2.0 / 2.5（Ark）", baseUrl: "https://ark.cn-beijing.volces.com", models: "doubao-seedance-2-0-260128 / doubao-seedance-2-0-fast-260128 / doubao-seedance-2-0-mini-260615 / doubao-seedance-2-5-260628" },
+    { value: "fal-veo", label: "Veo 3.1（fal）", baseUrl: "https://queue.fal.run", models: "fal-ai/veo3.1 / fal-ai/veo3.1/fast" },
+    { value: "fal-grok", label: "Grok Imagine Video（fal）", baseUrl: "https://queue.fal.run", models: "xai/grok-imagine-video" },
+    { value: "fal-wan", label: "Wan 2.6（fal）", baseUrl: "https://queue.fal.run", models: "wan/v2.6" },
+    { value: "fal-kling", label: "Kling 3.0 Pro（fal）", baseUrl: "https://queue.fal.run", models: "fal-ai/kling-video/v3/pro" },
+];
 const jsonEditorTheme = EditorView.theme({
     "&": { backgroundColor: "var(--ant-color-bg-container)", color: "var(--ant-color-text)" },
     ".cm-content": { caretColor: "var(--ant-color-text)", padding: "12px 0" },
@@ -1657,13 +1670,14 @@ export default function AdminSettingsPage() {
                                                         <Form.Item noStyle shouldUpdate={(previous, current) => previous.modelMappings?.[field.name] !== current.modelMappings?.[field.name]}>
                                                             {() => {
                                                                 const mapping = channelForm.getFieldValue(["modelMappings", field.name]);
-                                                                const adapter = model3DAdapterOptions.find((option) => option.value === mapping?.adapter);
-                                                                return mapping?.capability === "model3d" ? <Col span={24}>
+                                                                const options = mapping?.capability === "video" ? videoAdapterOptions : model3DAdapterOptions;
+                                                                const adapter = options.find((option) => option.value === mapping?.adapter);
+                                                                return ["model3d", "video"].includes(mapping?.capability) ? <Col span={24}>
                                                                 <Form.Item name={[field.name, "adapter"]} label="适配方式" extra={<>
-                                                                    <div>留空使用通用 3D 接口；选择适配后，请填写对应渠道地址、密钥和上游模型名。</div>
+                                                                    <div>{mapping?.capability === "video" ? "留空使用通用视频接口；选择适配后，请填写对应渠道地址、密钥和上游模型名。" : "留空使用通用 3D 接口；选择适配后，请填写对应渠道地址、密钥和上游模型名。"}</div>
                                                                     {adapter ? <div className="break-all"><span>参考地址：</span><span data-i18n-skip>{adapter.baseUrl}</span><br /><span>支持的上游模型：</span><span data-i18n-skip>{adapter.models}</span></div> : null}
                                                                 </>} style={{ marginBottom: 0 }}>
-                                                                    <Select allowClear placeholder="通用" options={model3DAdapterOptions} />
+                                                                    <Select allowClear placeholder="通用" options={options} />
                                                                 </Form.Item>
                                                             </Col> : null;
                                                             }}
@@ -2489,7 +2503,7 @@ function normalizeChannelMappings(items: Partial<AdminModelChannelModel>[] = [])
             name: (item.name || "").trim(),
             upstreamName: (item.upstreamName || item.name || "").trim(),
             capability: item.capability === "text" || item.capability === "video" || item.capability === "model3d" ? item.capability : "image",
-            adapter: item.capability === "model3d" && model3DAdapterOptions.some((option) => option.value === item.adapter) ? item.adapter : "",
+            adapter: (item.capability === "model3d" ? model3DAdapterOptions : item.capability === "video" ? videoAdapterOptions : []).some((option) => option.value === item.adapter) ? item.adapter : "",
         }))
         .filter((item) => {
             if (!item.name || !item.upstreamName || seen.has(item.name)) return false;

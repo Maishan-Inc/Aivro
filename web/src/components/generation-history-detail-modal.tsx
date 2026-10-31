@@ -1,5 +1,6 @@
 "use client";
 
+import { videoResolution } from "@/lib/video-models";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { App, Empty, Modal, Tag, Typography } from "antd";
 
@@ -162,7 +163,7 @@ function earliestExpiresAt(history: GenerationHistory) {
 function historySize(history: GenerationHistory) {
     const config = history.config || {};
     const mediaSize = history.media.map((item) => (item.width && item.height ? `${item.width}x${item.height}` : "")).find(Boolean);
-    const videoInfo = [config.vquality ? `${config.vquality}p` : "", config.videoSeconds ? `${config.videoSeconds}s` : ""].filter(Boolean).join(" / ");
+    const videoInfo = [config.vquality ? videoResolution(config.vquality) : "", config.videoSeconds ? `${config.videoSeconds}s` : ""].filter(Boolean).join(" / ");
     return [config.size, mediaSize, videoInfo].filter(Boolean).join(" / ") || "未记录";
 }
 

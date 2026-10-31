@@ -226,6 +226,8 @@ MetaMask 登录服务端签名挑战表。nonce 与钱包地址绑定，短时�
 | `availableModels` | string[] | 系统可用模型列表       |
 | `imageModels` | string[] | 图片生成服务可用模型范围 |
 | `videoModels` | string[] | 视频生成服务可用模型范围 |
+| `videoAdapters` | object | 按公开模型名派生当前优先渠道的视频适配；不公开渠道凭证 |
+| `videoCapabilities` | object | 派生能力：`minImages`、`maxImages`、`durations`、`resolutions`、`aspectRatios`，特殊清晰度与时长组合由适配同时校验 |
 | `textModels` | string[] | 对话、文本和画布助手服务可用模型范围 |
 | `model3DModels` | string[] | 3D 模型服务可用模型范围 |
 | `model3DAdapters` | object | 按公开模型名返回当前优先渠道的 3D 适配方式；后端由私有渠道映射派生，未出现的模型使用通用接口，不包含渠道地址或密钥 |
@@ -252,6 +254,9 @@ MetaMask 登录服务端签名挑战表。nonce 与钱包地址绑定，短时�
 | `apiCredits` | number | API 显式单价；为 0 时按 `credits × apiMultiplier` 计算 |
 | `apiBilling` | string | API 计费方式，取值同 `billingType`；未配置时沿用 `billingType` |
 | `apiMultiplier` | number | API 价相对标准价的倍数，默认 `2` |
+| `videoSecondPrice` | object? | 仅视频：存在时同时开放按秒价格，含 `credits`、`apiCredits`、`planCredits`；与主行按次价独立，API 倍数共用 `apiMultiplier` |
+
+视频的主行 `billingType` / `apiBilling` 固定为 `fixed`；按秒用 `videoSecondPrice`，不使用 token。按秒 API 显式价格为 0 时使用每秒标准价乘以 API 倍数。请求缺省 `billingType` 使用主行按次价，`second` 使用请求 `seconds` 乘以每秒单价。
 
 `modelCosts` 只跟随 `availableModels` 中开放给前台的模型生成，内部优先按 `modelId` 匹配计费配置，不再依赖模型名称作为唯一计费标识。
 `planCredits` 只保留大于 0 的套餐档位，配置为 0 或留空都表示沿用标准价；`apiCredits`、`apiMultiplier` 和厂商信息由后端在保存时统一补齐，管理员不需要逐条填写。
@@ -371,7 +376,7 @@ MetaMask 登录服务端签名挑战表。nonce 与钱包地址绑定，短时�
 | `name` | string | 前台模型名，用于用户选择和公开模型列表 |
 | `upstreamName` | string | 上游模型名，实际请求渠道时写入 `model` 字段 |
 | `capability` | string | 模型能力：`image`、`text`、`video`、`model3d` |
-| `adapter` | string | 3D 适配方式：空字符串为通用 JSON；`hunyuan3d` 为 GPT.GE 单图，另支持 `meshy`、`tripo`、`rodin`、`fal-hunyuan3d`、`fal-trellis`；其他模型类型保存为空。版本及参数见 [3D 适配配置](model-3d-adapters.md) |
+| `adapter` | string | 3D 适配方式：空字符串为通用 JSON；`hunyuan3d` 为 GPT.GE 单图，另支持 `meshy`、`tripo`、`rodin`、`fal-hunyuan3d`、`fal-trellis`；视频支持 `gptge-kling`、`gptge-jimeng`、`gptge-bailian`、`gptge-vidu`、`gptge-seedance`、`gptge-hailuo`、`ark-seedance`、`fal-veo`、`fal-grok`、`fal-wan`、`fal-kling`，空字符串为通用视频协议。图片/文本保存为空。见 [3D 适配配置](model-3d-adapters.md) 与 [视频适配配置](video-adapters.md) |
 
 `runtime` 字段：
 
@@ -464,7 +469,7 @@ MetaMask 私有配置字段：
 
 `body` 为纯文本说明，HTML 输出由 Go `html/template` 转义。验证码、有效期、收件邮箱、请求 IP/地区和场景安全提醒由统一布局自动附加，不必在正文重复填写。HTML 与纯文本邮件均包含安全提醒及固定英文版权 `© <year> Maishan Inc. · Aivro. All rights reserved.`。Logo 使用已配置站点来源下的 `/logo-mail-dark.png`，访问站点链接携带邮件语言前缀；未配置站点来源时保留 Aivro 文字品牌。
 
-后端请求模型时，先按前台模型名筛选启用且包含该模型映射的渠道，并把请求里的 `model` 改写为对应 `upstreamName`。同一前台模型命中多个渠道时先使用权重最高的渠道；明确失败时按更低权重渠道继续尝试，最后一个可用渠道会再重试一次。图片和视频创建遇到传输中断、响应读取失败或 HTTP 408/504/524 时停止重发，避免上游已执行却重复计费。
+后端请求模型时，先按前台模型名筛选启用且包含该模型映射的渠道，并把请求里的 `model` 改写为对应 `upstreamName`。同一前台模型命中多个渠道时先使用权重最高的渠道；专用 3D 和视频适配不自动重发创建。通用图片/对话转发明确失败时按更低权重渠道继续尝试，最后一个可用渠道会再重试一次。图片和视频创建遇到传输中断、响应读取失败或 HTTP 408/504/524 时停止重发，避免上游已执行却重复计费。
 
 ### cloud_files
 
@@ -510,7 +515,7 @@ MetaMask 私有配置字段：
 
 ### video_tasks
 
-视频任务归属与原渠道映射表。客户端只能用本站任务 ID 查询自己的任务和下载视频。
+通用视频适配内部使用的上游任务归属与原渠道映射表。客户端统一用 `generation_tasks.id` 查询自己的任务和下载已保存的视频；专用适配在后台执行期间持有原渠道和上游编号。
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
@@ -540,6 +545,9 @@ AI 生成队列表。任务表只保存状态和对象引用，原始请求体�
 | `credits` | number | 本任务预扣算力点；API 词元任务成功后更新为实际结算值 |
 | `api_billing_type` | string | API 请求提交时的计费方式快照，登录会话任务为空，不返回前端 |
 | `api_unit_credits` | number | API 请求提交时的单价快照，不返回前端 |
+| `video_billing_type` | string | 视频请求计费方式快照：`fixed` 或 `second` |
+| `video_seconds` | number | 视频请求的生成秒数，按秒费用采用此值 |
+| `video_unit_credits` | number | 视频单价快照，登录会话为标准价，API 请求为 API 价 |
 | `ip` | string | 提交任务的客户端 IP，供退款和用量结算流水使用，不返回前端 |
 | `country` | string | 提交任务的客户端国家或地区，不返回前端 |
 | `request_count` | number | 本次请求生成数量 |
@@ -557,7 +565,7 @@ AI 生成队列表。任务表只保存状态和对象引用，原始请求体�
 | `created_at` | string | 创建时间 |
 | `updated_at` | string | 更新时间 |
 
-执行期限按开始执行时的 `private.aiTimeouts` 取值：图片默认 10 分钟、视频 15 分钟、3D 模型 30 分钟，租约比该次执行期限多 1 分钟。修改设置不会缩短正在执行的任务。站内图片、视频和 3D 生成在额度充足或关闭限流队列时也会立即返回任务编号，由后台独立执行并保存结果；站内视频的创建、上游状态轮询、下载与转存共享同一期限。API 密钥调用仍在额度充足时同步返回，触发限流时返回队列编号。3D 复用本表，保留原数量、质量和材质计费倍率，API 用量由任务终态事务统一结算。
+执行期限按开始执行时的 `private.aiTimeouts` 取值：图片默认 10 分钟、视频 15 分钟、3D 模型 30 分钟，租约比该次执行期限多 1 分钟。修改设置不会缩短正在执行的任务。站内图片、视频和 3D 生成在额度充足或关闭限流队列时也会立即返回任务编号，由后台独立执行并保存结果；站内视频的创建、上游状态轮询、下载与转存共享同一期限。视频的 API 密钥调用也统一后台执行；其他 API 密钥生成请求在额度充足时同步返回，触发限流时返回队列编号。3D 复用本表，保留原数量、质量和材质计费倍率，API 用量由任务终态事务统一结算。
 
 启动及每 30 秒只恢复租约到期的任务。终态更新比较原状态与 worker ID，失败/撤销的退款和流水在同一事务内提交，重复处理不会重复退款。模型速率与排队容量的调度锁仍为进程内锁。
 

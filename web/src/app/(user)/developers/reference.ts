@@ -12,8 +12,8 @@ export const endpoints: Endpoint[] = [
         id: "models", title: "查询可用模型", method: "GET", path: "/models",
         description: "获取已开放并已配置计费的模型。返回的模型名称可直接填入生成请求的 model 字段。",
         params: [], code: getRequest("/models"),
-        response: JSON.stringify({ code: 0, data: [{ id: "AVAILABLE_CHAT_MODEL", type: "text", credits: 2, billingType: "token" }], msg: "ok" }, null, 2),
-        note: "type 为 text（对话）、image（图片）、video（视频）或 model3d（3D）。credits 是 API 单价；billingType 为 fixed（按次）或 token（每千个词元）。示例价格仅用于解释字段，实际值以接口和模型定价表为准。",
+        response: JSON.stringify({ code: 0, data: [{ id: "AVAILABLE_CHAT_MODEL", type: "text", credits: 2, billingType: "token" }, { id: "AVAILABLE_VIDEO_MODEL", type: "video", credits: 12, billingType: "fixed", videoPrices: { fixed: 12, second: 3 } }], msg: "ok" }, null, 2),
+        note: "type 为 text（对话）、image（图片）、video（视频）或 model3d（3D）。credits 是 API 单价；billingType 为 fixed（按次）或 token（每千个词元）。示例价格仅用于解释字段，实际值以接口和模型定价表为准。" + " " + "视频模型的 videoPrices.fixed 为每次 API 价格，videoPrices.second 为每秒 API 价格；未提供 second 表示未开放按秒计费。",
     },
     {
         id: "chat", title: "生成对话", method: "POST", path: "/chat/completions",
@@ -66,38 +66,41 @@ export const endpoints: Endpoint[] = [
     },
     {
         id: "videos", title: "创建视频", method: "POST", path: "/videos",
-        description: "提交视频生成任务，推荐使用 multipart/form-data。创建成功返回本站视频编号；也可能先进入本站生成队列。",
+        description: "提交视频生成任务，支持 JSON 或 multipart/form-data，统一返回 data.taskId；后台完成生成、查询和文件转存。",
         params: [
             ["model", "文本字段", "必填", "已开放的视频模型名称"],
             ["prompt", "文本字段", "必填", "视频场景、动作与镜头描述"],
-            ["seconds", "文本字段", "选填", "视频秒数，例如 6，实际支持范围由模型决定"],
-            ["size", "文本字段", "选填", "视频尺寸，实际支持值由模型决定"],
+            ["billingType", "字符串", "选填", "fixed 按次，second 按秒；未传默认 fixed，单价由后台读取"],
+            ["seconds", "整数或数字字符串", "条件必填", "按秒计费必须传入正整数秒数；按次省略时使用模型默认时长"],
+            ["size", "文本字段", "选填", "画面比例，例如 16:9；支持值由模型能力决定"],
             ["resolution_name", "文本字段", "选填", "清晰度，例如 720p，实际支持值由模型决定"],
-            ["input_reference[]", "文件字段", "选填", "参考图片，支持数量由模型决定"],
+            ["input_reference[]", "文件字段", "选填", "multipart 参考图片，每张最大 10 MiB，数量由模型决定"],
+            ["images", "数组", "选填", "JSON 参考图片，每项包含 url，可附带本站 storageKey"],
         ],
         code: `curl "$AIVRO_BASE_URL/videos" \\
   -H "Authorization: Bearer $AIVRO_API_KEY" \\
   -F 'model=AVAILABLE_VIDEO_MODEL' \\
   -F 'prompt=Slow camera push-in through a mountain forest in morning mist' \\
+  -F 'billingType=fixed' \\
   -F 'seconds=6' \\
   -F 'resolution_name=720p'`,
-        note: "创建响应中的 id 是本站视频编号，请保存该编号。先排队时要等生成队列完成，再从队列结果读取视频 id，之后才查询视频生成进度。上游任务编号不能代替本站编号。",
+        note: "使用 data.taskId 查询 /videos/{id} 或 /generation-tasks/{id}，成功后读取 /generation-tasks/{id}/result 或下载 /videos/{id}/content。费用、单价、计费方式和请求秒数随任务保存；不接受客户端单价或 duration、n、preset 等额外字段。" + " " + "通过 GET /api/settings 的 modelChannel.videoCapabilities 查询 durations、resolutions、aspectRatios、minImages 和 maxImages。部分图生视频比例跟随参考图；Veo 高清仅 8 秒，海螺 1080p 仅 6 秒。",
     },
     {
         id: "video-status", title: "查询视频进度", method: "GET", path: "/videos/{id}",
-        description: "查询属于当前账号的视频生成状态。路径参数 id 使用创建接口返回的本站视频编号。",
+        description: "查询属于当前账号的视频生成状态。路径参数 id 使用创建响应的 data.taskId。",
         params: [["id", "路径参数", "必填", "本站视频编号"]],
         code: getRequest("/videos/VIDEO_ID"),
-        note: "该接口保留模型渠道返回的状态 JSON，进度与状态字段依渠道而定。此接口与本站 generation-tasks 队列接口分别表示视频上游进度与本站排队进度。",
+        note: "返回本站统一任务状态：queued、executing、succeeded、failed、canceled；同时返回 billingType、seconds、unitCredits 和 credits。succeeded 表示视频已经转存。",
     },
     {
         id: "video-content", title: "获取视频内容", method: "GET", path: "/videos/{id}/content",
-        description: "在视频生成完成后获取视频内容。成功可能返回视频文件，也可能返回本站存储地址 JSON。",
+        description: "在视频生成并转存完成后获取视频文件。成功返回文件流，失败返回业务错误 JSON。",
         params: [["id", "路径参数", "必填", "本站视频编号"]],
         code: `curl "$AIVRO_BASE_URL/videos/VIDEO_ID/content" \\
   -H "Authorization: Bearer $AIVRO_API_KEY" \\
   -D response-headers.txt -o video-response.bin`,
-        note: "先检查 Content-Type。视频类型可直接保存为文件；application/json 时解析其中的文件地址再下载，勿把错误 JSON 或地址 JSON 当成 MP4 文件。",
+        note: "先检查 Content-Type 和业务错误，勿把错误 JSON 当成 MP4 文件。视频文件过期后无法下载。",
     },
     {
         id: "model3d", title: "生成 3D 模型", method: "POST", path: "/model-3d/generations",
@@ -138,7 +141,7 @@ export const endpoints: Endpoint[] = [
         id: "task-result", title: "获取队列结果", method: "GET", path: "/generation-tasks/{id}/result",
         description: "任务成功且 resultAvailable 为 true 后读取原始生成结果。响应形式沿用对应生成接口。",
         params: [["id", "路径参数", "必填", "本站生成队列任务编号"]], code: getRequest("/generation-tasks/TASK_ID/result"),
-        note: "图片结果读取 data 数组；视频创建结果读取本站视频 id。任务未完成、结果已过期或不属于当前账号时返回业务错误。",
+        note: "图片结果读取 data 数组；视频结果读取 file，并包含 id、billingType、seconds、unitCredits、energyCost。任务未完成、结果已过期或不属于当前账号时返回业务错误。",
     },
     {
         id: "task-cancel", title: "取消排队任务", method: "DELETE", path: "/generation-tasks/{id}",

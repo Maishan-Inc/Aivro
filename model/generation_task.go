@@ -23,6 +23,9 @@ type GenerationTask struct {
 	Credits        int                  `json:"credits"`
 	APIBillingType string               `json:"-"`
 	APIUnitCredits int                  `json:"-"`
+	VideoBillingType string             `json:"videoBillingType,omitempty"`
+	VideoSeconds int                    `json:"videoSeconds,omitempty"`
+	VideoUnitCredits int                `json:"videoUnitCredits,omitempty"`
 	IP             string               `json:"-"`
 	Country        string               `json:"-"`
 	RequestCount   int                  `json:"requestCount"`
@@ -53,6 +56,9 @@ type VideoTask struct {
 
 // GenerationTaskView 是前端轮询使用的轻量任务视图。
 type GenerationTaskView struct {
+	BillingType string `json:"billingType,omitempty"`
+	Seconds int `json:"seconds,omitempty"`
+	UnitCredits int `json:"unitCredits"`
 	ID              string `json:"id"`
 	Model           string `json:"model"`
 	Path            string `json:"path"`
@@ -70,6 +76,10 @@ type GenerationTaskView struct {
 
 // GenerationTaskSubmitResult 是 AI 请求被队列接管时返回给前端的结果。
 type GenerationTaskSubmitResult struct {
+	BillingType string `json:"billingType,omitempty"`
+	Seconds int `json:"seconds,omitempty"`
+	UnitCredits int `json:"unitCredits"`
+	EnergyCost int `json:"energyCost"`
 	Queued        bool   `json:"queued"`
 	TaskID        string `json:"taskId"`
 	Status        string `json:"status"`

@@ -101,6 +101,21 @@ type ModelCost struct {
 	APICredits    int            `json:"apiCredits"`
 	APIBilling    string         `json:"apiBilling"`
 	ApiMultiplier int            `json:"apiMultiplier"`
+	VideoSecondPrice *VideoSecondPrice `json:"videoSecondPrice,omitempty"`
+}
+
+type VideoSecondPrice struct {
+	Credits int `json:"credits"`
+	APICredits int `json:"apiCredits"`
+	PlanCredits map[string]int `json:"planCredits"`
+}
+
+type VideoCapabilities struct {
+	MinImages int `json:"minImages"`
+	MaxImages int `json:"maxImages"`
+	Durations []int `json:"durations"`
+	Resolutions []string `json:"resolutions"`
+	AspectRatios []string `json:"aspectRatios"`
 }
 
 // PublicModelChannelSetting 公开模型渠道配置。
@@ -108,6 +123,8 @@ type PublicModelChannelSetting struct {
 	AvailableModels   []string    `json:"availableModels"`
 	ImageModels       []string    `json:"imageModels"`
 	VideoModels       []string    `json:"videoModels"`
+	VideoAdapters map[string]string `json:"videoAdapters"`
+	VideoCapabilities map[string]VideoCapabilities `json:"videoCapabilities"`
 	TextModels        []string    `json:"textModels"`
 	Model3DModels     []string    `json:"model3DModels"`
 	Model3DAdapters   map[string]string `json:"model3DAdapters"`

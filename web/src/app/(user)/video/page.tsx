@@ -17,7 +17,8 @@ import { AssetPickerModal, type InsertAssetPayload } from "@/app/(user)/canvas/c
 import { GenerationHistoryDetailModal } from "@/components/generation-history-detail-modal";
 import { AivroDrawableLoader } from "@/components/aivro-drawable-loader";
 import { PromptSelectDialog } from "@/components/prompts/prompt-select-dialog";
-import { normalizeVideoResolutionValue, normalizeVideoSizeValue } from "@/components/video-settings-panel";
+import { useI18n } from "@/hooks/use-i18n";
+import { getVideoCapabilities, resolveVideoConfig, videoResolution } from "@/lib/video-models";
 import { formatDateTime } from "@/lib/datetime";
 import { formatBytes, formatDuration } from "@/lib/image-utils";
 import { uploadMediaFile } from "@/services/file-storage";
@@ -68,9 +69,10 @@ type GenerationLog = {
     history?: GenerationHistory;
 };
 
-type GenerationLogConfig = Pick<AiConfig, "model" | "videoModel" | "size" | "vquality" | "videoSeconds">;
+type GenerationLogConfig = Pick<AiConfig, "model" | "videoModel" | "size" | "vquality" | "videoSeconds" | "videoBillingType">;
 
 export default function VideoPage() {
+    const { tr } = useI18n();
     const searchParams = useSearchParams();
     const { message } = App.useApp();
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -96,6 +98,7 @@ export default function VideoPage() {
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
     const model = effectiveConfig.videoModel;
+    const maxReferences = getVideoCapabilities(model).maxImages;
     const canGenerate = Boolean(prompt.trim());
     const composerExpanded = composerFocused || canGenerate || references.length > 0;
 
@@ -115,14 +118,15 @@ export default function VideoPage() {
     }, [token]);
 
     const addReferences = async (files?: FileList | File[] | null) => {
-        const imageFiles = Array.from(files || []).filter((file) => file.type.startsWith("image/")).slice(0, 7 - references.length);
+        const imageFiles = Array.from(files || []).filter((file) => file.type.startsWith("image/"));
+        if (imageFiles.length + references.length > maxReferences) { message.warning("参考图数量不符合当前视频模型要求"); return; }
         const nextReferences = await Promise.all(
             imageFiles.map(async (file) => {
                 const image = await uploadImage(file);
                 return { id: nanoid(), name: file.name, type: image.mimeType, dataUrl: image.url, storageKey: image.storageKey };
             }),
         );
-        setReferences((value) => [...value, ...nextReferences].slice(0, 7));
+        setReferences((value) => [...value, ...nextReferences]);
     };
 
     const addReferencesFromClipboard = async () => {
@@ -133,13 +137,14 @@ export default function VideoPage() {
                 message.error("剪切板里没有可读取的图片");
                 return;
             }
+            if (blobs.length + references.length > maxReferences) { message.warning("参考图数量不符合当前视频模型要求"); return; }
             const nextReferences = await Promise.all(
-                blobs.slice(0, 7 - references.length).map(async (blob, index) => {
+                blobs.map(async (blob, index) => {
                     const image = await uploadImage(blob);
                     return { id: nanoid(), name: `clipboard-${index + 1}.png`, type: image.mimeType, dataUrl: image.url, storageKey: image.storageKey };
                 }),
             );
-            setReferences((value) => [...value, ...nextReferences].slice(0, 7));
+            setReferences((value) => [...value, ...nextReferences]);
             message.success(`已读取 ${nextReferences.length} 张参考图`);
         } catch {
             message.error("剪切板里没有可读取的图片");
@@ -225,8 +230,9 @@ export default function VideoPage() {
         if (payload.kind === "text") {
             setPrompt(payload.content);
         } else if (payload.kind === "image") {
+            if (references.length >= maxReferences) { message.warning("参考图数量不符合当前视频模型要求"); return; }
             const stored = await uploadImage(payload.dataUrl);
-            setReferences((value) => [...value, { id: nanoid(), name: payload.title, type: stored.mimeType, dataUrl: stored.url, storageKey: stored.storageKey }].slice(0, 7));
+            setReferences((value) => [...value, { id: nanoid(), name: payload.title, type: stored.mimeType, dataUrl: stored.url, storageKey: stored.storageKey }]);
         }
         setAssetPickerOpen(false);
     };
@@ -273,6 +279,7 @@ export default function VideoPage() {
                 size: log.config.size || "",
                 vquality: log.config.vquality || "",
                 videoSeconds: log.config.videoSeconds || "",
+                videoBillingType: log.config.videoBillingType,
             },
             references: log.references.map((item) => ({ name: item.name, type: item.type, url: item.dataUrl, storageKey: item.storageKey || "" })),
             media: [media],
@@ -300,6 +307,7 @@ export default function VideoPage() {
         if (log.config.size) updateConfig("size", log.config.size);
         if (log.config.vquality) updateConfig("vquality", log.config.vquality);
         if (log.config.videoSeconds) updateConfig("videoSeconds", log.config.videoSeconds);
+        updateConfig("videoBillingType", log.config.videoBillingType);
         setResults(log.video ? [{ id: log.video.id, status: "success", video: log.video }] : [{ id: log.id, status: "failed", error: log.error || "生成失败" }]);
     };
 
@@ -370,7 +378,7 @@ export default function VideoPage() {
                                 <Button className={composer.send} type="primary" shape="circle" icon={<ArrowUp size={20} />} loading={running} disabled={!canGenerate || running} onClick={() => void generate()} aria-label="开始生成" title="开始生成" />
                             </div>
                         </div>
-                        <p className={studio.composerHint}>Enter 生成 · Shift + Enter 换行 · 最多 7 张参考图</p>
+                        <p data-i18n-skip className={studio.composerHint}>{tr("Enter 生成 · Shift + Enter 换行 · 最多 {0} 张参考图").replace("{0}", String(maxReferences))}</p>
                     </div>
                 </section>
                 <StudioHistorySidebar items={logs.map((log) => ({ id: log.id, title: log.title, prompt: log.prompt, preview: log.references[0]?.dataUrl, video: log.video?.url }))} onSelect={(id) => { const log = logs.find((item) => item.id === id); if (log) previewGenerationLog(log); }}>
@@ -529,7 +537,7 @@ function LogCard({ log, selected, active, onSelectedChange, onClick, onOpenDetai
                         ) : null}
                         <div className="mt-2 flex flex-wrap gap-1">
                             <Tag className="m-0 flex h-6 items-center rounded-md px-1.5 text-xs leading-none">{log.size}</Tag>
-                            <Tag className="m-0 flex h-6 items-center rounded-md px-1.5 text-xs leading-none">{log.resolution}p</Tag>
+                            <Tag className="m-0 flex h-6 items-center rounded-md px-1.5 text-xs leading-none">{videoResolution(log.resolution)}</Tag>
                             <Tag className="m-0 flex h-6 items-center rounded-md px-1.5 text-xs leading-none">{log.seconds}s</Tag>
                         </div>
                     </div>
@@ -555,6 +563,7 @@ function historyToVideoLog(history: GenerationHistory): GenerationLog {
             size: history.config?.size,
             vquality: history.config?.vquality,
             videoSeconds: history.config?.videoSeconds,
+            videoBillingType: history.config?.videoBillingType === "second" ? "second" : "fixed",
         },
         model: history.model,
     });
@@ -616,6 +625,7 @@ function normalizeLogConfig(log: Partial<GenerationLog>): GenerationLogConfig {
         size: log.config?.size || log.size || "",
         vquality: normalizeResolution(log.config?.vquality || log.resolution || ""),
         videoSeconds: log.config?.videoSeconds || log.seconds || "",
+        videoBillingType: log.config?.videoBillingType === "second" ? "second" : "fixed",
     };
 }
 
@@ -626,6 +636,7 @@ function buildLog({ prompt, model, config, references, durationMs, status, video
         size: config.size,
         vquality: normalizeResolution(config.vquality),
         videoSeconds: config.videoSeconds,
+        videoBillingType: config.videoBillingType,
     };
     return {
         id: nanoid(),
@@ -647,25 +658,9 @@ function buildLog({ prompt, model, config, references, durationMs, status, video
 }
 
 function buildVideoConfig(config: AiConfig, model: string): AiConfig {
-    return {
-        ...config,
-        model,
-        videoModel: model,
-        size: normalizeVideoSize(config.size),
-        videoSeconds: normalizeVideoSeconds(config.videoSeconds),
-        vquality: normalizeResolution(config.vquality),
-    };
-}
-
-function normalizeVideoSeconds(value: string) {
-    const seconds = Math.floor(Number(value) || 6);
-    return String(Math.max(1, Math.min(20, seconds)));
-}
-
-function normalizeVideoSize(value: string) {
-    return normalizeVideoSizeValue(value);
+    return resolveVideoConfig(config, model);
 }
 
 function normalizeResolution(value: string) {
-    return normalizeVideoResolutionValue(value);
+    return videoResolution(value);
 }

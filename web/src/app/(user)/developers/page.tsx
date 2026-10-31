@@ -83,12 +83,12 @@ $env:AIVRO_API_KEY = 'YOUR_API_KEY'`} /></details>
 
                     <section id="queue" className="border-t border-border pt-8">
                         <h2>{tr("异步任务处理")}</h2>
-                        <p>{tr("图片和视频请求可能进入本站队列。排队响应仍为 HTTP 200，请检查 ")}<code>data.queued</code>{tr("，并保存 ")}<code>data.taskId</code>{tr("。排队后不要重复提交相同生成请求。")}</p>
+                        <p>{tr("视频请求统一交由后台任务执行，图片繁忙时也会排队。响应为 HTTP 200，请检查 ")}<code>data.queued</code>{tr("，并保存 ")}<code>data.taskId</code>{tr("。排队后不要重复提交相同生成请求。")}</p>
                         <CodeBlock label={tr("排队响应示例")} code={JSON.stringify({ code: 0, data: { queued: true, taskId: "TASK_ID", status: "queued", queuePosition: 2, aheadCount: 1 }, msg: "ok" }, null, 2)} />
-                        <ol className="space-y-2 pl-5"><li className="list-decimal">{tr("每隔约 3 秒请求 ")}<code>/generation-tasks/TASK_ID</code>{tr("。")}</li><li className="list-decimal">{tr("状态为 ")}<code>succeeded</code> {tr(" 且 ")}<code>resultAvailable</code> {tr(" 为 true 时，请求 ")}<code>/generation-tasks/TASK_ID/result</code>{tr("。")}</li><li className="list-decimal">{tr("状态为 ")}<code>failed</code> {tr(" 或 ")}<code>canceled</code> {tr(" 时停止轮询，展示错误并检查退款。")}</li><li className="list-decimal">{tr("视频队列结果是视频创建响应，再使用其中的本站视频编号查询视频进度；3D 当前由创建接口直接返回结果。")}</li></ol>
+                        <ol className="space-y-2 pl-5"><li className="list-decimal">{tr("每隔约 3 秒请求 ")}<code>/generation-tasks/TASK_ID</code>{tr("。")}</li><li className="list-decimal">{tr("状态为 ")}<code>succeeded</code> {tr(" 且 ")}<code>resultAvailable</code> {tr(" 为 true 时，请求 ")}<code>/generation-tasks/TASK_ID/result</code>{tr("。")}</li><li className="list-decimal">{tr("状态为 ")}<code>failed</code> {tr(" 或 ")}<code>canceled</code> {tr(" 时停止轮询，展示错误并检查退款。")}</li><li className="list-decimal">{tr("视频任务成功时已完成转存，结果包含 file 和计费信息；3D 排队任务成功后从结果读取模型文件。")}</li></ol>
                         <CodeBlock label={tr("Python · 图片生成与队列轮询")} code={queueExample} />
                         <h3 id="video-workflow" className="mt-8 scroll-mt-8">{tr("从参考图到视频下载")}</h3>
-                        <p>{tr("以下 Python 示例串联参考图上传、视频创建、本站队列、视频进度和文件下载。先执行 pip install requests，设置 AIVRO_VIDEO_MODEL，并准备 reference.png。状态字段以所选渠道为准。")}</p>
+                        <p>{tr("以下 Python 示例串联参考图上传、视频创建、任务查询和文件下载。先执行 pip install requests，设置 AIVRO_VIDEO_MODEL，并准备 reference.png；秒数、清晰度和参考图数量须符合模型能力。")}</p>
                         <CodeBlock label={tr("Python · 视频创建、轮询与下载")} code={videoWorkflowExample} />
                         <p>{tr("等待超时只表示客户端停止等待，请保留任务编号稍后查询。本站执行中的任务不能取消；仅排队任务支持取消并退款。生成结果与临时文件存在保留期限，请及时取回。")}</p>
                     </section>
@@ -97,7 +97,7 @@ $env:AIVRO_API_KEY = 'YOUR_API_KEY'`} /></details>
                         <h2>{tr("响应与错误处理")}</h2>
                         <p>{tr("模型查询、上传、3D、任务和密钥管理等业务接口统一返回 ")}<code>{"{ code, data, msg }"}</code>{tr("。")}<code>code</code> {tr(" 为 0 表示成功，非 0 表示失败。普通业务错误可能返回 HTTP 200，所以需要同时检查 HTTP 状态和业务状态。")}</p>
                         <CodeBlock label={tr("业务错误示例")} code={JSON.stringify({ code: 1, data: null, msg: "Invalid or revoked API key" }, null, 2)} />
-                        <p>{tr("对话、图片和视频的直接成功响应通常保留模型接口的标准 JSON；对话流为事件流，视频内容也可能是文件。请根据 ")}<code>Content-Type</code> {tr(" 和响应中的 ")}<code>code</code> {tr(" 选择处理方式，勿假定所有 ")}<code>data</code> {tr(" 字段都是业务包装。")}</p>
+                        <p>{tr("对话和图片的直接成功响应通常保留模型接口的标准 JSON；视频创建返回任务编号，下载接口返回文件。请根据 ")}<code>Content-Type</code> {tr(" 和响应中的 ")}<code>code</code> {tr(" 选择处理方式，勿假定所有 ")}<code>data</code> {tr(" 字段都是业务包装。")}</p>
                         <div className="thin-scrollbar my-5 overflow-x-auto rounded-lg border border-border"><table className="w-full min-w-[520px] text-left text-xs leading-6"><thead className="bg-muted/40"><tr><th scope="col" className="px-4 py-3 font-medium">{tr("情况")}</th><th scope="col" className="px-4 py-3 font-medium">{tr("处理建议")}</th></tr></thead><tbody>{[
                             ["HTTP 401：密钥无效、已撤销或账号不可用", "检查完整密钥和 Bearer 请求头，必要时在密钥管理中创建新密钥。"],
                             ["HTTP 403：请求来源无效", "服务端调用通常不携带浏览器 Cookie；浏览器跨站调用应通过自己的后端。"],
@@ -113,7 +113,7 @@ $env:AIVRO_API_KEY = 'YOUR_API_KEY'`} /></details>
 
                     <section id="billing" className="border-t border-border pt-8">
                         <h2>{tr("计费与使用建议")}</h2>
-                        <ul className="space-y-3 pl-5"><li className="list-disc">{tr("API 使用密钥所属账号的算力点，价格读取")}<Link href={withLocalePath("/models", locale)} className="mx-1 underline underline-offset-4">{tr("模型定价表 → API 价")}</Link>{tr("。显式 API 单价优先；未填写时按标准价乘以 API 倍数计算，默认 2 倍。")}</li><li className="list-disc">{tr("按次计费根据请求数量预扣。图片、视频的 ")}<code>n</code> {tr(" 默认为 1；3D 另按数量、网格质量、贴图、物理材质和面数计算。")}</li><li className="list-disc">{tr("词元计费按每千个词元的 API 单价结算，算力点向上取整。对话会先预扣输入估算与输出上限的额度，再按返回用量补扣或退回；未返回用量时采用估算，估算不超过预扣值。")}</li><li className="list-disc">{tr("图片、视频和 3D 配置为词元计费时，有上游用量就按用量结算；未返回用量时保留提交时的预扣额度。")}</li><li className="list-disc">{tr("排队任务保留提交时的计费配置。请求失败和排队取消沿用本站退款流程，实际明细以账号算力流水为准。")}</li><li className="list-disc">{tr("文件上传最大 50 MiB，通用模型请求上限为 80 MiB；仍受所选模型、本站容量和并发设置约束。建议为生成请求设置至少 300 秒超时，并及时下载生成文件。")}</li></ul>
+                        <ul className="space-y-3 pl-5"><li className="list-disc">{tr("API 使用密钥所属账号的算力点，价格读取")}<Link href={withLocalePath("/models", locale)} className="mx-1 underline underline-offset-4">{tr("模型定价表 → API 价")}</Link>{tr("。显式 API 单价优先；未填写时按标准价乘以 API 倍数计算，默认 2 倍。")}</li><li className="list-disc">{tr("按次计费根据请求数量预扣。图片的 ")}<code>n</code> {tr(" 默认为 1；3D 另按数量、网格质量、贴图、物理材质和面数计算。")}</li><li className="list-disc">{tr("词元计费按每千个词元的 API 单价结算，算力点向上取整。对话会先预扣输入估算与输出上限的额度，再按返回用量补扣或退回；未返回用量时采用估算，估算不超过预扣值。")}</li><li className="list-disc">{tr("视频支持 fixed（按次）和 second（按秒），未传 billingType 默认 fixed。second 按请求 seconds 乘以后端每秒 API 单价计费，不按成片时长结算；每次请求生成一个视频。")}</li><li className="list-disc">{tr("排队任务保留提交时的计费配置。请求失败和排队取消沿用本站退款流程，实际明细以账号算力流水为准。")}</li><li className="list-disc">{tr("文件上传最大 50 MiB，通用模型请求上限为 80 MiB；仍受所选模型、本站容量和并发设置约束。建议为生成请求设置至少 300 秒超时，并及时下载生成文件。")}</li></ul>
                         <div className="mt-8 flex flex-wrap items-center justify-between gap-4 border-t border-border pt-6 text-xs"><p>{tr("这是一份静态接入文档。模型、价格和站点限额以实际接口返回为准。")}</p><Link href={withLocalePath("/console/api-keys", locale)} className="inline-flex items-center gap-2">{tr("前往密钥管理")}<ArrowUpRight className="size-3.5" /></Link></div>
                     </section>
                 </article>

@@ -259,6 +259,10 @@ export type AdminModelChannel = {
 
 export type Model3DAdapter = "" | "hunyuan3d" | "meshy" | "tripo" | "rodin" | "fal-hunyuan3d" | "fal-trellis";
 
+export type VideoAdapter = "" | "gptge-kling" | "gptge-jimeng" | "gptge-bailian" | "gptge-vidu" | "gptge-seedance" | "gptge-hailuo" | "ark-seedance" | "fal-veo" | "fal-grok" | "fal-wan" | "fal-kling";
+export type VideoCapabilities = { minImages: number; maxImages: number; durations: number[]; resolutions: string[]; aspectRatios: string[] };
+export type VideoSecondPrice = { credits: number; apiCredits: number; planCredits: Record<string, number> };
+
 export type Model3DCapabilities = {
     modes: ("text" | "image" | "multi_image")[];
     maxImages: number;
@@ -280,13 +284,15 @@ export type AdminModelChannelModel = {
     name: string;
     upstreamName: string;
     capability: "image" | "text" | "video" | "model3d";
-    adapter?: Model3DAdapter;
+    adapter?: Model3DAdapter | VideoAdapter;
 };
 
 export type AdminPublicModelChannelSettings = {
     availableModels: string[];
     imageModels: string[];
     videoModels: string[];
+    videoAdapters?: Record<string, VideoAdapter>;
+    videoCapabilities?: Record<string, VideoCapabilities>;
     textModels: string[];
     model3DModels: string[];
     model3DAdapters?: Record<string, Model3DAdapter>;
@@ -301,6 +307,7 @@ export type AdminPublicModelChannelSettings = {
 };
 
 export type AdminModelCost = {
+    videoSecondPrice?: VideoSecondPrice;
     modelId: string;
     model: string;
     credits: number;

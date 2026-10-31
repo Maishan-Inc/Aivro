@@ -63,7 +63,14 @@ func SubmitAITask(ctx context.Context, user model.AuthUser, body []byte, content
 		return model.GenerationTaskSubmitResult{}, nil, err
 	}
 	queue := normalizeAIQueueSetting(settings.Private.AIQueue)
-	billing, err := RequestModelBilling(ctx, modelName)
+	var videoInput VideoGenerationInput
+	var billing model.ModelCost
+	if path == "/videos" {
+		videoInput, body, err = prepareVideoGeneration(ctx, user, body, contentType, modelName)
+		if err != nil { return model.GenerationTaskSubmitResult{}, nil, err }
+		contentType = "application/json"
+		billing, err = videoModelBilling(ctx, modelName, videoInput.BillingType)
+	} else { billing, err = RequestModelBilling(ctx, modelName) }
 	if err != nil {
 		return model.GenerationTaskSubmitResult{}, nil, err
 	}
@@ -72,6 +79,11 @@ func SubmitAITask(ctx context.Context, user model.AuthUser, body []byte, content
 	if err != nil { return model.GenerationTaskSubmitResult{}, nil, err }
 	if credits < 0 || credits > int(^uint(0)>>1)/requestCount { return model.GenerationTaskSubmitResult{}, nil, safeMessageError{message: "模型计费配置无效"} }
 	credits *= requestCount
+	if path == "/videos" && videoInput.BillingType == model.BillingTypeSecond {
+		seconds, _ := strconv.Atoi(videoInput.Seconds.String())
+		if credits > int(^uint(0)>>1)/seconds { return model.GenerationTaskSubmitResult{}, nil, SafeAIError("模型计费配置无效") }
+		credits *= seconds
+	}
 	if path == model3DPath {
 		var input Model3DGenerationInput
 		if err := json.Unmarshal(body, &input); err != nil { return model.GenerationTaskSubmitResult{}, nil, err }
@@ -127,6 +139,10 @@ func SubmitAITask(ctx context.Context, user model.AuthUser, body []byte, content
 		UpdatedAt:     now,
 	}
 	if IsAPIKeyRequest(ctx) { task.APIBillingType, task.APIUnitCredits = billing.BillingType, billing.Credits }
+	if path == "/videos" {
+		task.VideoBillingType, task.VideoUnitCredits = videoInput.BillingType, billing.Credits
+		task.VideoSeconds, _ = strconv.Atoi(videoInput.Seconds.String())
+	}
 	canRun, err := canDispatchModel(modelName, queue)
 	if err != nil {
 		queueMu.Unlock()
@@ -147,9 +163,9 @@ func SubmitAITask(ctx context.Context, user model.AuthUser, body []byte, content
 			_ = deleteTaskPayload(requestFile.File.ID)
 			return model.GenerationTaskSubmitResult{}, nil, err
 		}
-		if !IsAPIKeyRequest(ctx) {
+		if !IsAPIKeyRequest(ctx) || path == "/videos" {
 			go runGenerationTask(saved, timeout)
-			return model.GenerationTaskSubmitResult{Queued: true, TaskID: saved.ID, Status: string(saved.Status), Model: modelName, Path: path}, nil, nil
+			return model.GenerationTaskSubmitResult{BillingType: saved.VideoBillingType, Seconds: saved.VideoSeconds, UnitCredits: saved.VideoUnitCredits, EnergyCost: saved.Credits, Queued: true, TaskID: saved.ID, Status: string(saved.Status), Model: modelName, Path: path}, nil, nil
 		}
 		resp, execErr := executeTask(ctx, user, saved, timeout)
 		if execErr != nil {
@@ -172,7 +188,7 @@ func SubmitAITask(ctx context.Context, user model.AuthUser, body []byte, content
 		return model.GenerationTaskSubmitResult{}, nil, err
 	}
 	queueMu.Unlock()
-	return model.GenerationTaskSubmitResult{Queued: true, TaskID: task.ID, Status: string(task.Status), QueuePosition: position, AheadCount: position - 1, Model: modelName, Path: path}, nil, nil
+	return model.GenerationTaskSubmitResult{BillingType: task.VideoBillingType, Seconds: task.VideoSeconds, UnitCredits: task.VideoUnitCredits, EnergyCost: task.Credits, Queued: true, TaskID: task.ID, Status: string(task.Status), QueuePosition: position, AheadCount: position - 1, Model: modelName, Path: path}, nil, nil
 }
 
 func GetGenerationTask(user model.AuthUser, id string) (model.GenerationTaskView, error) {
@@ -348,11 +364,10 @@ func executeTask(ctx context.Context, user model.AuthUser, task model.Generation
 	var resp AIProxyResponse
 	if task.Path == model3DPath {
 		resp, err = executeModel3DTask(ctx, user, task, content)
+	} else if task.Path == "/videos" {
+		resp, err = executeVideoGeneration(ctx, user, task, content)
 	} else {
 		resp, err = proxyExecutor(ctx, user, content, task.ContentType, task.Model, task.Path)
-		if err == nil && task.Path == "/videos" && task.APIBillingType == "" {
-			resp.Body, err = completeVideoTask(ctx, user, resp.Body)
-		}
 	}
 	_ = content.Close()
 	now := time.Now().Format(time.RFC3339)
@@ -444,7 +459,7 @@ func generationTaskView(task model.GenerationTask) model.GenerationTaskView {
 	if task.Status == model.GenerationTaskQueued && task.QueuePosition > 0 {
 		ahead = task.QueuePosition - 1
 	}
-	return model.GenerationTaskView{ID: task.ID, Model: task.Model, Path: task.Path, Status: string(task.Status), QueuePosition: task.QueuePosition, AheadCount: ahead, Credits: task.Credits, Error: task.Error, CreatedAt: task.CreatedAt, StartedAt: task.StartedAt, FinishedAt: task.FinishedAt, ResultAvailable: task.Status == model.GenerationTaskSucceeded && task.ResponseFileID != "", ResponseStatus: task.ResponseStatus}
+	return model.GenerationTaskView{BillingType: task.VideoBillingType, Seconds: task.VideoSeconds, UnitCredits: task.VideoUnitCredits, ID: task.ID, Model: task.Model, Path: task.Path, Status: string(task.Status), QueuePosition: task.QueuePosition, AheadCount: ahead, Credits: task.Credits, Error: task.Error, CreatedAt: task.CreatedAt, StartedAt: task.StartedAt, FinishedAt: task.FinishedAt, ResultAvailable: task.Status == model.GenerationTaskSucceeded && task.ResponseFileID != "", ResponseStatus: task.ResponseStatus}
 }
 
 func canDispatchModel(modelName string, queue model.AIQueueSetting) (bool, error) {

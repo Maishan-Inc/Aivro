@@ -34,4 +34,5 @@ type APIModel struct {
 	Type        string `json:"type"`
 	Credits     int    `json:"credits"`
 	BillingType string `json:"billingType"`
+	VideoPrices map[string]int `json:"videoPrices,omitempty"`
 }

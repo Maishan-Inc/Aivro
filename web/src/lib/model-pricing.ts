@@ -67,6 +67,11 @@ export function normalizeModelCost(item: Partial<AdminModelCost>): AdminModelCos
     const guessed = guessModelVendor(item.model || "");
     return {
         modelId: item.modelId || "",
+        videoSecondPrice: item.videoSecondPrice ? {
+            credits: Math.max(0, Math.floor(Number(item.videoSecondPrice.credits) || 0)),
+            apiCredits: Math.max(0, Math.floor(Number(item.videoSecondPrice.apiCredits) || 0)),
+            planCredits: Object.fromEntries(planPricingCodes.map((code) => [code, Math.max(0, Math.floor(Number(item.videoSecondPrice?.planCredits?.[code]) || 0))]).filter(([, value]) => Number(value) > 0)),
+        } : undefined,
         model: item.model || "",
         credits: Math.max(0, Math.floor(Number(item.credits) || 0)),
         billingType,
@@ -94,7 +99,7 @@ export function planCostOf(item: Pick<AdminModelCost, "credits" | "planCredits">
 }
 
 export function billingUnit(type?: string) {
-    return type === "token" ? "点/千 token" : "点/次";
+    return type === "token" ? "点/千 token" : type === "second" ? "点/秒" : "点/次";
 }
 
 // 模型类型取自后台的模型范围配置，用于前台筛选和标签。

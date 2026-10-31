@@ -15,6 +15,7 @@ export type AiConfig = {
     textModel: string;
     model3DModel: string;
     videoSeconds: string;
+    videoBillingType: "fixed" | "second";
     vquality: string;
     systemPrompt: string;
     models: string[];
@@ -34,6 +35,7 @@ export const defaultConfig: AiConfig = {
     textModel: "gpt-5.5",
     model3DModel: "hunyuan3d",
     videoSeconds: "6",
+    videoBillingType: "fixed",
     vquality: "720",
     systemPrompt: "",
     models: [],
@@ -110,6 +112,7 @@ function normalizeStoredConfig(value: Partial<AiConfig> = {}): AiConfig {
         textModel: value.textModel || value.model || defaultConfig.textModel,
         model3DModel: value.model3DModel || defaultConfig.model3DModel,
         videoSeconds: value.videoSeconds || defaultConfig.videoSeconds,
+        videoBillingType: value.videoBillingType === "second" ? "second" : "fixed",
         vquality: value.vquality || defaultConfig.vquality,
         systemPrompt: "",
         models: [],

@@ -1,5 +1,7 @@
 "use client";
 
+import { resolveVideoConfig } from "@/lib/video-models";
+
 import { useEffect, useState } from "react";
 import { ArrowUp, LoaderCircle } from "lucide-react";
 import { App, Button } from "antd";
@@ -106,7 +108,7 @@ export function CanvasNodePromptPanel({ node, isRunning, inputs, onHighlightInpu
                     data-canvas-action="generate"
                     data-canvas-running={isRunning}
                 >
-                    <ModelBilling summaryOnly model={config.model} kind={mode} count={mode === "image" ? config.count : 1} className="shrink-0 [&>span]:whitespace-nowrap" />
+                    <ModelBilling summaryOnly video={config} model={config.model} kind={mode} count={mode === "image" ? config.count : 1} className="shrink-0 [&>span]:whitespace-nowrap" />
                     {isRunning ? <LoaderCircle className="size-4 shrink-0 animate-spin" /> : <ArrowUp className="size-4 shrink-0" />}
                 </Button>
             </div>
@@ -120,13 +122,15 @@ function defaultMode(type: CanvasNodeData["type"]): CanvasNodeGenerationMode {
 
 function buildNodeConfig(globalConfig: AiConfig, node: CanvasNodeData, mode: CanvasNodeGenerationMode): AiConfig {
     const defaultModel = mode === "image" ? globalConfig.imageModel : mode === "video" ? globalConfig.videoModel : globalConfig.textModel;
-    return {
+    const result: AiConfig = {
         ...globalConfig,
         model: mode === "video" ? resolveVideoModel(globalConfig, node.metadata?.model) : node.metadata?.model || defaultModel || globalConfig.model || defaultConfig.model,
         quality: node.metadata?.quality || globalConfig.quality || defaultConfig.quality,
         size: node.metadata?.size || globalConfig.size || defaultConfig.size,
+        videoBillingType: node.metadata?.videoBillingType || globalConfig.videoBillingType,
         videoSeconds: node.metadata?.seconds || globalConfig.videoSeconds || defaultConfig.videoSeconds,
         vquality: node.metadata?.vquality || globalConfig.vquality || defaultConfig.vquality,
         count: String(node.metadata?.count || (mode === "image" ? 3 : globalConfig.count) || defaultConfig.count),
     };
+    return mode === "video" ? resolveVideoConfig(result) : result;
 }

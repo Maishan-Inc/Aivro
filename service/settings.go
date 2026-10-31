@@ -217,6 +217,14 @@ func normalizePublicSettingWithChannels(setting model.PublicSetting, channels []
 		}
 	}
 	setting.ModelChannel.VideoModels = videoModels
+	setting.ModelChannel.VideoAdapters = map[string]string{}
+	setting.ModelChannel.VideoCapabilities = map[string]model.VideoCapabilities{}
+	for _, name := range videoModels {
+		if routes := modelChannelRoutesForModel(channels, name); len(routes) > 0 {
+			setting.ModelChannel.VideoAdapters[name] = routes[0].Adapter
+			if caps, err := videoCapabilities(routes[0]); err == nil { setting.ModelChannel.VideoCapabilities[name] = caps }
+		}
+	}
 	setting.ModelChannel.TextModels = normalizeScopedModels(setting.ModelChannel.TextModels, setting.ModelChannel.AvailableModels, collectChannelModelNamesByCapability(channels, "text"))
 	model3DModels := []string{}
 	for _, name := range collectChannelModelNamesByCapability(channels, "model3d") {
@@ -977,7 +985,7 @@ func normalizeModelMappingsWithIDs(items []model.ModelChannelModel, usedIDs map[
 			item.Capability = "image"
 		}
 		item.Adapter = strings.TrimSpace(item.Adapter)
-		if item.Capability != "model3d" || !model.IsModel3DAdapter(item.Adapter) {
+		if !(item.Capability == "model3d" && model.IsModel3DAdapter(item.Adapter)) && !(item.Capability == "video" && model.IsVideoAdapter(item.Adapter)) {
 			item.Adapter = ""
 		}
 		if seen[item.Name] {
@@ -1096,6 +1104,7 @@ func normalizeModelCosts(items []model.ModelCost, availableModels []string, chan
 			byName[item.Model] = item
 		}
 	}
+	videoModels := collectChannelModelNamesByCapability(channels, "video")
 	result := make([]model.ModelCost, 0, len(availableModels))
 	seenIDs := map[string]bool{}
 	for _, modelName := range availableModels {
@@ -1116,6 +1125,9 @@ func normalizeModelCosts(items []model.ModelCost, availableModels []string, chan
 			item.Credits = 0
 		}
 		item = normalizeModelCostPricing(item)
+		if containsModel(videoModels, modelName) {
+			item.BillingType, item.APIBilling = model.BillingTypeFixed, model.BillingTypeFixed
+		} else { item.VideoSecondPrice = nil }
 		key := firstNonEmpty(modelID, modelName)
 		if key == "" || seenIDs[key] {
 			continue

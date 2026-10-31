@@ -70,7 +70,7 @@ export function ModelPicker({ config, kind, count, model3D, value, onChange, mod
             >
                 <ModelIcon model={current} />
                 <span className="canvas-model-picker-text w-[190px] min-w-0 flex-auto truncate text-left">{current || tr(placeholder)}</span>
-                {showBilling ? <ModelBilling summaryOnly model={current} kind={kind} count={count} model3D={model3D} className="max-w-[calc(100%_-_72px)] shrink-0 opacity-70" /> : null}
+                {showBilling ? <ModelBilling summaryOnly model={current} kind={kind} count={count} model3D={model3D} video={config} className="max-w-[calc(100%_-_72px)] shrink-0 opacity-70" /> : null}
             </SelectTrigger>
             <SelectContent
                 data-canvas-no-zoom
@@ -85,7 +85,7 @@ export function ModelPicker({ config, kind, count, model3D, value, onChange, mod
                 {options.length ? (
                     options.map((model) => (
                         <SelectItem key={model} value={model} textValue={model} className="py-2 [&>span:last-child]:min-w-0 [&>span:last-child]:flex-1">
-                            <ModelLabel model={model} kind={kind} />
+                            <ModelLabel model={model} kind={kind} video={config} />
                         </SelectItem>
                     ))
                 ) : (
@@ -98,8 +98,8 @@ export function ModelPicker({ config, kind, count, model3D, value, onChange, mod
     );
 }
 
-function ModelLabel({ model, kind }: { model: string; kind: GenerationKind }) {
-    const { cost, billingType, unavailable } = useModelBilling({ model, kind });
+function ModelLabel({ model, kind, video }: Pick<ModelBillingOptions, "model" | "kind" | "video">) {
+    const { cost, billingType, unavailable } = useModelBilling({ model, kind, video });
     const { tr, locale } = useI18n();
     return (
         <span className="flex min-w-0 items-center gap-2" data-i18n-skip>

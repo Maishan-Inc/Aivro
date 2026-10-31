@@ -13,10 +13,12 @@ export function CreditSymbol({ className, ...props }: ComponentProps<"span">) {
 export type ModelCreditCost = {
     model: string;
     credits: number;
+    videoSecondPrice?: { credits: number };
 };
 
 export type GenerationKind = "image" | "video" | "text" | "model3d";
 export type Model3DPricing = Pick<Model3DGenerationInput, "quantity" | "meshQuality" | "textureEnabled" | "pbrEnabled" | "targetFaceCount">;
+export type VideoPricing = { videoSeconds: string; videoBillingType: "fixed" | "second"; vquality: string };
 
 export function model3DCreditMultiplier(input: Model3DPricing, base = 1) {
     const quality = input.meshQuality === "high" ? 1.6 : input.meshQuality === "ultra" ? 2.5 : 1;
@@ -29,7 +31,11 @@ export function modelCreditCost(modelCosts: ModelCreditCost[] | undefined, model
     return modelCosts?.find((item) => item.model === model)?.credits || 0;
 }
 
-export function requestCreditCost(options: { modelCosts?: ModelCreditCost[]; model: string; count?: string | number; model3D?: Model3DPricing }) {
+export function requestCreditCost(options: { modelCosts?: ModelCreditCost[]; model: string; count?: string | number; model3D?: Model3DPricing; video?: VideoPricing }) {
+    if (options.video?.videoBillingType === "second") {
+        const price = options.modelCosts?.find((item) => item.model === options.model)?.videoSecondPrice;
+        return (price?.credits || 0) * Number(options.video.videoSeconds);
+    }
     const base = modelCreditCost(options.modelCosts, options.model);
     if (!base) return 0;
     if (options.model3D) {

@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -12,6 +13,23 @@ import (
 	"github.com/basketikun/aivro/model"
 	"github.com/basketikun/aivro/repository"
 )
+
+func GetVideoGeneration(user model.AuthUser, id string) (model.GenerationTaskView, error) {
+	task, err := GetGenerationTask(user, id)
+	if err != nil { return task, err }
+	if task.Path != "/videos" { return model.GenerationTaskView{}, SafeAIError("视频任务不存在或无权访问") }
+	return task, nil
+}
+
+func GetVideoGenerationContent(ctx context.Context, user model.AuthUser, id string) (model.CloudFile, io.ReadCloser, error) {
+	if _, err := GetVideoGeneration(user, id); err != nil { return model.CloudFile{}, nil, err }
+	result, err := GetGenerationTaskResult(ctx, user, id)
+	if err != nil { return model.CloudFile{}, nil, err }
+	defer result.Content.Close()
+	var payload struct { File struct { StorageKey string `json:"storageKey"` } `json:"file"` }
+	if err := json.NewDecoder(result.Content).Decode(&payload); err != nil { return model.CloudFile{}, nil, err }
+	return GetFileContent(ctx, user, cloudID("", payload.File.StorageKey), "")
+}
 
 type videoTaskStatus struct {
 	ID     string `json:"id"`

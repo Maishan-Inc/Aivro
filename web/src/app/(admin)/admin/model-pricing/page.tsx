@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { ReloadOutlined, SaveOutlined } from "@ant-design/icons";
-import { App, Button, Card, Flex, Input, InputNumber, Segmented, Select, Space, Table, Tag, Typography } from "antd";
+import { App, Button, Card, Flex, Input, InputNumber, Segmented, Select, Space, Switch, Table, Tag, Typography } from "antd";
 import { Eye } from "lucide-react";
 
 import { ModelLogo } from "@/components/model-logo";
@@ -14,6 +14,7 @@ import { useAdminModelPricing } from "./use-admin-model-pricing";
 export default function AdminModelPricingPage() {
     const { modal } = App.useApp();
     const { settings, rows, isLoading, isSaving, dirty, load, save, updateRow, updateAllRows } = useAdminModelPricing();
+    const isVideo = (item: AdminModelCost) => settings?.public.modelChannel.videoModels.includes(item.model);
     const [view, setView] = useState<"edit" | "preview">("edit");
     const [multiplier, setMultiplier] = useState(2);
     // 预览要显示模型类型，直接复用后台已保存的模型范围配置。
@@ -66,6 +67,22 @@ export default function AdminModelPricingPage() {
                             pagination={false}
                             size="small"
                             scroll={{ x: 1180 }}
+                            expandable={{
+                                rowExpandable: (item) => Boolean(isVideo(item)),
+                                expandedRowRender: (item) => {
+                                    const price = item.videoSecondPrice;
+                                    const setPrice = (patch: Partial<NonNullable<AdminModelCost["videoSecondPrice"]>>) => updateRow(item.modelId || item.model, { videoSecondPrice: { credits: 0, apiCredits: 0, planCredits: {}, ...price, ...patch } });
+                                    return <Flex vertical gap={12} className="py-2">
+                                        <Space><Switch aria-label="同时开放按秒计费" checked={Boolean(price)} onChange={(enabled) => updateRow(item.modelId || item.model, { videoSecondPrice: enabled ? { credits: 0, apiCredits: 0, planCredits: {} } : undefined })} /><Typography.Text>同时开放按秒计费</Typography.Text></Space>
+                                        <Typography.Text type="secondary">按次价格保留在主行；按秒费用为请求秒数乘以单价，API 未传 billingType 时默认按次。</Typography.Text>
+                                        {price ? <Space wrap>
+                                            <InputNumber min={0} precision={0} addonBefore="标准价" addonAfter="点/秒" value={price.credits} onChange={(value) => setPrice({ credits: Number(value) || 0 })} />
+                                            {planPricingCodes.map((code) => <InputNumber key={code} min={0} precision={0} addonBefore={code.toUpperCase()} placeholder={String(price.credits)} value={price.planCredits[code] || undefined} onChange={(value) => setPrice({ planCredits: { ...price.planCredits, [code]: Number(value) || 0 } })} />)}
+                                            <InputNumber min={0} precision={0} addonBefore="API 价" addonAfter="点/秒" value={price.apiCredits || undefined} placeholder={String(apiCostOf({ ...price, apiMultiplier: item.apiMultiplier }))} onChange={(value) => setPrice({ apiCredits: Number(value) || 0 })} />
+                                        </Space> : null}
+                                    </Flex>;
+                                },
+                            }}
                             columns={[
                                 {
                                     title: "模型",
@@ -95,7 +112,7 @@ export default function AdminModelPricingPage() {
                                     dataIndex: "billingType",
                                     width: 130,
                                     render: (_: unknown, item) => (
-                                        <Select size="small" value={item.billingType} options={[{ label: "按次", value: "fixed" }, { label: "词元", value: "token" }]} onChange={(value) => updateRow(item.modelId || item.model, { billingType: value })} style={{ width: "100%" }} />
+                                        <Select size="small" disabled={Boolean(isVideo(item))} value={isVideo(item) ? "fixed" : item.billingType} options={[{ label: "按次", value: "fixed" }, { label: "词元", value: "token" }]} onChange={(value) => updateRow(item.modelId || item.model, { billingType: value })} style={{ width: "100%" }} />
                                     ),
                                 },
                                 {
