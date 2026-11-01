@@ -1,5 +1,6 @@
 // Generated translations. Source strings are Simplified Chinese (zh-CN).
 const zhTW = {
+    "查看详情": "檢視詳情",
     "已取消": "已取消",
     "正在生成 3D 模型": "正在生成 3D 模型",
     "正在加载模型": "正在載入模型",

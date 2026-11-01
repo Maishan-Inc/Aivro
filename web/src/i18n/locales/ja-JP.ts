@@ -1,5 +1,6 @@
 // Generated translations. Source strings are Simplified Chinese (zh-CN).
 const jaJP = {
+    "查看详情": "詳細を表示",
     "已取消": "キャンセル済み",
     "正在生成 3D 模型": "3D モデルを生成中",
     "正在加载模型": "モデルを読み込み中",

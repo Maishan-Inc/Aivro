@@ -1,5 +1,6 @@
 // Generated translations. Source strings are Simplified Chinese (zh-CN).
 const koKR = {
+    "查看详情": "상세 보기",
     "已取消": "취소됨",
     "正在生成 3D 模型": "3D 모델 생성 중",
     "正在加载模型": "모델 불러오는 중",

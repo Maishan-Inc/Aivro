@@ -2,10 +2,8 @@
 
 import { videoResolution } from "@/lib/video-models";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { App, Button, Empty, Modal, Tag, Typography } from "antd";
+import { App, Empty, Modal, Tag, Typography } from "antd";
 
-import { Model3DPreview, type Model3DViewMode } from "@/components/model-3d-preview";
-import { useI18n } from "@/hooks/use-i18n";
 import { fetchCreditLogs, type CreditLog } from "@/services/api/billing";
 import type { GenerationHistory, GenerationHistoryMedia } from "@/services/api/generation-history";
 import { formatDateTime, formatNumber } from "@/lib/datetime";
@@ -42,7 +40,6 @@ export function GenerationHistoryDetailModal({ open, history, onClose }: Generat
         <Modal title="详细任务" open={open} onCancel={onClose} footer={null} centered width={720} styles={{ body: { height: "min(672px, calc(100vh - 150px))", overflowY: "auto", paddingRight: 4 } }}>
             {history ? (
                 <div className="space-y-4 pr-2">
-                    {open && history.type === "model3d" ? <Model3DHistoryPreview key={history.id} media={history.media} /> : null}
                     <section className="rounded-lg border border-stone-200 bg-background p-3 dark:border-stone-800">
                         <div className="mb-2 text-sm font-semibold">任务信息</div>
                         <div className="divide-y divide-stone-100 dark:divide-stone-800">
@@ -106,30 +103,6 @@ export function GenerationHistoryDetailModal({ open, history, onClose }: Generat
             ) : null}
         </Modal>
     );
-}
-
-function Model3DHistoryPreview({ media }: { media: GenerationHistoryMedia[] }) {
-    const { tr } = useI18n();
-    const [selectedIndex, setSelectedIndex] = useState(0);
-    const [mode, setMode] = useState<Model3DViewMode>("default");
-    const models = media.filter((item) => item.fileType === "model3d" && item.url);
-    const selected = models[selectedIndex] || models[0];
-
-    return <section className="rounded-lg border border-border bg-background p-3">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <div className="text-sm font-semibold">{tr("3D 模型预览")}</div>
-            <div className="flex gap-1">
-                {(["default", "white", "wireframe"] as const).map((value) => <Button key={value} size="small" type={mode === value ? "primary" : "default"} aria-pressed={mode === value} onClick={() => setMode(value)}>{tr(value === "default" ? "贴图" : value === "white" ? "白模" : "线框")}</Button>)}
-            </div>
-        </div>
-        {selected ? <>
-            <div className="h-[min(48vh,400px)] min-h-64 rounded-lg bg-muted/20"><Model3DPreview key={selected.url} url={selected.url} mode={mode} /></div>
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-                {models.length > 1 ? models.map((item, index) => <Button key={item.cloudFileId || item.storageKey || item.url} size="small" type={item === selected ? "primary" : "default"} aria-pressed={item === selected} onClick={() => setSelectedIndex(index)}>{tr("模型文件")} {formatNumber(index + 1)}</Button>) : null}
-                <Button size="small" className="!ml-auto" href={selected.url} download>{tr("下载模型文件")}</Button>
-            </div>
-        </> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={tr("暂无媒体信息")} />}
-    </section>;
 }
 
 function DetailRow({ label, value }: { label: string; value: ReactNode }) {

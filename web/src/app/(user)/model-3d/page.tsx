@@ -11,7 +11,7 @@ import composer from "@/components/image-prompt-composer.module.css";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { App, Button, Drawer, Dropdown, Empty, Input, InputNumber, Modal, Select, Spin, Tag } from "antd";
-import { ArrowUp, ChevronDown, Download, Eye, FolderPlus, History, Plus, SlidersHorizontal, Trash2, Upload, X } from "lucide-react";
+import { ArrowUp, ChevronDown, Download, FileText, FolderPlus, History, Plus, SlidersHorizontal, Trash2, Upload, X } from "lucide-react";
 import { useUserStore } from "@/stores/use-user-store";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { requestModel3DGeneration, type Model3DGenerationInput, type Model3DGenerationResult } from "@/services/api/model-3d";
@@ -40,6 +40,9 @@ type UploadedReference = {
     height: number;
     bytes: number;
 };
+
+type Model3DResultAsset = Omit<Model3DGenerationResult["results"][number], "vertices" | "faces"> & { vertices?: number; faces?: number };
+type Model3DResult = Pick<Model3DGenerationResult, "id" | "model" | "prompt" | "createdAt" | "durationMs" | "status"> & { results: Model3DResultAsset[] };
 
 export default function Model3DPage() {
     const searchParams = useSearchParams();
@@ -82,7 +85,7 @@ export default function Model3DPage() {
     const [dragging, setDragging] = useState(false);
     const [previewIndex, setPreviewIndex] = useState(0);
     const uploadLock = useRef(false);
-    const [currentResult, setCurrentResult] = useState<Model3DGenerationResult | null>(null);
+    const [currentResult, setCurrentResult] = useState<Model3DResult | null>(null);
     const [viewMode, setViewMode] = useState<Model3DViewMode>("default");
 
     const [historyOpen, setHistoryOpen] = useState(false);
@@ -92,6 +95,7 @@ export default function Model3DPage() {
     const [detailHistory, setDetailHistory] = useState<GenerationHistory | null>(null);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const resultsRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         const urlPrompt = searchParams.get("prompt");
@@ -181,6 +185,8 @@ export default function Model3DPage() {
         }
 
         setGenerating(true);
+        setCurrentResult(null);
+        setPreviewIndex(0);
         try {
             const input: Model3DGenerationInput = {
                 model,
@@ -191,11 +197,10 @@ export default function Model3DPage() {
             };
 
             const result = await requestModel3DGeneration(token, input);
-            setCurrentResult(result);
-            setPreviewIndex(0);
+            setCurrentResult((current) => current || result);
 
             if (result.status === "completed" && result.results.length > 0 && result.results[0].url) {
-                await saveGenerationHistory(token, {
+                const history = await saveGenerationHistory(token, {
                     type: "model3d",
                     title: prompt || "3D 模型",
                     prompt: result.prompt,
@@ -217,6 +222,7 @@ export default function Model3DPage() {
                     error: "",
                     durationMs: result.durationMs,
                 });
+                setCurrentResult((current) => current?.id === result.id ? { ...current, id: history.id } : current);
                 await handleLoadHistory();
             }
         } catch (err) {
@@ -252,18 +258,33 @@ export default function Model3DPage() {
         setPrompt("");
         setImages([]);
         setCurrentResult(null);
+        setPreviewIndex(0);
     };
 
-    const saveAsset = async (asset: Model3DGenerationResult["results"][number]) => {
+    const previewHistory = (history: GenerationHistory) => {
+        setCurrentResult({
+            id: history.id, model: history.model, prompt: history.prompt, createdAt: history.createdAt, durationMs: history.durationMs,
+            status: history.status === "成功" ? "completed" : "failed",
+            results: history.media.filter((item) => item.fileType === "model3d").map((item) => ({
+                id: item.cloudFileId, cloudFileId: item.cloudFileId, url: item.url, storageKey: item.storageKey,
+                mimeType: item.contentType, bytes: item.size, expiresAt: item.expiresAt,
+            })),
+        });
+        setPreviewIndex(0);
+        setHistoryOpen(false);
+        resultsRef.current?.scrollTo({ top: 0 });
+    };
+
+    const saveAsset = async (asset: Model3DResultAsset) => {
         try {
             await addAsset({
                 kind: "model3d",
-                title: prompt || "3D 模型",
+                title: currentResult?.prompt || "3D 模型",
                 coverUrl: asset.thumbnailUrl || "",
                 tags: [],
                 source: "3D 模型",
                 data: { url: asset.url, storageKey: asset.storageKey, bytes: asset.bytes, mimeType: asset.mimeType, thumbnailUrl: asset.thumbnailUrl, vertices: asset.vertices, faces: asset.faces },
-                metadata: { source: "model-3d-page", prompt, model: currentResult?.model },
+                metadata: { source: "model-3d-page", prompt: currentResult?.prompt, model: currentResult?.model },
             });
             message.success("已加入我的素材");
         } catch (error) {
@@ -285,7 +306,7 @@ export default function Model3DPage() {
                             <div className={studio.historyActions}><Button type="text" icon={<History size={15} />} onClick={openHistory}>记录</Button></div>
                         </div>
                     </header>
-                    <div className={studio.results}>
+                    <div ref={resultsRef} className={studio.results}>
                         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                             <h2 className="text-xl font-semibold">生成结果</h2>
                             <div className="flex gap-2">
@@ -301,7 +322,7 @@ export default function Model3DPage() {
                             </div>
                         </div>
 
-                        {generating ? <div className="h-[min(58vh,520px)] min-h-80 rounded-2xl border border-border bg-muted/20"><Model3DLoading /></div> : currentResult?.results[previewIndex]?.url ? <div className="h-[min(58vh,520px)] min-h-80 rounded-2xl border border-border bg-muted/20"><Model3DPreview key={currentResult.results[previewIndex].url} url={currentResult.results[previewIndex].url} mode={viewMode} /></div> : <StudioEmptyState kind="model-3d" onUsePrompt={(value) => { setPrompt(value); setMode("text"); }} />}
+                        {generating && !currentResult ? <div className="h-[min(58vh,520px)] min-h-80 rounded-2xl border border-border bg-muted/20"><Model3DLoading /></div> : currentResult?.results[previewIndex]?.url ? <div className="h-[min(58vh,520px)] min-h-80 rounded-2xl border border-border bg-muted/20"><Model3DPreview key={currentResult.results[previewIndex].url} url={currentResult.results[previewIndex].url} mode={viewMode} /></div> : <StudioEmptyState kind="model-3d" onUsePrompt={(value) => { setPrompt(value); setMode("text"); }} />}
 
                         {currentResult ? <div className="mt-4 grid gap-3 xl:grid-cols-2">
                             <div className="rounded-lg border border-stone-200 bg-background p-3 dark:border-stone-800">
@@ -336,11 +357,11 @@ export default function Model3DPage() {
                                                     <span className="text-stone-500 dark:text-stone-400">{formatBytes(asset.bytes)}</span>
                                                 </div>
                                                 <div className="mb-2 grid grid-cols-2 gap-2 text-xs text-stone-500 dark:text-stone-400">
-                                                    <span>顶点：{formatNumber(asset.vertices)}</span>
-                                                    <span>网格面：{formatNumber(asset.faces)}</span>
+                                                    <span>顶点：{asset.vertices === undefined ? tr("未记录") : formatNumber(asset.vertices)}</span>
+                                                    <span>网格面：{asset.faces === undefined ? tr("未记录") : formatNumber(asset.faces)}</span>
                                                 </div>
                                                 <div className="flex flex-wrap gap-2">
-                                                    <Button size="small" type={previewIndex === index ? "primary" : "default"} disabled={generating} onClick={() => setPreviewIndex(index)}>{tr("预览")}</Button>
+                                                    <Button size="small" type={previewIndex === index ? "primary" : "default"} onClick={() => setPreviewIndex(index)}>{tr("预览")}</Button>
                                                     <Button size="small" icon={<FolderPlus className="size-3.5" />} onClick={() => saveAsset(asset)}>
                                                         添加到素材
                                                     </Button>
@@ -415,8 +436,8 @@ export default function Model3DPage() {
                         {generationMode !== "text" && images.length > 0 && !imageCountValid ? <p className={studio.composerHint}>请调整参考图数量或切换生成模式。</p> : null}
                     </div>
                 </section>
-                <StudioHistorySidebar items={histories.map((item) => ({ id: item.id, title: item.title, prompt: item.prompt, preview: item.references[0]?.url }))} onSelect={(id) => { const item = histories.find((history) => history.id === id); if (item) setDetailHistory(item); }}>
-                    <HistoryPanel histories={histories} loading={loadingHistory} token={token} onRefresh={handleLoadHistory} onOpenDetail={setDetailHistory} />
+                <StudioHistorySidebar activeId={currentResult?.id} items={histories.map((item) => ({ id: item.id, title: item.title, prompt: item.prompt, preview: item.references[0]?.url }))} onSelect={(id) => { const item = histories.find((history) => history.id === id); if (item) previewHistory(item); }} onOpenDetail={(id) => { const item = histories.find((history) => history.id === id); if (item) setDetailHistory(item); }}>
+                    <HistoryPanel histories={histories} activeId={currentResult?.id} loading={loadingHistory} token={token} onRefresh={handleLoadHistory} onPreview={previewHistory} onOpenDetail={setDetailHistory} />
                 </StudioHistorySidebar>
             </main>
 
@@ -434,7 +455,7 @@ export default function Model3DPage() {
             />
 
             <Drawer title="生成记录" placement="right" size={340} open={historyOpen} onClose={() => setHistoryOpen(false)}>
-                <HistoryPanel histories={histories} loading={loadingHistory} token={token} onRefresh={handleLoadHistory} onOpenDetail={setDetailHistory} />
+                <HistoryPanel histories={histories} activeId={currentResult?.id} loading={loadingHistory} token={token} onRefresh={handleLoadHistory} onPreview={previewHistory} onOpenDetail={setDetailHistory} />
             </Drawer>
             <Modal centered title="模型生成参数" open={settingsOpen} onCancel={() => setSettingsOpen(false)} footer={<Button type="primary" onClick={() => setSettingsOpen(false)}>完成</Button>} width={500}>
                 <div className="grid grid-cols-2 gap-5 py-4">
@@ -449,7 +470,8 @@ export default function Model3DPage() {
     );
 }
 
-function HistoryPanel({ histories, loading, token, onRefresh, onOpenDetail }: { histories: GenerationHistory[]; loading: boolean; token: string; onRefresh: () => void; onOpenDetail: (history: GenerationHistory) => void }) {
+function HistoryPanel({ histories, activeId, loading, token, onRefresh, onPreview, onOpenDetail }: { histories: GenerationHistory[]; activeId?: string; loading: boolean; token: string; onRefresh: () => void; onPreview: (history: GenerationHistory) => void; onOpenDetail: (history: GenerationHistory) => void }) {
+    const { tr } = useI18n();
     return (
         <>
             <div className="mb-3 flex items-center justify-between gap-3">
@@ -468,16 +490,14 @@ function HistoryPanel({ histories, loading, token, onRefresh, onOpenDetail }: { 
             ) : histories.length ? (
                 <div className="space-y-3">
                     {histories.map((history) => (
-                        <div key={history.id} className="rounded-lg border border-stone-200 bg-background p-3 transition hover:bg-stone-50 dark:border-stone-800 dark:hover:bg-stone-900">
-                            <button type="button" className="block w-full cursor-pointer text-left" onClick={() => onOpenDetail(history)}>
+                        <Dropdown key={history.id} trigger={["contextMenu"]} menu={{ items: [{ key: "detail", icon: <FileText className="size-4" />, label: tr("查看详情"), onClick: () => onOpenDetail(history) }] }}>
+                        <div className={`cursor-pointer rounded-lg border p-3 transition ${activeId === history.id ? "border-foreground bg-muted" : "border-border bg-background hover:bg-muted/50"}`} onClick={() => onPreview(history)}>
+                            <button type="button" className="block w-full cursor-pointer text-left" aria-pressed={activeId === history.id}>
                                 <span className="block truncate text-sm font-semibold" data-i18n-skip={history.title !== "3D 模型" || Boolean(history.prompt) || undefined}>{history.title}</span>
                                 <span className="mt-1 line-clamp-2 whitespace-pre-wrap break-words text-xs leading-4 text-stone-500 dark:text-stone-400">{history.prompt ? <span data-i18n-skip>{history.prompt}</span> : "无提示词"}</span>
                                 <span className="mt-1 block text-xs text-stone-500 dark:text-stone-400">{formatDateTime(history.createdAt)}</span>
                             </button>
-                            <div className="mt-3 flex gap-2">
-                                <Button size="small" icon={<Eye className="size-3.5" />} onClick={() => onOpenDetail(history)}>
-                                    预览
-                                </Button>
+                            <div className="mt-3 flex gap-2" onClick={(event) => event.stopPropagation()}>
                                 <Button size="small" icon={<Download className="size-3.5" />} onClick={() => history.media[0] && window.open(history.media[0].url, "_blank")}>
                                     下载
                                 </Button>
@@ -486,6 +506,7 @@ function HistoryPanel({ histories, loading, token, onRefresh, onOpenDetail }: { 
                                 </Button>
                             </div>
                         </div>
+                        </Dropdown>
                     ))}
                 </div>
             ) : (

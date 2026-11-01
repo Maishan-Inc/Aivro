@@ -1,5 +1,6 @@
 // Generated translations. Source strings are Simplified Chinese (zh-CN).
 const frFR = {
+    "查看详情": "Voir les détails",
     "已取消": "Annulé",
     "正在生成 3D 模型": "Génération du modèle 3D",
     "正在加载模型": "Chargement du modèle",

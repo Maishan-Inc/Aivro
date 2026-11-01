@@ -1,5 +1,6 @@
 // Generated translations. Source strings are Simplified Chinese (zh-CN).
 const enUS = {
+    "查看详情": "View details",
     "已取消": "Canceled",
     "正在生成 3D 模型": "Generating 3D model",
     "正在加载模型": "Loading model",
