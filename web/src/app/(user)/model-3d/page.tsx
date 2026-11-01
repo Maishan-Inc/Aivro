@@ -11,7 +11,7 @@ import composer from "@/components/image-prompt-composer.module.css";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { App, Button, Drawer, Dropdown, Empty, Input, InputNumber, Modal, Select, Spin, Tag } from "antd";
-import { ArrowUp, ChevronDown, Download, FolderPlus, History, Plus, SlidersHorizontal, Trash2, Upload, X } from "lucide-react";
+import { ArrowUp, ChevronDown, Download, Eye, FolderPlus, History, Plus, SlidersHorizontal, Trash2, Upload, X } from "lucide-react";
 import { useUserStore } from "@/stores/use-user-store";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { requestModel3DGeneration, type Model3DGenerationInput, type Model3DGenerationResult } from "@/services/api/model-3d";
@@ -468,11 +468,16 @@ function HistoryPanel({ histories, loading, token, onRefresh, onOpenDetail }: { 
             ) : histories.length ? (
                 <div className="space-y-3">
                     {histories.map((history) => (
-                        <div key={history.id} className="cursor-pointer rounded-lg border border-stone-200 bg-background p-3 transition hover:bg-stone-50 dark:border-stone-800 dark:hover:bg-stone-900" onDoubleClick={() => onOpenDetail(history)}>
-                            <div className="truncate text-sm font-semibold" data-i18n-skip={history.title !== "3D 模型" || Boolean(history.prompt) || undefined}>{history.title}</div>
-                            <div className="mt-1 line-clamp-2 whitespace-pre-wrap break-words text-xs leading-4 text-stone-500 dark:text-stone-400">{history.prompt ? <span data-i18n-skip>{history.prompt}</span> : "无提示词"}</div>
-                            <div className="mt-1 text-xs text-stone-500 dark:text-stone-400">{formatDateTime(history.createdAt)}</div>
+                        <div key={history.id} className="rounded-lg border border-stone-200 bg-background p-3 transition hover:bg-stone-50 dark:border-stone-800 dark:hover:bg-stone-900">
+                            <button type="button" className="block w-full cursor-pointer text-left" onClick={() => onOpenDetail(history)}>
+                                <span className="block truncate text-sm font-semibold" data-i18n-skip={history.title !== "3D 模型" || Boolean(history.prompt) || undefined}>{history.title}</span>
+                                <span className="mt-1 line-clamp-2 whitespace-pre-wrap break-words text-xs leading-4 text-stone-500 dark:text-stone-400">{history.prompt ? <span data-i18n-skip>{history.prompt}</span> : "无提示词"}</span>
+                                <span className="mt-1 block text-xs text-stone-500 dark:text-stone-400">{formatDateTime(history.createdAt)}</span>
+                            </button>
                             <div className="mt-3 flex gap-2">
+                                <Button size="small" icon={<Eye className="size-3.5" />} onClick={() => onOpenDetail(history)}>
+                                    预览
+                                </Button>
                                 <Button size="small" icon={<Download className="size-3.5" />} onClick={() => history.media[0] && window.open(history.media[0].url, "_blank")}>
                                     下载
                                 </Button>
