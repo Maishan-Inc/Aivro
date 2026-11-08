@@ -70,6 +70,7 @@ func SaveSettings(settings model.Settings) (model.Settings, error) {
 	if err != nil {
 		return model.Settings{}, err
 	}
+	syncModelZeroDayTags(settings.Public.ModelChannel.ModelCosts, saved.Public.ModelChannel.ModelCosts)
 	settings = normalizeSettings(settings)
 	if err := validatePublicModelPricing(settings.Public.ModelChannel); err != nil { return model.Settings{}, err }
 	for _, channel := range settings.Private.Channels {

@@ -321,6 +321,7 @@ export type AdminModelCost = {
     priceConfigured: boolean;
     freeConfirmed: boolean;
     tags: string[];
+    zeroDayExpiresAt?: string;
     videoSecondPrice?: VideoSecondPrice;
     modelId: string;
     model: string;

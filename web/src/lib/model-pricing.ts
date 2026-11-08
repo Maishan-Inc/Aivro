@@ -77,6 +77,7 @@ export function normalizeModelCost(item: Partial<AdminModelCost>): AdminModelCos
         priceConfigured: Boolean(item.priceConfigured),
         freeConfirmed: Boolean(item.freeConfirmed),
         tags: Array.from(new Set(item.tags || [])),
+        zeroDayExpiresAt: item.zeroDayExpiresAt,
         resolutions: item.resolutions,
         billingType,
         vendor: (item.vendor || "").trim() || guessed.vendor,

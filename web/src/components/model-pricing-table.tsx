@@ -89,7 +89,7 @@ export function ModelPricingTable({ preview }: { preview?: PricingRow[] }) {
                                 <button type="button" className={styles.row} onClick={() => copyText(item.model, "模型 ID 已复制")} aria-label={`${tr("复制模型 ID")} ${item.model}`} title={tr("复制模型 ID")}>
                                     <span className={styles.model}>
                                         <ModelLogo icon={item.icon} name={item.vendor || item.model} />
-                                        <span className="min-w-0"><span className={styles.modelName} data-i18n-skip>{item.model}</span>{Date.parse(item.freeUntil || "") > at ? <span className="mt-1 block text-xs text-muted-foreground">{tr("Free [限量]")}</span> : null}{item.tags?.length ? <span className="mt-1 flex"><ModelTags tags={item.tags} /></span> : null}</span>
+                                        <span className="min-w-0"><span className={styles.modelName} data-i18n-skip>{item.model}</span>{Date.parse(item.freeUntil || "") > at ? <span className="mt-1 block text-xs text-muted-foreground">{tr("Free [限量]")}</span> : null}{item.tags?.length ? <span className="mt-1 flex"><ModelTags tags={item.tags} zeroDayExpiresAt={item.zeroDayExpiresAt} /></span> : null}</span>
                                     </span>
                                     <span className={styles.vendor}>{item.vendor || "—"}</span>
                                     <span><span className={styles.badge}>{tr(capabilityLabels[item.capability] || item.capability)}</span></span>

@@ -257,7 +257,8 @@ MetaMask 登录服务端签名挑战表。nonce 与钱包地址绑定，短时�
 | `credits` | number | 控制台标准价；按次计费时表示每次调用点数，Token 计费时表示每 1000 token 点数 |
 | `priceConfigured` | bool | 管理员已明确设置标准价；未设置时不能开放模型或执行计费请求 |
 | `freeConfirmed` | bool | 管理员已确认零计费；后台保存零标准价或零按秒价需等待 5 秒并再次同意，修改价格后重新确认 |
-| `tags` | string[] | 展示标签标识：`deal` 特惠、`4k`、`8k`、`recommended` 推荐、`new` 新上、`popular` 热门、`fast` 高速、`hd` 高清；只影响展示 |
+| `tags` | string[] | 展示标签标识：`0day`（0Day，模型发布后第一时间接入）、`deal` 特惠、`4k`、`8k`、`recommended` 推荐、`new` 新上、`popular` 热门、`fast` 高速、`hd` 高清；只影响展示 |
+| `zeroDayExpiresAt` | string? | 0Day 标签的 RFC3339 UTC 到期时间，由后端在添加并保存时设为 7 天后；保存其他配置不续期，读取时过滤过期标签，前端到期自动隐藏 |
 | `resolutions` | string[] | 图片或视频模型启用的分辨率档位；在模型配置“信息扩充”中维护，文本和 3D 不使用 |
 | `billingType` | string | 计费方式：`fixed` 按次计费，`token` 按 Token 计费 |
 | `vendor` | string | 厂商名称；留空时按模型名关键词自动识别 |
@@ -852,7 +853,7 @@ KYC 认证记录表。当前服务商为 Didit。
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
 | `user_id` | string | 用户 ID，主键 |
-| `value` | json | 偏好 JSON，例如 `theme`、`locale`、`config` |
+| `value` | json | 偏好 JSON，例如 `theme`、`locale`、`config`，以及免费生图已同意的协议版本 `freeImageAgreement`；当前协议版本无需重复同意，版本更新后重新确认 |
 | `created_at` | string | 创建时间 |
 | `updated_at` | string | 更新时间 |
 

@@ -98,6 +98,7 @@ type ModelCost struct {
 	PriceConfigured bool        `json:"priceConfigured"`
 	FreeConfirmed bool          `json:"freeConfirmed"`
 	Tags          []string       `json:"tags"`
+	ZeroDayExpiresAt string     `json:"zeroDayExpiresAt,omitempty"`
 	Resolutions   []string       `json:"resolutions"`
 	BillingType   string         `json:"billingType"`
 	Vendor        string         `json:"vendor"`

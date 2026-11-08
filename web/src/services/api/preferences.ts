@@ -4,6 +4,7 @@ import type { Locale } from "@/i18n/messages";
 import type { ThemeName } from "@/stores/use-theme-store";
 
 export type UserPreference = {
+    freeImageAgreement?: string;
     theme?: ThemeName;
     locale?: Locale;
     config?: Partial<AiConfig>;

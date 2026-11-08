@@ -51,7 +51,7 @@ export function ModelPicker({ config, kind, count, model3D, value, onChange, onO
             const billingType = second ? "second" : kind === "text" && cost?.billingType === "token" ? "token" : "fixed";
             const vendor = cost?.vendor || guessed.vendor;
             const priceLabel = billingLabel ? tr(billingLabel) : credits !== undefined ? `${tr("基础单价")} ${credits.toLocaleString(locale)} ${tr(billingUnit(billingType))}` : tr("该模型尚未配置计费");
-            return { value: model, label: model, vendor, icon: cost?.icon || guessed.icon, tags: cost?.tags, priceLabel, search: `${model} ${tr(vendor)}`.toLowerCase() };
+            return { value: model, label: model, vendor, icon: cost?.icon || guessed.icon, tags: cost?.tags, zeroDayExpiresAt: cost?.zeroDayExpiresAt, priceLabel, search: `${model} ${tr(vendor)}`.toLowerCase() };
         });
     }, [channel, config, kind, models, billingLabel, tr, locale]);
     const vendors = useMemo(() => Array.from(new Set(options.map((item) => item.vendor).filter(Boolean))).sort(), [options]);
@@ -127,12 +127,12 @@ export function ModelPicker({ config, kind, count, model3D, value, onChange, onO
 }
 
 // 滚动时仅挂载可见行，价格与搜索文本在列表变化时计算。
-const ModelOption = memo(function ModelOption({ item }: { item: { value: string; icon: string; tags?: string[]; priceLabel: string } }) {
+const ModelOption = memo(function ModelOption({ item }: { item: { value: string; icon: string; tags?: string[]; zeroDayExpiresAt?: string; priceLabel: string } }) {
     return <span className="flex h-full min-w-0 items-center gap-2" data-i18n-skip>
         <ModelLogo icon={item.icon} name={item.value} size={22} />
         <span className="min-w-0 flex-1">
             <span className="block truncate text-sm font-medium leading-5" title={item.value}>{item.value}</span>
-            <span className="mt-1 flex min-w-0 items-center gap-2"><span className="min-w-0 flex-1 truncate text-xs leading-5 text-muted-foreground" title={item.priceLabel}>{item.priceLabel}</span><ModelTags tags={item.tags} limit={2} /></span>
+            <span className="mt-1 flex min-w-0 items-center gap-2"><span className="min-w-0 flex-1 truncate text-xs leading-5 text-muted-foreground" title={item.priceLabel}>{item.priceLabel}</span><ModelTags tags={item.tags} limit={2} zeroDayExpiresAt={item.zeroDayExpiresAt} /></span>
         </span>
     </span>;
 });

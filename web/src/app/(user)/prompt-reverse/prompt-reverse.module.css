@@ -6,6 +6,10 @@
 .upload:disabled { cursor: wait; }
 .uploadIcon { display: grid; place-items: center; width: 76px; height: 76px; margin-bottom: 12px; border-radius: 22px; background: var(--background); color: var(--foreground); }
 .taskGrid { display: grid; width: 100%; grid-template-columns: repeat(3, minmax(0, 1fr)); align-content: start; gap: 24px; padding-block: 12px 24px; }
+.taskGrid[data-count="1"], .taskGrid[data-count="2"], .taskGrid[data-count="3"] { flex: 1; align-content: safe center; padding-block: 24px; }
+.taskGrid[data-count="1"] { max-width: 560px; grid-template-columns: minmax(0, 1fr); }
+.taskGrid[data-count="2"] { max-width: 860px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.taskGrid[data-count="3"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .task { min-width: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 18px; background: var(--card); }
 .taskImage { position: relative; display: block; width: 100%; aspect-ratio: 4 / 3; overflow: hidden; background: var(--muted); cursor: default; }
 .taskImage img { width: 100%; height: 100%; object-fit: contain; }
@@ -24,6 +28,6 @@
 @keyframes scan { to { transform: translateY(390%); } }
 @keyframes complete { from { opacity: 0; transform: translate(-50%, -50%) scale(.35) rotate(-15deg); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
 @container (max-width: 760px) { .taskGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }.uploadArea { padding-bottom: 24px; } }
-@container (max-width: 440px) { .taskGrid { grid-template-columns: minmax(0, 1fr); }.taskImage { aspect-ratio: 3 / 2; }.upload { padding: 20px; } }
+@container (max-width: 440px) { .taskGrid[data-count] { grid-template-columns: minmax(0, 1fr); }.taskImage { aspect-ratio: 3 / 2; }.upload { padding: 20px; } }
 @media (max-width: 640px) { .detail { grid-template-columns: minmax(0, 1fr); }.previews { gap: 8px; } }
 @media (prefers-reduced-motion: reduce) { .scanner { animation: none; top: 30%; }.completed { animation: none; }.upload { transition: none; } }

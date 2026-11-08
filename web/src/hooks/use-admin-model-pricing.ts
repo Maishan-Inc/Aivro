@@ -44,6 +44,16 @@ export function useAdminModelPricing() {
         void load();
     }, [load]);
 
+    useEffect(() => {
+        const expires = Math.min(...rows.filter((item) => item.tags.includes("0day")).map((item) => Date.parse(item.zeroDayExpiresAt || "")).filter(Number.isFinite));
+        if (!Number.isFinite(expires)) return;
+        const timer = window.setTimeout(() => {
+            const at = Date.now();
+            setRows((current) => current.map((item) => Date.parse(item.zeroDayExpiresAt || "") <= at ? { ...item, tags: item.tags.filter((tag) => tag !== "0day"), zeroDayExpiresAt: undefined } : item));
+        }, Math.max(0, Math.min(2147483647, expires - Date.now() + 25)));
+        return () => window.clearTimeout(timer);
+    }, [rows]);
+
     const updateRow = useCallback((key: string, patch: Partial<AdminModelCost>) => {
         setRows((current) => current.map((item) => (item.modelId || item.model) === key ? {
             ...item, ...patch,

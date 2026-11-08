@@ -14,6 +14,7 @@ import { useI18n } from "@/hooks/use-i18n";
 import { useLocalizedPath } from "@/hooks/use-localized-path";
 import { useRecordExpiry } from "@/hooks/use-record-expiry";
 import { fetchFreeImageState, freeImageAgreementVersion } from "@/services/api/explore";
+import { fetchUserPreference, saveUserPreference } from "@/services/api/preferences";
 import { requestFreeGeneration, type GenerationQueueUpdate, type ImageApiResult } from "@/services/api/image";
 import type { GenerationHistory } from "@/services/api/generation-history";
 import { formatDateTime } from "@/lib/datetime";
@@ -32,7 +33,8 @@ export default function FreeImagePage() {
     const token = useUserStore((state) => state.token);
     const user = useUserStore((state) => state.user);
     const enabled = Boolean(settings?.explore?.freeImageEnabled && canAccessPath(user, "/free-image"));
-    const [accepted, setAccepted] = useState(false);
+    const [agreementOpen, setAgreementOpen] = useState(false);
+    const [savingAgreement, setSavingAgreement] = useState(false);
     const [checked, setChecked] = useState(false);
     const [prompt, setPrompt] = useState("");
     const [model, setModel] = useState("");
@@ -44,6 +46,8 @@ export default function FreeImagePage() {
     const [images, setImages] = useState<ImageApiResult[]>([]);
     const [queue, setQueue] = useState<GenerationQueueUpdate | null>(null);
     const [selected, setSelected] = useState<GenerationHistory | null>(null);
+    const agreement = useQuery({ queryKey: ["free-image-agreement", user?.id], queryFn: () => fetchUserPreference(token), enabled: Boolean(token && user?.id && enabled) });
+    const accepted = agreement.data?.freeImageAgreement === freeImageAgreementVersion;
     const state = useQuery({ queryKey: ["free-image-state", token], queryFn: () => fetchFreeImageState(token), enabled: Boolean(token && enabled && accepted), refetchInterval: 15000 });
     const campaign = state.data?.campaign;
     const models = campaign?.models || [];
@@ -58,8 +62,20 @@ export default function FreeImagePage() {
         const timer = window.setTimeout(() => { setAt(Date.now()); void state.refetch(); void useConfigStore.getState().loadPublicSettings(); }, Math.max(0, Math.min(2147483647, Date.parse(campaign.endsAt) - Date.now() + 50)));
         return () => window.clearTimeout(timer);
     }, [campaign, state.refetch]);
-    useEffect(() => { setImages([]); setSelected(null); setAccepted(false); setChecked(false); }, [token]);
+    useEffect(() => { setImages([]); setSelected(null); setAgreementOpen(false); setChecked(false); }, [token, user?.id]);
     useRecordExpiry(selected, setSelected);
+    const acceptAgreement = async () => {
+        if (!user?.id || !checked || savingAgreement) return;
+        const userId = user.id;
+        setSavingAgreement(true);
+        try {
+            const saved = await saveUserPreference(token, { freeImageAgreement: freeImageAgreementVersion });
+            if (useUserStore.getState().user?.id !== userId) return;
+            client.setQueryData(["free-image-agreement", userId], saved);
+            setAgreementOpen(false);
+        } catch (error) { message.error(tr(error instanceof Error ? error.message : "保存失败")); }
+        finally { setSavingAgreement(false); }
+    };
     const generate = async () => {
         if (submitting.current || !accepted || !active || !state.data?.remaining || !currentModel || !requestSize || !prompt.trim()) return;
         submitting.current = true;
@@ -75,10 +91,12 @@ export default function FreeImagePage() {
     const preview = selected ? selected.media.map((item) => item.url) : images.map((item) => item.dataUrl);
     if (!settings) return <Skeleton active className="p-8" />;
     if (!enabled) return <div className="grid h-full place-items-center"><Empty description={tr("免费生成图片尚未开启")} /></div>;
+    if (token && agreement.isPending) return <Skeleton active className="p-8" />;
+    if (token && agreement.isError) return <div className={studio.empty}><Empty description={tr(agreement.error.message)} /><Button onClick={() => void agreement.refetch()}>{tr("重试")}</Button></div>;
     return <main className={`${studio.studio} relative`}>
         <div className={studio.layout}>
             <div className={studio.panels}>
-                <header className={studio.header}><div><h1>{tr("免费生成图片")}</h1></div><Button type="text" className="mr-24" onClick={() => { setAccepted(false); setChecked(false); }}>{tr("查看协议")}</Button></header>
+                <header className={studio.header}><div><h1>{tr("免费生成图片")}</h1></div><Button type="text" className="mr-24" onClick={() => setAgreementOpen(true)}>{tr("查看协议")}</Button></header>
                 <section className={studio.results}>
                     {!token ? <div className={studio.empty}><Sparkles size={36} /><h3>{tr("登录后参加免费活动")}</h3><Link href={localizedPath("/login?redirect=/free-image")}>{tr("登录")}</Link></div> : !accepted ? null : state.isLoading ? <Spin /> : state.isError ? <Empty description={tr(state.error.message)} /> : !active && !preview.length ? <div className={studio.empty}><Sparkles size={36} /><h3>{tr("当前暂未免费活动")}</h3></div> : <div>
                         <div className="mb-6 flex flex-wrap items-end justify-between gap-3 border-b border-border pb-4">
@@ -101,10 +119,10 @@ export default function FreeImagePage() {
             </div>
             {token && accepted ? <ExploreHistory type="free-image" activeId={selected?.id} onSelect={setSelected} onNew={() => { setPrompt(""); setImages([]); setSelected(null); }} newDisabled={running} /> : null}
         </div>
-        <Modal title={tr("免费生成图片协议")} open={!accepted} closable={false} maskClosable={false} okText={tr("同意并继续")} cancelText={tr("取消")} okButtonProps={{ disabled: !checked }} onOk={() => setAccepted(true)} onCancel={() => router.push(localizedPath("/home"))}>
+        <Modal title={tr("免费生成图片协议")} open={Boolean(token && agreement.isSuccess && (!accepted || agreementOpen))} closable={accepted} maskClosable={accepted} confirmLoading={savingAgreement} okText={tr("同意并继续")} cancelText={tr("取消")} okButtonProps={{ disabled: !checked }} cancelButtonProps={{ disabled: savingAgreement }} onOk={() => void acceptAgreement()} onCancel={() => accepted ? setAgreementOpen(false) : router.push(localizedPath("/home"))} footer={accepted ? <Button onClick={() => setAgreementOpen(false)}>{tr("关闭")}</Button> : undefined}>
             <p className="mb-5 leading-7">{tr("免费生成图片：Aivro 会根据你图片的质量公开你生成的图片和提示词。公开后，你将获得一定的奖励额度。")}</p>
             <p className="mb-5 text-xs leading-6 text-muted-foreground">{tr("公开与奖励由管理员审核决定，奖励额度在审核后发放。请仅提交你有权公开的内容。")}</p>
-            <Checkbox checked={checked} onChange={(event) => setChecked(event.target.checked)}>{tr("我已阅读并同意公开图片和提示词")}</Checkbox>
+            {!accepted ? <Checkbox checked={checked} onChange={(event) => setChecked(event.target.checked)}>{tr("我已阅读并同意公开图片和提示词")}</Checkbox> : null}
         </Modal>
     </main>;
 }

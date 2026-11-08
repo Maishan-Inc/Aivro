@@ -15,7 +15,7 @@ import { useCopyText } from "@/hooks/use-copy-text";
 import { useLocalizedPath } from "@/hooks/use-localized-path";
 import { useRecordExpiry } from "@/hooks/use-record-expiry";
 import { reverseImagePrompt } from "@/services/api/explore";
-import type { GenerationHistory } from "@/services/api/generation-history";
+import type { GenerationHistory, GenerationHistoryList } from "@/services/api/generation-history";
 import { canAccessPath } from "@/lib/user-sections";
 import { formatDateTime } from "@/lib/datetime";
 import studio from "@/components/studio-layout.module.css";
@@ -94,6 +94,9 @@ export default function PromptReversePage() {
             try {
                 const reversed = await reverseImagePrompt(token, currentModel, item.image);
                 if (session.current !== currentSession) return;
+                client.setQueryData<GenerationHistoryList>(["explore-history", "prompt-reverse", token], (data) => ({
+                    items: [reversed, ...(data?.items || []).filter((history) => history.id !== reversed.id)], total: (data?.total || 0) + (data?.items.some((history) => history.id === reversed.id) ? 0 : 1), retentionDays: data?.retentionDays || 0,
+                }));
                 setTasks((items) => items.map((task) => task.id === item.id ? { ...task, image: reversed.media[0]?.url || task.image, status: "success", result: reversed } : task));
                 void client.invalidateQueries({ queryKey: ["explore-history", "prompt-reverse"] });
             } catch (error) {
@@ -121,7 +124,7 @@ export default function PromptReversePage() {
                             <span className="text-sm text-muted-foreground">{tr("最多 6 张图片 · 每张不超过 5MB")}</span>
                             <span className="text-sm text-muted-foreground" data-i18n-skip>PNG / JPEG / WebP</span>
                         </button>
-                    </div> : <div className={styles.taskGrid}>
+                    </div> : <div className={styles.taskGrid} data-count={tasks.length}>
                         {tasks.map((task) => <article key={task.id} className={styles.task} data-status={task.status}>
                             <button type="button" className={styles.taskImage} onDoubleClick={() => task.result && setSelected(task.result)} onKeyDown={(event) => { if (task.result && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); setSelected(task.result); } }} aria-label={tr(task.status === "success" ? "双击查看提示词" : task.status === "running" ? "正在反推" : "反推失败")}>
                                 <img src={task.image} alt={task.name} data-i18n-skip />
@@ -138,7 +141,8 @@ export default function PromptReversePage() {
                     </div>}
                 </section>
             </div>
-            {token ? <ExploreHistory type="prompt-reverse" activeId={selected?.id} onSelect={setSelected} onNew={newTask} newDisabled={running || loading} /> : null}
+            {token ? <ExploreHistory type="prompt-reverse" activeId={selected?.id} onSelect={setSelected} onNew={newTask} newDisabled={running || loading}
+                pendingTasks={tasks.flatMap((task) => task.status === "success" ? [] : [{ id: task.id, name: task.name, image: task.image, status: task.status, error: task.error }])} /> : null}
         </div>
         <input ref={fileInput} hidden multiple type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => { void readImages(Array.from(event.target.files || [])); event.target.value = ""; }} />
         <Modal centered title={tr("确认反推任务")} open={pending.length > 0} width={680} onCancel={() => setPending([])} onOk={() => void reverse()} okText={tr("确认反推 {0} 张图片").replace("{0}", String(pending.length))} cancelText={tr("取消")} okButtonProps={{ disabled: !currentModel }}>

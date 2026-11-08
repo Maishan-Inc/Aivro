@@ -1,7 +1,9 @@
 package service
 
 import (
+	"slices"
 	"strings"
+	"time"
 
 	"github.com/basketikun/aivro/model"
 )
@@ -85,6 +87,11 @@ func normalizeModelCostPricing(item model.ModelCost) model.ModelCost {
 	}
 	item.Vendor = strings.TrimSpace(item.Vendor)
 	item.Tags = uniqueNonEmptyStrings(item.Tags)
+	expires, err := time.Parse(time.RFC3339, item.ZeroDayExpiresAt)
+	if !containsModel(item.Tags, "0day") || err != nil || !time.Now().Before(expires) {
+		item.Tags = slices.DeleteFunc(item.Tags, func(tag string) bool { return tag == "0day" })
+		item.ZeroDayExpiresAt = ""
+	}
 	item.Icon = strings.TrimSpace(item.Icon)
 	// 图标统一存成可直接访问的路径，内置目录只登记文件名。
 	if item.Icon != "" && !strings.HasPrefix(item.Icon, "/") && !strings.HasPrefix(item.Icon, "http") {
@@ -101,6 +108,21 @@ func normalizeModelCostPricing(item model.ModelCost) model.ModelCost {
 		item.APIBilling = item.BillingType
 	}
 	return item
+}
+
+func syncModelZeroDayTags(items []model.ModelCost, saved []model.ModelCost) {
+	previous := map[string]model.ModelCost{}
+	for _, item := range saved { previous[firstNonEmpty(item.ModelID, item.Model)] = item }
+	at := time.Now().UTC()
+	for index := range items {
+		item := &items[index]
+		if !containsModel(item.Tags, "0day") { item.ZeroDayExpiresAt = ""; continue }
+		old := previous[firstNonEmpty(item.ModelID, item.Model)]
+		expires, _ := time.Parse(time.RFC3339, old.ZeroDayExpiresAt)
+		if containsModel(old.Tags, "0day") && (at.Before(expires) || item.ZeroDayExpiresAt != "") {
+			item.ZeroDayExpiresAt = old.ZeroDayExpiresAt
+		} else { item.ZeroDayExpiresAt = at.Add(7 * 24 * time.Hour).Format(time.RFC3339) }
+	}
 }
 
 func hasFreeModelPrice(item model.ModelCost) bool {
