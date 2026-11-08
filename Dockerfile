@@ -7,7 +7,7 @@ RUN --mount=type=cache,target=/root/.bun/install/cache bun install --frozen-lock
 COPY VERSION /app/VERSION
 COPY CHANGELOG.md /app/CHANGELOG.md
 COPY web ./
-RUN bun run build
+RUN NEXT_OUTPUT_STANDALONE=1 bun run build
 
 # 构建 Go 后端入口。
 FROM golang:1.26.10-alpine AS api-build
@@ -31,7 +31,10 @@ WORKDIR /app
 COPY VERSION /app/VERSION
 COPY CHANGELOG.md /app/CHANGELOG.md
 COPY --from=api-build /server /app/server
-COPY --from=web-build /app/web /app/web
+# 只复制运行依赖与完整静态资源，构建工具和缓存留在构建阶段。
+COPY --from=web-build /app/web/.next/standalone /app/web
+COPY --from=web-build /app/web/.next/static /app/web/.next/static
+COPY --from=web-build /app/web/public /app/web/public
 COPY docker-entrypoint.mjs /app/docker-entrypoint.mjs
 ENV PROMPT_DATA_DIR=/app/data/prompts
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*

@@ -7,7 +7,7 @@ const children = [
     },
     {
         name: "web",
-        command: ["bun", "run", "start"],
+        command: ["bun", "server.js"],
         cwd: "/app/web",
         env: { ...process.env, HOSTNAME: "0.0.0.0", PORT: "3000" },
     },
