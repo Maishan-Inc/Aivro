@@ -181,8 +181,8 @@ export default function AssetsPage() {
                 await addAsset(payload as Parameters<typeof addAsset>[0]);
             }
             message.success(`已导入 ${importedAssets.length} 个素材`);
-        } catch {
-            message.error("导入失败，请选择有效的素材压缩包");
+        } catch (error) {
+            message.error(error instanceof Error ? error.message : "导入失败，请选择有效的素材压缩包");
         } finally {
             if (assetInputRef.current) assetInputRef.current.value = "";
         }

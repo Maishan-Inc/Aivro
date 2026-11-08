@@ -1,5 +1,7 @@
 // Generated translations. Source strings are Simplified Chinese (zh-CN).
 const koKR = {
+    "素材包超过大小或数量限制": "소재 패키지가 크기 또는 항목 수 제한을 초과합니다.",
+    "素材包格式无效": "소재 패키지 형식이 올바르지 않습니다.",
     "工单服务": "지원 티켓",
     "工单回复": "티켓 답변",
     "工单详情": "티켓 상세",

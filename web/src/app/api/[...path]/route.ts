@@ -33,7 +33,7 @@ function proxyHeaders(request: NextRequest) {
     return headers;
 }
 
-function responseHeaders(response: Response, path: string[], method: string) {
+function responseHeaders(response: Response, path: string[]) {
     const headers = new Headers(response.headers);
     for (const [key, value] of Object.entries(apiSecurityHeaders)) headers.set(key, value);
     const setCookies = (response.headers as Headers & { getSetCookie?: () => string[] }).getSetCookie?.() || [];
@@ -45,16 +45,6 @@ function responseHeaders(response: Response, path: string[], method: string) {
     headers.delete("content-length");
     headers.delete("content-encoding");
     headers.delete("transfer-encoding");
-    if (method === "GET" && path.join("/") === "prompts") {
-        const value = "public, max-age=0, s-maxage=300, stale-while-revalidate=600";
-        headers.set("Cache-Control", value);
-        headers.set("CDN-Cache-Control", value);
-        headers.set("Surrogate-Control", "max-age=300, stale-while-revalidate=600");
-        headers.delete("Pragma");
-        headers.delete("Expires");
-        headers.set("Vary", "Accept-Encoding");
-        return headers;
-    }
     headers.set("Cache-Control", "no-store, no-cache, max-age=0, must-revalidate, proxy-revalidate");
     headers.set("CDN-Cache-Control", "no-store");
     headers.set("Surrogate-Control", "no-store");
@@ -83,7 +73,7 @@ async function proxy(request: NextRequest, context: RouteContext) {
         return new Response(response.body, {
             status: response.status,
             statusText: response.statusText,
-            headers: responseHeaders(response, path, request.method),
+            headers: responseHeaders(response, path),
         });
     } catch (error) {
         console.error("Failed to proxy", request.nextUrl.pathname, error instanceof Error ? error.name : "Error");

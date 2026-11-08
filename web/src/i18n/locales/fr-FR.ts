@@ -1,5 +1,7 @@
 // Generated translations. Source strings are Simplified Chinese (zh-CN).
 const frFR = {
+    "素材包超过大小或数量限制": "Le paquet de ressources dépasse la limite de taille ou de nombre d’éléments.",
+    "素材包格式无效": "Le format du paquet de ressources est invalide.",
     "工单服务": "Tickets d’assistance",
     "工单回复": "Réponses aux tickets",
     "工单详情": "Détails du ticket",

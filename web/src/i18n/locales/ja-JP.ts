@@ -1,5 +1,7 @@
 // Generated translations. Source strings are Simplified Chinese (zh-CN).
 const jaJP = {
+    "素材包超过大小或数量限制": "素材パッケージがサイズまたは件数の上限を超えています。",
+    "素材包格式无效": "素材パッケージの形式が無効です。",
     "工单服务": "サポートチケット",
     "工单回复": "チケット返信",
     "工单详情": "チケット詳細",

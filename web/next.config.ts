@@ -28,6 +28,7 @@ export default function nextConfig(phase: string): NextConfig {
 
     return {
         allowedDevOrigins: isDev ? ["127.0.0.1", "localhost"] : [],
+        images: { unoptimized: true },
         env: {
             NEXT_PUBLIC_APP_VERSION: localVersion,
             NEXT_PUBLIC_APP_RELEASES: JSON.stringify(releases),

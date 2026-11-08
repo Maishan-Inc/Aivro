@@ -13,7 +13,7 @@ type Config struct {
 	ListenHost          string `env:"LISTEN_HOST" envDefault:"127.0.0.1"`
 	MaxUserStorageBytes int64  `env:"MAX_USER_STORAGE_BYTES" envDefault:"5368709120"`
 	AdminUsername       string `env:"ADMIN_USERNAME" envDefault:"admin"`
-	AdminPassword       string `env:"ADMIN_PASSWORD" envDefault:"aivro"`
+	AdminPassword       string `env:"ADMIN_PASSWORD"`
 	JWTSecret           string `env:"JWT_SECRET"`
 	JWTExpireHours      int    `env:"JWT_EXPIRE_HOURS" envDefault:"168"`
 	AppOrigin           string `env:"APP_ORIGIN"`

@@ -1,5 +1,7 @@
 // Generated translations. Source strings are Simplified Chinese (zh-CN).
 const zhTW = {
+    "素材包超过大小或数量限制": "素材包超過大小或數量限制。",
+    "素材包格式无效": "素材包格式無效。",
     "工单服务": "客服工單",
     "工单回复": "工單回覆",
     "工单详情": "工單詳情",

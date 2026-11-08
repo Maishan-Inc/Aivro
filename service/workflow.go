@@ -109,6 +109,7 @@ type shareAccessClaims struct {
 	ShareID string `json:"shareId"`
 	Token   string `json:"token"`
 	UserID  string `json:"userId"`
+	Version int    `json:"version"`
 	jwt.RegisteredClaims
 }
 
@@ -291,6 +292,7 @@ func ShareWorkflow(r *http.Request, userID string, workflowID string, input Shar
 	passwordHash := share.PasswordHash
 	if input.PasswordEnabled {
 		if strings.TrimSpace(input.Password) != "" {
+			if err := validatePassword(input.Password); err != nil { return nil, err }
 			hash, err := hashPassword(input.Password)
 			if err != nil {
 				return nil, err
@@ -473,6 +475,8 @@ func CopyWorkflowShare(userID string, token string, input CopyWorkflowShareInput
 		workflow.SourceSyncMode = model.WorkflowSyncDetached
 	}
 	return workflow, db.Transaction(func(tx *gorm.DB) error {
+		var current model.WorkflowShare
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND status = ? AND version = ?", share.ID, model.WorkflowShareStatusActive, share.Version).First(&current).Error; err != nil { return safeMessageError{message: "请先验证分享密码"} }
 		user, err := consumeWorkflowCreditTx(tx, userID, workflow.ID, "复制分享工作流")
 		if err != nil {
 			return err
@@ -1247,7 +1251,10 @@ func newShareAccessToken(userID string, share model.WorkflowShare) (string, erro
 		ShareID: share.ID,
 		Token:   share.Token,
 		UserID:  userID,
+		Version: share.Version,
 		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer:    "aivro",
+			Audience:  jwt.ClaimStrings{"workflow-share"},
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(30 * time.Minute)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			Subject:   share.ID,
@@ -1263,8 +1270,8 @@ func validShareAccessToken(userID string, share model.WorkflowShare, tokenText s
 	claims := shareAccessClaims{}
 	token, err := jwt.ParseWithClaims(tokenText, &claims, func(token *jwt.Token) (any, error) {
 		return []byte(config.Cfg.JWTSecret), nil
-	}, jwt.WithValidMethods([]string{"HS256"}), jwt.WithExpirationRequired())
-	return err == nil && token.Valid && claims.UserID == userID && claims.ShareID == share.ID && claims.Token == share.Token
+	}, jwt.WithValidMethods([]string{"HS256"}), jwt.WithExpirationRequired(), jwt.WithIssuer("aivro"), jwt.WithAudience("workflow-share"), jwt.WithSubject(share.ID))
+	return err == nil && token.Valid && claims.UserID == userID && claims.ShareID == share.ID && claims.Token == share.Token && claims.Version == share.Version
 }
 
 func mustRandomToken(size int) string {

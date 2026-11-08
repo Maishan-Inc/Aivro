@@ -1,16 +1,16 @@
 # 构建 Next.js 前端产物。
-FROM oven/bun:1.3.13 AS web-build
+FROM oven/bun:1.4.4 AS web-build
 
 WORKDIR /app/web
 COPY web/package.json web/bun.lock ./
-RUN --mount=type=cache,target=/root/.bun/install/cache bun install --frozen-lockfile --registry=https://registry.npmmirror.com --cache-dir=/root/.bun/install/cache
+RUN --mount=type=cache,target=/root/.bun/install/cache bun install --frozen-lockfile --ignore-scripts --registry=https://registry.npmjs.org --cache-dir=/root/.bun/install/cache
 COPY VERSION /app/VERSION
 COPY CHANGELOG.md /app/CHANGELOG.md
 COPY web ./
 RUN bun run build
 
 # 构建 Go 后端入口。
-FROM golang:1.25-alpine AS api-build
+FROM golang:1.26.10-alpine AS api-build
 
 WORKDIR /app
 COPY go.mod go.sum ./
@@ -25,7 +25,7 @@ COPY main.go ./
 RUN go build -o /server .
 
 # 运行镜像：Next.js 对外监听 3000，Go 只在容器内部监听 8080。
-FROM oven/bun:1.3.13
+FROM oven/bun:1.4.4
 
 WORKDIR /app
 COPY VERSION /app/VERSION

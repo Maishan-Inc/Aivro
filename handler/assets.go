@@ -9,7 +9,7 @@ import (
 )
 
 func Assets(w http.ResponseWriter, r *http.Request) {
-	result, err := service.ListAssets(parseQuery(r))
+	result, err := service.ListPublicAssets(r.Context(), parseQuery(r))
 	if err != nil {
 		FailError(w, err)
 		return

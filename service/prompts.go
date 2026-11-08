@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"strings"
@@ -38,7 +39,8 @@ func ListPrompts(q model.Query) (model.PromptList, error) {
 	return model.PromptList{Items: items, Tags: tags, Categories: categoryCodes, Total: int(total)}, nil
 }
 
-func ListPublicPrompts(q model.Query) (model.PromptList, error) {
+func ListPublicPrompts(ctx context.Context, q model.Query) (model.PromptList, error) {
+	if err := checkPublicPageAccess(ctx, "prompts"); err != nil { return model.PromptList{}, err }
 	q.Normalize()
 	key := publicPromptCacheKey(q)
 	now := time.Now()

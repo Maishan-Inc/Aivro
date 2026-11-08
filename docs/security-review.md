@@ -4,6 +4,42 @@
 
 按项目要求，本轮未运行语法检查、类型检查、测试、构建或部署。所有改动需要按 [待测试](pending-test.md) 和文末场景实际验证。
 
+## 高危类别复核后的补充修复
+
+此次继续检查用户列出的全部类别。确认并修复代码与依赖版本中的缺口；没有可确认的攻击链时，不把类别名或依赖告警直接当作已发生的高危漏洞。
+
+| 补充发现 | 本轮改动 |
+| --- | --- |
+| Next 与原生图片处理依赖版本落后 | Next 升级至 16.4.5，锁定的 Sharp 为 0.35.5，覆盖本轮查到的 Windows RCE、图片解码 RCE、middleware 绕过及 nonce 相关修复；项目未使用 Next 图片优化，设置 `images.unoptimized` 关闭 `/_next/image`。Windows、glibc、解码器、缓存和 Server Actions 等公告前提不同，版本命中不代表每条攻击链均可利用 |
+| 前端间接依赖告警 | Axios 1.21.0、Nanoid 5.1.16；为 baseline-browser-mapping、follow-redirects、PostCSS、source-map-js、Prism 指定修复版本并由 Bun 重建锁文件。移除只通过 CSS 引用的 shadcn CLI，保留实际用到的三个状态变体，移除其无关服务器工具和无修复版 deepmerge 依赖链 |
+| Go 依赖与工具链告警 | Go 工具链 1.26.10；升级 Gin 1.12.0、go-ethereum 1.17.10、pgx 5.9.2、quic-go 0.59.1、compress 1.20.3、WebSocket、gRPC 及相关依赖；x/crypto 0.58.0、x/net 0.62.0、x/text 0.43.0。依赖图中 go-jose 与 Goldmark 也更新至修复版。数据库占位符、网络协议和签名相关行为仍须实际回归 |
+| 修改分享密码后旧访问凭证仍有效 | 分享 JWT 增加版本、issuer、audience 与 subject 校验；新密码沿用账号密码强度规则。更新分享后旧凭证失效，预览及复制共用校验；复制事务再次锁定当前有效版本，避免状态变化后继续扣费复制 |
+| 提示词、素材的登录限制仅在客户端生效 | service 在读数据和提示词缓存之前检查当前开关与中间件验证的用户。管理端列表保持独立鉴权入口。删除提示词公开缓存头和代理中强制公开缓存的分支，成功与失败响应均沿用 no-store |
+| CSP nonce 与共享首页缓存 | 所有 nonce HTML（含首页）使用 no-store；保留构建资源和演示图的静态缓存。入口需清除旧 HTML/API 缓存并遵守响应头 |
+| CAPTCHA 未绑定足够的站点信息 | hCaptcha Siteverify 提交配置的 sitekey；Turnstile 校验返回的 hostname 与可信站点。hCaptcha 文档明确 hostname 来自浏览器，故不把该字段用于认证。验证请求继承请求取消、15 秒超时、HTTP 状态与响应体长度限制，继续默认拒绝验证失败 |
+| 公开管理员示例密码可直接使用 | 删除配置与环境示例中的可用密码；新数据库首次启动必须显式提供独立密码，两个公开默认密码不随用户名变更而放行。已有管理员重启不自动重置密码；后台设置和登录同样拒绝默认密码 |
+| 素材 ZIP 与 JSON 缺少资源和结构边界 | 使用 fflate 流式解压、实际输出字节上限及路径/数量检查；Zod 校验清单和素材结构，在上传前检查引用、MIME、大小及重复项；上传最多并行三个。媒体只使用新上传的本站文件地址，封面限制为 HTTP/HTTPS 与位图 data 预览，错误提示覆盖六语言 |
+
+依赖公告复查结果：当前 `web/bun.lock` 的 498 个包版本条目在 OSV 查询中没有命中已公开告警。Go 模块图连同所选标准库查询仍命中 `GO-2026-5932` 与 `GO-2026-5781`：前者针对未维护的 `x/crypto/openpgp`，当前业务仅使用同模块的 bcrypt 等维护包；后者为 `rsc.io/pdf`，`go mod why -m` 确认主模块无需该包。没有把未调用的模块改报成可利用漏洞，也没有通过不稳定版本或手写底层实现隐藏告警。模块版本查询不证明符号可达性，公告库也可能滞后；未来新增这些包的调用必须重新审阅。
+
+公告参考：[Next Windows RCE](https://github.com/vercel/next.js/security/advisories/GHSA-p293-qw3h-jr36)、[图片优化解码 RCE](https://github.com/vercel/next.js/security/advisories/GHSA-2464-fhr4-w9xw)、[nonce 与共享缓存](https://github.com/vercel/next.js/security/advisories/GHSA-ffhc-5mcf-pf4q)、[OpenPGP 包告警](https://osv.dev/vulnerability/GO-2026-5932)、[未使用的 PDF 包告警](https://osv.dev/vulnerability/GO-2026-5781)。验证码行为依据 [Turnstile 服务端校验](https://developers.cloudflare.com/turnstile/get-started/server-side-validation/) 与 [hCaptcha 文档](https://docs.hcaptcha.com/)。
+
+| 用户要求覆盖的类别 | 本轮复核状态 |
+| --- | --- |
+| Brute Force | 保留数据库共享限流、账号归一和 bcrypt；分享密码增加强度与版本绑定 |
+| Command Injection | 未确认应用执行用户输入的 shell 路径；受影响的框架与解码依赖已升级，不能将框架 RCE 与应用 shell 注入混为一类 |
+| CSRF | 保留 Cookie 修改请求的可信 Origin/Referer 校验及独立 webhook 签名 |
+| File Inclusion | 未确认用户可控 include；沿用本地文件最终路径、归属与访问凭证校验 |
+| File Upload | 保留 MIME 检查与账号配额；补齐导入包资源边界，关闭未使用的图片优化入口 |
+| Insecure CAPTCHA | 补齐供应商站点绑定、状态与超时校验；有效票据仍不能代替账号和资源权限 |
+| SQL Injection / SQL Injection (Blind) | 已审阅查询仍用参数绑定；升级存在占位符处理公告的 pgx，未证实业务查询存在经典或盲注攻击链 |
+| Weak Session IDs | 沿用登录 JWT 的算法、过期、密钥与版本吊销；分享凭证新增独立用途和版本约束 |
+| XSS (DOM) / XSS (Reflected) / XSS (Stored) | 保留 JSX 转义、API 输出头/MIME 约束与 nonce CSP；导入 JSON 不能保留可执行媒体地址，升级相关依赖。未运行浏览器攻击验证 |
+| CSP Bypass | 修复 nonce HTML 共享缓存，升级已公布的框架修复；生产仍保留界面必要的样式权限 |
+| Java Script | 按不可信脚本执行、URL 与前端依赖风险处理；JavaScript 本身不是独立漏洞名称 |
+| Authorisation Bypass | 提示词与素材登录开关落实到 service，分享复制受当前版本和状态约束；沿用角色与资源所有者校验 |
+| Open HTTP Redirect | 沿用前后端一致的本站路径白名单、解码与协议检查，未新增任意外站回跳 |
+
 ## 风险与处理
 
 | 报告项 | 审阅结论与处理 |

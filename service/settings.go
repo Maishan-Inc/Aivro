@@ -27,6 +27,16 @@ func PublicSettings() (model.PublicSetting, error) {
 	return settings.Public, nil
 }
 
+func checkPublicPageAccess(ctx context.Context, page string) error {
+	settings, err := repository.GetSettings()
+	if err != nil { return err }
+	access := settings.Public.PageAccess
+	required := (page == "prompts" && access.PromptsLoginRequired) || (page == "assets" && access.AssetsLoginRequired)
+	user, ok := UserFromContext(ctx)
+	if required && (!ok || user.ID == "" || user.Role == model.UserRoleGuest) { return safeMessageError{message: "未登录或权限不足"} }
+	return nil
+}
+
 func AdsTxt() (string, error) {
 	settings, err := repository.GetSettings()
 	if err != nil {

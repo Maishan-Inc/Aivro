@@ -1,11 +1,17 @@
 package service
 
 import (
+	"context"
 	"time"
 
 	"github.com/basketikun/aivro/model"
 	"github.com/basketikun/aivro/repository"
 )
+
+func ListPublicAssets(ctx context.Context, q model.Query) (model.AssetList, error) {
+	if err := checkPublicPageAccess(ctx, "assets"); err != nil { return model.AssetList{}, err }
+	return ListAssets(q)
+}
 
 func ListAssets(q model.Query) (model.AssetList, error) {
 	items, total, err := repository.ListAssets(q)

@@ -73,17 +73,14 @@ type MetaMaskChallengeResponse struct {
 var usernameSlugReplacer = strings.NewReplacer("-", "", "_", "", ".", "")
 
 func EnsureDefaultAdmin() error {
-	if strings.TrimSpace(config.Cfg.AdminUsername) == "" || strings.TrimSpace(config.Cfg.AdminPassword) == "" {
-		return nil
-	}
 	hasAdmin, err := repository.HasAdmin()
 	if err != nil {
 		return err
 	}
 	if hasAdmin {
-		return upgradeDefaultAdminPassword()
+		return nil
 	}
-	if isDefaultAdminCredential(config.Cfg.AdminUsername, config.Cfg.AdminPassword) {
+	if strings.TrimSpace(config.Cfg.AdminUsername) == "" || strings.TrimSpace(config.Cfg.AdminPassword) == "" || isDefaultAdminPassword(config.Cfg.AdminPassword) {
 		return safeMessageError{message: "首次启动前请设置安全的 ADMIN_USERNAME 和 ADMIN_PASSWORD"}
 	}
 	if err := validatePassword(config.Cfg.AdminPassword); err != nil {
@@ -105,31 +102,6 @@ func EnsureDefaultAdmin() error {
 		CreatedAt:        now(),
 		UpdatedAt:        now(),
 	})
-	return err
-}
-
-func upgradeDefaultAdminPassword() error {
-	if strings.TrimSpace(config.Cfg.AdminPassword) == "" || strings.TrimSpace(config.Cfg.AdminPassword) == "aivro" {
-		return nil
-	}
-	user, ok, err := repository.GetUserByUsername("admin")
-	if err != nil || !ok || user.Role != model.UserRoleAdmin {
-		return err
-	}
-	if bcrypt.CompareHashAndPassword([]byte(user.Password), []byte("aivro")) != nil {
-		return nil
-	}
-	if err := validatePassword(config.Cfg.AdminPassword); err != nil {
-		return err
-	}
-	hash, err := hashPassword(config.Cfg.AdminPassword)
-	if err != nil {
-		return err
-	}
-	user.Password = hash
-	user.TokenVersion++
-	user.UpdatedAt = now()
-	_, err = repository.UpdateUser(user.ID, map[string]any{"password": hash, "token_version": gorm.Expr("token_version + 1"), "updated_at": now()})
 	return err
 }
 
@@ -252,7 +224,7 @@ func Login(username string, password string) (model.AuthSession, error) {
 	if !ok || passwordErr != nil {
 		return model.AuthSession{}, safeMessageError{message: "用户名或密码错误"}
 	}
-	if user.Role == model.UserRoleAdmin && isDefaultAdminCredential(user.Username, password) {
+	if user.Role == model.UserRoleAdmin && isDefaultAdminPassword(password) {
 		return model.AuthSession{}, safeMessageError{message: "默认管理员密码已禁用，请重置管理员密码"}
 	}
 	if user.Status == model.UserStatusBan {
@@ -687,6 +659,7 @@ func SaveUser(user model.User, password string) (model.User, error) {
 		user.LastLoginAt = saved.LastLoginAt
 	}
 	if password != "" {
+		if user.Role == model.UserRoleAdmin && isDefaultAdminPassword(password) { return user, safeMessageError{message: "默认管理员密码已禁用，请重置管理员密码"} }
 		if err := validatePassword(password); err != nil {
 			return user, err
 		}
@@ -2164,11 +2137,12 @@ func firstNonEmpty(values ...string) string {
 }
 
 func WarnDefaultSecurityConfig() {
-	if config.Cfg.AdminUsername == "admin" && config.Cfg.AdminPassword == "aivro" {
+	if isDefaultAdminPassword(config.Cfg.AdminPassword) {
 		log.Println("WARNING: using default admin credentials, please set ADMIN_USERNAME and ADMIN_PASSWORD to safer values before deployment")
 	}
 }
 
-func isDefaultAdminCredential(username string, password string) bool {
-	return strings.TrimSpace(username) == "admin" && strings.TrimSpace(password) == "aivro"
+func isDefaultAdminPassword(password string) bool {
+	password = strings.TrimSpace(password)
+	return password == "aivro" || password == "change-me-strong-123"
 }

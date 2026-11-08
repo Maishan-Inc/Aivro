@@ -1,5 +1,7 @@
 // Generated translations. Source strings are Simplified Chinese (zh-CN).
 const enUS = {
+    "素材包超过大小或数量限制": "The asset package exceeds the size or item limit.",
+    "素材包格式无效": "The asset package format is invalid.",
     "工单服务": "Support tickets",
     "工单回复": "Ticket replies",
     "工单详情": "Ticket details",

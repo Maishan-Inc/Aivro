@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net"
 	"net/netip"
 	"net/http"
@@ -41,7 +42,8 @@ func CaptchaSessionFromRequest(r *http.Request) map[string]string {
 }
 
 type captchaVerifyResponse struct {
-	Success bool `json:"success"`
+	Success  bool   `json:"success"`
+	Hostname string `json:"hostname"`
 }
 
 type webhookSignatureError struct {
@@ -127,22 +129,40 @@ func VerifyCaptcha(r *http.Request, token string) error {
 	values := url.Values{}
 	values.Set("secret", provider.SecretKey)
 	values.Set("response", strings.TrimSpace(token))
+	if captcha.Provider == model.CaptchaProviderHCaptcha { values.Set("sitekey", provider.SiteKey) }
 	if ip := requestIP(r); ip != "" && ip != "未知" {
 		values.Set("remoteip", ip)
 	}
-	resp, err := publicHTTPClient().PostForm(captchaVerifyURL(captcha.Provider), values)
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	defer cancel()
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, captchaVerifyURL(captcha.Provider), strings.NewReader(values.Encode()))
+	if err != nil { return err }
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	client := *publicHTTPClient()
+	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	resp, err := client.Do(request)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
 	payload := captchaVerifyResponse{}
-	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+	if resp.StatusCode != http.StatusOK { return safeMessageError{message: "人机验证失败，请重试"} }
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 64<<10)).Decode(&payload); err != nil {
 		return err
 	}
-	if !payload.Success {
+	if !payload.Success || (captcha.Provider != model.CaptchaProviderHCaptcha && !validCaptchaHostname(r, payload.Hostname)) {
 		return safeMessageError{message: "人机验证失败，请重试"}
 	}
 	return nil
+}
+
+func validCaptchaHostname(r *http.Request, hostname string) bool {
+	if strings.TrimSpace(hostname) == "" { return false }
+	for _, origin := range append([]string{RequestOrigin(r)}, strings.Split(configuredAllowedOrigins(), ",")...) {
+		parsed, err := url.Parse(strings.TrimSpace(origin))
+		if err == nil && (parsed.Scheme == "https" || parsed.Scheme == "http") && strings.EqualFold(parsed.Hostname(), hostname) { return true }
+	}
+	return false
 }
 
 func captchaVerifyURL(provider model.CaptchaProvider) string {
