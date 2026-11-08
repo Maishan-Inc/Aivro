@@ -10,17 +10,20 @@ import { useLocalizedPath } from "@/hooks/use-localized-path";
 import { formatShortDateTime } from "@/lib/datetime";
 import { useCanvasUiStore } from "../stores/use-canvas-ui-store";
 import type { CanvasConnection, CanvasNodeData } from "../types";
+import { canAccessPath } from "@/lib/user-sections";
+import { useUserStore } from "@/stores/use-user-store";
 
 export function CanvasProjectCard({ project, onRename, onDelete }: { project: CloudWorkflow; onRename: (project: CloudWorkflow, title: string) => void | Promise<void>; onDelete: (id: string) => void }) {
     const router = useRouter();
     const localizedPath = useLocalizedPath();
+    const workflowEnabled = useUserStore((state) => canAccessPath(state.user, "/canvas"));
     const selectedIds = useCanvasUiStore((state) => state.selectedProjectIds);
     const toggleSelected = useCanvasUiStore((state) => state.toggleSelectedProjectId);
     const selected = selectedIds.includes(project.id);
     const [detailOpen, setDetailOpen] = useState(false);
     const [editing, setEditing] = useState(false);
     const [titleDraft, setTitleDraft] = useState(project.title);
-    const open = () => router.push(localizedPath(`/canvas/${project.id}`));
+    const open = () => workflowEnabled ? router.push(localizedPath(`/canvas/${project.id}`)) : setDetailOpen(true);
 
     useEffect(() => {
         setTitleDraft(project.title);
@@ -40,9 +43,9 @@ export function CanvasProjectCard({ project, onRename, onDelete }: { project: Cl
                 trigger={["contextMenu"]}
                 menu={{
                     items: [
-                        { key: "rename", icon: <Pencil className="size-4" />, label: "修改名称" },
-                        { key: "open", icon: <GitBranch className="size-4" />, label: "打开工作流" },
-                        { key: "delete", danger: true, icon: <Trash2 className="size-4" />, label: "删除工作流" },
+                        { key: "rename", disabled: !workflowEnabled, icon: <Pencil className="size-4" />, label: "修改名称" },
+                        { key: "open", disabled: !workflowEnabled, icon: <GitBranch className="size-4" />, label: "打开工作流" },
+                        { key: "delete", disabled: !workflowEnabled, danger: true, icon: <Trash2 className="size-4" />, label: "删除工作流" },
                         { type: "divider" },
                         { key: "info", icon: <FileText className="size-4" />, label: "工作流信息" },
                     ],
@@ -60,7 +63,7 @@ export function CanvasProjectCard({ project, onRename, onDelete }: { project: Cl
                 <article className={`group relative aspect-square min-h-[220px] cursor-pointer overflow-hidden rounded-lg border bg-card text-stone-900 shadow-none transition hover:-translate-y-0.5 hover:shadow-none sm:aspect-[1.18] dark:text-stone-100 dark:shadow-sm dark:hover:shadow-md ${selected ? "border-stone-400 ring-2 ring-stone-300/70 dark:border-stone-600 dark:ring-stone-700/70" : "border-stone-200 dark:border-stone-800"}`} onClick={open}>
                     <WorkflowPreviewBackdrop nodes={project.nodes} connections={project.connections} />
                     <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/38 dark:from-black/8 dark:to-black/48" />
-                    <input type="checkbox" checked={selected} onClick={(event) => event.stopPropagation()} onChange={(event) => toggleSelected(project.id, event.target.checked)} className="absolute left-3 top-3 z-10 size-4 accent-stone-900 dark:accent-stone-100" aria-label={`选择 ${project.title}`} />
+                    <input type="checkbox" disabled={!workflowEnabled} checked={selected} onClick={(event) => event.stopPropagation()} onChange={(event) => toggleSelected(project.id, event.target.checked)} className="absolute left-3 top-3 z-10 size-4 accent-stone-900 dark:accent-stone-100" aria-label={`选择 ${project.title}`} />
                     <div className="absolute left-10 right-3 top-3 rounded-md border border-white/30 bg-white/80 px-2.5 py-1 text-right text-sm font-semibold shadow-none backdrop-blur sm:left-auto sm:max-w-[70%] dark:border-white/10 dark:bg-stone-950/72 dark:shadow-sm">
                         <span className="block truncate">{project.title}</span>
                     </div>
@@ -80,8 +83,8 @@ export function CanvasProjectCard({ project, onRename, onDelete }: { project: Cl
                     <div className="space-y-3">
                         {editing ? (
                             <div className="flex gap-2">
-                                <Input value={titleDraft} onChange={(event) => setTitleDraft(event.target.value)} onPressEnter={saveTitle} autoFocus />
-                                <Button type="primary" icon={<Check className="size-4" />} onClick={saveTitle}>保存</Button>
+                                <Input disabled={!workflowEnabled} value={titleDraft} onChange={(event) => setTitleDraft(event.target.value)} onPressEnter={saveTitle} autoFocus />
+                                <Button disabled={!workflowEnabled} type="primary" icon={<Check className="size-4" />} onClick={saveTitle}>保存</Button>
                                 <Button icon={<X className="size-4" />} onClick={() => setEditing(false)}>取消</Button>
                             </div>
                         ) : (
@@ -94,7 +97,7 @@ export function CanvasProjectCard({ project, onRename, onDelete }: { project: Cl
                                         <Tag>版本 {project.sourceVersion || 1}</Tag>
                                     </div>
                                 </div>
-                                <Button icon={<Pencil className="size-4" />} onClick={() => setEditing(true)}>修改名称</Button>
+                                <Button disabled={!workflowEnabled} icon={<Pencil className="size-4" />} onClick={() => setEditing(true)}>修改名称</Button>
                             </div>
                         )}
                         <div className="grid grid-cols-2 gap-2 text-xs text-stone-500 sm:grid-cols-3 dark:text-stone-400">
@@ -108,8 +111,8 @@ export function CanvasProjectCard({ project, onRename, onDelete }: { project: Cl
                         </div>
                     </div>
                     <div className="flex justify-end gap-2 border-t border-stone-200 pt-4 dark:border-stone-800">
-                        <Button danger icon={<Trash2 className="size-4" />} onClick={() => onDelete(project.id)}>删除</Button>
-                        <Button type="primary" onClick={open}>打开工作流</Button>
+                        <Button disabled={!workflowEnabled} danger icon={<Trash2 className="size-4" />} onClick={() => onDelete(project.id)}>删除</Button>
+                        <Button disabled={!workflowEnabled} type="primary" onClick={open}>打开工作流</Button>
                     </div>
                 </div>
             </Modal>

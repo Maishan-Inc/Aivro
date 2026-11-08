@@ -1,5 +1,6 @@
 // Generated translations. Source strings are Simplified Chinese (zh-CN).
 const frFR = {
+    "该区块访问已被管理员禁用": "L’accès à cette section a été désactivé par un administrateur",
     "查看详情": "Voir les détails",
     "已取消": "Annulé",
     "正在生成 3D 模型": "Génération du modèle 3D",
@@ -1219,7 +1220,8 @@ const frFR = {
     "Fork 工作流": "Fork du workflow",
     "Fork 失败": "Échec du fork",
     "Fork 运行": "Fork et exécuter",
-    "Free 用户生成记录最多保存 7 天": "L'historique de génération des utilisateurs Free est conservé 7 jours maximum",
+    "新生成记录保存 {0} 天，具体到期时间见详情": "Les nouveaux historiques de génération sont conservés {0} jours. Consultez les détails pour la date d’expiration exacte.",
+    "保存至 {0}": "Conservé jusqu’au {0}",
     "hCaptcha 加载超时，请重试": "Le chargement de hCaptcha a expiré. Veuillez réessayer.",
     "hCaptcha 加载失败，请重试": "Échec du chargement de hCaptcha. Veuillez réessayer.",
     "hCaptcha 脚本加载失败，请检查网络或域名配置": "Échec du chargement du script hCaptcha. Vérifiez votre réseau ou la configuration du domaine.",

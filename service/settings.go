@@ -210,12 +210,7 @@ func normalizePublicSettingWithChannels(setting model.PublicSetting, channels []
 	}
 	setting.ModelChannel.AvailableModels = filterModels(setting.ModelChannel.AvailableModels, collectChannelModelNames(channels))
 	setting.ModelChannel.ImageModels = normalizeScopedModels(setting.ModelChannel.ImageModels, setting.ModelChannel.AvailableModels, collectChannelModelNamesByCapability(channels, "image"))
-	videoModels := []string{}
-	for _, name := range collectChannelModelNamesByCapability(channels, "video") {
-		if containsModel(setting.ModelChannel.AvailableModels, name) && (setting.ModelChannel.VideoModels == nil || containsModel(setting.ModelChannel.VideoModels, name)) {
-			videoModels = append(videoModels, name)
-		}
-	}
+	videoModels := orderedCapabilityModels(setting.ModelChannel.VideoModels, setting.ModelChannel.AvailableModels, collectChannelModelNamesByCapability(channels, "video"))
 	setting.ModelChannel.VideoModels = videoModels
 	setting.ModelChannel.VideoAdapters = map[string]string{}
 	setting.ModelChannel.VideoCapabilities = map[string]model.VideoCapabilities{}
@@ -226,12 +221,7 @@ func normalizePublicSettingWithChannels(setting model.PublicSetting, channels []
 		}
 	}
 	setting.ModelChannel.TextModels = normalizeScopedModels(setting.ModelChannel.TextModels, setting.ModelChannel.AvailableModels, collectChannelModelNamesByCapability(channels, "text"))
-	model3DModels := []string{}
-	for _, name := range collectChannelModelNamesByCapability(channels, "model3d") {
-		if containsModel(setting.ModelChannel.AvailableModels, name) && (setting.ModelChannel.Model3DModels == nil || containsModel(setting.ModelChannel.Model3DModels, name)) {
-			model3DModels = append(model3DModels, name)
-		}
-	}
+	model3DModels := orderedCapabilityModels(setting.ModelChannel.Model3DModels, setting.ModelChannel.AvailableModels, collectChannelModelNamesByCapability(channels, "model3d"))
 	setting.ModelChannel.Model3DModels = model3DModels
 	setting.ModelChannel.Model3DAdapters = map[string]string{}
 	setting.ModelChannel.Model3DCapabilities = map[string]model.Model3DCapabilities{}
@@ -245,11 +235,11 @@ func normalizePublicSettingWithChannels(setting model.PublicSetting, channels []
 		setting.ModelChannel.ModelCosts = []model.ModelCost{}
 	}
 	setting.ModelChannel.ModelCosts = normalizeModelCosts(setting.ModelChannel.ModelCosts, setting.ModelChannel.AvailableModels, channels)
-	setting.ModelChannel.DefaultImageModel = defaultScopedModel(setting.ModelChannel.ImageModels, setting.ModelChannel.DefaultImageModel)
-	setting.ModelChannel.DefaultVideoModel = defaultScopedModel(setting.ModelChannel.VideoModels, setting.ModelChannel.DefaultVideoModel)
-	setting.ModelChannel.DefaultTextModel = defaultScopedModel(setting.ModelChannel.TextModels, setting.ModelChannel.DefaultTextModel)
-	setting.ModelChannel.DefaultModel3D = defaultScopedModel(setting.ModelChannel.Model3DModels, setting.ModelChannel.DefaultModel3D)
-	setting.ModelChannel.DefaultModel = firstNonEmpty(setting.ModelChannel.DefaultTextModel, setting.ModelChannel.DefaultImageModel, setting.ModelChannel.DefaultVideoModel, setting.ModelChannel.DefaultModel3D)
+	setting.ModelChannel.DefaultImageModel = defaultScopedModel(setting.ModelChannel.ImageModels)
+	setting.ModelChannel.DefaultVideoModel = defaultScopedModel(setting.ModelChannel.VideoModels)
+	setting.ModelChannel.DefaultTextModel = defaultScopedModel(setting.ModelChannel.TextModels)
+	setting.ModelChannel.DefaultModel3D = defaultScopedModel(setting.ModelChannel.Model3DModels)
+	setting.ModelChannel.DefaultModel = defaultScopedModel(setting.ModelChannel.AvailableModels)
 	if setting.Auth.AllowRegister == nil {
 		enabled := true
 		setting.Auth.AllowRegister = &enabled
@@ -1072,17 +1062,24 @@ func normalizeScopedModels(models []string, availableModels []string, capability
 	return availableModels
 }
 
-func defaultScopedModel(models []string, current string) string {
-	current = strings.TrimSpace(current)
-	for _, item := range models {
-		if item == current {
-			return current
-		}
-	}
+func defaultScopedModel(models []string) string {
 	if len(models) > 0 {
 		return models[0]
 	}
 	return ""
+}
+
+func orderedCapabilityModels(models []string, availableModels []string, capabilityModels []string) []string {
+	if models == nil {
+		models = availableModels
+	}
+	result := []string{}
+	for _, name := range uniqueNonEmptyStrings(models) {
+		if containsModel(availableModels, name) && containsModel(capabilityModels, name) {
+			result = append(result, name)
+		}
+	}
+	return result
 }
 
 func normalizeModelCosts(items []model.ModelCost, availableModels []string, channels []model.ModelChannel) []model.ModelCost {

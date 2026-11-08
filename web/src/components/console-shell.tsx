@@ -15,6 +15,7 @@ import { stripLocalePath } from "@/i18n/routing";
 import { cn } from "@/lib/utils";
 import { formatNumber } from "@/lib/datetime";
 import { useUserStore } from "@/stores/use-user-store";
+import { canAccessPath } from "@/lib/user-sections";
 
 const accountItems = [
     { href: "/console", label: "控制台", icon: LayoutDashboard },
@@ -48,7 +49,7 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
     return (
         <div className="flex h-full min-h-0 bg-background text-foreground">
             <aside className={cn("hidden shrink-0 flex-col border-r border-border bg-sidebar transition-[width] duration-200 lg:flex", collapsed ? "w-[72px]" : "w-[224px]")}>
-                <Link href={localizedPath("/")} aria-label="Aivro 首页" className={cn("flex h-16 shrink-0 items-center gap-2.5 border-b border-border px-5", collapsed && "justify-center px-0")}>
+                <Link href={localizedPath(user ? "/home" : "/")} aria-label="Aivro 首页" className={cn("flex h-16 shrink-0 items-center gap-2.5 border-b border-border px-5", collapsed && "justify-center px-0")}>
                     <span className="size-7 shrink-0 bg-foreground" style={{ mask: "url(/logo.svg) center / contain no-repeat" }} />
                     {!collapsed ? <span className="whitespace-nowrap text-lg font-semibold tracking-[-0.04em]">Aivro Studio</span> : null}
                 </Link>
@@ -85,15 +86,16 @@ function ConsoleNavigation({ collapsed = false, onNavigate }: { collapsed?: bool
     const pathname = stripLocalePath(usePathname());
     const localizedPath = useLocalizedPath();
     const { locale, t } = useI18n();
+    const user = useUserStore((state) => state.user);
     const groups = [
-        { title: "创作工具", items: navigationTools.filter((tool) => !tool.external).map((tool) => ({ href: `/${tool.slug}`, label: t(tool.labelKey), icon: tool.icon, external: false })) },
+        { title: "创作工具", items: navigationTools.filter((tool) => !tool.external && canAccessPath(user, `/${tool.slug}`)).map((tool) => ({ href: `/${tool.slug}`, label: t(tool.labelKey), icon: tool.icon, external: false })) },
         { title: "探索更多", items: navigationTools.filter((tool) => tool.external).map((tool) => ({ href: tool.href + ("localeAware" in tool && tool.localeAware && locale === "zh-CN" ? "/zh-CN" : ""), label: t(tool.labelKey), icon: tool.icon, external: true })) },
-        { title: "我的空间", items: accountItems.map((item) => ({ ...item, external: false })) },
+        { title: "我的空间", items: accountItems.filter((item) => canAccessPath(user, item.href)).map((item) => ({ ...item, external: false })) },
     ];
     return (
         <nav className="thin-scrollbar min-h-0 flex-1 space-y-6 overflow-y-auto px-3 py-5" aria-label="工作空间导航">
-            <Link href={localizedPath("/")} onClick={onNavigate} title={collapsed ? "首页" : undefined} className={cn("flex h-9 items-center gap-3 rounded-md px-3 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground", collapsed && "justify-center px-0")}><Home className="size-4 shrink-0" />{!collapsed ? "首页" : null}</Link>
-            {groups.map((group) => <div key={group.title}>
+            <Link href={localizedPath(user ? "/home" : "/")} onClick={onNavigate} title={collapsed ? "首页" : undefined} className={cn("flex h-9 items-center gap-3 rounded-md px-3 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground", collapsed && "justify-center px-0")}><Home className="size-4 shrink-0" />{!collapsed ? "首页" : null}</Link>
+            {groups.filter((group) => group.items.length).map((group) => <div key={group.title}>
                 {!collapsed ? <p className="mb-2 px-3 text-[10px] tracking-wider text-muted-foreground">{group.title}</p> : <div className="mx-3 mb-3 border-t border-border" />}
                 <div className="space-y-1">{group.items.map(({ href, label, icon: Icon, external }) => {
                     const active = !external && (pathname === href || (href !== "/console" && pathname.startsWith(`${href}/`)));

@@ -11,6 +11,7 @@ import { useConfigStore } from "@/stores/use-config-store";
 import { useLocaleStore } from "@/stores/use-locale-store";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { useUserStore } from "@/stores/use-user-store";
+import { canAccessPath, defaultWorkspacePath, sectionForPath } from "@/lib/user-sections";
 
 export function ClientRootInit({ children }: { children: ReactNode }) {
     const pathname = usePathname();
@@ -30,6 +31,9 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
     const cleanPathname = stripLocalePath(pathname);
     const isLoginPage = cleanPathname === "/login" || cleanPathname === "/admin/login";
     const isProfileSetupPage = cleanPathname === "/profile/setup";
+    const accessDenied = Boolean(user && !canAccessPath(user, cleanPathname));
+    const redirectHome = cleanPathname === "/" && Boolean(user);
+    const redirectGuestHome = cleanPathname === "/home" && isUserReady && !user;
 
     useEffect(() => {
         void loadPublicSettings();
@@ -37,7 +41,15 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
 
     useEffect(() => {
         if (!isLoginPage) void hydrateUser();
-    }, [hydrateUser, isLoginPage]);
+    }, [hydrateUser, isLoginPage, pathname]);
+
+    useEffect(() => {
+        if (!token || isLoginPage) return;
+        const refresh = () => { if (!document.hidden) void hydrateUser(); };
+        const timer = window.setInterval(refresh, 30_000);
+        window.addEventListener("focus", refresh);
+        return () => { window.clearInterval(timer); window.removeEventListener("focus", refresh); };
+    }, [hydrateUser, isLoginPage, token]);
 
     useEffect(() => {
         if (!token || !user) return;
@@ -46,7 +58,7 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
             if (preference.locale && !pathLocale) setLocale(preference.locale, false);
             if (preference.config) setConfig(preference.config, false);
         });
-    }, [pathLocale, setConfig, setLocale, setTheme, token, user]);
+    }, [pathLocale, setConfig, setLocale, setTheme, token, user?.id]);
 
     useEffect(() => {
         if (isLoginPage || !publicSettings || isPublicSettingsLoading || !isUserReady || user) return;
@@ -58,6 +70,19 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
         if (!isUserReady || !user || user.role === "guest" || user.profileCompleted || isProfileSetupPage || isLoginPage) return;
         router.replace(withLocalePath(`/profile/setup?redirect=${encodeURIComponent(pathname + window.location.search)}`, locale));
     }, [isLoginPage, isProfileSetupPage, isUserReady, locale, pathname, router, user]);
+
+    useEffect(() => {
+        if (redirectGuestHome) router.replace(withLocalePath("/", locale));
+    }, [locale, redirectGuestHome, router]);
+
+    useEffect(() => {
+        if (!isUserReady || !user?.profileCompleted || (!accessDenied && !redirectHome)) return;
+        router.replace(withLocalePath(defaultWorkspacePath(user), locale));
+    }, [accessDenied, isUserReady, locale, redirectHome, router, user]);
+
+    if (((sectionForPath(cleanPathname) || cleanPathname === "/home") && !isUserReady) || redirectGuestHome || (user?.profileCompleted && (accessDenied || redirectHome))) {
+        return <div className="grid h-dvh place-items-center bg-background text-sm text-muted-foreground" role="status">正在打开工作空间…</div>;
+    }
 
     return <>{children}</>;
 }

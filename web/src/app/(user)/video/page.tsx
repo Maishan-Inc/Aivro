@@ -86,6 +86,7 @@ export default function VideoPage() {
     const [references, setReferences] = useState<ReferenceImage[]>([]);
     const [results, setResults] = useState<GenerationResult[]>([]);
     const [logs, setLogs] = useState<GenerationLog[]>([]);
+    const [retentionDays, setRetentionDays] = useState<number | null>(null);
     const [running, setRunning] = useState(false);
     const [logsOpen, setLogsOpen] = useState(false);
     const [promptDialogOpen, setPromptDialogOpen] = useState(false);
@@ -292,10 +293,12 @@ export default function VideoPage() {
     const refreshLogs = async () => {
         if (!token) {
             setLogs([]);
+            setRetentionDays(null);
             return;
         }
         const data = await fetchGenerationHistories(token, { type: "video", pageSize: 100 });
         setLogs(data.items.map(historyToVideoLog));
+        setRetentionDays(data.retentionDays);
     };
 
     const previewGenerationLog = (log: GenerationLog) => {
@@ -382,7 +385,7 @@ export default function VideoPage() {
                     </div>
                 </section>
                 <StudioHistorySidebar items={logs.map((log) => ({ id: log.id, title: log.title, prompt: log.prompt, preview: log.references[0]?.dataUrl, video: log.video?.url }))} onSelect={(id) => { const log = logs.find((item) => item.id === id); if (log) previewGenerationLog(log); }}>
-                    <LogPanel logs={logs} selectedLogIds={selectedLogIds} activeLogId={previewLog?.id} onSelectedLogIdsChange={setSelectedLogIds} onCreateSession={createSession} onDeleteSelected={() => setDeleteConfirmOpen(true)} onPreviewLog={previewGenerationLog} onOpenDetail={(log) => log.history && setDetailHistory(log.history)} />
+                    <LogPanel logs={logs} retentionDays={retentionDays} selectedLogIds={selectedLogIds} activeLogId={previewLog?.id} onSelectedLogIdsChange={setSelectedLogIds} onCreateSession={createSession} onDeleteSelected={() => setDeleteConfirmOpen(true)} onPreviewLog={previewGenerationLog} onOpenDetail={(log) => log.history && setDetailHistory(log.history)} />
                 </StudioHistorySidebar>
             </main>
             <input
@@ -397,7 +400,7 @@ export default function VideoPage() {
                 }}
             />
             <Drawer title="生成记录" placement="right" size={340} open={logsOpen} onClose={() => setLogsOpen(false)}>
-                <LogPanel logs={logs} selectedLogIds={selectedLogIds} activeLogId={previewLog?.id} onSelectedLogIdsChange={setSelectedLogIds} onCreateSession={createSession} onDeleteSelected={() => setDeleteConfirmOpen(true)} onPreviewLog={previewGenerationLog} onOpenDetail={(log) => log.history && setDetailHistory(log.history)} />
+                <LogPanel logs={logs} retentionDays={retentionDays} selectedLogIds={selectedLogIds} activeLogId={previewLog?.id} onSelectedLogIdsChange={setSelectedLogIds} onCreateSession={createSession} onDeleteSelected={() => setDeleteConfirmOpen(true)} onPreviewLog={previewGenerationLog} onOpenDetail={(log) => log.history && setDetailHistory(log.history)} />
             </Drawer>
 
             <PromptSelectDialog open={promptDialogOpen} onOpenChange={setPromptDialogOpen} onSelect={setPrompt} />
@@ -466,6 +469,7 @@ function FailedVideoCard({ error, onRetry }: { error: string; onRetry: () => voi
 
 function LogPanel({
     logs,
+    retentionDays,
     selectedLogIds,
     activeLogId,
     onSelectedLogIdsChange,
@@ -475,6 +479,7 @@ function LogPanel({
     onOpenDetail,
 }: {
     logs: GenerationLog[];
+    retentionDays: number | null;
     selectedLogIds: string[];
     activeLogId?: string;
     onSelectedLogIdsChange: (ids: string[]) => void;
@@ -483,6 +488,7 @@ function LogPanel({
     onPreviewLog: (log: GenerationLog) => void;
     onOpenDetail: (log: GenerationLog) => void;
 }) {
+    const { tr } = useI18n();
     const allSelected = Boolean(logs.length) && selectedLogIds.length === logs.length;
     const toggleAll = () => onSelectedLogIdsChange(allSelected ? [] : logs.map((log) => log.id));
 
@@ -491,7 +497,7 @@ function LogPanel({
             <div className="mb-3 flex items-center justify-between gap-3">
                 <div>
                     <h2 className="text-base font-semibold">生成记录</h2>
-                    <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">Free 用户生成记录最多保存 7 天</p>
+                    {retentionDays !== null ? <p data-i18n-skip className="mt-1 text-xs text-stone-500 dark:text-stone-400">{tr("新生成记录保存 {0} 天，具体到期时间见详情").replace("{0}", String(retentionDays))}</p> : null}
                 </div>
                 <Tag className="m-0">{logs.length}</Tag>
             </div>
@@ -517,6 +523,7 @@ function LogPanel({
 }
 
 function LogCard({ log, selected, active, onSelectedChange, onClick, onOpenDetail }: { log: GenerationLog; selected: boolean; active: boolean; onSelectedChange: (checked: boolean) => void; onClick: () => void; onOpenDetail: () => void }) {
+    const { tr } = useI18n();
     const detailMenu = {
         items: [{ key: "detail", disabled: !log.history, icon: <FileText className="size-4" />, label: "详情" }],
         onClick: ({ key }: { key: string }) => {
@@ -550,6 +557,7 @@ function LogCard({ log, selected, active, onSelectedChange, onClick, onOpenDetai
                         </Tag>
                     </div>
                 </div>
+                {log.history?.expiresAt ? <div data-i18n-skip className="mt-2 text-xs text-muted-foreground">{tr("保存至 {0}").replace("{0}", formatDateTime(log.history.expiresAt))}</div> : null}
             </button>
         </Dropdown>
     );

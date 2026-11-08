@@ -22,16 +22,13 @@ func SaveGenerationHistory(item model.GenerationHistory, fileIDs []string) (mode
 	return item, err
 }
 
-func ListGenerationHistories(userID string, historyType model.GenerationHistoryType, query model.Query) (model.GenerationHistoryList, error) {
+func ListGenerationHistories(userID string, historyTypes []model.GenerationHistoryType, query model.Query) (model.GenerationHistoryList, error) {
 	db, err := DB()
 	if err != nil {
 		return model.GenerationHistoryList{}, err
 	}
 	query.Normalize()
-	tx := db.Model(&model.GenerationHistory{}).Where("user_id = ?", userID)
-	if historyType != "" {
-		tx = tx.Where("type = ?", historyType)
-	}
+	tx := db.Model(&model.GenerationHistory{}).Where("user_id = ? AND type IN ?", userID, historyTypes)
 	if query.Keyword != "" {
 		like := LikePattern(query.Keyword)
 		tx = tx.Where("title LIKE ? ESCAPE '!' OR prompt LIKE ? ESCAPE '!' OR model LIKE ? ESCAPE '!'", like, like, like)
@@ -51,6 +48,16 @@ func DeleteGenerationHistory(userID string, id string) error {
 		return err
 	}
 	return db.Where("user_id = ? AND id = ?", userID, id).Delete(&model.GenerationHistory{}).Error
+}
+
+func GetGenerationHistory(userID string, id string) (model.GenerationHistory, error) {
+	db, err := DB()
+	if err != nil {
+		return model.GenerationHistory{}, err
+	}
+	var item model.GenerationHistory
+	err = db.Where("user_id = ? AND id = ?", userID, id).First(&item).Error
+	return item, err
 }
 
 func DeleteGenerationHistories(ids []string) error {

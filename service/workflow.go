@@ -131,6 +131,10 @@ func ListWorkflows(userID string, q model.Query) (model.WorkflowList, error) {
 	return model.WorkflowList{Items: items, Total: int(total)}, err
 }
 
+func ListSharedWorkflows(userID string, q model.Query) (model.WorkflowList, error) {
+	return repository.ListSharedWorkflows(userID, q)
+}
+
 func GetWorkflow(userID string, id string) (model.Workflow, error) {
 	db, err := repository.DB()
 	if err != nil {

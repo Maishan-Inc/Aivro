@@ -9,6 +9,7 @@ import { useI18n } from "@/hooks/use-i18n";
 import { withLocalePath } from "@/i18n/routing";
 import { cn } from "@/lib/utils";
 import { useUserStore } from "@/stores/use-user-store";
+import { canAccessPath } from "@/lib/user-sections";
 
 type MobileNavDrawerProps = {
     open: boolean;
@@ -19,18 +20,19 @@ type MobileNavDrawerProps = {
 export function MobileNavDrawer({ open, activeToolSlug, onClose }: MobileNavDrawerProps) {
     const { locale, t } = useI18n();
     const user = useUserStore((state) => state.user);
+    const homePath = user ? "/home" : "/";
 
     return (
         <Drawer title={t("nav.title")} placement="left" size={280} open={open} onClose={onClose}>
             <div className="space-y-1">
-                {[{ href: "/#platform", label: "创作平台" }, { href: "/#showcase", label: "灵感探索" }, { href: "/pricing", label: "套餐" }, { href: "/#faq", label: "常见问题" }].map((item) => <Link key={item.href} href={withLocalePath(item.href, locale)} onClick={onClose} className="block rounded-lg px-3 py-3 text-base hover:bg-muted">{item.label}</Link>)}
+                {[{ href: `${homePath}#platform`, label: "创作平台" }, { href: `${homePath}#showcase`, label: "灵感探索" }, { href: "/pricing", label: "套餐" }, { href: `${homePath}#faq`, label: "常见问题" }].map((item) => <Link key={item.href} href={withLocalePath(item.href, locale)} onClick={onClose} className="block rounded-lg px-3 py-3 text-base hover:bg-muted">{item.label}</Link>)}
                 {user ? (
                     <Link href={withLocalePath("/console", locale)} onClick={onClose} className="flex items-center gap-3 rounded-lg px-3 py-3 text-base font-medium text-stone-900 transition hover:bg-stone-100 dark:text-stone-100 dark:hover:bg-stone-800">
                         <LayoutDashboard className="size-5" />
                         <span>控制台</span>
                     </Link>
                 ) : null}
-                {navigationTools.map((tool) => {
+                {navigationTools.filter((tool) => canAccessPath(user, `/${tool.slug}`)).map((tool) => {
                     const Icon = tool.icon;
                     const active = tool.slug === activeToolSlug;
                     const externalHref = "localeAware" in tool && tool.localeAware && locale === "zh-CN" ? `${tool.href}/zh-CN` : tool.href ?? "#";
@@ -51,7 +53,7 @@ export function MobileNavDrawer({ open, activeToolSlug, onClose }: MobileNavDraw
                         </Link>
                     );
                 })}
-                <Link href={withLocalePath("/console/community", locale)} onClick={onClose} className="block rounded-lg px-3 py-3 text-base hover:bg-muted">社区工作流</Link>
+                {canAccessPath(user, "/console/community") ? <Link href={withLocalePath("/console/community", locale)} onClick={onClose} className="block rounded-lg px-3 py-3 text-base hover:bg-muted">社区工作流</Link> : null}
                 <Link href={withLocalePath("/models", locale)} onClick={onClose} className="block rounded-lg px-3 py-3 text-base hover:bg-muted">模型定价</Link>
                 <Link href={withLocalePath("/developers", locale)} onClick={onClose} className="block rounded-lg px-3 py-3 text-base hover:bg-muted">开发文档</Link>
             </div>

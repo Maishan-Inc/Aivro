@@ -56,7 +56,7 @@ function MetaMaskEmailContent() {
     const walletAddress = payload?.walletAddress || "";
     const signMessage = payload?.message || "";
     const signature = payload?.signature || "";
-    const redirect = safeRedirect(payload?.redirect || searchParams.get("redirect") || localizedPath("/canvas"));
+    const redirect = safeRedirect(payload?.redirect || searchParams.get("redirect") || localizedPath("/image"));
 
     useEffect(() => {
         if (codeSeconds <= 0) return;

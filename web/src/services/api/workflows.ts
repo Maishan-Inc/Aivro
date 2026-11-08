@@ -94,6 +94,10 @@ export async function fetchWorkflows(token: string, query: { keyword?: string; p
     return apiGet<WorkflowListResponse>("/api/v1/workflows", compactApiParams(query), token);
 }
 
+export function fetchSharedWorkflows(token: string) {
+    return apiGet<WorkflowListResponse>("/api/v1/workflow-shares", { pageSize: 200 }, token);
+}
+
 export async function fetchWorkflow(token: string, id: string) {
     return apiGet<CloudWorkflow>(`/api/v1/workflows/${encodeURIComponent(id)}`, undefined, token);
 }

@@ -22,6 +22,17 @@ const (
 	UserAccountTypeCompany  UserAccountType = "company"
 )
 
+type UserSection string
+
+const (
+	UserSectionWorkflow  UserSection = "workflow"
+	UserSectionImage     UserSection = "image"
+	UserSectionVideo     UserSection = "video"
+	UserSectionModel3D   UserSection = "model3d"
+	UserSectionShares    UserSection = "shares"
+	UserSectionCommunity UserSection = "community"
+)
+
 // User 系统用户。
 type User struct {
 	ID                    string          `json:"id" gorm:"primaryKey"`
@@ -46,6 +57,7 @@ type User struct {
 	AuthProvider          string          `json:"authProvider"`
 	EmailVerified         bool            `json:"emailVerified"`
 	Status                UserStatus      `json:"status"`
+	DisabledSections      []UserSection   `json:"disabledSections" gorm:"serializer:json"`
 	TokenVersion          int             `json:"tokenVersion"`
 	LastLoginAt           string          `json:"lastLoginAt"`
 	Extra                 string          `json:"extra" gorm:"type:text"`
@@ -68,6 +80,7 @@ type AuthUser struct {
 	ProfileCompleted      bool            `json:"profileCompleted"`
 	AvatarURL             string          `json:"avatarUrl"`
 	Role                  UserRole        `json:"role"`
+	DisabledSections      []UserSection   `json:"disabledSections"`
 	Credits               int             `json:"credits"`
 	WorkflowCreateCredits int             `json:"workflowCreateCredits"`
 	CreatedAt             string          `json:"createdAt"`
@@ -97,6 +110,7 @@ func PublicUser(user User) AuthUser {
 		ProfileCompleted:      user.ProfileCompleted,
 		AvatarURL:             user.AvatarURL,
 		Role:                  user.Role,
+		DisabledSections:      append([]UserSection{}, user.DisabledSections...),
 		Credits:               user.Credits,
 		WorkflowCreateCredits: user.WorkflowCreateCredits,
 		CreatedAt:             user.CreatedAt,

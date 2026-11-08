@@ -22,15 +22,18 @@ type GenerationHistoryInput struct {
 }
 
 func SaveGenerationHistory(user model.AuthUser, input GenerationHistoryInput) (model.GenerationHistory, error) {
+	if input.Type != model.GenerationHistoryTypeVideo && input.Type != model.GenerationHistoryTypeModel3D {
+		input.Type = model.GenerationHistoryTypeImage
+	}
+	if err := CheckSectionAccess(user, model.UserSection(input.Type)); err != nil {
+		return model.GenerationHistory{}, err
+	}
 	media, expiresAt, err := normalizeGenerationHistoryMedia(user.ID, input.Media)
 	if err != nil {
 		return model.GenerationHistory{}, err
 	}
 	if len(media) == 0 {
 		return model.GenerationHistory{}, safeMessageError{message: "没有可保存的云端图片、视频或 3D 模型"}
-	}
-	if input.Type != model.GenerationHistoryTypeVideo && input.Type != model.GenerationHistoryTypeModel3D {
-		input.Type = model.GenerationHistoryTypeImage
 	}
 	title := strings.TrimSpace(input.Title)
 	if title == "" {
@@ -84,14 +87,41 @@ func historyCloudFileType(historyType model.GenerationHistoryType) model.CloudFi
 }
 
 func ListGenerationHistories(user model.AuthUser, historyType model.GenerationHistoryType, query model.Query) (model.GenerationHistoryList, error) {
-	items, err := repository.ListGenerationHistories(user.ID, historyType, query)
+	if err := CheckSectionAccess(user, model.UserSection(historyType)); err != nil {
+		return model.GenerationHistoryList{}, err
+	}
+	types := []model.GenerationHistoryType{}
+	for _, kind := range []model.GenerationHistoryType{model.GenerationHistoryTypeImage, model.GenerationHistoryTypeVideo, model.GenerationHistoryTypeModel3D} {
+		if (historyType == "" || historyType == kind) && CheckSectionAccess(user, model.UserSection(kind)) == nil {
+			types = append(types, kind)
+		}
+	}
+	items, err := repository.ListGenerationHistories(user.ID, types, query)
 	if err != nil {
 		return model.GenerationHistoryList{}, err
 	}
-	return pruneEmptyGenerationHistories(items)
+	items, err = pruneEmptyGenerationHistories(items)
+	if err != nil {
+		return model.GenerationHistoryList{}, err
+	}
+	if historyType != "" {
+		setting, _, err := CloudStorageEnabled()
+		if err != nil {
+			return model.GenerationHistoryList{}, err
+		}
+		items.RetentionDays = cloudRetentionDays(setting, historyCloudFileType(historyType))
+	}
+	return items, nil
 }
 
 func DeleteGenerationHistory(user model.AuthUser, id string) error {
+	item, err := repository.GetGenerationHistory(user.ID, id)
+	if err != nil {
+		return err
+	}
+	if err := CheckSectionAccess(user, model.UserSection(item.Type)); err != nil {
+		return err
+	}
 	if err := DeleteHistoryCloudFiles(user.ID, id); err != nil {
 		return err
 	}

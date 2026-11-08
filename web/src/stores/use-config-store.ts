@@ -29,11 +29,11 @@ export type AiConfig = {
 };
 
 export const defaultConfig: AiConfig = {
-    model: "gpt-image-2",
-    imageModel: "gpt-image-2",
-    videoModel: "grok-imagine-video",
-    textModel: "gpt-5.5",
-    model3DModel: "hunyuan3d",
+    model: "",
+    imageModel: "",
+    videoModel: "",
+    textModel: "",
+    model3DModel: "",
     videoSeconds: "6",
     videoBillingType: "fixed",
     vquality: "720",

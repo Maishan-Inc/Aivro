@@ -17,6 +17,7 @@ import { collectChannelModelColors, collectChannelModels, filterModels, modelCos
 import { previewMailTemplate, type AdminMailPreview } from "@/services/api/admin";
 import { localeLabels, type Locale } from "@/i18n/messages";
 import { locales } from "@/i18n/routing";
+import { OrderedModelSelect } from "./components/ordered-model-select";
 
 const CodeMirror = dynamic(() => import("@uiw/react-codemirror"), { ssr: false });
 const model3DAdapterOptions = [
@@ -322,10 +323,6 @@ export default function AdminSettingsPage() {
     const [currentOrigin, setCurrentOrigin] = useState("");
     const [knownModels, setKnownModels] = useState<string[]>([]);
     const publicModels = Form.useWatch(["public", "modelChannel", "availableModels"], form) || [];
-    const imageModels = Form.useWatch(["public", "modelChannel", "imageModels"], form) || [];
-    const videoModels = Form.useWatch(["public", "modelChannel", "videoModels"], form) || [];
-    const textModels = Form.useWatch(["public", "modelChannel", "textModels"], form) || [];
-    const model3DModels = Form.useWatch(["public", "modelChannel", "model3DModels"], form) || [];
     const customAuthProviders = Form.useWatch(["private", "auth", "customProviders"], { form, preserve: true }) || [];
     const channelModels = useMemo(() => collectChannelModels(channels), [channels]);
     const channelColorByModel = useMemo(() => collectChannelModelColors(channels), [channels]);
@@ -846,48 +843,28 @@ export default function AdminSettingsPage() {
                                             <Card size="small" extra={sectionSaveButton()}>
                                                 <Row gutter={16}>
                                                     <Col span={24}>
-                                                        <Form.Item name={["public", "modelChannel", "availableModels"]} label="系统可用模型" extra="可选项来自已启用渠道中的前台模型名，最终开放哪些模型由这里勾选决定。">
-                                                            <Select mode="multiple" placeholder="请选择系统可用模型" options={channelModels.map((item) => ({ label: <ModelTag model={item} color={channelColorByModel[item]} />, value: item }))} />
+                                                        <Form.Item name={["public", "modelChannel", "availableModels"]} label="系统可用模型" extra="可选项来自已启用渠道中的前台模型名。使用左右箭头调整展示顺序，最左侧的模型排在最上面并作为默认模型；各类型模型也按相同规则排序。">
+                                                            <OrderedModelSelect placeholder="请选择系统可用模型" options={channelModels.map((item) => ({ label: <ModelTag model={item} color={channelColorByModel[item]} />, value: item }))} />
                                                         </Form.Item>
                                                     </Col>
-                                                    <Col xs={24} md={6}>
+                                                    <Col xs={24} md={12}>
                                                         <Form.Item name={["public", "modelChannel", "imageModels"]} label="选择图片模型">
-                                                            <Select mode="multiple" placeholder="选择图片服务可用模型" options={publicModels.map((item) => ({ label: <ModelTag model={item} color={channelColorByModel[item]} />, value: item }))} />
+                                                            <OrderedModelSelect placeholder="选择图片服务可用模型" options={publicModels.map((item) => ({ label: <ModelTag model={item} color={channelColorByModel[item]} />, value: item }))} />
                                                         </Form.Item>
                                                     </Col>
-                                                    <Col xs={24} md={6}>
+                                                    <Col xs={24} md={12}>
                                                         <Form.Item name={["public", "modelChannel", "videoModels"]} label="选择视频模型">
-                                                            <Select mode="multiple" placeholder="选择视频服务可用模型" options={publicModels.map((item) => ({ label: <ModelTag model={item} color={channelColorByModel[item]} />, value: item }))} />
+                                                            <OrderedModelSelect placeholder="选择视频服务可用模型" options={publicModels.map((item) => ({ label: <ModelTag model={item} color={channelColorByModel[item]} />, value: item }))} />
                                                         </Form.Item>
                                                     </Col>
-                                                    <Col xs={24} md={6}>
+                                                    <Col xs={24} md={12}>
                                                         <Form.Item name={["public", "modelChannel", "textModels"]} label="选择文本模型">
-                                                            <Select mode="multiple" placeholder="选择文本服务可用模型" options={publicModels.map((item) => ({ label: <ModelTag model={item} color={channelColorByModel[item]} />, value: item }))} />
+                                                            <OrderedModelSelect placeholder="选择文本服务可用模型" options={publicModels.map((item) => ({ label: <ModelTag model={item} color={channelColorByModel[item]} />, value: item }))} />
                                                         </Form.Item>
                                                     </Col>
-                                                    <Col xs={24} md={6}>
+                                                    <Col xs={24} md={12}>
                                                         <Form.Item name={["public", "modelChannel", "model3DModels"]} label="选择3D模型">
-                                                            <Select mode="multiple" placeholder="选择3D服务可用模型" options={publicModels.map((item) => ({ label: <ModelTag model={item} color={channelColorByModel[item]} />, value: item }))} />
-                                                        </Form.Item>
-                                                    </Col>
-                                                    <Col xs={24} md={6}>
-                                                        <Form.Item name={["public", "modelChannel", "defaultImageModel"]} label="默认图片模型">
-                                                            <Select showSearch allowClear options={scopedModelOptions(imageModels, publicModels).map((item) => ({ label: <ModelTag model={item} color={channelColorByModel[item]} />, value: item }))} />
-                                                        </Form.Item>
-                                                    </Col>
-                                                    <Col xs={24} md={6}>
-                                                        <Form.Item name={["public", "modelChannel", "defaultVideoModel"]} label="默认视频模型">
-                                                            <Select showSearch allowClear options={scopedModelOptions(videoModels, publicModels).map((item) => ({ label: <ModelTag model={item} color={channelColorByModel[item]} />, value: item }))} />
-                                                        </Form.Item>
-                                                    </Col>
-                                                    <Col xs={24} md={6}>
-                                                        <Form.Item name={["public", "modelChannel", "defaultTextModel"]} label="默认文本模型">
-                                                            <Select showSearch allowClear options={scopedModelOptions(textModels, publicModels).map((item) => ({ label: <ModelTag model={item} color={channelColorByModel[item]} />, value: item }))} />
-                                                        </Form.Item>
-                                                    </Col>
-                                                    <Col xs={24} md={6}>
-                                                        <Form.Item name={["public", "modelChannel", "defaultModel3D"]} label="默认3D模型">
-                                                            <Select showSearch allowClear options={scopedModelOptions(model3DModels, publicModels).map((item) => ({ label: <ModelTag model={item} color={channelColorByModel[item]} />, value: item }))} />
+                                                            <OrderedModelSelect placeholder="选择3D服务可用模型" options={publicModels.map((item) => ({ label: <ModelTag model={item} color={channelColorByModel[item]} />, value: item }))} />
                                                         </Form.Item>
                                                     </Col>
                                                     <Col span={24}>
@@ -2610,10 +2587,6 @@ function buildModelSelectGroups(sourceModels: string[], existingModels: string[]
     };
 }
 
-function scopedModelOptions(models: string[], publicModels: string[]) {
-    return filterModels(models, publicModels);
-}
-
 function normalizeModelChannelScopes(modelChannel: AdminSettings["public"]["modelChannel"]) {
     const availableModels = uniqueModels(modelChannel.availableModels || []);
     const imageModels = filterModels(modelChannel.imageModels || [], availableModels);
@@ -2627,16 +2600,12 @@ function normalizeModelChannelScopes(modelChannel: AdminSettings["public"]["mode
         videoModels,
         textModels,
         model3DModels,
-        defaultModel: firstModel(textModels) || firstModel(imageModels) || firstModel(videoModels) || firstModel(model3DModels),
-        defaultImageModel: modelInScope(modelChannel.defaultImageModel, imageModels),
-        defaultVideoModel: modelInScope(modelChannel.defaultVideoModel, videoModels),
-        defaultTextModel: modelInScope(modelChannel.defaultTextModel, textModels),
-        defaultModel3D: modelInScope(modelChannel.defaultModel3D, model3DModels),
+        defaultModel: firstModel(availableModels),
+        defaultImageModel: firstModel(imageModels),
+        defaultVideoModel: firstModel(videoModels),
+        defaultTextModel: firstModel(textModels),
+        defaultModel3D: firstModel(model3DModels),
     };
-}
-
-function modelInScope(model: string, models: string[]) {
-    return models.includes(model) ? model : firstModel(models);
 }
 
 function firstModel(models: string[]) {

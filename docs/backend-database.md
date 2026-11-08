@@ -94,6 +94,7 @@
 | `auth_provider` | string | 主要登录来源：`password`、`google`、`github`、`linux-do`、`metamask` 等 |
 | `email_verified` | bool | 邮箱是否已验证                 |
 | `status`        | string | 用户状态：`active`、`ban`       |
+| `disabled_sections` | json | 被禁用的区块：`workflow`、`image`、`video`、`model3d`、`shares`、`community`；空列表允许全部区块，独立权限更新不递增登录令牌版本 |
 | `token_version` | number | 登录令牌版本，登出、改密及管理端更新用户后递增，旧 JWT 失效 |
 | `last_login_at` | string | 最近登录时间                   |
 | `extra`         | json   | 扩展信息，第三方资料按平台命名空间保存，如 `linuxDo` |

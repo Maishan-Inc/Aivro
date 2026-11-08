@@ -60,11 +60,11 @@ func New() *gin.Engine {
 	api.POST("/workflow-share-paths/:username/:slug/verify", middleware.OptionalAuth, func(c *gin.Context) {
 		handler.VerifyWorkflowShareByPath(c.Writer, c.Request, c.Param("username"), c.Param("slug"))
 	})
-	v1 := api.Group("/v1", middleware.UserAuth)
+	v1 := api.Group("/v1", middleware.UserAuth, middleware.SectionAccess)
 	v1.GET("/api-keys", gin.WrapF(handler.UserAPIKeys))
 	v1.POST("/api-keys", gin.WrapF(handler.CreateUserAPIKey))
 	v1.DELETE("/api-keys/:id", func(c *gin.Context) { handler.RevokeUserAPIKey(c.Writer, c.Request, c.Param("id")) })
-	modelAPI := api.Group("/v1", middleware.ModelAuth)
+	modelAPI := api.Group("/v1", middleware.ModelAuth, middleware.SectionAccess)
 	modelAPI.GET("/models", gin.WrapF(handler.APIModels))
 	modelAPI.POST("/files", gin.WrapF(handler.UploadFile))
 	v1.POST("/asset-files", func(c *gin.Context) { handler.RetainAssetFiles(c.Writer, c.Request, "") })
@@ -105,6 +105,7 @@ func New() *gin.Engine {
 	v1.POST("/profile", gin.WrapF(handler.CompleteProfile))
 	v1.POST("/profile/avatar", gin.WrapF(handler.UploadAvatar))
 	v1.GET("/workflows", gin.WrapF(handler.Workflows))
+	v1.GET("/workflow-shares", gin.WrapF(handler.SharedWorkflows))
 	v1.POST("/workflows", gin.WrapF(handler.CreateWorkflow))
 	v1.GET("/workflow-community", gin.WrapF(handler.CommunityWorkflows))
 	v1.GET("/workflow-community/me", gin.WrapF(handler.MyCommunityWorkflows))
@@ -183,6 +184,9 @@ func New() *gin.Engine {
 	admin.GET("/users", gin.WrapF(handler.AdminUsers))
 	admin.GET("/users/auth-provider-stats", gin.WrapF(handler.AdminAuthProviderStats))
 	admin.POST("/users", gin.WrapF(handler.AdminSaveUser))
+	admin.POST("/users/:id/sections", func(c *gin.Context) {
+		handler.AdminSaveUserSections(c.Writer, c.Request, c.Param("id"))
+	})
 	admin.POST("/users/:id/credits", func(c *gin.Context) {
 		handler.AdminAdjustUserCredits(c.Writer, c.Request, c.Param("id"))
 	})

@@ -42,6 +42,7 @@ export type GenerationHistory = {
 export type GenerationHistoryList = {
     items: GenerationHistory[];
     total: number;
+    retentionDays: number;
 };
 
 export type SaveGenerationHistoryInput = Pick<GenerationHistory, "type" | "title" | "prompt" | "model" | "config" | "references" | "media" | "status" | "error" | "durationMs">;

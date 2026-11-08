@@ -36,7 +36,7 @@ function ProfileSetupContent() {
     const setSession = useUserStore((state) => state.setSession);
     const localizedPath = useLocalizedPath();
     const [saving, setSaving] = useState(false);
-    const redirect = safeRedirect(search.get("redirect") || localizedPath("/canvas"));
+    const redirect = safeRedirect(search.get("redirect") || localizedPath("/image"));
 
     useEffect(() => {
         if (user?.profileCompleted) router.replace(redirect);

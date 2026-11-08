@@ -808,6 +808,10 @@ func cloudExpiresAt(setting model.CloudStorageSetting, fileType model.CloudFileT
 	if fileType == model.CloudFileTypeTask {
 		return taskPayloadExpiresAt()
 	}
+	return time.Now().Add(time.Duration(cloudRetentionDays(setting, fileType)) * 24 * time.Hour).Format(time.RFC3339)
+}
+
+func cloudRetentionDays(setting model.CloudStorageSetting, fileType model.CloudFileType) int {
 	days := setting.ImageExpireDays
 	if fileType == model.CloudFileTypeVideo {
 		days = setting.VideoExpireDays
@@ -815,7 +819,7 @@ func cloudExpiresAt(setting model.CloudStorageSetting, fileType model.CloudFileT
 	if fileType == model.CloudFileTypeModel3D {
 		days = setting.Model3DExpireDays
 	}
-	return time.Now().Add(time.Duration(days) * 24 * time.Hour).Format(time.RFC3339)
+	return days
 }
 
 func mediaExtension(contentType string, fallback string) string {

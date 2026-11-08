@@ -12,6 +12,7 @@ import {
     fetchCommunityWorkflows,
     fetchMyCommunityWorkflows,
     fetchWorkflows,
+    fetchSharedWorkflows,
     publishCommunityWorkflow,
     syncCommunityWorkflow,
     updateWorkflow,
@@ -21,7 +22,7 @@ import {
 import { useLocalizedPath } from "@/hooks/use-localized-path";
 import { formatShortDateTime } from "@/lib/datetime";
 import { useWorkflowModals, workflowConfirmName } from "@/hooks/use-workflow-modals";
-import { FlowBackground } from "@/components/flow-background";
+import { canAccessPath } from "@/lib/user-sections";
 import { useUserStore } from "@/stores/use-user-store";
 import { CanvasProjectCard, WorkflowPreviewBackdrop } from "@/app/(user)/canvas/components/canvas-project-card";
 import { useCanvasStore } from "@/app/(user)/canvas/stores/use-canvas-store";
@@ -37,10 +38,9 @@ type WorkflowLibraryViewProps = {
     initialTab?: CanvasTab;
     lockTab?: boolean;
     redirectPath?: string;
-    embedded?: boolean;
 };
 
-export function WorkflowLibraryView({ initialTab = "workflows", lockTab = false, redirectPath = "/canvas", embedded = false }: WorkflowLibraryViewProps) {
+export function WorkflowLibraryView({ initialTab = "workflows", lockTab = false, redirectPath = "/canvas" }: WorkflowLibraryViewProps) {
     const { message, modal } = App.useApp();
     const { requestWorkflowName, confirmWorkflowDelete } = useWorkflowModals();
     const router = useRouter();
@@ -79,12 +79,16 @@ export function WorkflowLibraryView({ initialTab = "workflows", lockTab = false,
             router.replace(localizedPath(`/login?redirect=${redirectPath}`));
             return;
         }
+        if (activeTab === "community" && !canAccessPath(user, "/canvas")) {
+            setProjects([]);
+            return;
+        }
         setIsLoading(true);
-        fetchWorkflows(token, { pageSize: 200 })
+        (activeTab === "shares" ? fetchSharedWorkflows(token) : fetchWorkflows(token, { pageSize: 200 }))
             .then((data) => setProjects(data.items))
             .catch((error) => message.error(error instanceof Error ? error.message : "读取工作流失败"))
             .finally(() => setIsLoading(false));
-    }, [isReady, message, redirectPath, router, setProjects, token]);
+    }, [activeTab, isReady, message, redirectPath, router, setProjects, token, user?.disabledSections]);
 
     useEffect(() => {
         setActiveTab(initialTab);
@@ -220,6 +224,7 @@ export function WorkflowLibraryView({ initialTab = "workflows", lockTab = false,
     };
 
     const openPublish = () => {
+        if (!canAccessPath(user, "/canvas")) return;
         setPublishWorkflowId(projects[0]?.id || "");
         setPublishTitle("");
         setPublishLocale("zh-CN");
@@ -280,10 +285,6 @@ export function WorkflowLibraryView({ initialTab = "workflows", lockTab = false,
             ) : null}
 
             <section className={`${lockTab ? "flex-1" : "order-1 lg:order-2"} flex min-h-0 flex-col`}>
-                {embedded && activeTab !== "workflows" ? <div className="relative shrink-0 overflow-hidden border-b border-border bg-background px-5 py-6 lg:px-8 lg:py-8">
-                    <FlowBackground />
-                    <div className="relative"><span className="text-[9px] tracking-widest text-muted-foreground">创作空间 / {activeTab === "community" ? "社区" : "分享"}</span><h1 className="mt-3 text-2xl font-medium tracking-tight">{activeTab === "community" ? "从彼此的灵感，发现新的可能。" : "让好的想法，被更多人看见。"}</h1><p className="mt-2 text-xs leading-6 text-muted-foreground">{activeTab === "community" ? "探索社区创作，在他人的工作流中找到你的起点。" : "管理你的工作流分享，继续传递创作灵感。"}</p></div>
-                </div> : null}
                 <header className="shrink-0 border-b border-border bg-background px-4 lg:h-20 lg:overflow-x-auto lg:px-6">
                     <div className="flex min-w-0 flex-wrap items-center gap-2 py-2 lg:h-full lg:min-w-max lg:flex-nowrap lg:py-0">
                         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 lg:flex-none lg:flex-nowrap">{controlBar}</div>
@@ -404,6 +405,7 @@ function WorkflowSection({
     onRename: (project: CloudWorkflow, title: string) => void | Promise<void>;
     onDelete: (ids: string[]) => void;
 }) {
+    const workflowEnabled = useUserStore((state) => canAccessPath(state.user, "/canvas"));
     return (
         <>
             {isLoading ? (
@@ -415,7 +417,7 @@ function WorkflowSection({
                     </div>
                 </div>
             ) : (
-                <EmptyState title={keyword ? "没有匹配的工作流" : emptyTitle} description={keyword ? "换一个关键词或筛选条件继续查找。" : emptyDescription} action={<Button type="primary" icon={<Plus className="size-4" />} loading={isCreating} onClick={onCreate}>新建工作流</Button>} />
+                <EmptyState title={keyword ? "没有匹配的工作流" : emptyTitle} description={keyword ? "换一个关键词或筛选条件继续查找。" : emptyDescription} action={<Button disabled={!workflowEnabled} type="primary" icon={<Plus className="size-4" />} loading={isCreating} onClick={onCreate}>新建工作流</Button>} />
             )}
         </>
     );
@@ -444,6 +446,7 @@ function WorkflowControls({
     onCreate: () => void;
     onDelete: (ids: string[]) => void;
 }) {
+    const workflowEnabled = useUserStore((state) => canAccessPath(state.user, "/canvas"));
     return (
         <>
             <Input allowClear value={keyword} onChange={(event) => onKeywordChange(event.target.value)} prefix={<Search className="size-4 text-stone-400" />} placeholder="搜索工作流名称" className="!w-full min-[520px]:!w-[220px]" />
@@ -457,9 +460,9 @@ function WorkflowControls({
                 ]}
             />
             <span className="shrink-0 text-xs text-stone-500 dark:text-stone-400">显示 {projects.length}/{allProjects.length}</span>
-            {selectedIds.length ? <Button className="max-[519px]:flex-1" onClick={() => onDelete(selectedIds)}>删除选中</Button> : null}
-            {projects.length ? <Button className="max-[519px]:flex-1" onClick={() => onDelete(projects.map((project) => project.id))}>删除全部</Button> : null}
-            <Button className="max-[519px]:flex-1" type="primary" icon={<Plus className="size-4" />} loading={isCreating} onClick={onCreate}>新建工作流</Button>
+            {selectedIds.length ? <Button disabled={!workflowEnabled} className="max-[519px]:flex-1" onClick={() => onDelete(selectedIds)}>删除选中</Button> : null}
+            {projects.length ? <Button disabled={!workflowEnabled} className="max-[519px]:flex-1" onClick={() => onDelete(projects.map((project) => project.id))}>删除全部</Button> : null}
+            <Button disabled={!workflowEnabled} className="max-[519px]:flex-1" type="primary" icon={<Plus className="size-4" />} loading={isCreating} onClick={onCreate}>新建工作流</Button>
         </>
     );
 }
@@ -485,6 +488,7 @@ function CommunitySection({
     onSync: (item: WorkflowCommunityPost) => void;
     onDelete: (item: WorkflowCommunityPost) => void;
 }) {
+    const workflowEnabled = useUserStore((state) => canAccessPath(state.user, "/canvas"));
     const visibleItems = mode === "mine" ? myItems : items;
     const projectMap = new Map(projects.map((project) => [project.id, project]));
     return (
@@ -498,13 +502,14 @@ function CommunitySection({
                     </div>
                 </div>
             ) : (
-                <EmptyState title={mode === "mine" ? "还没有上传作品" : "暂无社区工作流"} description={mode === "mine" ? "上传作品会保存当前工作流快照，不会自动跟随后续编辑。" : "换一个关键词或等待更多公开作品。"} action={<Button type="primary" icon={<UploadCloud className="size-4" />} onClick={onUpload}>上传我的作品</Button>} />
+                <EmptyState title={mode === "mine" ? "还没有上传作品" : "暂无社区工作流"} description={mode === "mine" ? "上传作品会保存当前工作流快照，不会自动跟随后续编辑。" : "换一个关键词或等待更多公开作品。"} action={<Button disabled={!workflowEnabled} type="primary" icon={<UploadCloud className="size-4" />} onClick={onUpload}>上传我的作品</Button>} />
             )}
         </>
     );
 }
 
 function CommunityControls({ mode, setMode, keyword, locale, onKeywordChange, onLocaleChange, onUpload }: { mode: CommunityMode; setMode: (mode: CommunityMode) => void; keyword: string; locale: "" | "zh-CN" | "en-US"; onKeywordChange: (value: string) => void; onLocaleChange: (value: "" | "zh-CN" | "en-US") => void; onUpload: () => void }) {
+    const workflowEnabled = useUserStore((state) => canAccessPath(state.user, "/canvas"));
     return (
         <>
             <Segmented value={mode} onChange={(value) => setMode(value as CommunityMode)} options={[{ label: "社区工作流", value: "browse" }, { label: "我的作品", value: "mine" }]} />
@@ -515,7 +520,7 @@ function CommunityControls({ mode, setMode, keyword, locale, onKeywordChange, on
                 </>
             ) : null}
             <Button className="max-[519px]:flex-1" icon={<UserRound className="size-4" />} onClick={() => setMode("mine")}>查看我的作品</Button>
-            <Button className="max-[519px]:flex-1" type="primary" icon={<UploadCloud className="size-4" />} onClick={onUpload}>上传我的作品</Button>
+            <Button disabled={!workflowEnabled} className="max-[519px]:flex-1" type="primary" icon={<UploadCloud className="size-4" />} onClick={onUpload}>上传我的作品</Button>
         </>
     );
 }

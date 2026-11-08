@@ -4,6 +4,7 @@ import type { Plan } from "@/services/api/billing";
 import type { WorkflowCommunityListResponse, WorkflowCommunityPost } from "@/services/api/workflows";
 import type { Locale } from "@/i18n/messages";
 import type { EmailCodePurpose } from "@/services/api/auth";
+import type { UserSection } from "@/lib/user-sections";
 
 export type AdminPromptCategory = {
     category: string;
@@ -24,6 +25,7 @@ export type AdminUser = {
     profileCompleted: boolean;
     avatarUrl: string;
     role: "user" | "admin";
+    disabledSections: UserSection[];
     credits: number;
     workflowCreateCredits: number;
     affCode: string;
@@ -45,6 +47,10 @@ export type AdminUserListResponse = {
     items: AdminUser[];
     total: number;
 };
+
+export function saveAdminUserSections(token: string, id: string, disabledSections: UserSection[]) {
+    return apiPost<AdminUser>(`/api/admin/users/${encodeURIComponent(id)}/sections`, { disabledSections }, token);
+}
 
 export type AdminLogUser = {
     id: string;

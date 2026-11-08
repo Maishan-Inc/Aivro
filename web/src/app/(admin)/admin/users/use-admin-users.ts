@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { App } from "antd";
 
-import { adjustAdminUserCredits, adjustAdminUserWorkflowCreateCredits, deleteAdminUser, fetchAdminUsers, saveAdminUser, type AdminUser } from "@/services/api/admin";
+import { adjustAdminUserCredits, adjustAdminUserWorkflowCreateCredits, deleteAdminUser, fetchAdminUsers, saveAdminUser, saveAdminUserSections, type AdminUser } from "@/services/api/admin";
+import type { UserSection } from "@/lib/user-sections";
 import { useUserStore } from "@/stores/use-user-store";
 import { adminRealtimeQueryOptions } from "../admin-query-options";
 
@@ -43,6 +44,17 @@ export function useAdminUsers() {
             message.success("用户已删除");
         },
         onError: (error) => message.error(error instanceof Error ? error.message : "删除失败"),
+    });
+
+    const sectionsMutation = useMutation({
+        mutationFn: ({ id, disabledSections }: { id: string; disabledSections: UserSection[] }) => saveAdminUserSections(token, id, disabledSections),
+        onSuccess: async (user) => {
+            const session = useUserStore.getState();
+            if (session.user?.id === user.id) session.setSession(token, user);
+            await queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+            message.success("区块访问权限已保存");
+        },
+        onError: (error) => message.error(error instanceof Error ? error.message : "保存失败"),
     });
 
     const creditMutation = useMutation({
@@ -94,6 +106,8 @@ export function useAdminUsers() {
         resetFilters: () => updateFilters({ keyword: "", page: 1, pageSize: defaultPageSize }),
         refreshUsers: () => query.refetch(),
         saveUser: (user: Partial<AdminUser> & { password?: string }) => saveMutation.mutateAsync(user),
+        saveSections: (id: string, disabledSections: UserSection[]) => sectionsMutation.mutateAsync({ id, disabledSections }),
+        isSavingSections: sectionsMutation.isPending,
         adjustCredits: (id: string, credits: number) => creditMutation.mutateAsync({ id, credits }),
         adjustWorkflowCreateCredits: (id: string, workflowCreateCredits: number) => workflowCreateCreditMutation.mutateAsync({ id, workflowCreateCredits }),
         deleteUser: (id: string) => deleteMutation.mutateAsync(id),

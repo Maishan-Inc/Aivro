@@ -29,6 +29,7 @@ import { HomeNetwork } from "./home-network";
 import { HomeWorkflowDemo } from "./home-workflow-demo";
 import { CodeExamples } from "./developers/code-examples";
 import styles from "./home.module.css";
+import { canAccessPath } from "@/lib/user-sections";
 
 export function HomeClientPage() {
     const router = useRouter();
@@ -39,6 +40,7 @@ export function HomeClientPage() {
     const [openQuestion, setOpenQuestion] = useState<string | null>(null);
     const home = useConfigStore((state) => state.publicSettings?.home);
     const config = useEffectiveConfig();
+    const user = useUserStore((state) => state.user);
     const videoRef = useRef<HTMLVideoElement>(null);
     const [failedVideoUrl, setFailedVideoUrl] = useState("");
     const videoUrl = home?.videoUrl || defaultHomeSettings.videoUrl;
@@ -56,6 +58,10 @@ export function HomeClientPage() {
     }, [videoEnabled, videoUrl]);
 
     const startImage = async () => {
+        if (!canAccessPath(user, "/image")) {
+            message.warning("该区块访问已被管理员禁用");
+            return;
+        }
         if (sending) return;
         const { prompt, references } = useImageComposerStore.getState();
         if (!prompt.trim()) return;
@@ -118,7 +124,7 @@ export function HomeClientPage() {
 
             <section className={styles.section} data-reveal>
                 <div className={styles.sectionHeading}><div><span className={styles.eyebrow}>06 / 创作工具箱</span><h2>各有所长<br />也彼此相连</h2></div><p>生成、整理、探索、复用。<br />为每一个想法，找到合适的工具。</p></div>
-                <div className={styles.toolGrid}>{navigationTools.map((tool) => <Link key={tool.slug} href={tool.external ? tool.href + ("localeAware" in tool && tool.localeAware && locale === "zh-CN" ? "/zh-CN" : "") : localizedPath("/" + tool.slug)} target={tool.external ? "_blank" : undefined} rel={tool.external ? "noopener noreferrer" : undefined} className={styles.toolCard}><tool.icon size={30} strokeWidth={1.2} /><h3>{tool.label}<ArrowUpRight size={19} /></h3><p>{toolDescriptions[tool.slug]}</p><span>{tool.external ? "在独立站点打开" : "在工作空间中打开"}</span></Link>)}</div>
+                <div className={styles.toolGrid}>{navigationTools.filter((tool) => canAccessPath(user, "/" + tool.slug)).map((tool) => <Link key={tool.slug} href={tool.external ? tool.href + ("localeAware" in tool && tool.localeAware && locale === "zh-CN" ? "/zh-CN" : "") : localizedPath("/" + tool.slug)} target={tool.external ? "_blank" : undefined} rel={tool.external ? "noopener noreferrer" : undefined} className={styles.toolCard}><tool.icon size={30} strokeWidth={1.2} /><h3>{tool.label}<ArrowUpRight size={19} /></h3><p>{toolDescriptions[tool.slug]}</p><span>{tool.external ? "在独立站点打开" : "在工作空间中打开"}</span></Link>)}</div>
             </section>
 
             <section className={styles.stepsSection} data-reveal><span className={styles.eyebrow}>07 / 现在，轮到你了</span><h2>从想法到作品<br className="sm:hidden" />就从这三步开始</h2><div className={styles.steps}>{[{ title: "找到一个起点", text: "一句描述、一张参考图，或图库里让你心动的画面。", href: "/prompts", link: "寻找灵感" }, { title: "选择你的表达", text: "打开图片、视频或 3D 工作台，把想象写下来。", href: "/image", link: "尝试生成" }, { title: "让创作继续", text: "保存作品，在画布中连接下一步，建立自己的工作流。", href: "/canvas", link: "打开画布" }].map((step, index) => <div key={step.title}><span className={styles.stepNumber}>0{index + 1}</span><h3>{step.title}</h3><p>{step.text}</p><Link href={localizedPath(step.href)} className={styles.textLink}>{step.link}<ArrowRight size={17} /></Link></div>)}</div></section>
@@ -128,7 +134,7 @@ export function HomeClientPage() {
             <section className={styles.closing} data-reveal><span className={styles.eyebrow}>下一个好作品从你的想象开始</span><h2>想到了就去创造</h2><div className={styles.actions}><Link href={localizedPath("/canvas")} className={styles.primary}>开启我的创作 <ArrowUpRight size={18} /></Link><Link href={localizedPath("/prompts")} className={styles.secondary}>再找一点灵感 <ArrowRight size={17} /></Link></div></section>
 
             <footer className={styles.footer}>
-                <div className={styles.footerTop}><div><Link href={localizedPath("/")} className={styles.footerBrand}><span className={styles.logoMark} />Aivro</Link><p className={styles.footerIntro}>让想象成为作品。<br />连接文字、图像、视频与三维世界，<br />把每一次灵感，变成值得分享的创作。</p><div className={styles.footerSocial} aria-label="社交媒体">{homeSocialPlatforms.map(({ id, label }) => {
+                <div className={styles.footerTop}><div><Link href={localizedPath(user ? "/home" : "/")} className={styles.footerBrand}><span className={styles.logoMark} />Aivro</Link><p className={styles.footerIntro}>让想象成为作品。<br />连接文字、图像、视频与三维世界，<br />把每一次灵感，变成值得分享的创作。</p><div className={styles.footerSocial} aria-label="社交媒体">{homeSocialPlatforms.map(({ id, label }) => {
                     const link = home?.socialLinks[id] || defaultHomeSettings.socialLinks[id];
                     const Icon = { x: SiX, facebook: SiFacebook, discord: SiDiscord, tiktok: SiTiktok, bilibili: SiBilibili }[id];
                     return link.enabled ? <a key={id} href={link.url || undefined} role="link" aria-label={label} title={label} aria-disabled={!link.url} target={link.url ? "_blank" : undefined} rel={link.url ? "noopener noreferrer" : undefined}><Icon size={18} /></a> : null;

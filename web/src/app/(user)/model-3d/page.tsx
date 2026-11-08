@@ -91,6 +91,7 @@ export default function Model3DPage() {
     const [historyOpen, setHistoryOpen] = useState(false);
     const [settingsOpen, setSettingsOpen] = useState(false);
     const [histories, setHistories] = useState<GenerationHistory[]>([]);
+    const [retentionDays, setRetentionDays] = useState<number | null>(null);
     const [loadingHistory, setLoadingHistory] = useState(false);
     const [detailHistory, setDetailHistory] = useState<GenerationHistory | null>(null);
 
@@ -233,11 +234,16 @@ export default function Model3DPage() {
     };
 
     const handleLoadHistory = useCallback(async () => {
-        if (!token) return;
+        if (!token) {
+            setHistories([]);
+            setRetentionDays(null);
+            return;
+        }
         setLoadingHistory(true);
         try {
             const result = await fetchGenerationHistories(token, { type: "model3d", page: 1, pageSize: 20 });
             setHistories(result.items);
+            setRetentionDays(result.retentionDays);
         } catch (err) {
             console.error(err);
         } finally {
@@ -437,7 +443,7 @@ export default function Model3DPage() {
                     </div>
                 </section>
                 <StudioHistorySidebar activeId={currentResult?.id} items={histories.map((item) => ({ id: item.id, title: item.title, prompt: item.prompt, preview: item.references[0]?.url }))} onSelect={(id) => { const item = histories.find((history) => history.id === id); if (item) previewHistory(item); }} onOpenDetail={(id) => { const item = histories.find((history) => history.id === id); if (item) setDetailHistory(item); }}>
-                    <HistoryPanel histories={histories} activeId={currentResult?.id} loading={loadingHistory} token={token} onRefresh={handleLoadHistory} onPreview={previewHistory} onOpenDetail={setDetailHistory} />
+                    <HistoryPanel histories={histories} retentionDays={retentionDays} activeId={currentResult?.id} loading={loadingHistory} token={token} onRefresh={handleLoadHistory} onPreview={previewHistory} onOpenDetail={setDetailHistory} />
                 </StudioHistorySidebar>
             </main>
 
@@ -455,7 +461,7 @@ export default function Model3DPage() {
             />
 
             <Drawer title="生成记录" placement="right" size={340} open={historyOpen} onClose={() => setHistoryOpen(false)}>
-                <HistoryPanel histories={histories} activeId={currentResult?.id} loading={loadingHistory} token={token} onRefresh={handleLoadHistory} onPreview={previewHistory} onOpenDetail={setDetailHistory} />
+                <HistoryPanel histories={histories} retentionDays={retentionDays} activeId={currentResult?.id} loading={loadingHistory} token={token} onRefresh={handleLoadHistory} onPreview={previewHistory} onOpenDetail={setDetailHistory} />
             </Drawer>
             <Modal centered title="模型生成参数" open={settingsOpen} onCancel={() => setSettingsOpen(false)} footer={<Button type="primary" onClick={() => setSettingsOpen(false)}>完成</Button>} width={500}>
                 <div className="grid grid-cols-2 gap-5 py-4">
@@ -470,14 +476,14 @@ export default function Model3DPage() {
     );
 }
 
-function HistoryPanel({ histories, activeId, loading, token, onRefresh, onPreview, onOpenDetail }: { histories: GenerationHistory[]; activeId?: string; loading: boolean; token: string; onRefresh: () => void; onPreview: (history: GenerationHistory) => void; onOpenDetail: (history: GenerationHistory) => void }) {
+function HistoryPanel({ histories, retentionDays, activeId, loading, token, onRefresh, onPreview, onOpenDetail }: { histories: GenerationHistory[]; retentionDays: number | null; activeId?: string; loading: boolean; token: string; onRefresh: () => void; onPreview: (history: GenerationHistory) => void; onOpenDetail: (history: GenerationHistory) => void }) {
     const { tr } = useI18n();
     return (
         <>
             <div className="mb-3 flex items-center justify-between gap-3">
                 <div>
                     <h2 className="text-base font-semibold">生成记录</h2>
-                    <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">Free 用户生成记录最多保存 7 天</p>
+                    {retentionDays !== null ? <p data-i18n-skip className="mt-1 text-xs text-stone-500 dark:text-stone-400">{tr("新生成记录保存 {0} 天，具体到期时间见详情").replace("{0}", String(retentionDays))}</p> : null}
                 </div>
                 <Button size="small" onClick={onRefresh}>
                     刷新
@@ -496,6 +502,7 @@ function HistoryPanel({ histories, activeId, loading, token, onRefresh, onPrevie
                                 <span className="block truncate text-sm font-semibold" data-i18n-skip={history.title !== "3D 模型" || Boolean(history.prompt) || undefined}>{history.title}</span>
                                 <span className="mt-1 line-clamp-2 whitespace-pre-wrap break-words text-xs leading-4 text-stone-500 dark:text-stone-400">{history.prompt ? <span data-i18n-skip>{history.prompt}</span> : "无提示词"}</span>
                                 <span className="mt-1 block text-xs text-stone-500 dark:text-stone-400">{formatDateTime(history.createdAt)}</span>
+                                {history.expiresAt ? <span data-i18n-skip className="mt-1 block text-xs text-muted-foreground">{tr("保存至 {0}").replace("{0}", formatDateTime(history.expiresAt))}</span> : null}
                             </button>
                             <div className="mt-3 flex gap-2" onClick={(event) => event.stopPropagation()}>
                                 <Button size="small" icon={<Download className="size-3.5" />} onClick={() => history.media[0] && window.open(history.media[0].url, "_blank")}>

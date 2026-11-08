@@ -58,6 +58,9 @@ func AIQueueEnabled() bool {
 }
 
 func SubmitAITask(ctx context.Context, user model.AuthUser, body []byte, contentType string, modelName string, path string, meta RequestLogMeta) (model.GenerationTaskSubmitResult, *AIProxyResponse, error) {
+	if err := CheckSectionAccess(user, generationSection(path)); err != nil {
+		return model.GenerationTaskSubmitResult{}, nil, err
+	}
 	settings, err := repository.GetSettings()
 	if err != nil {
 		return model.GenerationTaskSubmitResult{}, nil, err
@@ -199,6 +202,9 @@ func GetGenerationTask(user model.AuthUser, id string) (model.GenerationTaskView
 	if !ok || task.UserID != user.ID {
 		return model.GenerationTaskView{}, safeMessageError{message: "任务不存在或无权限访问"}
 	}
+	if err := CheckSectionAccess(user, generationSection(task.Path)); err != nil {
+		return model.GenerationTaskView{}, err
+	}
 	return generationTaskView(task), nil
 }
 
@@ -209,6 +215,9 @@ func ListGenerationTasks(user model.AuthUser) ([]model.GenerationTaskView, error
 	}
 	result := make([]model.GenerationTaskView, 0, len(items))
 	for _, item := range items {
+		if CheckSectionAccess(user, generationSection(item.Path)) != nil {
+			continue
+		}
 		result = append(result, generationTaskView(item))
 	}
 	return result, nil
@@ -224,6 +233,9 @@ func GetGenerationTaskResult(ctx context.Context, user model.AuthUser, id string
 	}
 	if task.Status != model.GenerationTaskSucceeded || task.ResponseFileID == "" {
 		return GenerationTaskResultStream{}, safeMessageError{message: "任务结果尚未生成"}
+	}
+	if err := CheckSectionAccess(user, generationSection(task.Path)); err != nil {
+		return GenerationTaskResultStream{}, err
 	}
 	header := http.Header{}
 	_ = json.Unmarshal([]byte(task.ResponseHeader), &header)
@@ -246,6 +258,9 @@ func CancelGenerationTask(user model.AuthUser, id string) error {
 	}
 	if task.Status != model.GenerationTaskQueued {
 		return safeMessageError{message: "只能撤销排队中的任务"}
+	}
+	if err := CheckSectionAccess(user, generationSection(task.Path)); err != nil {
+		return err
 	}
 	now := time.Now().Format(time.RFC3339)
 	changed, err := repository.FinishGenerationTask(task, model.GenerationTaskCanceled, map[string]any{"canceled_at": now, "finished_at": now, "error": "用户已撤销", "queue_position": 0}, taskRefundLog(task))

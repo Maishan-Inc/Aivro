@@ -1,5 +1,15 @@
 // Admin-console-only strings (zh/en). These never render on the user-facing site.
 export const adminTranslations: Record<string, string> = {
+    "区块访问": "Section access",
+    "保存权限": "Save permissions",
+    "取消勾选后，该区块将从侧栏隐藏并禁止访问。": "Uncheck a section to hide it from the sidebar and disable access.",
+    "区块访问权限已保存": "Section access permissions saved",
+    "区块权限无效": "Invalid section permissions",
+    "管理员修改区块访问权限": "An administrator updated section access permissions",
+    "前移模型": "Move model earlier",
+    "后移模型": "Move model later",
+    "默认": "Default",
+    "可选项来自已启用渠道中的前台模型名。使用左右箭头调整展示顺序，最左侧的模型排在最上面并作为默认模型；各类型模型也按相同规则排序。": "Options come from public model names in enabled channels. Use the arrows to reorder models. The leftmost model appears first and is the default. The same rule applies to each model type.",
     "同时开放按秒计费": "Also enable per-second billing",
     "按次价格保留在主行；按秒费用为请求秒数乘以单价，API 未传 billingType 时默认按次。": "The main row retains the per-request price. Per-second cost is the requested duration multiplied by the unit price. API requests default to per-request billing when billingType is omitted.",
     "留空使用通用视频接口；选择适配后，请填写对应渠道地址、密钥和上游模型名。": "Leave blank to use the generic video API. After choosing an adapter, enter the matching provider URL, API key and upstream model name.",

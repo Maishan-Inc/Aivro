@@ -45,9 +45,8 @@ function responseHeaders(response: Response, path: string[], method: string) {
     headers.delete("content-length");
     headers.delete("content-encoding");
     headers.delete("transfer-encoding");
-    if (method === "GET" && (path.join("/") === "prompts" || path.join("/") === "settings")) {
-        const maxAge = path[0] === "settings" ? 300 : 0;
-        const value = `public, max-age=${maxAge}, s-maxage=300, stale-while-revalidate=600`;
+    if (method === "GET" && path.join("/") === "prompts") {
+        const value = "public, max-age=0, s-maxage=300, stale-while-revalidate=600";
         headers.set("Cache-Control", value);
         headers.set("CDN-Cache-Control", value);
         headers.set("Surrogate-Control", "max-age=300, stale-while-revalidate=600");

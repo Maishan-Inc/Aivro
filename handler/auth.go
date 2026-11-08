@@ -389,6 +389,25 @@ func AdminSaveUser(w http.ResponseWriter, r *http.Request) {
 	OK(w, user)
 }
 
+func AdminSaveUserSections(w http.ResponseWriter, r *http.Request, id string) {
+	var request struct {
+		DisabledSections []model.UserSection `json:"disabledSections"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		Fail(w, "请求参数错误")
+		return
+	}
+	user, err := service.SaveUserSections(id, request.DisabledSections)
+	if err != nil {
+		FailError(w, err)
+		return
+	}
+	admin, _ := service.UserFromContext(r.Context())
+	meta := service.RequestLogMetaFromRequest(r)
+	_ = service.SaveAuditLog(model.AuditLog{Action: model.AuditLogActionUserUpdate, Category: "用户资料", ActorID: admin.ID, ActorUsername: admin.Username, TargetType: "user", TargetID: user.ID, Remark: "管理员修改区块访问权限", IP: meta.IP, Country: meta.Country})
+	OK(w, user)
+}
+
 func AdminAdjustUserCredits(w http.ResponseWriter, r *http.Request, id string) {
 	var request adjustUserCreditsRequest
 	_ = json.NewDecoder(r.Body).Decode(&request)

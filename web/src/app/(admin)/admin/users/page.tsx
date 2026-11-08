@@ -2,11 +2,13 @@
 
 import { DeleteOutlined, EditOutlined, FilterOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from "@ant-design/icons";
 import { ProTable, type ProColumns } from "@ant-design/pro-components";
-import { Avatar, Button, Card, Col, Drawer, Flex, Form, Grid, Input, InputNumber, Modal, Row, Select, Space, Tag, Tooltip, Typography } from "antd";
+import { Avatar, Button, Card, Checkbox, Col, Drawer, Flex, Form, Grid, Input, InputNumber, Modal, Row, Select, Space, Tag, Tooltip, Typography } from "antd";
+import { ShieldCheck } from "lucide-react";
 import dayjs from "dayjs";
 import { useEffect, useState } from "react";
 
 import type { AdminUser } from "@/services/api/admin";
+import { userSections, type UserSection } from "@/lib/user-sections";
 import { useAdminUsers } from "./use-admin-users";
 
 type UserFormValues = Partial<AdminUser> & { password?: string };
@@ -32,7 +34,7 @@ const profileCompletedOptions = [
 ];
 
 export default function AdminUsersPage() {
-    const { users, keyword, page, pageSize, total, isLoading, searchUsers, changePage, changePageSize, resetFilters, refreshUsers, saveUser: saveAdminUser, adjustCredits, adjustWorkflowCreateCredits, deleteUser } = useAdminUsers();
+    const { users, keyword, page, pageSize, total, isLoading, searchUsers, changePage, changePageSize, resetFilters, refreshUsers, saveUser: saveAdminUser, saveSections, isSavingSections, adjustCredits, adjustWorkflowCreateCredits, deleteUser } = useAdminUsers();
     const screens = Grid.useBreakpoint();
     const isCompact = !screens.lg;
     const [form] = Form.useForm<UserFormValues>();
@@ -40,6 +42,13 @@ export default function AdminUsersPage() {
     const [filtersOpen, setFiltersOpen] = useState(false);
     const [editingUser, setEditingUser] = useState<Partial<AdminUser> | null>(null);
     const [deletingUser, setDeletingUser] = useState<AdminUser | null>(null);
+    const [accessUser, setAccessUser] = useState<AdminUser | null>(null);
+    const [enabledSections, setEnabledSections] = useState<UserSection[]>([]);
+
+    const openSectionAccess = (user: AdminUser) => {
+        setAccessUser(user);
+        setEnabledSections(userSections.filter((section) => !user.disabledSections?.includes(section.key)).map((section) => section.key));
+    };
 
     useEffect(() => setKeywordText(keyword), [keyword]);
 
@@ -184,10 +193,13 @@ export default function AdminUsersPage() {
         {
             title: "操作",
             key: "actions",
-            width: 96,
+            width: 128,
             align: "right",
             render: (_, item) => (
                 <Space size={4}>
+                    <Tooltip title="区块访问">
+                        <Button type="text" size="small" aria-label="区块访问" icon={<ShieldCheck className="size-4" />} onClick={() => openSectionAccess(item)} />
+                    </Tooltip>
                     <Tooltip title="编辑">
                         <Button type="text" size="small" icon={<EditOutlined />} onClick={() => setEditingUser(item)} />
                     </Tooltip>
@@ -253,6 +265,16 @@ export default function AdminUsersPage() {
             <Drawer title="筛选用户" placement="bottom" height="62vh" open={filtersOpen} onClose={() => setFiltersOpen(false)} destroyOnHidden>
                 {filterForm(true)}
             </Drawer>
+
+            <Modal title="区块访问" open={Boolean(accessUser)} onCancel={() => setAccessUser(null)} confirmLoading={isSavingSections} okText="保存权限" cancelText="取消" onOk={async () => {
+                if (!accessUser) return;
+                await saveSections(accessUser.id, userSections.filter((section) => !enabledSections.includes(section.key)).map((section) => section.key));
+                setAccessUser(null);
+            }}>
+                <Typography.Paragraph>{accessUser?.displayName || accessUser?.username}</Typography.Paragraph>
+                <Typography.Paragraph type="secondary">取消勾选后，该区块将从侧栏隐藏并禁止访问。</Typography.Paragraph>
+                <Checkbox.Group value={enabledSections} onChange={setEnabledSections} className="py-2" style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 16 }} options={userSections.map((section) => ({ label: section.label, value: section.key }))} />
+            </Modal>
 
             <Modal title={editingUser?.id ? "编辑用户" : "新增用户"} open={Boolean(editingUser)} width="min(920px, calc(100vw - 24px))" onCancel={() => setEditingUser(null)} onOk={() => void saveUser()} okText="保存资料" cancelText="取消" destroyOnHidden>
                 <Form form={form} layout="vertical" requiredMark={false}>

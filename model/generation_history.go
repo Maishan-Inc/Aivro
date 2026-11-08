@@ -47,6 +47,7 @@ type GenerationHistory struct {
 }
 
 type GenerationHistoryList struct {
-	Items []GenerationHistory `json:"items"`
-	Total int                 `json:"total"`
+	Items         []GenerationHistory `json:"items"`
+	Total         int                 `json:"total"`
+	RetentionDays int                 `json:"retentionDays,omitempty"`
 }

@@ -37,6 +37,7 @@
 
 ## 生成期限与后台任务
 
+- `GET /api/v1/generation-histories?type=image|video|model3d` 的 `data` 返回 `{ items, total, retentionDays }`；`retentionDays` 为该类型新生成记录当前配置的保存天数，与后端文件到期计算共用规则，不与 Free 等套餐绑定。每条记录和媒体的 `expiresAt` 保留实际到期时间；修改后台期限不改写已有记录。未指定类型的混合列表只返回 `{ items, total }`。
 - 管理员使用 `POST /api/admin/settings/ai-timeouts` 保存 `{ imageMinutes, videoMinutes, model3DMinutes, textMinutes }`，单位为分钟，默认分别为 10、15、30、5，允许 1–120 的整数。响应 `data` 为保存后的四项设置；只更新该私有配置并记录审计流水，其他未保存设置不会被提交。无需重启，新开始执行的任务使用最新设置。
 - 登录会话提交图片生成、图片编辑、视频、3D 生成后，返回 `{ code: 0, data: { queued: true, taskId, status, queuePosition, aheadCount, model, path }, msg: "ok" }`。`queued: true` 表示请求交由后台任务接管，`status` 可为 `queued` 或 `executing`；关闭限流队列时仍在后台执行。
 - 使用 `GET /api/v1/generation-tasks/{id}` 查询状态，`succeeded` 后通过 `/result` 获取结果。图片保留 `data[]` 图片格式；视频结果为 `{ id, status: "completed", file, billingType, seconds, unitCredits, energyCost }`，其中 `file` 包含云端/本地后端文件 URL、storageKey、cloudFileId 等，视频的上游轮询和转存已由后台完成；3D 结果保留 `{ code, data: { results, energyCost, ... }, msg }`。
@@ -57,6 +58,13 @@
 - API 密钥调用按 `apiCredits`（显式价格优先，否则标准价乘 `apiMultiplier`，默认 2 倍）及 `apiBilling` 扣所属账号算力点。对话按原有预扣/词元结算；图片和 3D 的词元计费有上游用量则按每千词元向上取整，缺少用量则保留提交时预扣。队列的 API 单价和方式在提交时保存，成功结算与任务终态在同一事务中提交。
 - 对话成功继续返回标准 JSON/SSE，图片直接成功保留模型接口响应；视频始终后台执行，图片限流排队时也返回 `{ code: 0, data: { queued: true, taskId, ... }, msg: "ok" }`。使用同一账号的有效密钥查询 `/generation-tasks/:id` 和 `/generation-tasks/:id/result`，任务仍在排队时可 DELETE 取消并退款。
 - 静态中文开发文档入口为 `/developers`（中文路径 `/zh-CN/developers`），包含所有已开放的对外接口说明与 22 种语言示例。具体功能与联调结果记录在 `docs/pending-test.md`。
+
+## 用户区块访问
+
+- 管理端 `POST /api/admin/users/:id/sections` 接收 `{ "disabledSections": ["workflow", "image"] }`，返回更新后的用户；`[]` 允许全部区块。支持 `workflow`、`image`、`video`、`model3d`、`shares`、`community`，未知值返回业务错误。此接口只调整区块访问并记录审计，不修改角色或吊销登录会话。
+- 登录信息及用户列表返回 `disabledSections`；后端每次鉴权读取当前账户限制，模型 API 密钥也受相同限制。访问被禁用区块的接口返回 `{ code: 1, data: null, msg: "该区块访问已被管理员禁用" }`。
+- `GET /api/v1/workflow-shares` 返回当前用户从分享复制的工作流副本，按“我的分享”权限控制；普通工作流列表和编辑仍由工作流权限控制。任务及历史列表隐藏被禁用生成类型，对应详情、结果和修改接口同样检查权限。
+- 模型配置中的有序数组决定展示顺序，各类型第一项为缺省模型；`/api/settings` 返回最新顺序与派生默认值，`/api/v1/models` 沿用系统可用模型顺序。
 
 ## 安全响应与来源校验
 

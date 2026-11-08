@@ -1,5 +1,6 @@
 // Generated translations. Source strings are Simplified Chinese (zh-CN).
 const zhTW = {
+    "该区块访问已被管理员禁用": "管理員已停用此區塊的存取權限",
     "查看详情": "檢視詳情",
     "已取消": "已取消",
     "正在生成 3D 模型": "正在生成 3D 模型",
@@ -1219,7 +1220,8 @@ const zhTW = {
     "Fork 工作流": "Fork 工作流",
     "Fork 失败": "Fork 失敗",
     "Fork 运行": "Fork 運行",
-    "Free 用户生成记录最多保存 7 天": "Free 使用者生成記錄最多儲存 7 天",
+    "新生成记录保存 {0} 天，具体到期时间见详情": "新生成記錄儲存 {0} 天，確切到期時間請查看詳情",
+    "保存至 {0}": "儲存至 {0}",
     "hCaptcha 加载超时，请重试": "hCaptcha 載入超時，請重試",
     "hCaptcha 加载失败，请重试": "hCaptcha 載入失敗，請重試",
     "hCaptcha 脚本加载失败，请检查网络或域名配置": "hCaptcha 腳本載入失敗，請檢查網路或域名設定",

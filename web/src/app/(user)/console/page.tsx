@@ -13,6 +13,7 @@ import { createKycSession, fetchKycStatus } from "@/services/api/billing";
 import { fetchWorkflows, type CloudWorkflow } from "@/services/api/workflows";
 import { useUserStore } from "@/stores/use-user-store";
 import { formatNumber } from "@/lib/datetime";
+import { canAccessPath } from "@/lib/user-sections";
 
 type KycStatus = Awaited<ReturnType<typeof fetchKycStatus>>;
 
@@ -27,9 +28,10 @@ export default function ConsolePage() {
 
     useEffect(() => {
         if (!token) return;
-        fetchWorkflows(token, { pageSize: 200 }).then((data) => setWorkflows(data.items)).catch(() => undefined);
+        if (canAccessPath(user, "/canvas")) fetchWorkflows(token, { pageSize: 200 }).then((data) => setWorkflows(data.items)).catch(() => undefined);
+        else setWorkflows([]);
         fetchKycStatus(token).then(setKyc).catch(() => undefined);
-    }, [token]);
+    }, [token, user?.disabledSections]);
 
     const stats = useMemo(
         () =>
@@ -65,10 +67,10 @@ export default function ConsolePage() {
                             <p className="mt-2 text-sm leading-6 text-stone-500 dark:text-stone-400">管理工作流、余额、身份认证和个人资料，创作工具仍保持原页面体验。</p>
                         </div>
                         <div className="flex flex-wrap gap-2">
-                            <Button type="primary" href={localizedPath("/canvas")} icon={<Layers3 className="size-4" />}>
+                            <Button disabled={!canAccessPath(user, "/canvas")} type="primary" href={localizedPath("/canvas")} icon={<Layers3 className="size-4" />}>
                                 我的工作流
                             </Button>
-                            <Button href={localizedPath("/image")} icon={<ImagePlus className="size-4" />}>
+                            <Button disabled={!canAccessPath(user, "/image")} href={localizedPath("/image")} icon={<ImagePlus className="size-4" />}>
                                 生图工作台
                             </Button>
                         </div>
@@ -117,6 +119,8 @@ function MetricCard({ icon, label, value, helper }: { icon: ReactNode; label: st
 
 function QuickLink({ href, icon, title, description }: { href: string; icon: ReactNode; title: string; description: string }) {
     const localizedPath = useLocalizedPath();
+    const user = useUserStore((state) => state.user);
+    if (!canAccessPath(user, href)) return null;
     return (
         <Link href={localizedPath(href)} className="rounded-lg border border-stone-200 p-4 transition hover:border-stone-400 dark:border-stone-800 dark:hover:border-stone-600">
             <div className="mb-3 flex size-9 items-center justify-center rounded-md bg-stone-100 dark:bg-stone-900">{icon}</div>

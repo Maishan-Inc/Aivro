@@ -6,6 +6,7 @@ import { StudioHistorySidebar } from "@/components/studio-history-sidebar";
 import { useImageComposerStore, type ImageComposerDraft } from "@/stores/use-image-composer-store";
 import localforage from "localforage";
 import { useLocalizedPath } from "@/hooks/use-localized-path";
+import { useI18n } from "@/hooks/use-i18n";
 import studio from "@/components/studio-layout.module.css";
 
 import { CheckSquare, Download, FileText, FolderPlus, History, PenLine, Plus, Trash2 } from "lucide-react";
@@ -84,6 +85,7 @@ type RecoverableGeneration = {
 };
 
 const RECOVERY_KEY = "image-generation-recovery-v1";
+const SINGLE_IMAGE_PREVIEW_HEIGHT = "min(640px, max(160px, calc(100cqh - 96px)))";
 
 type GenerationLogConfig = Pick<AiConfig, "model" | "imageModel" | "quality" | "size" | "count">;
 
@@ -108,6 +110,7 @@ export default function ImagePage() {
     const { prompt, references, setPrompt, setReferences } = useImageComposerStore();
     const [results, setResults] = useState<GenerationResult[]>([]);
     const [logs, setLogs] = useState<GenerationLog[]>([]);
+    const [retentionDays, setRetentionDays] = useState<number | null>(null);
     const [pendingLog, setPendingLog] = useState<GenerationLog | null>(null);
     const [running, setRunning] = useState(false);
     const [logsOpen, setLogsOpen] = useState(false);
@@ -340,10 +343,12 @@ export default function ImagePage() {
     const refreshLogs = async () => {
         if (!token) {
             setLogs([]);
+            setRetentionDays(null);
             return;
         }
         const data = await fetchGenerationHistories(token, { type: "image", pageSize: 100 });
         setLogs(data.items.map(historyToImageLog));
+        setRetentionDays(data.retentionDays);
     };
 
     const previewGenerationLog = async (log: GenerationLog) => {
@@ -472,7 +477,7 @@ export default function ImagePage() {
                             <div className={studio.historyActions}><Button type="text" icon={<History size={15} />} onClick={() => setLogsOpen(true)}>记录</Button></div>
                         </div>
                     </header>
-                    <div className={studio.results}>
+                    <div className={studio.results} style={{ containerType: "size" }}>
                         <div className="mb-4 flex items-center justify-between gap-3">
                             <div>
                                 <h2 className="text-xl font-semibold">生成结果</h2>
@@ -480,7 +485,7 @@ export default function ImagePage() {
                             {running ? <Tag className="m-0 px-2 py-1">等待 {formatDuration(elapsedMs)}</Tag> : null}
                         </div>
                         {results.length ? (
-                            <div className={`grid gap-4 ${results.length > 1 ? "sm:grid-cols-2 2xl:grid-cols-3" : ""}`}>
+                            <div className={`grid items-start gap-4 ${results.length > 1 ? "sm:grid-cols-2 2xl:grid-cols-3" : "justify-items-center"}`}>
                                 {results.map((result, index) => {
                                     const single = results.length === 1;
                                     return result.status === "success" && result.image ? (
@@ -508,6 +513,7 @@ export default function ImagePage() {
                 <StudioHistorySidebar items={visibleLogs.map((log) => ({ id: log.id, title: log.title, prompt: log.prompt, preview: log.thumbnails[0] }))} onSelect={(id) => { const log = visibleLogs.find((item) => item.id === id); if (log) void previewGenerationLog(log); }}>
                     <LogPanel
                         logs={visibleLogs}
+                        retentionDays={retentionDays}
                         selectedLogIds={selectedLogIds}
                         activeLogId={previewLog?.id}
                         onSelectedLogIdsChange={setSelectedLogIds}
@@ -521,6 +527,7 @@ export default function ImagePage() {
             <Drawer title="生成记录" placement="right" size={340} open={logsOpen} onClose={() => setLogsOpen(false)}>
                 <LogPanel
                     logs={visibleLogs}
+                    retentionDays={retentionDays}
                     selectedLogIds={selectedLogIds}
                     activeLogId={previewLog?.id}
                     onSelectedLogIdsChange={setSelectedLogIds}
@@ -555,8 +562,8 @@ function ResultImageCard({
     onSaveAsset: (image: GeneratedImage, index: number) => void;
 }) {
     return (
-        <div className="overflow-hidden rounded-lg border border-stone-200 bg-background dark:border-stone-800">
-            <Image src={image.dataUrl} alt={`生成结果 ${index + 1}`} className={single ? "w-full" : "aspect-square object-cover"} />
+        <div className="min-w-0 w-full overflow-hidden rounded-lg border border-stone-200 bg-background dark:border-stone-800" style={single ? { maxWidth: singleImagePreviewMaxWidth(`${image.width} / ${image.height}`) } : undefined}>
+            <Image src={image.dataUrl} alt={`生成结果 ${index + 1}`} width="100%" styles={{ root: { display: "block" }, image: { width: "100%", height: "auto", maxHeight: single ? SINGLE_IMAGE_PREVIEW_HEIGHT : undefined, aspectRatio: single ? undefined : "1", objectFit: single ? "contain" : "cover" } }} />
             <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-stone-200 px-3 py-2.5 dark:border-stone-800">
                 <div className="flex min-w-0 flex-wrap gap-x-2 gap-y-1 text-xs text-stone-500 dark:text-stone-400">
                     <span>
@@ -565,7 +572,7 @@ function ResultImageCard({
                     <span>{formatBytes(image.bytes)}</span>
                     <span>{formatDuration(image.durationMs)}</span>
                 </div>
-                <div className="flex shrink-0 gap-1">
+                <div className="flex min-w-0 flex-wrap gap-1">
                     <Button size="small" icon={<FolderPlus className="size-3.5" />} onClick={() => void onSaveAsset(image, index)}>
                         添加到素材
                     </Button>
@@ -582,11 +589,11 @@ function ResultImageCard({
 }
 
 function PendingImageCard({ label = "生成中", single, aspectRatio }: { label?: string; single?: boolean; aspectRatio?: string }) {
-    const ratioStyle = single && aspectRatio ? { aspectRatio } : undefined;
+    const ratioStyle = single && aspectRatio ? { aspectRatio, maxWidth: singleImagePreviewMaxWidth(aspectRatio) } : undefined;
     return (
-        <div className={`relative ${single ? (aspectRatio ? "" : "min-h-[280px]") : "aspect-square"} overflow-hidden rounded-lg border border-dashed border-stone-300 bg-stone-50 dark:border-stone-700 dark:bg-stone-900`} style={ratioStyle}>
+        <div className={`relative w-full ${single ? (aspectRatio ? "" : "min-h-[280px]") : "aspect-square"} overflow-hidden rounded-lg border border-dashed border-stone-300 bg-stone-50 dark:border-stone-700 dark:bg-stone-900`} style={ratioStyle}>
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-stone-500 dark:text-stone-400">
-                <AivroDrawableLoader className="h-28 w-80 text-stone-900 dark:text-stone-100" />
+                <AivroDrawableLoader className="h-28 w-80 max-w-[80%] text-stone-900 dark:text-stone-100" />
                 <span className="text-sm">{label}</span>
             </div>
         </div>
@@ -594,11 +601,11 @@ function PendingImageCard({ label = "生成中", single, aspectRatio }: { label?
 }
 
 function QueuedImageCard({ aheadCount, queuePosition, onCancel, single, aspectRatio }: { aheadCount: number; queuePosition: number; onCancel: () => void; single?: boolean; aspectRatio?: string }) {
-    const ratioStyle = single && aspectRatio ? { aspectRatio } : undefined;
+    const ratioStyle = single && aspectRatio ? { aspectRatio, maxWidth: singleImagePreviewMaxWidth(aspectRatio) } : undefined;
     return (
-        <div className={`relative ${single ? (aspectRatio ? "" : "min-h-[280px]") : "aspect-square"} overflow-hidden rounded-lg border border-dashed border-blue-300 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/20`} style={ratioStyle}>
+        <div className={`relative w-full ${single ? (aspectRatio ? "" : "min-h-[280px]") : "aspect-square"} overflow-hidden rounded-lg border border-dashed border-blue-300 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/20`} style={ratioStyle}>
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-5 text-center text-blue-700 dark:text-blue-200">
-                <AivroDrawableLoader className="h-24 w-72 text-blue-700 dark:text-blue-200" />
+                <AivroDrawableLoader className="h-24 w-72 max-w-full text-blue-700 dark:text-blue-200" />
                 <div className="text-sm font-medium">排队中</div>
                 <div className="text-xs text-blue-600 dark:text-blue-300">前方 {aheadCount} 位 · 当前第 {queuePosition} 位</div>
                 <Button size="small" danger onClick={onCancel}>撤销任务</Button>
@@ -610,7 +617,7 @@ function QueuedImageCard({ aheadCount, queuePosition, onCancel, single, aspectRa
 function FailedImageCard({ error, single, aspectRatio }: { error: string; single?: boolean; aspectRatio?: string }) {
     const ratioStyle = single && aspectRatio ? { aspectRatio } : undefined;
     return (
-        <div className="overflow-hidden rounded-lg border border-red-200 bg-red-50 dark:border-red-950 dark:bg-red-950/20">
+        <div className="w-full overflow-hidden rounded-lg border border-red-200 bg-red-50 dark:border-red-950 dark:bg-red-950/20" style={single && aspectRatio ? { maxWidth: singleImagePreviewMaxWidth(aspectRatio) } : undefined}>
             <div className={`flex ${single ? (aspectRatio ? "" : "min-h-[200px]") : "aspect-square"} flex-col items-center justify-center gap-3 p-5 text-center`} style={ratioStyle}>
                 <div className="text-sm font-medium text-red-600 dark:text-red-300">生成失败</div>
                 <Typography.Paragraph ellipsis={{ rows: 4 }} className="!mb-0 !text-xs !text-red-500 dark:!text-red-300">
@@ -619,6 +626,11 @@ function FailedImageCard({ error, single, aspectRatio }: { error: string; single
             </div>
         </div>
     );
+}
+
+function singleImagePreviewMaxWidth(aspectRatio: string) {
+    const [width, height] = aspectRatio.split("/").map(Number);
+    return width > 0 && height > 0 ? `calc(${SINGLE_IMAGE_PREVIEW_HEIGHT} * ${width / height})` : undefined;
 }
 
 function updateResultAt(results: GenerationResult[], index: number, next: Partial<GenerationResult>) {
@@ -639,6 +651,7 @@ function imagePreviewAspectRatio(size?: string) {
 
 function LogPanel({
     logs,
+    retentionDays,
     selectedLogIds,
     activeLogId,
     onSelectedLogIdsChange,
@@ -648,6 +661,7 @@ function LogPanel({
     onOpenDetail,
 }: {
     logs: GenerationLog[];
+    retentionDays: number | null;
     selectedLogIds: string[];
     activeLogId?: string;
     onSelectedLogIdsChange: (ids: string[]) => void;
@@ -656,6 +670,7 @@ function LogPanel({
     onPreviewLog: (log: GenerationLog) => void;
     onOpenDetail: (log: GenerationLog) => void;
 }) {
+    const { tr } = useI18n();
     const selectableLogs = logs.filter((log) => log.status !== "生成中");
     const allSelected = Boolean(selectableLogs.length) && selectedLogIds.length === selectableLogs.length;
     const toggleAll = () => onSelectedLogIdsChange(allSelected ? [] : selectableLogs.map((log) => log.id));
@@ -665,7 +680,7 @@ function LogPanel({
             <div className="mb-3 flex items-center justify-between gap-3">
                 <div>
                     <h2 className="text-base font-semibold">生成记录</h2>
-                    <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">Free 用户生成记录最多保存 7 天</p>
+                    {retentionDays !== null ? <p data-i18n-skip className="mt-1 text-xs text-stone-500 dark:text-stone-400">{tr("新生成记录保存 {0} 天，具体到期时间见详情").replace("{0}", String(retentionDays))}</p> : null}
                 </div>
                 <Tag className="m-0">{logs.length}</Tag>
             </div>
@@ -699,6 +714,7 @@ function LogPanel({
 }
 
 function LogCard({ log, selected, active, onSelectedChange, onClick, onOpenDetail }: { log: GenerationLog; selected: boolean; active: boolean; onSelectedChange: (checked: boolean) => void; onClick: () => void; onOpenDetail: () => void }) {
+    const { tr } = useI18n();
     const detailMenu = {
         items: [{ key: "detail", disabled: !log.history, icon: <FileText className="size-4" />, label: "详情" }],
         onClick: ({ key }: { key: string }) => {
@@ -754,6 +770,7 @@ function LogCard({ log, selected, active, onSelectedChange, onClick, onOpenDetai
                         </div>
                     </div>
                 </div>
+                {log.history?.expiresAt ? <div data-i18n-skip className="mt-2 text-xs text-muted-foreground">{tr("保存至 {0}").replace("{0}", formatDateTime(log.history.expiresAt))}</div> : null}
             </button>
         </Dropdown>
     );

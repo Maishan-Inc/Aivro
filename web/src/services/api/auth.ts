@@ -2,6 +2,7 @@ import { apiGet, apiPost } from "@/services/api/request";
 import { authHeader } from "@/services/api/request";
 import axios from "axios";
 import { COOKIE_SESSION_TOKEN } from "@/services/api/request";
+import type { UserSection } from "@/lib/user-sections";
 
 export const AUTH_TOKEN_KEY = "aivro-auth-token-v1";
 export { COOKIE_SESSION_TOKEN };
@@ -16,6 +17,7 @@ export type AuthUser = {
     profileCompleted: boolean;
     avatarUrl: string;
     role: UserRole;
+    disabledSections: UserSection[];
     credits: number;
     workflowCreateCredits: number;
     createdAt: string;

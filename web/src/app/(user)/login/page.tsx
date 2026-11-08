@@ -68,7 +68,7 @@ function LoginContent() {
     const [submitting, setSubmitting] = useState(false);
     const [codeSeconds, setCodeSeconds] = useState(0);
     const [metaMaskAvailable, setMetaMaskAvailable] = useState(true);
-    const redirect = safeRedirect(searchParams.get("redirect") || localizedPath("/canvas"));
+    const redirect = safeRedirect(searchParams.get("redirect") || localizedPath("/image"));
     const thirdPartyProviders = ([authSettings?.google, authSettings?.github, authSettings?.linuxDo, ...(authSettings?.customProviders || [])] as Array<AdminPublicAuthProvider | undefined>).filter((item): item is AdminPublicAuthProvider => item?.enabled === true && item.id !== "metamask");
 
     useEffect(() => {

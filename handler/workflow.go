@@ -23,6 +23,16 @@ func Workflows(w http.ResponseWriter, r *http.Request) {
 	OK(w, result)
 }
 
+func SharedWorkflows(w http.ResponseWriter, r *http.Request) {
+	user, _ := service.UserFromContext(r.Context())
+	result, err := service.ListSharedWorkflows(user.ID, parseQuery(r))
+	if err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, result)
+}
+
 func Workflow(w http.ResponseWriter, r *http.Request, id string) {
 	user, ok := service.UserFromContext(r.Context())
 	if !ok {

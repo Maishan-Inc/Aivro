@@ -1,5 +1,6 @@
 // Generated translations. Source strings are Simplified Chinese (zh-CN).
 const enUS = {
+    "该区块访问已被管理员禁用": "Access to this section has been disabled by an administrator",
     "查看详情": "View details",
     "已取消": "Canceled",
     "正在生成 3D 模型": "Generating 3D model",
@@ -1228,7 +1229,8 @@ const enUS = {
     "Fork 工作流": "Fork workflow",
     "Fork 失败": "Fork failed",
     "Fork 运行": "Fork and run",
-    "Free 用户生成记录最多保存 7 天": "Free users' generation history is kept for up to 7 days",
+    "新生成记录保存 {0} 天，具体到期时间见详情": "New generation history is kept for {0} days. See details for the exact expiry time.",
+    "保存至 {0}": "Kept until {0}",
     "hCaptcha 加载超时，请重试": "hCaptcha loading timed out. Please try again.",
     "hCaptcha 加载失败，请重试": "Failed to load hCaptcha. Please try again.",
     "hCaptcha 脚本加载失败，请检查网络或域名配置": "Failed to load the hCaptcha script. Check your network or domain configuration.",

@@ -4,6 +4,6 @@ import { WorkflowLibraryView } from "@/app/(user)/canvas/components/workflow-lib
 
 export default function CanvasPage() {
     return (
-        <WorkflowLibraryView initialTab="workflows" lockTab embedded redirectPath="/canvas" />
+        <WorkflowLibraryView initialTab="workflows" lockTab redirectPath="/canvas" />
     );
 }
