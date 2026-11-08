@@ -99,7 +99,7 @@ export default function FreeImagePage() {
                     </div> : null}
                 </div>
             </div>
-            {token && accepted ? <ExploreHistory type="free-image" activeId={selected?.id} onSelect={setSelected} /> : null}
+            {token && accepted ? <ExploreHistory type="free-image" activeId={selected?.id} onSelect={setSelected} onNew={() => { setPrompt(""); setImages([]); setSelected(null); }} newDisabled={running} /> : null}
         </div>
         <Modal title={tr("免费生成图片协议")} open={!accepted} closable={false} maskClosable={false} okText={tr("同意并继续")} cancelText={tr("取消")} okButtonProps={{ disabled: !checked }} onOk={() => setAccepted(true)} onCancel={() => router.push(localizedPath("/home"))}>
             <p className="mb-5 leading-7">{tr("免费生成图片：Aivro 会根据你图片的质量公开你生成的图片和提示词。公开后，你将获得一定的奖励额度。")}</p>

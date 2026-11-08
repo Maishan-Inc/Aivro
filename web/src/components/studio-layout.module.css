@@ -43,10 +43,15 @@
 @media (max-height: 740px) { .emptyArt { max-width: 300px; margin-bottom: 22px; }.empty { min-height: 280px; }.empty h3 { font-size: 22px; }.empty > small { display: none; } }
 @media (prefers-reduced-motion: reduce) { .composer, .empty button { transition: none; } }
 .history[data-collapsed="true"] { width: 72px; padding: 16px 12px; }
-.historyToggle { display: flex; justify-content: flex-end; margin-bottom: 16px; }
-.historyToggle > button { display: grid; width: 32px; height: 32px; place-items: center; color: var(--muted-foreground); border-radius: 6px; cursor: pointer; }
+.historyToggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 32px; margin-bottom: 12px; }
+.historyToggle > button { display: grid; width: 32px; height: 32px; flex-shrink: 0; place-items: center; color: var(--muted-foreground); border-radius: 6px; cursor: pointer; }
 .historyToggle > button:hover { background: var(--muted); color: var(--foreground); }
 .history[data-collapsed="true"] .historyToggle { justify-content: center; }
+.historyRetention { margin-bottom: 12px; font-size: 12px; line-height: 1.6; color: var(--muted-foreground); }
+.historyControls { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 16px; }
+.historyButtons { display: flex; align-items: center; gap: 8px; min-width: 0; overflow-x: auto; }
+.historyButtons :global(.ant-btn), .historyControls :global(.ant-tag) { flex-shrink: 0; }
+.historyControls :global(.ant-tag) { margin: 0; }
 .historyRail { display: grid; justify-items: center; gap: 12px; }
 .historyRail > button { display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; cursor: pointer; }
 .historyRail > button:hover { border-color: var(--ring); }

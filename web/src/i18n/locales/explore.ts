@@ -1,5 +1,6 @@
 // 内置工具的六语言文案；模型名、协议字段和用户内容保持原样。
 const rows: Record<string, string[]> = {
+    "选择生成记录": ["選擇生成記錄", "Select generation record", "生成履歴を選択", "생성 기록 선택", "Sélectionner un historique de génération"],
     "每次最多上传 6 张图片": ["每次最多上傳 6 張圖片", "Upload up to 6 images at a time", "一度にアップロードできる画像は6枚までです", "한 번에 최대 6장의 이미지를 업로드할 수 있습니다", "Importez jusqu’à 6 images à la fois"],
     "最多 6 张图片 · 每张不超过 5MB": ["最多 6 張圖片 · 每張不超過 5MB", "Up to 6 images · 5MB per image", "最大6枚 · 1枚あたり5MBまで", "최대 6장 · 이미지당 최대 5MB", "6 images maximum · 5 Mo par image"],
     "确认反推任务": ["確認反推任務", "Confirm prompt reconstruction", "プロンプト逆生成を確認", "프롬프트 역추출 확인", "Confirmer la reconstruction de prompts"],

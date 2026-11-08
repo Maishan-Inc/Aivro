@@ -12,8 +12,8 @@ import composer from "@/components/image-prompt-composer.module.css";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { App, Button, Drawer, Dropdown, Empty, Input, InputNumber, Modal, Select, Spin, Tag } from "antd";
-import { ArrowUp, ChevronDown, Download, FileText, FolderPlus, History, Plus, SlidersHorizontal, Trash2, Upload, X } from "lucide-react";
+import { App, Button, Checkbox, Drawer, Dropdown, Empty, Input, InputNumber, Modal, Popconfirm, Select, Spin, Tag } from "antd";
+import { ArrowUp, CheckSquare, ChevronDown, Download, FileText, FolderPlus, History, Plus, SlidersHorizontal, Trash2, Upload, X } from "lucide-react";
 import { useUserStore } from "@/stores/use-user-store";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { requestModel3DGeneration, type Model3DGenerationInput, type Model3DGenerationResult } from "@/services/api/model-3d";
@@ -444,8 +444,8 @@ export default function Model3DPage() {
                         {generationMode !== "text" && images.length > 0 && !imageCountValid ? <p className={studio.composerHint}>请调整参考图数量或切换生成模式。</p> : null}
                     </div>
                 </section>
-                <StudioHistorySidebar activeId={currentResult?.id} items={histories.map((item) => ({ id: item.id, title: item.title, prompt: item.prompt, preview: item.references[0]?.url }))} onSelect={(id) => { const item = histories.find((history) => history.id === id); if (item) previewHistory(item); }} onOpenDetail={(id) => { const item = histories.find((history) => history.id === id); if (item) setDetailHistory(item); }}>
-                    <HistoryPanel histories={histories} retentionDays={retentionDays} activeId={currentResult?.id} loading={loadingHistory} token={token} onRefresh={handleLoadHistory} onPreview={previewHistory} onOpenDetail={setDetailHistory} />
+                <StudioHistorySidebar onNew={createSession} newDisabled={generating || uploading} activeId={currentResult?.id} items={histories.map((item) => ({ id: item.id, title: item.title, prompt: item.prompt, preview: item.references[0]?.url }))} onSelect={(id) => { const item = histories.find((history) => history.id === id); if (item) previewHistory(item); }} onOpenDetail={(id) => { const item = histories.find((history) => history.id === id); if (item) setDetailHistory(item); }}>
+                    <HistoryPanel histories={histories} retentionDays={retentionDays} activeId={currentResult?.id} loading={loadingHistory} onNew={generating || uploading ? undefined : createSession} onRefresh={handleLoadHistory} onPreview={previewHistory} onOpenDetail={setDetailHistory} />
                 </StudioHistorySidebar>
             </main>
 
@@ -463,7 +463,7 @@ export default function Model3DPage() {
             />
 
             <Drawer title="生成记录" placement="right" size={340} open={historyOpen} onClose={() => setHistoryOpen(false)}>
-                <HistoryPanel histories={histories} retentionDays={retentionDays} activeId={currentResult?.id} loading={loadingHistory} token={token} onRefresh={handleLoadHistory} onPreview={previewHistory} onOpenDetail={setDetailHistory} />
+                <HistoryPanel histories={histories} retentionDays={retentionDays} activeId={currentResult?.id} loading={loadingHistory} onNew={generating || uploading ? undefined : () => { createSession(); setHistoryOpen(false); }} onRefresh={handleLoadHistory} onPreview={previewHistory} onOpenDetail={setDetailHistory} />
             </Drawer>
             <Modal centered title="模型生成参数" open={settingsOpen} onCancel={() => setSettingsOpen(false)} footer={<Button type="primary" onClick={() => setSettingsOpen(false)}>完成</Button>} width={500}>
                 <div className="grid grid-cols-2 gap-5 py-4">
@@ -478,18 +478,40 @@ export default function Model3DPage() {
     );
 }
 
-function HistoryPanel({ histories, retentionDays, activeId, loading, token, onRefresh, onPreview, onOpenDetail }: { histories: GenerationHistory[]; retentionDays: number | null; activeId?: string; loading: boolean; token: string; onRefresh: () => void; onPreview: (history: GenerationHistory) => void; onOpenDetail: (history: GenerationHistory) => void }) {
+function HistoryPanel({ histories, retentionDays, activeId, loading, onNew, onRefresh, onPreview, onOpenDetail }: { histories: GenerationHistory[]; retentionDays: number | null; activeId?: string; loading: boolean; onNew?: () => void; onRefresh: () => void; onPreview: (history: GenerationHistory) => void; onOpenDetail: (history: GenerationHistory) => void }) {
     const { tr } = useI18n();
+    const token = useUserStore((state) => state.token);
+    const { message } = App.useApp();
+    const [selectedIds, setSelectedIds] = useState<string[]>([]);
+    const [deleting, setDeleting] = useState(false);
+    useEffect(() => setSelectedIds([]), [token]);
+    const selected = histories.filter((history) => selectedIds.includes(history.id)).map((history) => history.id);
+    const allSelected = Boolean(histories.length) && selected.length === histories.length;
+    const remove = async (ids: string[]) => {
+        if (!token || deleting || !ids.length) return;
+        setDeleting(true);
+        try {
+            const results = await Promise.allSettled(ids.map((id) => deleteGenerationHistory(token, id)));
+            const removed = ids.filter((_, index) => results[index].status === "fulfilled");
+            setSelectedIds((selected) => selected.filter((id) => !removed.includes(id)));
+            const failed = results.find((result) => result.status === "rejected");
+            if (failed?.status === "rejected") message.error(tr(failed.reason instanceof Error ? failed.reason.message : "删除失败"));
+        } finally {
+            setDeleting(false);
+            onRefresh();
+        }
+    };
     return (
         <>
-            <div className="mb-3 flex items-center justify-between gap-3">
-                <div>
-                    <h2 className="text-base font-semibold">生成记录</h2>
-                    {retentionDays !== null ? <p data-i18n-skip className="mt-1 text-xs text-stone-500 dark:text-stone-400">{tr("新生成记录保存 {0} 天，具体到期时间见详情").replace("{0}", String(retentionDays))}</p> : null}
+            {retentionDays !== null ? <p data-i18n-skip className={studio.historyRetention}>{tr("新生成记录保存 {0} 天，具体到期时间见详情").replace("{0}", String(retentionDays))}</p> : null}
+            <div className={studio.historyControls}>
+                <div className={studio.historyButtons}>
+                    <Button size="small" icon={<Plus size={14} />} disabled={!onNew} onClick={onNew}>{tr("新建")}</Button>
+                    <Button size="small" icon={<CheckSquare size={14} />} disabled={!histories.length || deleting} onClick={() => setSelectedIds(allSelected ? [] : histories.map((history) => history.id))}>{tr(allSelected ? "取消" : "全选")}</Button>
+                    <Popconfirm title={tr("删除选中")} okText={tr("删除")} cancelText={tr("取消")} onConfirm={() => remove(selected)}><Button size="small" danger icon={<Trash2 size={14} />} disabled={!selected.length} loading={deleting}>{tr("删除")}</Button></Popconfirm>
+                    <Button size="small" disabled={loading || deleting} onClick={onRefresh}>{tr("刷新")}</Button>
                 </div>
-                <Button size="small" onClick={onRefresh}>
-                    刷新
-                </Button>
+                <Tag>{histories.length}</Tag>
             </div>
             {loading ? (
                 <div className="flex min-h-48 items-center justify-center">
@@ -500,19 +522,20 @@ function HistoryPanel({ histories, retentionDays, activeId, loading, token, onRe
                     {histories.map((history) => (
                         <Dropdown key={history.id} trigger={["contextMenu"]} menu={{ items: [{ key: "detail", icon: <FileText className="size-4" />, label: tr("查看详情"), onClick: () => onOpenDetail(history) }] }}>
                         <div className={`cursor-pointer rounded-lg border p-3 transition ${activeId === history.id ? "border-foreground bg-muted" : "border-border bg-background hover:bg-muted/50"}`} onClick={() => onPreview(history)}>
-                            <button type="button" className="block w-full cursor-pointer text-left" aria-pressed={activeId === history.id}>
-                                <span className="block truncate text-sm font-semibold" data-i18n-skip={history.title !== "3D 模型" || Boolean(history.prompt) || undefined}>{history.title}</span>
-                                <span className="mt-1 line-clamp-2 whitespace-pre-wrap break-words text-xs leading-4 text-stone-500 dark:text-stone-400">{history.prompt ? <span data-i18n-skip>{history.prompt}</span> : "无提示词"}</span>
-                                <span className="mt-1 block text-xs text-stone-500 dark:text-stone-400">{formatDateTime(history.createdAt)}</span>
-                                {history.expiresAt ? <span data-i18n-skip className="mt-1 block text-xs text-muted-foreground">{tr("保存至 {0}").replace("{0}", formatDateTime(history.expiresAt))}</span> : null}
-                            </button>
+                            <div className="flex items-start gap-2">
+                                <span onClick={(event) => event.stopPropagation()}><Checkbox aria-label={tr("选择生成记录")} checked={selected.includes(history.id)} disabled={deleting} onChange={(event) => setSelectedIds(event.target.checked ? [...selected, history.id] : selected.filter((id) => id !== history.id))} /></span>
+                                <button type="button" className="min-w-0 flex-1 cursor-pointer text-left" aria-pressed={activeId === history.id}>
+                                    <span className="block truncate text-sm font-semibold" data-i18n-skip={history.title !== "3D 模型" || Boolean(history.prompt) || undefined}>{history.title}</span>
+                                    <span className="mt-1 line-clamp-2 whitespace-pre-wrap break-words text-xs leading-4 text-stone-500 dark:text-stone-400">{history.prompt ? <span data-i18n-skip>{history.prompt}</span> : "无提示词"}</span>
+                                    <span className="mt-1 block text-xs text-stone-500 dark:text-stone-400">{formatDateTime(history.createdAt)}</span>
+                                    {history.expiresAt ? <span data-i18n-skip className="mt-1 block text-xs text-muted-foreground">{tr("保存至 {0}").replace("{0}", formatDateTime(history.expiresAt))}</span> : null}
+                                </button>
+                            </div>
                             <div className="mt-3 flex gap-2" onClick={(event) => event.stopPropagation()}>
                                 <Button size="small" icon={<Download className="size-3.5" />} onClick={() => history.media[0] && window.open(history.media[0].url, "_blank")}>
                                     下载
                                 </Button>
-                                <Button size="small" danger icon={<Trash2 className="size-3.5" />} onClick={() => token && deleteGenerationHistory(token, history.id).then(onRefresh)}>
-                                    删除
-                                </Button>
+                                <Popconfirm title={tr("删除这条记录？")} okText={tr("删除")} cancelText={tr("取消")} onConfirm={() => remove([history.id])}><Button size="small" danger icon={<Trash2 className="size-3.5" />} disabled={deleting}>{tr("删除")}</Button></Popconfirm>
                             </div>
                         </div>
                         </Dropdown>

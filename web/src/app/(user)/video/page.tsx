@@ -386,7 +386,7 @@ export default function VideoPage() {
                         <p data-i18n-skip className={studio.composerHint}>{tr("Enter 生成 · Shift + Enter 换行 · 最多 {0} 张参考图").replace("{0}", String(maxReferences))}</p>
                     </div>
                 </section>
-                <StudioHistorySidebar items={logs.map((log) => ({ id: log.id, title: log.title, prompt: log.prompt, preview: log.references[0]?.dataUrl, video: log.video?.url }))} onSelect={(id) => { const log = logs.find((item) => item.id === id); if (log) previewGenerationLog(log); }}>
+                <StudioHistorySidebar onNew={createSession} newDisabled={running} items={logs.map((log) => ({ id: log.id, title: log.title, prompt: log.prompt, preview: log.references[0]?.dataUrl, video: log.video?.url }))} onSelect={(id) => { const log = logs.find((item) => item.id === id); if (log) previewGenerationLog(log); }}>
                     <LogPanel logs={logs} retentionDays={retentionDays} selectedLogIds={selectedLogIds} activeLogId={previewLog?.id} onSelectedLogIdsChange={setSelectedLogIds} onCreateSession={createSession} onDeleteSelected={() => setDeleteConfirmOpen(true)} onPreviewLog={previewGenerationLog} onOpenDetail={(log) => log.history && setDetailHistory(log.history)} />
                 </StudioHistorySidebar>
             </main>
@@ -496,23 +496,20 @@ function LogPanel({
 
     return (
         <>
-            <div className="mb-3 flex items-center justify-between gap-3">
-                <div>
-                    <h2 className="text-base font-semibold">生成记录</h2>
-                    {retentionDays !== null ? <p data-i18n-skip className="mt-1 text-xs text-stone-500 dark:text-stone-400">{tr("新生成记录保存 {0} 天，具体到期时间见详情").replace("{0}", String(retentionDays))}</p> : null}
+            {retentionDays !== null ? <p data-i18n-skip className={studio.historyRetention}>{tr("新生成记录保存 {0} 天，具体到期时间见详情").replace("{0}", String(retentionDays))}</p> : null}
+            <div className={studio.historyControls}>
+                <div className={studio.historyButtons}>
+                    <Button size="small" icon={<Plus className="size-3.5" />} onClick={onCreateSession}>
+                        {tr("新建")}
+                    </Button>
+                    <Button size="small" icon={<CheckSquare className="size-3.5" />} disabled={!logs.length} onClick={toggleAll}>
+                        {tr(allSelected ? "取消" : "全选")}
+                    </Button>
+                    <Button size="small" danger icon={<Trash2 className="size-3.5" />} disabled={!selectedLogIds.length} onClick={onDeleteSelected}>
+                        {tr("删除")}
+                    </Button>
                 </div>
-                <Tag className="m-0">{logs.length}</Tag>
-            </div>
-            <div className="mb-4 flex flex-wrap gap-2">
-                <Button size="small" icon={<Plus className="size-3.5" />} onClick={onCreateSession}>
-                    新建
-                </Button>
-                <Button size="small" icon={<CheckSquare className="size-3.5" />} disabled={!logs.length} onClick={toggleAll}>
-                    {allSelected ? "取消" : "全选"}
-                </Button>
-                <Button size="small" danger icon={<Trash2 className="size-3.5" />} disabled={!selectedLogIds.length} onClick={onDeleteSelected}>
-                    删除
-                </Button>
+                <Tag>{logs.length}</Tag>
             </div>
             <div className="space-y-3">
                 {logs.map((log) => (

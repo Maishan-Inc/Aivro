@@ -1,7 +1,7 @@
 .panels { grid-template-rows: auto minmax(0, 1fr); }
 .workspace { display: flex; flex-direction: column; padding-top: 12px; }
 .uploadArea { display: grid; place-items: center; width: 100%; flex: 1; padding-block: 24px 64px; }
-.upload { display: flex; width: min(100%, 720px); min-height: 390px; flex-direction: column; align-items: center; justify-content: center; gap: 14px; border: 1px dashed var(--ring); border-radius: 24px; background: color-mix(in srgb, var(--muted) 40%, var(--background)); cursor: pointer; transition: background .2s, border-color .2s; }
+.upload { display: flex; width: min(100%, 720px); aspect-ratio: 1; min-height: 0; flex-direction: column; align-items: center; justify-content: center; gap: 14px; border: 1px dashed var(--ring); border-radius: 24px; background: color-mix(in srgb, var(--muted) 40%, var(--background)); cursor: pointer; transition: background .2s, border-color .2s; }
 .upload:hover, .upload[data-dragging="true"] { border-color: var(--foreground); background: var(--muted); }
 .upload:disabled { cursor: wait; }
 .uploadIcon { display: grid; place-items: center; width: 76px; height: 76px; margin-bottom: 12px; border-radius: 22px; background: var(--background); color: var(--foreground); }
@@ -23,7 +23,7 @@
 .detail { display: grid; grid-template-columns: minmax(0, .75fr) minmax(0, 1.25fr); align-items: start; gap: 24px; padding-top: 16px; }
 @keyframes scan { to { transform: translateY(390%); } }
 @keyframes complete { from { opacity: 0; transform: translate(-50%, -50%) scale(.35) rotate(-15deg); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
-@container (max-width: 760px) { .taskGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }.upload { min-height: 340px; }.uploadArea { padding-bottom: 24px; } }
-@container (max-width: 440px) { .taskGrid { grid-template-columns: minmax(0, 1fr); }.taskImage { aspect-ratio: 3 / 2; }.upload { min-height: 320px; padding: 20px; } }
+@container (max-width: 760px) { .taskGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }.uploadArea { padding-bottom: 24px; } }
+@container (max-width: 440px) { .taskGrid { grid-template-columns: minmax(0, 1fr); }.taskImage { aspect-ratio: 3 / 2; }.upload { padding: 20px; } }
 @media (max-width: 640px) { .detail { grid-template-columns: minmax(0, 1fr); }.previews { gap: 8px; } }
 @media (prefers-reduced-motion: reduce) { .scanner { animation: none; top: 30%; }.completed { animation: none; }.upload { transition: none; } }

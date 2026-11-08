@@ -2,7 +2,7 @@
 
 import { memo, useDeferredValue, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Input, Select, type RefSelectProps } from "antd";
-import { ChevronDown, Search } from "lucide-react";
+import { Building2, ChevronDown, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useConfigStore, type AiConfig } from "@/stores/use-config-store";
 import { ModelLogo } from "./model-logo";
@@ -110,7 +110,10 @@ export function ModelPicker({ config, kind, count, model3D, value, onChange, onO
         notFoundContent={<span className="text-xs text-muted-foreground">{tr("没有匹配的模型")}</span>}
         popupRender={(menu) => <div data-canvas-no-zoom onPointerDown={(event) => event.stopPropagation()} onMouseDown={(event) => event.stopPropagation()} onWheel={(event) => event.stopPropagation()}>
             <div className="mb-1 flex items-center gap-2 border-b border-border/60 px-1 pb-2 pt-1">
-                <Select size="small" value={vendor} onChange={setVendor} aria-label={tr("筛选模型厂商")} className="w-32 shrink-0" popupMatchSelectWidth={180} styles={{ popup: { root: { zIndex: 1210 } } }} options={[{ value: "", label: tr("全部厂商") }, ...vendors.map((item) => ({ value: item, label: tr(item) }))]} />
+                <Select size="small" value={vendor} onChange={setVendor} aria-label={tr("筛选模型厂商")} className="w-32 shrink-0" popupMatchSelectWidth={180} styles={{ popup: { root: { zIndex: 1210 } } }} options={[
+                    { value: "", label: <span className="flex min-w-0 items-center gap-2" data-i18n-skip><Building2 className="size-4 shrink-0" /><span className="truncate">{tr("全部厂商")}</span></span> },
+                    ...vendors.map((item) => ({ value: item, title: tr(item), label: <span className="flex min-w-0 items-center gap-2" data-i18n-skip><ModelLogo icon={options.find((option) => option.vendor === item && option.icon)?.icon} name={item} size={16} /><span className="truncate">{tr(item)}</span></span> })),
+                ]} />
                 <Input size="small" allowClear prefix={<Search className="size-3" />} placeholder={tr("搜索模型")} aria-label={tr("搜索模型")} value={keyword} onChange={(event) => setKeyword(event.target.value)} className="min-w-0 flex-1" onKeyDown={(event) => {
                     event.stopPropagation();
                     if (event.key === "Escape") { setOpen(false); selectRef.current?.focus(); }

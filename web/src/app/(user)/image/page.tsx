@@ -511,7 +511,7 @@ export default function ImagePage() {
                         <p className={studio.composerHint}>Enter 生成 · Shift + Enter 换行 · 参考图发送时提交</p>
                     </div>
                 </section>
-                <StudioHistorySidebar items={visibleLogs.map((log) => ({ id: log.id, title: log.title, prompt: log.prompt, preview: log.thumbnails[0] }))} onSelect={(id) => { const log = visibleLogs.find((item) => item.id === id); if (log) void previewGenerationLog(log); }}>
+                <StudioHistorySidebar onNew={createSession} newDisabled={running} items={visibleLogs.map((log) => ({ id: log.id, title: log.title, prompt: log.prompt, preview: log.thumbnails[0] }))} onSelect={(id) => { const log = visibleLogs.find((item) => item.id === id); if (log) void previewGenerationLog(log); }}>
                     <LogPanel
                         logs={visibleLogs}
                         retentionDays={retentionDays}
@@ -678,23 +678,20 @@ function LogPanel({
 
     return (
         <>
-            <div className="mb-3 flex items-center justify-between gap-3">
-                <div>
-                    <h2 className="text-base font-semibold">生成记录</h2>
-                    {retentionDays !== null ? <p data-i18n-skip className="mt-1 text-xs text-stone-500 dark:text-stone-400">{tr("新生成记录保存 {0} 天，具体到期时间见详情").replace("{0}", String(retentionDays))}</p> : null}
+            {retentionDays !== null ? <p data-i18n-skip className={studio.historyRetention}>{tr("新生成记录保存 {0} 天，具体到期时间见详情").replace("{0}", String(retentionDays))}</p> : null}
+            <div className={studio.historyControls}>
+                <div className={studio.historyButtons}>
+                    <Button size="small" icon={<Plus className="size-3.5" />} onClick={onCreateSession}>
+                        {tr("新建")}
+                    </Button>
+                    <Button size="small" icon={<CheckSquare className="size-3.5" />} disabled={!selectableLogs.length} onClick={toggleAll}>
+                        {tr(allSelected ? "取消" : "全选")}
+                    </Button>
+                    <Button size="small" danger icon={<Trash2 className="size-3.5" />} disabled={!selectedLogIds.length} onClick={onDeleteSelected}>
+                        {tr("删除")}
+                    </Button>
                 </div>
-                <Tag className="m-0">{logs.length}</Tag>
-            </div>
-            <div className="mb-4 flex flex-wrap gap-2">
-                <Button size="small" icon={<Plus className="size-3.5" />} onClick={onCreateSession}>
-                    新建
-                </Button>
-                <Button size="small" icon={<CheckSquare className="size-3.5" />} disabled={!selectableLogs.length} onClick={toggleAll}>
-                    {allSelected ? "取消" : "全选"}
-                </Button>
-                <Button size="small" danger icon={<Trash2 className="size-3.5" />} disabled={!selectedLogIds.length} onClick={onDeleteSelected}>
-                    删除
-                </Button>
+                <Tag>{logs.length}</Tag>
             </div>
             <div className="space-y-3">
                 {logs.map((log) => (
