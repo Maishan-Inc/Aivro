@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"os"
 	"path"
 	"strings"
 
@@ -30,7 +31,11 @@ func PublishFreeImage(ctx context.Context, admin model.AuthUser, input FreeImage
 	file, content, err := GetFileContent(ctx, model.PublicUser(owner), history.Media[0].CloudFileID, "")
 	if err != nil { return model.Asset{}, err }
 	defer content.Close()
-	copy, err := storeObject(ctx, CloudObjectUpload{User: admin, FileType: model.CloudFileTypeImage, Purpose: model.CloudFilePurposeAsset, Filename: path.Base(file.ObjectKey), ContentType: file.ContentType, Source: "/free-image/publication", Reader: content, Size: file.Size})
+	tmp, size, err := spoolLimited(content, maxUpstreamImageBytes, "上游图片文件过大")
+	if err != nil { return model.Asset{}, err }
+	defer os.Remove(tmp.Name())
+	defer tmp.Close()
+	copy, err := storeObject(ctx, CloudObjectUpload{User: admin, FileType: model.CloudFileTypeImage, Purpose: model.CloudFilePurposeAsset, Filename: path.Base(file.ObjectKey), ContentType: file.ContentType, Source: "/free-image/publication", Reader: tmp, Size: size})
 	if err != nil { return model.Asset{}, err }
 	asset := model.Asset{ID: newID("asset"), Title: firstNonEmpty(strings.TrimSpace(input.Title), history.Title), Type: model.AssetTypeImage, Category: "free-image", Content: firstNonEmpty(strings.TrimSpace(input.Prompt), history.Prompt), URL: copy.PublicURL, CoverURL: copy.PublicURL, CreatedAt: now(), UpdatedAt: now()}
 	reward := model.CreditLog{ID: newID("credit"), UserID: history.UserID, Category: creditLogCategory(model.CreditLogTypeFreeImageReward), Type: model.CreditLogTypeFreeImageReward, Amount: input.RewardCredits, RelatedID: history.ID, Model: history.Model, Path: "/free-image/publication", Remark: "免费生图作品公开奖励", CreatedAt: now()}
