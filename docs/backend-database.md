@@ -22,6 +22,8 @@
 - `user_assets`
 - `meta_mask_challenges`
 - `credit_logs`
+- `support_tickets`
+- `support_ticket_replies`
 - `audit_logs`
 - `prompt_categories`
 - `prompts`
@@ -834,6 +836,40 @@ KYC 认证记录表。当前服务商为 Didit。
 | `admin_adjust` | 后台手动调整 |
 | `ai_consume` | 调用后端模型接口消费 |
 | `ai_refund` | 后端模型接口调用失败返还 |
+
+### support_tickets
+
+用户工单表，服务端保存问题描述、当前处理状态和关联扣费快照。
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | 工单主键，由服务端生成 |
+| `user_id` | string | 提交用户，索引；用户端始终按当前账号隔离 |
+| `title` | string | 标题，1–100 个字符 |
+| `category` | string | 分类：`billing`、`generation`、`account`、`other`，索引 |
+| `content` | text | 问题描述，1–5000 个字符 |
+| `status` | string | `pending` 等待客服、`replied` 客服已回复、`closed` 已关闭，索引 |
+| `credit_log_id` | string | 可选关联扣费流水编号，索引 |
+| `charge` | json | 从当前账号的负数流水读取的快照：编号、类型、模型、请求路径、变动点数、扣费后余额、关联业务编号、说明和时间；不保存 IP、国家或私有扩展字段 |
+| `created_at` | string | UTC RFC3339Nano 创建时间 |
+| `updated_at` | string | UTC RFC3339Nano 最近回复或状态变更时间，索引 |
+
+扣费快照只在用户实际提交工单时由服务端读取并保存，前端不能指定或覆盖快照内容；打开或取消预填表单不会写入工单。回复和关闭/重开在同一工单的事务锁内执行，避免已关闭工单被并发回复意外重新打开。工单不直接调整钱包余额。
+
+### support_ticket_replies
+
+工单回复表，用户补充与客服回复均按时间保留。
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | 回复主键，由服务端生成 |
+| `ticket_id` | string | 关联工单编号，索引 |
+| `author_id` | string | 回复用户或管理员编号，由当前鉴权身份生成 |
+| `is_admin` | bool | 是否由管理端回复，客户端不能指定 |
+| `content` | text | 回复正文，1–5000 个字符 |
+| `created_at` | string | UTC RFC3339Nano 回复时间 |
+
+管理员回复将工单设为 `replied`，用户补充设为 `pending`；`closed` 状态拒绝回复，需要先重新打开。回复追加和状态更新一起提交或回滚。
 
 ### audit_logs
 

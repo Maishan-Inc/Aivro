@@ -19,3 +19,13 @@ func CreditLogs(w http.ResponseWriter, r *http.Request) {
 	}
 	OK(w, result)
 }
+
+func CreditLog(w http.ResponseWriter, r *http.Request, id string) {
+	user, _ := service.UserFromContext(r.Context())
+	result, err := service.GetUserCreditLog(user, id)
+	if err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, result)
+}

@@ -4,7 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Drawer } from "antd";
-import { ArrowUpRight, BookOpen, ChevronRight, Home, KeyRound, LayoutDashboard, Link2, Menu, PanelLeftClose, PanelLeftOpen, UserCircle, WalletCards } from "lucide-react";
+import { ArrowUpRight, BookOpen, ChevronRight, Home, KeyRound, LayoutDashboard, LifeBuoy, Link2, Menu, PanelLeftClose, PanelLeftOpen, UserCircle, WalletCards } from "lucide-react";
 
 import { LocaleMenu } from "@/components/layout/locale-menu";
 import { UserStatusActions } from "@/components/layout/user-status-actions";
@@ -24,6 +24,7 @@ const accountItems = [
     { href: "/console/wallet", label: "我的钱包", icon: WalletCards },
     { href: "/console/api-keys", label: "密钥管理", icon: KeyRound },
     { href: "/console/profile", label: "个人中心", icon: UserCircle },
+    { href: "/console/tickets", label: "工单服务", icon: LifeBuoy },
 ];
 
 export function ConsoleShell({ children }: { children: ReactNode }) {

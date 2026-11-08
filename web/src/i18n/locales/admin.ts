@@ -1,5 +1,9 @@
 // Admin-console-only strings (zh/en). These never render on the user-facing site.
 export const adminTranslations: Record<string, string> = {
+    "查看与回复": "View and reply",
+    "查看用户问题与关联扣费信息，回复并跟进处理结果。": "Review user issues and linked charge details, reply and follow up on the outcome.",
+    "搜索工单标题、工单或用户编号": "Search by ticket title, ticket ID or user ID",
+    "提交用户": "Submitted by",
     "区块访问": "Section access",
     "保存权限": "Save permissions",
     "取消勾选后，该区块将从侧栏隐藏并禁止访问。": "Uncheck a section to hide it from the sidebar and disable access.",

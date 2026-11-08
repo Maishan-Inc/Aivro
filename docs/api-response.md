@@ -59,6 +59,17 @@
 - 对话成功继续返回标准 JSON/SSE，图片直接成功保留模型接口响应；视频始终后台执行，图片限流排队时也返回 `{ code: 0, data: { queued: true, taskId, ... }, msg: "ok" }`。使用同一账号的有效密钥查询 `/generation-tasks/:id` 和 `/generation-tasks/:id/result`，任务仍在排队时可 DELETE 取消并退款。
 - 静态中文开发文档入口为 `/developers`（中文路径 `/zh-CN/developers`），包含所有已开放的对外接口说明与 22 种语言示例。具体功能与联调结果记录在 `docs/pending-test.md`。
 
+## 工单与钱包流水
+
+- 用户钱包通过 `GET /api/v1/credit-logs?page=1&pageSize=20&type=ai_consume` 读取真实流水，`type` 可省略或使用 `ai_consume`、`ai_refund`、`admin_adjust`；响应 `data` 为 `{ items, total }`。`GET /api/v1/credit-logs/:id` 返回当前用户流水的公开字段，用于预填扣费工单；不返回 IP、国家及私有扩展字段。
+- 用户端 `/console/tickets` 提供工单列表、创建及详情；钱包疑问入口携带 `creditLogId`，只读取关联流水并打开可编辑表单，不自动提交。工单 API 仅接受网站登录鉴权，不接受用户模型 API 密钥。
+- `GET /api/v1/support-tickets` 返回 `{ items, total }`，支持 `keyword`、`category`、`type`、`page`、`pageSize`；`type` 为工单状态 `pending`、`replied` 或 `closed`。用户端的列表、详情、回复和状态变更始终按当前账号校验。
+- `POST /api/v1/support-tickets` 接收 `{ title, category, content, creditLogId? }`，返回创建的工单；标题 1–100 个字符，描述 1–5000 个字符，分类为 `billing`、`generation`、`account`、`other`。关联流水时分类必须为 `billing`，流水必须属于当前账号且变动为负数；扣费快照由后端生成，客户端不能指定身份、状态及快照。创建每用户每分钟最多 5 次。
+- `GET /api/v1/support-tickets/:id` 返回工单及 `replies`。`POST /api/v1/support-tickets/:id/replies` 接收 `{ content }`，正文 1–5000 个字符，每账号每分钟最多 30 次；用户补充后状态变为 `pending`。
+- `POST /api/v1/support-tickets/:id/status` 接收 `{ status: "closed" | "pending" }`；关闭后禁止回复，仅已关闭工单可以使用 `pending` 重新打开。回复与状态修改成功返回 `data: true`。
+- 管理端 `/admin/tickets` 使用 `/api/admin/support-tickets` 及对应 `/:id`、`/:id/replies`、`/:id/status` 接口，可查看全部工单和公开提交用户资料；管理员回复后状态变为 `replied`。这些接口使用管理员鉴权。
+- 所有工单接口保持 `{ code, data, msg }` 响应结构。越权、无效分类、长度错误、关联非扣费流水及关闭后回复均返回业务错误；工单与回复内容保持用户原文，工单操作不会修改余额或自动退款。
+
 ## 用户区块访问
 
 - 管理端 `POST /api/admin/users/:id/sections` 接收 `{ "disabledSections": ["workflow", "image"] }`，返回更新后的用户；`[]` 允许全部区块。支持 `workflow`、`image`、`video`、`model3d`、`shares`、`community`，未知值返回业务错误。此接口只调整区块访问并记录审计，不修改角色或吊销登录会话。
