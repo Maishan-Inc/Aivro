@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/basketikun/aivro/model"
 	"github.com/gin-contrib/sse"
 )
 
@@ -36,6 +37,7 @@ func RequestChatCompletion(ctx context.Context, userID string, body []byte, mode
 	if len(body) > 8<<20 { return nil, safeMessageError{message: "对话内容过大"} }
 	billing, err := RequestModelBilling(ctx, modelName)
 	if err != nil { return nil, err }
+	if path == "/prompt-reverse" && billing.BillingType != model.BillingTypeToken { return nil, SafeAIError("提示词反推需要按词元计费的文本模型") }
 	routes, err := SelectModelChannelRoutes(modelName)
 	if err != nil { return nil, err }
 	reserved := canvasAgentReserveCredits(billingBody, maxTokens, billing)
@@ -60,6 +62,10 @@ func RequestChatCompletion(ctx context.Context, userID string, body []byte, mode
 			return nil, err
 		}
 		usage := chatResponseUsage(result, response.Header.Get("Content-Type"))
+		if path == "/prompt-reverse" && usage.TotalTokens <= 0 && firstPositive(usage.InputTokens, usage.PromptTokens)+firstPositive(usage.OutputTokens, usage.CompletionTokens) <= 0 {
+			if err := RefundUserCreditsWithMeta(userID, modelName, reserved, path, meta); err != nil { return nil, err }
+			return nil, SafeAIError("模型未返回词元用量，本次反推未扣费")
+		}
 		_, billErr := billAIUsage(userID, modelName, billing, reserved, usage, billingBody, result, meta, path)
 		if billErr != nil { return nil, billErr }
 		return result, err

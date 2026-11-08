@@ -1,6 +1,8 @@
-.picker:global(.ant-select) { flex-shrink: 0; min-width: 0; border: 1px solid var(--border) !important; border-radius: 999px; background: transparent !important; padding: 0 8px !important; box-shadow: none !important; font-size: 12px; color: var(--foreground); }
+.picker:global(.ant-select) { flex-shrink: 0; min-width: 0; border: 1px solid var(--border) !important; border-radius: 999px; background: transparent !important; padding: 0 8px !important; box-shadow: none !important; font-size: 13px; color: var(--foreground); }
 .picker :global(.ant-select-content) { display: flex; align-items: center; min-width: 0; flex: 1; }
 .picker:global(.ant-select-open), .picker:global(.ant-select-focused) { border-color: var(--ring) !important; }
 .popup:global(.ant-select-dropdown) { z-index: 1200; max-width: calc(100vw - 24px); border: 1px solid var(--border); border-radius: 12px; background: var(--popover); color: var(--popover-foreground); padding: 4px; }
 .popup :global(.ant-select-item) { color: var(--foreground); }
 .popup :global(.ant-select-item-option-active), .popup :global(.ant-select-item-option-selected) { background: var(--accent) !important; color: var(--accent-foreground) !important; }
+
+.popup :global(.rc-virtual-list-holder) { overscroll-behavior: contain; }

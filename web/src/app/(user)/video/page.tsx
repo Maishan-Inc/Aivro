@@ -85,6 +85,7 @@ export default function VideoPage() {
     const token = useUserStore((state) => state.token);
     const [prompt, setPrompt] = useState("");
     const [composerFocused, setComposerFocused] = useState(false);
+    const [modelOpen, setModelOpen] = useState(false);
     const [references, setReferences] = useState<ReferenceImage[]>([]);
     const [results, setResults] = useState<GenerationResult[]>([]);
     const [logs, setLogs] = useState<GenerationLog[]>([]);
@@ -104,7 +105,7 @@ export default function VideoPage() {
     const model = effectiveConfig.videoModel;
     const maxReferences = getVideoCapabilities(model).maxImages;
     const canGenerate = Boolean(prompt.trim());
-    const composerExpanded = composerFocused || canGenerate || references.length > 0;
+    const composerExpanded = modelOpen || composerFocused || canGenerate || references.length > 0;
 
     useEffect(() => {
         const urlPrompt = searchParams.get("prompt");
@@ -374,7 +375,7 @@ export default function VideoPage() {
                                 } }}>
                                     <Button type="text" shape="circle" icon={<Plus size={19} />} aria-label="添加参考图或选择灵感" />
                                 </Dropdown>
-                                <StudioGenerationSettings kind="video" part="model" />
+                                <StudioGenerationSettings kind="video" part="model" onModelOpenChange={setModelOpen} />
                                 </div>
                                 <div className={composer.toolbarRow}><StudioGenerationSettings kind="video" part="settings" /></div>
                             </div></div></div>

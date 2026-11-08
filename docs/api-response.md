@@ -5,7 +5,7 @@
 - `public.explore` 公开 `freeImageEnabled`、`promptReverseEnabled`，均默认 `false`；后台 `GET/POST /api/admin/explore-settings` 返回和保存这两个开关及 `systemPrompt`，提示词仅对管理员开放。
 - `GET/POST /api/admin/free-image-campaigns` 分页读取或保存每期活动，字段为 `id/name/enabled/startsAt/endsAt/models/groupLimits`。起止时间使用 RFC3339，服务统一按 UTC 保存，会员次数按 `free/go/plus/pro/max` 配置，不允许活动时间重叠。
 - `GET /api/v1/free-image` 返回 `{ campaign, group, limit, used, remaining }`，没有进行中的活动时 `campaign=null`。`POST /api/v1/free-image/generations` 接受 `campaignId/agreement/model/prompt/size/quality`，`agreement` 必须为 `free-image-v1`，每次固定一张；返回既有排队任务结构，通过生成任务接口轮询。活动模型、期限、次数和协议均由后端校验，失败或撤销返还次数。
-- `POST /api/v1/prompt-reverse` 接受 `{ model, image }`，`image` 是最大 5MB 的 PNG/JPEG/WebP data URL；仅接受已开放的文本模型。成功返回 `type=prompt-reverse` 的生成历史及 `result` 六语言提示词、分析、标签和结构化结果，按文本模型价格结算；返回无效或缺少语言的模型结果时返还预扣额度。
+- `POST /api/v1/prompt-reverse` 接受 `{ model, image }`，`image` 是最大 5MB 的 PNG/JPEG/WebP data URL；仅接受已开放且按词元计费的文本模型，每次请求仅处理一张图片，前端每批最多 6 张独立请求。成功返回 `type=prompt-reverse` 的生成历史及 `result` 六语言提示词、分析、标签和结构化结果，逐张按 `round(实际总 token × 每千 token 单价 / 1000)` 结算整数点数（不足半点可为 0 点），不先合并多张用量。沿用先预扣、后补扣或返还差额的流程；未返回实际用量、返回无效或缺少语言的模型结果时返还预扣额度。
 - 生成历史列表支持 `type=free-image|prompt-reverse`，返回当前会员保存天数和记录的实际 `expiresAt`。免费成功记录由后端自动保存，反推记录及参考图按有效期限删除；常规历史写入接口不能伪造活动或反推记录。
 - `GET /api/admin/free-image-histories` 分页读取活动作品；`POST /api/admin/free-image-publication` 接受 `{ historyId, title, prompt, rewardCredits }`，奖励范围 1–1000000 算力点。公开素材、作品状态和奖励流水在同一事务中写入，重复公开不能重复奖励。历史响应补充 `publishedAssetId/rewardCredits`。
 - 公开模型计费条目的 `freeUntil` 仅在免费功能开启且模型属于当前活动时返回，前端据此显示 `Free [限量]`。该标记不改变常规工作台或 API 的标准价。

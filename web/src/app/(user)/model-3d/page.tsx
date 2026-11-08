@@ -62,6 +62,7 @@ export default function Model3DPage() {
     const [mode, setMode] = useState<"image" | "multi_image" | "text">("text");
     const [prompt, setPrompt] = useState("");
     const [composerFocused, setComposerFocused] = useState(false);
+    const [modelOpen, setModelOpen] = useState(false);
     const [images, setImages] = useState<UploadedReference[]>([]);
     const [textureEnabled, setTextureEnabled] = useState(true);
     const [pbrEnabled, setPbrEnabled] = useState(true);
@@ -300,7 +301,7 @@ export default function Model3DPage() {
     };
 
     const canGenerate = !uploading && (generationMode === "text" ? Boolean(prompt.trim()) : imageCountValid);
-    const composerExpanded = dragging || composerFocused || Boolean(prompt.trim()) || images.length > 0;
+    const composerExpanded = modelOpen || dragging || composerFocused || Boolean(prompt.trim()) || images.length > 0;
 
     return (
         <div className={studio.studio}>
@@ -413,7 +414,7 @@ export default function Model3DPage() {
                             <div className={composer.controls}><div><div className={composer.toolbar} inert={!composerExpanded}>
                                 <div className={composer.toolbarRow}>
                                 <Button type="text" shape="circle" icon={<Upload size={17} />} loading={uploading} disabled={generating} onClick={() => fileInputRef.current?.click()} aria-label="上传参考图" title="上传参考图" />
-                                <ModelPicker config={effectiveConfig} kind="model3d" model3D={generationOptions} models={effectiveConfig.model3DModels} value={model} onChange={(value) => updateConfig("model3DModel", value)} onMissingConfig={() => message.warning("管理员尚未配置可用3D模型")} />
+                                <ModelPicker onOpenChange={setModelOpen} config={effectiveConfig} kind="model3d" model3D={generationOptions} models={effectiveConfig.model3DModels} value={model} onChange={(value) => updateConfig("model3DModel", value)} onMissingConfig={() => message.warning("管理员尚未配置可用3D模型")} />
                                 </div>
                                 <div className={composer.toolbarRow}>
                                 <Dropdown trigger={["click"]} placement="topLeft" menu={{ selectable: true, selectedKeys: [generationMode], items: [

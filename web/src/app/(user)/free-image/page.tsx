@@ -38,6 +38,7 @@ export default function FreeImagePage() {
     const [model, setModel] = useState("");
     const [size, setSize] = useState("1024x1024");
     const [focused, setFocused] = useState(false);
+    const [modelOpen, setModelOpen] = useState(false);
     const [running, setRunning] = useState(false);
     const submitting = useRef(false);
     const [images, setImages] = useState<ImageApiResult[]>([]);
@@ -77,7 +78,7 @@ export default function FreeImagePage() {
     return <main className={`${studio.studio} relative`}>
         <div className={studio.layout}>
             <div className={studio.panels}>
-                <header className={studio.header}><div><h1>{tr("免费生成图片")}</h1><p className="mt-1 text-xs text-muted-foreground">{tr("限量活动，让好作品获得奖励")}</p></div><Button type="text" className="mr-24" onClick={() => { setAccepted(false); setChecked(false); }}>{tr("查看协议")}</Button></header>
+                <header className={studio.header}><div><h1>{tr("免费生成图片")}</h1></div><Button type="text" className="mr-24" onClick={() => { setAccepted(false); setChecked(false); }}>{tr("查看协议")}</Button></header>
                 <section className={studio.results}>
                     {!token ? <div className={studio.empty}><Sparkles size={36} /><h3>{tr("登录后参加免费活动")}</h3><Link href={localizedPath("/login?redirect=/free-image")}>{tr("登录")}</Link></div> : !accepted ? null : state.isLoading ? <Spin /> : state.isError ? <Empty description={tr(state.error.message)} /> : !active && !preview.length ? <div className={studio.empty}><Sparkles size={36} /><h3>{tr("当前暂未免费活动")}</h3></div> : <div>
                         <div className="mb-6 flex flex-wrap items-end justify-between gap-3 border-b border-border pb-4">
@@ -90,10 +91,10 @@ export default function FreeImagePage() {
                     </div>}
                 </section>
                 <div className={studio.form}>
-                    {token && accepted && active ? <div className={composer.composer} data-expanded={focused || Boolean(prompt.trim())} onFocus={() => setFocused(true)} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocused(false); }}>
+                    {token && accepted && active ? <div className={composer.composer} data-expanded={modelOpen || focused || Boolean(prompt.trim())} onFocus={() => setFocused(true)} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocused(false); }}>
                         <div className={composer.main}><div className={composer.body}>
                             <div className={composer.inputRow}><Input.TextArea variant="borderless" value={prompt} onChange={(event) => setPrompt(event.target.value)} disabled={running} autoSize={{ minRows: 1, maxRows: 6 }} aria-label={tr("生图提示词")} placeholder={tr("描述你想免费生成的画面...")} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void generate(); } }} /></div>
-                            <div className={composer.controls}><div><div className={composer.toolbar} inert={!focused && !prompt.trim()}><div className={composer.toolbarRow}><ModelPicker config={config} kind="image" models={models} value={currentModel} onChange={setModel} billingLabel="Free [限量]" /></div><div className={composer.toolbarRow}><Select value={requestSize || undefined} onChange={setSize} aria-label={tr("分辨率")} options={sizes} disabled={running} /></div></div></div></div>
+                            <div className={composer.controls}><div><div className={composer.toolbar} inert={!modelOpen && !focused && !prompt.trim()}><div className={composer.toolbarRow}><ModelPicker onOpenChange={setModelOpen} config={config} kind="image" models={models} value={currentModel} onChange={setModel} billingLabel="Free [限量]" /></div><div className={composer.toolbarRow}><Select value={requestSize || undefined} onChange={setSize} aria-label={tr("分辨率")} options={sizes} disabled={running} /></div></div></div></div>
                         </div><Button className={composer.send} shape="circle" type="primary" icon={<ArrowUp size={18} />} loading={running} disabled={!prompt.trim() || !currentModel || !requestSize || !state.data?.remaining} aria-label={tr("免费生成图片")} onClick={() => void generate()} /></div>
                     </div> : null}
                 </div>

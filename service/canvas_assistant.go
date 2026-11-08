@@ -936,6 +936,10 @@ func billAIUsage(userID string, modelName string, billing model.ModelCost, reser
 		return result, nil
 	}
 	result.Credits = canvasAgentCreditsForTokens(result.TotalTokens, billing.Credits)
+	if path == "/prompt-reverse" {
+		credits := math.Round(float64(result.TotalTokens) * float64(billing.Credits) / 1000)
+		if credits >= float64(int(^uint(0)>>1)) { result.Credits = int(^uint(0)>>1) } else { result.Credits = int(credits) }
+	}
 	if result.Estimated && result.Credits > reservedCredits { result.Credits = reservedCredits }
 	delta := result.Credits - reservedCredits
 	if delta > 0 {

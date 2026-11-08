@@ -36,6 +36,10 @@ export default function nextConfig(phase: string): NextConfig {
         async headers() {
             return [
                 {
+                    source: "/icons/:path*",
+                    headers: [{ key: "Cache-Control", value: "public, max-age=86400, s-maxage=604800, stale-while-revalidate=604800" }],
+                },
+                {
                     source: "/((?!_next/static|icons|showcase|logo.svg|logo-mail-dark.png|logo-mail-light.png|favicon.ico).*)",
                     headers: [...noStoreHeaders, ...securityHeaders],
                 },

@@ -1,5 +1,17 @@
 // 内置工具的六语言文案；模型名、协议字段和用户内容保持原样。
 const rows: Record<string, string[]> = {
+    "每次最多上传 6 张图片": ["每次最多上傳 6 張圖片", "Upload up to 6 images at a time", "一度にアップロードできる画像は6枚までです", "한 번에 최대 6장의 이미지를 업로드할 수 있습니다", "Importez jusqu’à 6 images à la fois"],
+    "最多 6 张图片 · 每张不超过 5MB": ["最多 6 張圖片 · 每張不超過 5MB", "Up to 6 images · 5MB per image", "最大6枚 · 1枚あたり5MBまで", "최대 6장 · 이미지당 최대 5MB", "6 images maximum · 5 Mo par image"],
+    "确认反推任务": ["確認反推任務", "Confirm prompt reconstruction", "プロンプト逆生成を確認", "프롬프트 역추출 확인", "Confirmer la reconstruction de prompts"],
+    "确认反推 {0} 张图片": ["確認反推 {0} 張圖片", "Reconstruct prompts for {0} images", "{0}枚の逆生成を確定", "이미지 {0}장 역추출 확인", "Confirmer pour {0} images"],
+    "每张图片独立计费，按实际使用的 token 四舍五入扣除整数点数。": ["每張圖片獨立計費，按實際使用的 token 四捨五入扣除整數點數。", "Each image is billed separately for actual token usage, rounded to the nearest whole credit.", "画像ごとに実際のトークン使用量で課金し、四捨五入した整数のポイントを差し引きます。", "각 이미지는 실제 토큰 사용량에 따라 개별 과금되며, 포인트를 반올림하여 정수로 차감합니다.", "Chaque image est facturée séparément selon les tokens réellement utilisés, avec un arrondi au crédit entier le plus proche."],
+    "提示词反推需要按词元计费的文本模型": ["提示詞反推需要按詞元計費的文字模型", "Prompt reconstruction requires an enabled text model with token billing", "逆生成にはトークン課金の有効なテキストモデルが必要です", "프롬프트 역추출에는 토큰 과금 방식의 활성 텍스트 모델이 필요합니다", "La reconstruction nécessite un modèle de texte activé avec une facturation par token"],
+    "模型未返回词元用量，本次反推未扣费": ["模型未傳回詞元用量，本次反推未扣費", "The model did not report token usage. No credits were charged for this reconstruction.", "モデルがトークン使用量を返さなかったため、今回の逆生成は課金されませんでした。", "모델이 토큰 사용량을 반환하지 않아 이번 역추출은 과금되지 않았습니다.", "Le modèle n’a pas indiqué l’utilisation des tokens. Aucun crédit n’a été facturé pour cette reconstruction."],
+    "正在反推": ["正在反推", "Reconstructing prompt", "プロンプトを逆生成中", "프롬프트 역추출 중", "Reconstruction en cours"],
+    "反推完成": ["反推完成", "Prompt ready", "逆生成が完了しました", "역추출 완료", "Prompt prêt"],
+    "双击查看提示词": ["按兩下查看提示詞", "Double-click to view the prompt", "ダブルクリックでプロンプトを表示", "두 번 클릭하여 프롬프트 보기", "Double-cliquez pour voir le prompt"],
+    "查看提示词": ["查看提示詞", "View prompt", "プロンプトを表示", "프롬프트 보기", "Voir le prompt"],
+    "新建任务": ["新增任務", "New task", "新規タスク", "새 작업", "Nouvelle tâche"],
 "Free [限量] 仅用于免费生图活动，常规工作台和 API 仍按原价计费。": ["Free [限量] 僅用於免費生圖活動，一般工作台和 API 仍按原價計費。","Free [Limited] applies only to free image campaigns. Regular studios and the API retain their normal pricing.","Free [数量限定] は無料画像キャンペーンのみ適用され、通常のワークスペースと API は通常料金です。","Free [한정]은 무료 이미지 이벤트에만 적용됩니다. 일반 워크스페이스와 API는 기존 요금으로 과금됩니다.","Free [Limité] s’applique uniquement aux campagnes gratuites. Les ateliers habituels et l’API conservent leur tarification normale."],
     "免费生成图片尚未开启": [
         "免費生成圖片尚未開啟",

@@ -18,12 +18,13 @@ export function ImagePromptComposer({ onSubmit, running = false, scope = "image"
     const { prompt, references, setPrompt, setReferences } = useComposerStore();
     const fileInput = useRef<HTMLInputElement>(null);
     const [focused, setFocused] = useState(false);
+    const [modelOpen, setModelOpen] = useState(false);
     const [dragging, setDragging] = useState(false);
     const [promptsOpen, setPromptsOpen] = useState(false);
     const [assetsOpen, setAssetsOpen] = useState(false);
     const [reading, setReading] = useState(false);
-    // 输入中、已有文字或参考图时才展开控制栏；失焦且为空时自动收起。
-    const expanded = focused || dragging || references.length > 0 || prompt.trim().length > 0;
+    // 输入中、选择模型、已有文字或参考图时展开控制栏；失焦且为空时自动收起。
+    const expanded = modelOpen || focused || dragging || references.length > 0 || prompt.trim().length > 0;
     const addImages = async (files: File[]) => {
         if (!files.length || reading || running) return;
         setReading(true);
@@ -88,7 +89,7 @@ export function ImagePromptComposer({ onSubmit, running = false, scope = "image"
                                 if (key === "assets") setAssetsOpen(true);
                                 if (key === "prompts") setPromptsOpen(true);
                             } }}><Button type="text" shape="circle" icon={<Plus size={19} />} aria-label="添加参考图或选择灵感" /></Dropdown>
-                            <StudioGenerationSettings kind="image" part="model" />
+                            <StudioGenerationSettings kind="image" part="model" onModelOpenChange={setModelOpen} />
                         </div>
                         <div className={styles.toolbarRow}>
                             <StudioGenerationSettings kind="image" part="settings" />

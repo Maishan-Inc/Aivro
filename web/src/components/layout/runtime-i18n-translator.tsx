@@ -49,6 +49,7 @@ function translateNode(node: Node, locale: Locale) {
     if (node.nodeType !== Node.ELEMENT_NODE) return;
     const element = node as Element;
     translateElementAttrs(element, locale);
+    if (element.closest("[data-i18n-skip]")) return;
     const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
     for (let current = walker.nextNode(); current; current = walker.nextNode()) {
         translateTextNode(current as Text, locale);

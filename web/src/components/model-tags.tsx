@@ -12,6 +12,6 @@ export function ModelTags({ tags, limit = 3 }: { tags?: string[]; limit?: number
         const tag = modelTags.find((item) => item.value === value);
         if (!tag) return null;
         const Icon = icons[tag.icon];
-        return <span key={value} className="inline-flex items-center gap-0.5 whitespace-nowrap rounded border border-border/60 bg-muted/70 px-1 py-0.5 text-[10px] font-medium leading-none text-foreground/80"><Icon className="size-2.5" aria-hidden="true" />{tr(tag.label)}</span>;
-    })}{tags && tags.length > limit ? <span className="text-[10px] text-muted-foreground" title={tags.map((value) => tr(modelTags.find((item) => item.value === value)?.label || value)).join(" · ")}>+{tags.length - limit}</span> : null}</span>;
+        return <span key={value} className="inline-flex items-center gap-1 whitespace-nowrap rounded border border-border bg-muted px-1.5 py-0.5 text-xs font-medium leading-4 text-foreground"><Icon className="size-3" aria-hidden="true" />{tr(tag.label)}</span>;
+    })}{tags && tags.length > limit ? <span className="text-xs text-muted-foreground" title={tags.map((value) => tr(modelTags.find((item) => item.value === value)?.label || value)).join(" · ")}>+{tags.length - limit}</span> : null}</span>;
 }

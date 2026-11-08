@@ -6,6 +6,7 @@
 | --- | --- |
 | `alibaba.svg` | [Lobe Icons](https://github.com/lobehub/lobe-icons)，来自 `@lobehub/icons-static-svg@1.95.1`，用于阿里巴巴、通义千问与万相模型 |
 | `bytedance.svg`、`flux.svg`、`hunyuan.svg`、`kling.svg`、`meshy.svg`、`meta.svg`、`microsoft.svg`、`nanobanana.svg`、`reve.svg`、`tencent.svg` | [Lobe Icons](https://github.com/lobehub/lobe-icons)，来自 `@lobehub/icons-static-svg@1.95.1` |
+| `midjourney.svg`、`stability.svg`、`minimax.svg`、`runway.svg`、`luma.svg`、`pika.svg`、`ideogram.svg`、`recraft.svg` | [Lobe Icons](https://github.com/lobehub/lobe-icons)，来自 `@lobehub/icons-static-svg@1.95.1`，随站点本地提供并缓存 |
 | `404gen.svg` | [404—GEN 官网](https://404.xyz)导航中的品牌 SVG |
 | `trellis.png` | [TRELLIS 项目官网](https://microsoft.github.io/TRELLIS/favicon.png) |
 | `unilat3d.png` | [UniLat3D 官方项目](https://unilat3d.github.io/assets_unilat3d/icon/logo.png)，按原比例缩至 128px 宽 |

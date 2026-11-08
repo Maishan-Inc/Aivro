@@ -7,10 +7,10 @@
 .close { display: inline-flex; align-items: center; gap: 14px; color: var(--muted-foreground); font-size: 12px; }
 .close:hover { color: var(--foreground); }
 .heading { padding: 68px 24px 60px; text-align: center; }
-.heading > span { color: var(--muted-foreground); font-size: 11px; letter-spacing: .14em; }
+.heading > span { color: var(--muted-foreground); font-size: 13px; letter-spacing: .14em; }
 .heading h1 { margin: 24px 0; font-size: clamp(36px, 4.2vw, 72px); font-weight: 550; line-height: 1.25; letter-spacing: -.06em; }
 .heading p { max-width: 610px; margin-inline: auto; color: var(--muted-foreground); font-size: 14px; line-height: 2; }
-.heading > small { display: inline-block; margin-top: 28px; border-top: 1px solid var(--border); padding-top: 20px; color: var(--muted-foreground); font-size: 11px; }
+.heading > small { display: inline-block; margin-top: 28px; border-top: 1px solid var(--border); padding-top: 20px; color: var(--muted-foreground); font-size: 13px; }
 .enterprise { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 28px; margin-top: 48px; border-block: 1px solid var(--border); padding-block: 32px; }
 .enterprise > div { display: flex; align-items: center; gap: 20px; }
 .enterprise > div > svg { flex-shrink: 0; color: var(--muted-foreground); }
@@ -19,8 +19,8 @@
 .enterprise > a { display: inline-flex; align-items: center; gap: 14px; color: var(--foreground); font-size: 13px; }
 .enterprise > a:hover svg { transform: translateX(4px); }
 .enterprise > a svg { transition: transform .2s; }
-.note { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 18px; padding-top: 26px; font-size: 10px; color: var(--muted-foreground); }
+.note { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 18px; padding-top: 26px; font-size: 12px; color: var(--muted-foreground); }
 .note a { display: inline-flex; align-items: center; gap: 8px; color: inherit; }
 @media (max-width: 1000px) { .content { width: calc(100% - 64px); }.heading { padding-block: 48px; }.enterprise { margin-top: 36px; } }
-@media (max-width: 600px) { .content { width: calc(100% - 40px); }.nav { padding-block: 24px; }.close { gap: 8px; font-size: 11px; }.heading { padding: 38px 0 40px; }.heading h1 { font-size: 36px; }.heading p { font-size: 13px; }.enterprise { align-items: start; padding-block: 28px; }.enterprise > a { margin-left: 44px; }.note { font-size: 10px; } }
+@media (max-width: 600px) { .content { width: calc(100% - 40px); }.nav { padding-block: 24px; }.close { gap: 8px; font-size: 13px; }.heading { padding: 38px 0 40px; }.heading h1 { font-size: 36px; }.heading p { font-size: 13px; }.enterprise { align-items: start; padding-block: 28px; }.enterprise > a { margin-left: 44px; }.note { font-size: 12px; } }
 @media (prefers-reduced-motion: reduce) { .enterprise > a svg { transition: none; } }

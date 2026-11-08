@@ -1,6 +1,6 @@
 "use client";
 
-import { useDeferredValue, useEffect, useId, useMemo, useRef, useState } from "react";
+import { memo, useDeferredValue, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Input, Select, type RefSelectProps } from "antd";
 import { ChevronDown, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -22,6 +22,7 @@ type ModelPickerProps = {
     model3D?: ModelBillingOptions["model3D"];
     value?: string;
     onChange: (model: string) => void;
+    onOpenChange?: (open: boolean) => void;
     models?: string[];
     className?: string;
     fullWidth?: boolean;
@@ -31,7 +32,7 @@ type ModelPickerProps = {
     onMissingConfig?: () => void;
 };
 
-export function ModelPicker({ config, kind, count, model3D, value, onChange, models, className, fullWidth = false, showBilling = true, billingLabel, placeholder = "选择模型", onMissingConfig }: ModelPickerProps) {
+export function ModelPicker({ config, kind, count, model3D, value, onChange, onOpenChange, models, className, fullWidth = false, showBilling = true, billingLabel, placeholder = "选择模型", onMissingConfig }: ModelPickerProps) {
     const { tr, locale } = useI18n();
     const channel = useConfigStore((state) => state.publicSettings?.modelChannel);
     const pickerId = useId();
@@ -46,13 +47,22 @@ export function ModelPicker({ config, kind, count, model3D, value, onChange, mod
             const cost = prices.get(model);
             const guessed = guessModelVendor(model);
             const second = kind === "video" && resolveVideoConfig(config, model).videoBillingType === "second" && cost?.videoSecondPrice;
-            return { value: model, label: model, vendor: cost?.vendor || guessed.vendor, icon: cost?.icon || guessed.icon, tags: cost?.tags, credits: second ? second.credits : cost?.credits, billingType: second ? "second" : kind === "text" && cost?.billingType === "token" ? "token" : "fixed" };
+            const credits = second ? second.credits : cost?.credits;
+            const billingType = second ? "second" : kind === "text" && cost?.billingType === "token" ? "token" : "fixed";
+            const vendor = cost?.vendor || guessed.vendor;
+            const priceLabel = billingLabel ? tr(billingLabel) : credits !== undefined ? `${tr("基础单价")} ${credits.toLocaleString(locale)} ${tr(billingUnit(billingType))}` : tr("该模型尚未配置计费");
+            return { value: model, label: model, vendor, icon: cost?.icon || guessed.icon, tags: cost?.tags, priceLabel, search: `${model} ${tr(vendor)}`.toLowerCase() };
         });
-    }, [channel, config, kind, models]);
+    }, [channel, config, kind, models, billingLabel, tr, locale]);
     const vendors = useMemo(() => Array.from(new Set(options.map((item) => item.vendor).filter(Boolean))).sort(), [options]);
-    const filtered = useMemo(() => options.filter((item) => (!vendor || item.vendor === vendor) && (!word || `${item.value} ${tr(item.vendor)}`.toLowerCase().includes(word))), [options, tr, vendor, word]);
+    const filtered = useMemo(() => options.filter((item) => (!vendor || item.vendor === vendor) && (!word || item.search.includes(word))), [options, vendor, word]);
     const current = value || "";
     const selected = options.find((item) => item.value === current);
+
+    useEffect(() => {
+        onOpenChange?.(open);
+        return () => onOpenChange?.(false);
+    }, [open, onOpenChange]);
 
     useEffect(() => {
         const closeOtherPicker = (event: Event) => {
@@ -77,7 +87,7 @@ export function ModelPicker({ config, kind, count, model3D, value, onChange, mod
         placeholder={tr(placeholder)}
         labelRender={() => <span className="flex min-w-0 flex-1 items-center gap-2" data-i18n-skip>
             <span className={cn("canvas-model-picker-text min-w-0 truncate text-left", showBilling ? "flex-1" : "w-[190px]")}>{current}</span>
-            {showBilling ? billingLabel ? <span className="shrink-0 whitespace-nowrap text-xs opacity-70">{tr(billingLabel)}</span> : <ModelBilling summaryOnly model={current} kind={kind} count={count} model3D={model3D} video={config} className="shrink-0 opacity-70" /> : null}
+            {showBilling ? billingLabel ? <span className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">{tr(billingLabel)}</span> : <ModelBilling summaryOnly model={current} kind={kind} count={count} model3D={model3D} video={config} className="shrink-0 text-muted-foreground" /> : null}
         </span>}
         onMouseDown={(event) => event.stopPropagation()}
         onOpenChange={(nextOpen) => {
@@ -91,33 +101,38 @@ export function ModelPicker({ config, kind, count, model3D, value, onChange, mod
         onChange={(model) => { onChange(model); setOpen(false); }}
         options={filtered}
         virtual
-        listHeight={336}
-        listItemHeight={56}
-        popupMatchSelectWidth={380}
+        listHeight={384}
+        listItemHeight={64}
+        popupMatchSelectWidth={420}
         placement="bottomLeft"
         classNames={{ popup: { root: styles.popup } }}
-        styles={{ popup: { listItem: { height: 56, minHeight: 56, padding: "6px 8px" } } }}
+        styles={{ popup: { listItem: { height: 64, minHeight: 64, padding: "8px 10px", boxSizing: "border-box" } } }}
         notFoundContent={<span className="text-xs text-muted-foreground">{tr("没有匹配的模型")}</span>}
         popupRender={(menu) => <div data-canvas-no-zoom onPointerDown={(event) => event.stopPropagation()} onMouseDown={(event) => event.stopPropagation()} onWheel={(event) => event.stopPropagation()}>
             <div className="mb-1 flex items-center gap-2 border-b border-border/60 px-1 pb-2 pt-1">
+                <Select size="small" value={vendor} onChange={setVendor} aria-label={tr("筛选模型厂商")} className="w-32 shrink-0" popupMatchSelectWidth={180} styles={{ popup: { root: { zIndex: 1210 } } }} options={[{ value: "", label: tr("全部厂商") }, ...vendors.map((item) => ({ value: item, label: tr(item) }))]} />
                 <Input size="small" allowClear prefix={<Search className="size-3" />} placeholder={tr("搜索模型")} aria-label={tr("搜索模型")} value={keyword} onChange={(event) => setKeyword(event.target.value)} className="min-w-0 flex-1" onKeyDown={(event) => {
                     event.stopPropagation();
                     if (event.key === "Escape") { setOpen(false); selectRef.current?.focus(); }
                     if (event.key === "ArrowDown") { event.preventDefault(); selectRef.current?.focus(); }
                 }} />
-                <Select size="small" value={vendor} onChange={setVendor} aria-label={tr("筛选模型厂商")} className="w-32 shrink-0" popupMatchSelectWidth={180} styles={{ popup: { root: { zIndex: 1210 } } }} options={[{ value: "", label: tr("全部厂商") }, ...vendors.map((item) => ({ value: item, label: tr(item) }))]} />
             </div>
             {menu}
         </div>}
-        optionRender={({ data: item }) => <span className="flex h-full min-w-0 items-center gap-2" data-i18n-skip>
-            <ModelLogo icon={item.icon} name={item.vendor || item.value} size={18} />
-            <span className="min-w-0 flex-1">
-                <span className="flex min-w-0 items-center gap-2"><span className="min-w-0 flex-1 truncate text-[12px] leading-5" title={item.value}>{item.value}</span><ModelTags tags={item.tags} /></span>
-                <span className="block truncate text-[11px] leading-4 opacity-60">{billingLabel ? tr(billingLabel) : item.credits !== undefined ? `${tr("基础单价")} ${item.credits.toLocaleString(locale)} ${tr(billingUnit(item.billingType))}` : tr("该模型尚未配置计费")}</span>
-            </span>
-        </span>}
+        optionRender={({ data: item }) => <ModelOption item={item} />}
     /></div>;
 }
+
+// 滚动时仅挂载可见行，价格与搜索文本在列表变化时计算。
+const ModelOption = memo(function ModelOption({ item }: { item: { value: string; icon: string; tags?: string[]; priceLabel: string } }) {
+    return <span className="flex h-full min-w-0 items-center gap-2" data-i18n-skip>
+        <ModelLogo icon={item.icon} name={item.value} size={22} />
+        <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-medium leading-5" title={item.value}>{item.value}</span>
+            <span className="mt-1 flex min-w-0 items-center gap-2"><span className="min-w-0 flex-1 truncate text-xs leading-5 text-muted-foreground" title={item.priceLabel}>{item.priceLabel}</span><ModelTags tags={item.tags} limit={2} /></span>
+        </span>
+    </span>;
+});
 
 export function ModelIcon({ model }: { model: string }) {
     const icon = useConfigStore((state) => state.publicSettings?.modelChannel.modelCosts?.find((item) => item.model === model)?.icon);
