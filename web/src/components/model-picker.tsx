@@ -62,7 +62,7 @@ export function ModelPicker({ config, kind, count, model3D, value, onChange, mod
         return () => window.removeEventListener("model-picker-open", closeOtherPicker);
     }, [pickerId]);
 
-    return <Select
+    return <div className="contents" onPointerDown={(event) => event.stopPropagation()}><Select
         ref={selectRef}
         open={open}
         value={current || undefined}
@@ -79,7 +79,6 @@ export function ModelPicker({ config, kind, count, model3D, value, onChange, mod
             <span className={cn("canvas-model-picker-text min-w-0 truncate text-left", showBilling ? "flex-1" : "w-[190px]")}>{current}</span>
             {showBilling ? billingLabel ? <span className="shrink-0 whitespace-nowrap text-xs opacity-70">{tr(billingLabel)}</span> : <ModelBilling summaryOnly model={current} kind={kind} count={count} model3D={model3D} video={config} className="shrink-0 opacity-70" /> : null}
         </span>}
-        onPointerDown={(event) => event.stopPropagation()}
         onMouseDown={(event) => event.stopPropagation()}
         onOpenChange={(nextOpen) => {
             if (nextOpen && !options.length) { onMissingConfig?.(); return; }
@@ -117,7 +116,7 @@ export function ModelPicker({ config, kind, count, model3D, value, onChange, mod
                 <span className="block truncate text-[11px] leading-4 opacity-60">{billingLabel ? tr(billingLabel) : item.credits !== undefined ? `${tr("基础单价")} ${item.credits.toLocaleString(locale)} ${tr(billingUnit(item.billingType))}` : tr("该模型尚未配置计费")}</span>
             </span>
         </span>}
-    />;
+    /></div>;
 }
 
 export function ModelIcon({ model }: { model: string }) {
