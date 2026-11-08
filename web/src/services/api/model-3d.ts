@@ -45,8 +45,8 @@ export type Model3DGenerationResult = {
     completedAt: string;
 };
 
-export async function requestModel3DGeneration(token: string, input: Model3DGenerationInput) {
-    const submitted = await apiPost<Model3DGenerationResult | GenerationTaskSubmitResult>("/api/v1/model-3d/generations", input, token);
+export async function requestModel3DGeneration(token: string, input: Model3DGenerationInput, source?: "workflow") {
+    const submitted = await apiPost<Model3DGenerationResult | GenerationTaskSubmitResult>("/api/v1/model-3d/generations", input, token, source ? { "X-Aivro-Section": source } : undefined);
     if (!("queued" in submitted)) return submitted;
     for (;;) {
         await new Promise((resolve) => setTimeout(resolve, 2000));

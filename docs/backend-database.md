@@ -33,6 +33,9 @@
 - `cloud_file_references`
 - `generation_histories`
 - `generation_tasks`
+- `generation_retention_policies`
+- `free_image_campaigns`
+- `free_image_usages`
 - `video_tasks`
 - `user_preferences`
 - `workflows`
@@ -83,6 +86,8 @@
 | `profile_completed` | bool | 是否已完成账户类型和名称资料 |
 | `avatar_url`    | string | 头像地址                     |
 | `role`          | string | 角色：`user`、`admin`        |
+| `membership_group` | string | 会员组别：`free`、`go`、`plus`、`pro`、`max`，默认 `free`；Stripe 套餐付款完成时在权益事务内设为对应套餐组别 |
+| `generation_retention_days` | json | 用户单独配置的 `workflow`、`image`、`video`、`model3d`、`free-image`、`prompt-reverse` 保存天数，0 或未填写时跟随会员组；独立保存接口不递增令牌版本 |
 | `credits`       | number | 算力点余额                    |
 | `workflow_create_credits` | number | 工作流创建次数余额，新注册用户默认 0 |
 | `aff_code`      | string | 用户自己的邀请码，唯一索引            |
@@ -235,7 +240,7 @@ MetaMask 登录服务端签名挑战表。nonce 与钱包地址绑定，短时�
 | `model3DModels` | string[] | 3D 模型服务可用模型范围 |
 | `model3DAdapters` | object | 按公开模型名返回当前优先渠道的 3D 适配方式；后端由私有渠道映射派生，未出现的模型使用通用接口，不包含渠道地址或密钥 |
 | `model3DCapabilities` | object | 同优先渠道派生的能力：`modes`、`maxImages`、`maxQuantity`、`texture`、`pbr`、`alwaysTexture`、`qualities`、`minFaces`、`maxFaces`、`defaultFaces`、`referenceViews`、`promptMaxLength`、`imageMaxBytes`；`maxFaces=0` 表示不支持自定义面数，视角数组为空时无固定顺序 |
-| `modelCosts` | object[] | 模型计费配置       |
+| `modelCosts` | object[] | 模型计费、标签与分辨率配置 |
 | `defaultModel`    | string   | 兼容字段，保存当前通用默认模型 |
 | `defaultImageModel` | string | 默认图片模型         |
 | `defaultVideoModel` | string | 默认视频模型         |
@@ -250,6 +255,10 @@ MetaMask 登录服务端签名挑战表。nonce 与钱包地址绑定，短时�
 | `modelId` | string | 渠道模型隐藏 ID，用于计费匹配和审计；由后端按新增顺序分配，删除后不复用旧 ID |
 | `model` | string | 当前前台模型名；展示名称变更时随渠道模型同步更新 |
 | `credits` | number | 控制台标准价；按次计费时表示每次调用点数，Token 计费时表示每 1000 token 点数 |
+| `priceConfigured` | bool | 管理员已明确设置标准价；未设置时不能开放模型或执行计费请求 |
+| `freeConfirmed` | bool | 管理员已确认零计费；后台保存零标准价或零按秒价需等待 5 秒并再次同意，修改价格后重新确认 |
+| `tags` | string[] | 展示标签标识：`deal` 特惠、`4k`、`8k`、`recommended` 推荐、`new` 新上、`popular` 热门、`fast` 高速、`hd` 高清；只影响展示 |
+| `resolutions` | string[] | 图片或视频模型启用的分辨率档位；在模型配置“信息扩充”中维护，文本和 3D 不使用 |
 | `billingType` | string | 计费方式：`fixed` 按次计费，`token` 按 Token 计费 |
 | `vendor` | string | 厂商名称；留空时按模型名关键词自动识别 |
 | `icon` | string | 厂商图标路径，例如 `/icons/openai.svg`；留空时按自动识别结果填充 |
@@ -261,7 +270,10 @@ MetaMask 登录服务端签名挑战表。nonce 与钱包地址绑定，短时�
 
 视频的主行 `billingType` / `apiBilling` 固定为 `fixed`；按秒用 `videoSecondPrice`，不使用 token。按秒 API 显式价格为 0 时使用每秒标准价乘以 API 倍数。请求缺省 `billingType` 使用主行按次价，`second` 使用请求 `seconds` 乘以每秒单价。
 
-`modelCosts` 只跟随 `availableModels` 中开放给前台的模型生成，内部优先按 `modelId` 匹配计费配置，不再依赖模型名称作为唯一计费标识。
+`modelCosts` 可保存全部渠道模型的定价、标签与分辨率，包括未开放和渠道已停用的模型；公开设置接口只返回 `availableModels` 中开放模型的配置。内部优先按 `modelId` 匹配，未明确设置标准价或未确认零计费的模型不能开放，调用时同样拒绝。重新开放零价模型时后台再次显示 5 秒确认。
+
+图片 `resolutions` 支持 `1k`、`2k`、`4k`、`8k`，默认前三项，8K 默认关闭；每个档位的单边像素上限分别为 1024、2048、4096、8192。视频支持 `480p`、`720p`、`768p`、`1080p`、`1440p`、`4k`，默认沿用适配器规格，2K（`1440p`）默认关闭。管理员可主动开启模型实际支持的更高档位，公开 `videoCapabilities.resolutions` 和生成校验使用保存的档位；时长、比例与参考图限制仍来自适配器。图片和视频至少启用一个档位，缺省配置由后端补齐默认值；新增模型仍保持未定价，分辨率默认值不会使其自动开放。
+
 `planCredits` 只保留大于 0 的套餐档位，配置为 0 或留空都表示沿用标准价；`apiCredits`、`apiMultiplier` 和厂商信息由后端在保存时统一补齐，管理员不需要逐条填写。
 登录会话调用按 `credits` 和 `billingType` 结算，套餐专属价仍用于定价表展示。用户 API 密钥调用使用 `apiCredits`、`apiMultiplier` 和 `apiBilling`，共享所属账号的算力点余额。
 
@@ -493,12 +505,13 @@ MetaMask 私有配置字段：
 | `content_type` | string | 文件 MIME 类型 |
 | `size` | number | 文件字节数 |
 | `source` | string | 来源接口，例如 `/images/generations`、`/videos/:id/content` |
-| `expires_at` | string | 临时文件到期时间；存在有效引用时继续保留，头像为空 |
+| `generation_task_id` | string | 生成文件关联的本站任务编号，索引；上传文件和任务载荷为空 |
+| `expires_at` | string | 生成文件按任务保存天数快照计算到期时间，引用不延长；上传临时文件仍按原引用规则保留，头像为空 |
 | `deleted_at` | string | 删除占用标记；标记后禁止新增引用，存储删除失败时恢复为空 |
 | `created_at` | string | 创建时间 |
 | `updated_at` | string | 更新时间 |
 
-用户上传入口只接受安全白名单内的图片、视频或 3D 模型 MIME 类型，单文件最大 50MB。队列请求和响应使用内部 `task` 类型对象，不开放给用户直接上传。文件内容读取时校验上传者、当前用户持有的有效引用或访问 token。自动清理只处理已到期且没有有效引用的文件；手动释放引用也只删除没有其他有效引用的对象。文件行加锁后先标记删除，再移除存储对象，删除失败恢复标记并返回错误。
+用户上传入口只接受安全白名单内的图片、视频或 3D 模型 MIME 类型，单文件最大 50MB。队列请求和响应使用内部 `task` 类型对象，不开放给用户直接上传。文件内容读取时校验上传者、当前用户持有的有效引用或访问 token。生成文件到期后立即停止内容访问，定时清理删除本地或 R2/S3 对象，即使存在工作流、分享或素材引用也不延长；普通上传文件仍仅在到期且没有有效引用时清理，手动释放引用只删除没有其他有效引用的未到期对象。文件行加锁后先标记删除，再移除存储对象，删除失败恢复标记并返回错误。
 
 头像通过独立的 `/api/v1/profile/avatar` 接口上传，标记为 `purpose=avatar`。前端裁剪为 512 × 512 PNG，后端限制 5MB，验证图片尺寸并重新解码、编码为 PNG 后保存；`users.avatar_url` 更新为该文件的受控访问地址。
 
@@ -534,7 +547,9 @@ MetaMask 私有配置字段：
 
 ### generation_tasks
 
-AI 生成队列表。任务表只保存状态和对象引用，原始请求体与响应体保存为 `cloud_files.file_type=task`，避免大 BLOB 长期占用数据库。
+免费活动任务另保存 `campaign_id`、`agreement_version` 与 `agreement_accepted_at`，常规任务留空；活动任务的 `credits=0`，次数在任务创建事务中扣减，失败或撤销事务中返还。
+
+AI 生成队列与后台任务记录共用表。一次生成请求只创建一条任务，供应商重试和轮询只更新状态；任务参数、提示词、错误及时间长期保留。原始请求体与响应体保存为 `cloud_files.file_type=task`，按载荷保留小时清理，不删除任务行。
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
@@ -572,7 +587,20 @@ AI 生成队列表。任务表只保存状态和对象引用，原始请求体�
 
 启动及每 30 秒只恢复租约到期的任务。终态更新比较原状态与 worker ID，失败/撤销的退款和流水在同一事务内提交，重复处理不会重复退款。模型速率与排队容量的调度锁仍为进程内锁。
 
-队列旧任务清理会先删除 `request_file_id` 和 `response_file_id` 指向的文件对象，再删除任务行。
+队列旧任务清理只删除 `request_file_id` 和 `response_file_id` 指向的载荷并清空引用，保留任务行。任务详情根据 `cloud_files.generation_task_id` 查找未删除、未到期的媒体；媒体到期或手动删除后仍可查看提示词、完整参数和错误。任务提交阶段的保存、限流或扣费错误也记录为一次失败任务；执行阶段的失败和退款仍沿用原终态事务。
+
+任务新增字段：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `section` | string | `workflow`、`image`、`video`、`model3d`，供来源筛选与保存规则使用 |
+| `prompt` | text | 生成提示词，与媒体生命周期分开 |
+| `parameters` | json | 本站接收的完整请求参数；多部分表单保留全部文本值、重复字段与文件名称/MIME/字节数，内联媒体保存元信息；视频 `effective` 记录规范化参数 |
+| `retention_days` | number | 提交任务时生效的保存天数快照，排队中修改规则不影响该任务 |
+| `progress` | number | 供应商实际返回的百分比；未提供时为 0，成功为 100，不推算执行百分比 |
+| `stage` | string | 排队、执行、供应商状态、转存或终态 |
+| `provider_task_id` | string | 供应商返回的任务编号 |
+| `error_detail` | text | 管理员可见的执行或供应商错误详情，成功重试后清空 |
 
 ### workflows
 
@@ -771,15 +799,37 @@ KYC 认证记录表。当前服务商为 Didit。
 | `created_at` | string | 创建时间 |
 | `updated_at` | string | 更新时间 |
 
+### generation_retention_policies
+
+管理员“记录保存”的会员组保存规则表。
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `group` | string | 主键，`free`、`go`、`plus`、`pro`、`max` |
+| `days` | json | `workflow`、`image`、`video`、`model3d`、`free-image`、`prompt-reverse` 六项保存天数，各项 1–3650 |
+| `updated_at` | string | 最近更新时间 |
+
+未配置的会员组默认各项 7 天，FREE 生图及所有组的活动免费生图为 3 天。用户覆盖优先，0 跟随组别；修改会员组和规则只影响后续任务，不批量修改已生成文件期限。保存会员组或用户规则写入审计日志。工作流媒体期限只作用于生成文件，不删除工作流和节点提示词。
+
+### free_image_campaigns
+
+每一期免费生图活动独立保存 `id`（主键）、`name`、`enabled`、`starts_at`、`ends_at`、`models`（JSON 模型列表）、`group_limits`（JSON 会员次数）、`created_at` 和 `updated_at`。活动时间使用 UTC RFC3339，结束后不再接受新任务，活动关闭不取消已提交任务。
+
+### free_image_usages
+
+`campaign_id` 与 `user_id` 组成联合主键，`used` 保存本期成功与进行中任务占用的次数。任务创建与额度增加在同一事务内完成；失败、撤销只在任务状态实际变更时减一次，重新编辑活动不会清零，新活动独立计数。
+
 ### generation_histories
 
-用户图片、视频、3D 生成历史表。历史记录保存已转存到 `cloud_files` 的媒体及参考图，并建立有期限的文件引用；历史与引用统一按对应媒体的存储配置保存天数计算，不受临时文件最多 24 小时的限制。图片记录的 `config.taskIds` 保存关联的生成任务编号，供页面刷新后识别已保存记录并避免重复补写。列表只移除确实没有可用媒体的记录，数据库读取失败不会触发删除。
+活动与反推记录复用此表：`type=free-image` 关联 `campaign_id`；`type=prompt-reverse` 的 `result` JSON 保存六语言提示词、分析、风格标签及结构化结果，`media` 保存参考图。`published_asset_id` 和 `reward_credits` 标记管理员已公开和奖励的活动作品，公开副本用 `cloud_file_references.kind=public-asset` 持续保留，删除素材后释放；原生成文件仍按原期限到期。奖励流水类型为 `free_image_reward`。
+
+用户图片、视频、3D 生成历史表。历史记录保存已转存到 `cloud_files` 的媒体及参考图，并建立有期限的文件引用；历史与引用跟随生成文件的实际到期时间，新生成文件使用用户覆盖或会员组默认保存天数，不受上传临时文件最多 24 小时的限制。图片记录的 `config.taskIds` 保存关联的生成任务编号，供页面刷新后识别已保存记录并避免重复补写。列表只移除确实没有可用媒体的记录，数据库读取失败不会触发删除。
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
 | `id` | string | 主键 |
 | `user_id` | string | 用户 ID |
-| `type` | string | 历史类型：`image`、`video`、`model3d` |
+| `type` | string | 历史类型：`image`、`video`、`model3d`、`free-image`、`prompt-reverse` |
 | `title` | string | 标题，默认取提示词前缀或模型名 |
 | `prompt` | text | 本次生成提示词 |
 | `model` | string | 本次使用模型 |
@@ -793,7 +843,7 @@ KYC 认证记录表。当前服务商为 Didit。
 | `created_at` | string | 创建时间 |
 | `updated_at` | string | 更新时间 |
 
-删除生成历史或历史到期清理时，释放该历史的文件引用；素材、工作流或其他历史仍在引用的文件继续保留。R2/S3 与服务器本地存储使用同一套引用判断。
+删除生成历史或历史到期清理时释放该历史的文件引用；未到期文件有其他有效引用时继续保留，生成文件到期后不再由引用延长期限。后台任务记录不随历史删除。R2/S3 与服务器本地存储使用同一套引用判断。
 
 ### user_preferences
 
@@ -824,6 +874,7 @@ KYC 认证记录表。当前服务商为 Didit。
 | `remark`     | string | 备注                       |
 | `ip`         | string | 请求 IP 地址 |
 | `country`    | string | 请求国家或地区 |
+| `parameters` | json | 模型请求完整参数快照，消费、退款与任务结算流水均保留；用户侧流水不返回此字段 |
 | `extra`      | json   | 扩展信息                     |
 | `created_at` | string | 创建时间                     |
 

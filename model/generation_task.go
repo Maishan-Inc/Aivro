@@ -13,11 +13,25 @@ const (
 
 // GenerationTask 记录进入限流队列的 AI 请求。
 type GenerationTask struct {
+	CampaignID string `json:"campaignId,omitempty" gorm:"index"`
+	QuotaLimit int `json:"-" gorm:"-"`
+	AgreementAcceptedAt string `json:"agreementAcceptedAt,omitempty"`
+	AgreementVersion string `json:"agreementVersion,omitempty"`
 	ID             string               `json:"id" gorm:"primaryKey"`
 	UserID         string               `json:"userId" gorm:"index"`
 	Username       string               `json:"username"`
 	Model          string               `json:"model" gorm:"index"`
 	Path           string               `json:"path" gorm:"index"`
+	Section        string               `json:"section" gorm:"index"`
+	Prompt         string               `json:"prompt" gorm:"type:text"`
+	Parameters     map[string]any       `json:"parameters" gorm:"serializer:json"`
+	RetentionDays  int                  `json:"retentionDays"`
+	Progress       int                  `json:"progress"`
+	Stage          string               `json:"stage"`
+	ProviderTaskID string               `json:"providerTaskId"`
+	ErrorDetail    string               `json:"errorDetail" gorm:"type:text"`
+	User           *LogUser             `json:"user,omitempty" gorm:"-"`
+	Media          []GenerationHistoryMedia `json:"media,omitempty" gorm:"-"`
 	ContentType    string               `json:"contentType"`
 	RequestFileID  string               `json:"requestFileId" gorm:"index"`
 	Credits        int                  `json:"credits"`

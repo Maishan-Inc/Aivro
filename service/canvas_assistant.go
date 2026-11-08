@@ -428,6 +428,7 @@ func requestCanvasAgentPlan(ctx context.Context, userID string, input CanvasAgen
 		return canvasAgentPlanPayload{}, "", CanvasAgentUsage{}, safeMessageError{message: "画布上下文过大，请减少选中内容后重试"}
 	}
 	reservedCredits := canvasAgentReserveCredits(body, canvasAgentMaxOutputTokens, billing)
+	meta.Parameters, _ = ReadAIRequestParameters(body, "application/json")
 	if reservedCredits > 0 {
 		if err := ConsumeUserCreditsWithMeta(userID, modelName, reservedCredits, "/canvas-agent/plan-reserve", meta); err != nil {
 			return canvasAgentPlanPayload{}, "", CanvasAgentUsage{}, err

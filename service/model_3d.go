@@ -315,7 +315,7 @@ func StoreModel3DContentToCloud(ctx context.Context, user model.AuthUser, filena
 	if fileType != model.CloudFileTypeModel3D {
 		return StoredFileResult{}, safeMessageError{message: "只支持 3D 模型文件"}
 	}
-	result, err := storeObject(ctx, CloudObjectUpload{User: user, FileType: fileType, Purpose: model.CloudFilePurposeTemp, Filename: sanitizeFilename(strings.TrimSuffix(filename, filepath.Ext(filename))) + ext, ContentType: contentType, Source: source, Body: body, ExpiresAt: defaultTempExpiresAt(model.CloudFileTypeModel3D)})
+	result, err := storeObject(ctx, CloudObjectUpload{User: user, FileType: fileType, Purpose: model.CloudFilePurposeGeneration, Filename: sanitizeFilename(strings.TrimSuffix(filename, filepath.Ext(filename))) + ext, ContentType: contentType, Source: source, Body: body})
 	if err != nil {
 		return StoredFileResult{}, err
 	}
@@ -330,7 +330,7 @@ func StoreModel3DReaderToCloud(ctx context.Context, user model.AuthUser, filenam
 	if fileType != model.CloudFileTypeModel3D {
 		return StoredFileResult{}, safeMessageError{message: "只支持 3D 模型文件"}
 	}
-	result, err := storeObject(ctx, CloudObjectUpload{User: user, FileType: fileType, Purpose: model.CloudFilePurposeTemp, Filename: sanitizeFilename(strings.TrimSuffix(filename, filepath.Ext(filename))) + ext, ContentType: contentType, Source: source, Reader: file, Size: size, ExpiresAt: defaultTempExpiresAt(model.CloudFileTypeModel3D)})
+	result, err := storeObject(ctx, CloudObjectUpload{User: user, FileType: fileType, Purpose: model.CloudFilePurposeGeneration, Filename: sanitizeFilename(strings.TrimSuffix(filename, filepath.Ext(filename))) + ext, ContentType: contentType, Source: source, Reader: file, Size: size})
 	if err != nil {
 		return StoredFileResult{}, err
 	}

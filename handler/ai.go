@@ -157,6 +157,9 @@ func ExecuteAIProxyTask(ctx context.Context, user model.AuthUser, body io.Reader
 	if err != nil {
 		return service.AIProxyResponse{}, err
 	}
+	if path == "/images/generations" || path == "/images/edits" {
+		if err := service.ValidateImageRequest(modelName, payload, contentType); err != nil { return service.AIProxyResponse{}, err }
+	}
 	var lastStatus int
 	var lastErr error
 	for _, route := range service.ModelChannelRouteAttempts(routes) {
@@ -181,6 +184,8 @@ func ExecuteAIProxyTask(ctx context.Context, user model.AuthUser, body io.Reader
 			return service.AIProxyResponse{}, err
 		}
 		if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+			payload, _ := service.ReadAIProxyResponseBody(io.LimitReader(response.Body, 1<<20), path)
+			service.RecordGenerationTaskDiagnostic(ctx, fmt.Sprintf("HTTP %d: %s", response.StatusCode, string(payload)))
 			_ = response.Body.Close()
 			lastStatus = response.StatusCode
 			log.Printf("AI upstream error: status=%d", response.StatusCode)

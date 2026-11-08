@@ -26,6 +26,8 @@ export type AdminUser = {
     avatarUrl: string;
     role: "user" | "admin";
     disabledSections: UserSection[];
+    membershipGroup: string;
+    generationRetentionDays: Record<string, number>;
     credits: number;
     workflowCreateCredits: number;
     affCode: string;
@@ -73,6 +75,7 @@ export type AdminCreditLog = {
     ip: string;
     country: string;
     extra: string;
+    parameters?: Record<string, unknown>;
     user?: AdminLogUser;
     createdAt: string;
 };
@@ -313,6 +316,11 @@ export type AdminPublicModelChannelSettings = {
 };
 
 export type AdminModelCost = {
+	freeUntil?: string;
+    resolutions?: string[];
+    priceConfigured: boolean;
+    freeConfirmed: boolean;
+    tags: string[];
     videoSecondPrice?: VideoSecondPrice;
     modelId: string;
     model: string;
@@ -327,6 +335,7 @@ export type AdminModelCost = {
 };
 
 export type AdminPublicSettings = {
+	explore: { freeImageEnabled: boolean; promptReverseEnabled: boolean };
     modelChannel: AdminPublicModelChannelSettings;
     auth: {
         allowRegister: boolean;
@@ -410,6 +419,7 @@ export type AdminPublicAuthProvider = {
 };
 
 export type AdminPrivateSettings = {
+	promptReverse: { systemPrompt: string };
     channels: AdminModelChannel[];
     modelIdSeq: number;
     runtime: AdminRuntimeSettings;

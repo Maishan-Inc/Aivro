@@ -7,6 +7,8 @@ import { dataUrlToFile } from "@/lib/image-utils";
 import { authHeader } from "@/services/api/request";
 import { imageToDataUrl } from "@/services/image-storage";
 import type { ReferenceImage } from "@/types/image";
+import { imageSizeLimit, validateImageSize } from "@/lib/model-resolutions";
+import type { FreeImageInput } from "./explore";
 
 export type ChatCompletionMessage = {
     role: "system" | "user" | "assistant";
@@ -80,7 +82,7 @@ function normalizeQuality(quality: string) {
 }
 
 /** Map "quality + ratio" to an explicit pixel dimension like "3840x2160". Returns undefined when quality is auto. */
-function resolveSize(quality: string, ratio: string): string | undefined {
+function resolveSize(quality: string, ratio: string, limit: number): string | undefined {
     const basePixels = QUALITY_BASE[quality];
     if (!basePixels || ratio === "auto" || !ratio) return undefined;
 
@@ -95,7 +97,7 @@ function resolveSize(quality: string, ratio: string): string | undefined {
     const longRatio = isLandscape ? w / h : h / w;
 
     const longSideRaw = Math.sqrt(targetPixels * longRatio);
-    const longSide = Math.floor(longSideRaw / 16) * 16;
+    const longSide = Math.floor(Math.min(longSideRaw, limit) / 16) * 16;
     const shortSide = Math.round(longSide / longRatio / 16) * 16;
 
     const width = isLandscape ? longSide : shortSide;
@@ -104,11 +106,13 @@ function resolveSize(quality: string, ratio: string): string | undefined {
     return `${width}x${height}`;
 }
 
-function resolveRequestSize(quality: string | undefined, size: string) {
+function resolveRequestSize(quality: string | undefined, size: string, model: string) {
     const value = size.trim();
     if (!value || value === "auto") return undefined;
+    const limit = imageSizeLimit(model);
+    validateImageSize(value, limit);
     if (/^\d+x\d+$/.test(value)) return value;
-    return (quality && resolveSize(quality, value)) || value;
+    return (quality && resolveSize(quality, value, limit)) || value;
 }
 
 function resolveImageDataUrl(item: Record<string, unknown>) {
@@ -187,6 +191,7 @@ function aiHeaders(_config: AiConfig, contentType?: string) {
     const token = useUserStore.getState().token;
     return {
         ...authHeader(token),
+        ...(_config.generationSource ? { "X-Aivro-Section": _config.generationSource } : {}),
         ...(contentType ? { "Content-Type": contentType } : {}),
     };
 }
@@ -243,7 +248,7 @@ async function unwrapImageResponse(config: AiConfig, payload: ImageApiResponse, 
 export async function requestGeneration(config: AiConfig, prompt: string, onQueue?: GenerationQueueCallback) {
     const n = Math.max(1, Math.min(15, Math.floor(Math.abs(Number(config.count)) || 1)));
     const quality = normalizeQuality(config.quality);
-    const requestSize = resolveRequestSize(quality, config.size);
+    const requestSize = resolveRequestSize(quality, config.size, config.model);
     try {
         const response = await axios.post<ImageApiResponse>(
             aiApiUrl(config, "/images/generations"),
@@ -266,10 +271,17 @@ export async function requestGeneration(config: AiConfig, prompt: string, onQueu
     }
 }
 
+export async function requestFreeGeneration(config: AiConfig, input: FreeImageInput, onQueue?: GenerationQueueCallback) {
+    try {
+        const response = await axios.post<ImageApiResponse>("/api/v1/free-image/generations", input, { headers: aiHeaders(config, "application/json"), withCredentials: true });
+        return await unwrapImageResponse(config, response.data, onQueue);
+    } catch (error) { throw new Error(readAxiosError(error, "请求失败") || "请求失败"); }
+}
+
 export async function requestEdit(config: AiConfig, prompt: string, references: ReferenceImage[], onQueue?: GenerationQueueCallback) {
     const n = Math.max(1, Math.min(15, Math.floor(Math.abs(Number(config.count)) || 1)));
     const quality = normalizeQuality(config.quality);
-    const requestSize = resolveRequestSize(quality, config.size);
+    const requestSize = resolveRequestSize(quality, config.size, config.model);
     const formData = new FormData();
     formData.set("model", config.model);
     formData.set("prompt", withSystemPrompt(config, prompt));

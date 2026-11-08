@@ -1,5 +1,7 @@
 "use client";
 
+import { useGenerationRetention } from "@/hooks/use-generation-retention";
+
 import { StudioEmptyState } from "@/components/studio-empty-state";
 import { ImagePromptComposer } from "@/components/image-prompt-composer";
 import { StudioHistorySidebar } from "@/components/studio-history-sidebar";
@@ -110,7 +112,8 @@ export default function ImagePage() {
     const { prompt, references, setPrompt, setReferences } = useImageComposerStore();
     const [results, setResults] = useState<GenerationResult[]>([]);
     const [logs, setLogs] = useState<GenerationLog[]>([]);
-    const [retentionDays, setRetentionDays] = useState<number | null>(null);
+    const retention = useGenerationRetention();
+    const retentionDays = retention.data?.days.image ?? null;
     const [pendingLog, setPendingLog] = useState<GenerationLog | null>(null);
     const [running, setRunning] = useState(false);
     const [logsOpen, setLogsOpen] = useState(false);
@@ -131,8 +134,8 @@ export default function ImagePage() {
     }, [running, startedAt]);
 
     useEffect(() => {
-        void refreshLogs();
-    }, [token]);
+        void refreshLogs().catch(() => {});
+    }, [token, retention.dataUpdatedAt]);
 
     useEffect(() => {
         const urlPrompt = searchParams.get("prompt");
@@ -343,12 +346,10 @@ export default function ImagePage() {
     const refreshLogs = async () => {
         if (!token) {
             setLogs([]);
-            setRetentionDays(null);
             return;
         }
         const data = await fetchGenerationHistories(token, { type: "image", pageSize: 100 });
         setLogs(data.items.map(historyToImageLog));
-        setRetentionDays(data.retentionDays);
     };
 
     const previewGenerationLog = async (log: GenerationLog) => {
@@ -471,7 +472,7 @@ export default function ImagePage() {
             <main className={studio.layout}>
                 <section className={studio.panels}>
                     <header className={studio.header}>
-                        <div><h1>生图工作台</h1><p>从一句描述开始，让画面自然发生。</p></div>
+                        <h1>生图工作台</h1>
                         <div className={studio.headerActions}>
                             <Button type="text" icon={<Plus size={15} />} disabled={running} onClick={createSession}>新建</Button>
                             <div className={studio.historyActions}><Button type="text" icon={<History size={15} />} onClick={() => setLogsOpen(true)}>记录</Button></div>

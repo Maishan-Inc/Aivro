@@ -12,6 +12,7 @@ func CanReferenceCloudFileTx(tx *gorm.DB, userID string, id string, now string) 
 		return false, err
 	}
 	if file.FileType == model.CloudFileTypeTask { return false, nil }
+	if file.Purpose == model.CloudFilePurposeGeneration && file.ExpiresAt != "" && file.ExpiresAt <= now { return false, nil }
 	var refs []model.CloudFileReference
 	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("file_id = ? AND (expires_at = ? OR expires_at > ?)", id, "", now).Find(&refs).Error; err != nil { return false, err }
 	if file.ExpiresAt != "" && file.ExpiresAt <= now && len(refs) == 0 { return false, nil }
@@ -84,7 +85,7 @@ func ClaimCloudFileDeletion(id string, now string) (bool, error) {
 			return nil
 		}
 		refs := tx.Model(&model.CloudFileReference{}).Select("file_id").Where("file_id = ? AND (expires_at = ? OR expires_at > ?)", id, "", now)
-		result := tx.Model(&model.CloudFile{}).Where("id = ? AND deleted_at = ? AND NOT EXISTS (?)", id, "", refs).Updates(map[string]any{"deleted_at": now, "updated_at": now})
+		result := tx.Model(&model.CloudFile{}).Where("id = ? AND deleted_at = ? AND (NOT EXISTS (?) OR (purpose = ? AND expires_at != '' AND expires_at <= ?))", id, "", refs, model.CloudFilePurposeGeneration, now).Updates(map[string]any{"deleted_at": now, "updated_at": now})
 		claimed = result.RowsAffected > 0
 		return result.Error
 	})

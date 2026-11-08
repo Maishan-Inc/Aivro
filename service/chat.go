@@ -30,12 +30,15 @@ func RequestChatCompletion(ctx context.Context, userID string, body []byte, mode
 	payload[tokenField] = maxTokens
 	if streaming, _ := payload["stream"].(bool); streaming { payload["stream_options"] = map[string]bool{"include_usage": true} }
 	body, _ = json.Marshal(payload)
+	meta.Parameters, _ = ReadAIRequestParameters(body, "application/json")
+	billingBody := body
+	if path == "/prompt-reverse" { billingBody, _ = json.Marshal(meta.Parameters) }
 	if len(body) > 8<<20 { return nil, safeMessageError{message: "对话内容过大"} }
 	billing, err := RequestModelBilling(ctx, modelName)
 	if err != nil { return nil, err }
 	routes, err := SelectModelChannelRoutes(modelName)
 	if err != nil { return nil, err }
-	reserved := canvasAgentReserveCredits(body, maxTokens, billing)
+	reserved := canvasAgentReserveCredits(billingBody, maxTokens, billing)
 	if err := ConsumeUserCreditsWithMeta(userID, modelName, reserved, path, meta); err != nil { return nil, err }
 	ctx, cancel := context.WithTimeout(ctx, AIRequestTimeoutForPath("/chat/completions"))
 	defer cancel()
@@ -57,7 +60,7 @@ func RequestChatCompletion(ctx context.Context, userID string, body []byte, mode
 			return nil, err
 		}
 		usage := chatResponseUsage(result, response.Header.Get("Content-Type"))
-		_, billErr := billAIUsage(userID, modelName, billing, reserved, usage, body, result, meta, path)
+		_, billErr := billAIUsage(userID, modelName, billing, reserved, usage, billingBody, result, meta, path)
 		if billErr != nil { return nil, billErr }
 		return result, err
 	}

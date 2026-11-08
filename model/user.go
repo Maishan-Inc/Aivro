@@ -31,6 +31,8 @@ const (
 	UserSectionModel3D   UserSection = "model3d"
 	UserSectionShares    UserSection = "shares"
 	UserSectionCommunity UserSection = "community"
+	UserSectionFreeImage UserSection = "free-image"
+	UserSectionPromptReverse UserSection = "prompt-reverse"
 )
 
 // User 系统用户。
@@ -58,6 +60,8 @@ type User struct {
 	EmailVerified         bool            `json:"emailVerified"`
 	Status                UserStatus      `json:"status"`
 	DisabledSections      []UserSection   `json:"disabledSections" gorm:"serializer:json"`
+	MembershipGroup       string          `json:"membershipGroup" gorm:"default:free;index"`
+	GenerationRetentionDays map[string]int `json:"generationRetentionDays" gorm:"serializer:json"`
 	TokenVersion          int             `json:"tokenVersion"`
 	LastLoginAt           string          `json:"lastLoginAt"`
 	Extra                 string          `json:"extra" gorm:"type:text"`
@@ -124,6 +128,7 @@ const (
 	CreditLogTypeAdminAdjust CreditLogType = "admin_adjust"
 	CreditLogTypeAIConsume   CreditLogType = "ai_consume"
 	CreditLogTypeAIRefund    CreditLogType = "ai_refund"
+	CreditLogTypeFreeImageReward CreditLogType = "free_image_reward"
 )
 
 // CreditLog 用户算力点变更流水。
@@ -141,6 +146,7 @@ type CreditLog struct {
 	IP        string        `json:"ip"`
 	Country   string        `json:"country"`
 	Extra     string        `json:"extra" gorm:"type:text"`
+	Parameters map[string]any `json:"parameters,omitempty" gorm:"serializer:json"`
 	User      *LogUser      `json:"user,omitempty" gorm:"-"`
 	CreatedAt string        `json:"createdAt"`
 }

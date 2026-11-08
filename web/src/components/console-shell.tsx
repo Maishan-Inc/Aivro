@@ -4,11 +4,12 @@ import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Drawer } from "antd";
-import { ArrowUpRight, BookOpen, ChevronRight, Home, KeyRound, LayoutDashboard, LifeBuoy, Link2, Menu, PanelLeftClose, PanelLeftOpen, UserCircle, WalletCards } from "lucide-react";
+import { ArrowUpRight, BookOpen, ChevronRight, CircleDollarSign, Home, KeyRound, LayoutDashboard, LifeBuoy, Link2, Menu, PanelLeftClose, PanelLeftOpen, UserCircle, WalletCards } from "lucide-react";
 
 import { LocaleMenu } from "@/components/layout/locale-menu";
 import { UserStatusActions } from "@/components/layout/user-status-actions";
 import { navigationTools } from "@/constant/navigation-tools";
+import { useNavigationTools } from "@/hooks/use-navigation-tools";
 import { useI18n } from "@/hooks/use-i18n";
 import { useLocalizedPath } from "@/hooks/use-localized-path";
 import { stripLocalePath } from "@/i18n/routing";
@@ -31,6 +32,7 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
     const router = useRouter();
     const pathname = usePathname();
     const localizedPath = useLocalizedPath();
+    const { tr } = useI18n();
     const token = useUserStore((state) => state.token);
     const user = useUserStore((state) => state.user);
     const isReady = useUserStore((state) => state.isReady);
@@ -69,6 +71,10 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
                         <span className="hidden text-muted-foreground sm:inline">工作空间</span><ChevronRight className="hidden size-3 text-muted-foreground sm:block" /><span className="truncate font-medium">{title}</span>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
+                        <nav className="mr-1 flex items-center gap-2 text-xs sm:gap-3" aria-label={tr("快捷导航")}>
+                            <Link href={localizedPath("/models")} aria-label={tr("模型定价")} title={tr("模型定价")} className="inline-flex h-8 items-center gap-1.5 whitespace-nowrap text-muted-foreground transition hover:text-foreground"><CircleDollarSign className="size-4" aria-hidden="true" /><span className="hidden md:inline">{tr("模型定价")}</span></Link>
+                            <Link href={localizedPath("/developers")} aria-label={tr("开发文档")} title={tr("开发文档")} className="inline-flex h-8 items-center gap-1.5 whitespace-nowrap text-muted-foreground transition hover:text-foreground"><BookOpen className="size-4" aria-hidden="true" /><span className="hidden md:inline">{tr("开发文档")}</span></Link>
+                        </nav>
                         {user ? <Link href={localizedPath("/console/wallet")} className="mr-2 hidden text-xs tabular-nums text-muted-foreground sm:block">{formatNumber(user.credits ?? 0)} 算力点</Link> : null}
                         <LocaleMenu /><UserStatusActions />
                     </div>
@@ -86,11 +92,12 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
 function ConsoleNavigation({ collapsed = false, onNavigate }: { collapsed?: boolean; onNavigate?: () => void }) {
     const pathname = stripLocalePath(usePathname());
     const localizedPath = useLocalizedPath();
-    const { locale, t } = useI18n();
+    const { t } = useI18n();
+    const tools = useNavigationTools();
     const user = useUserStore((state) => state.user);
     const groups = [
-        { title: "创作工具", items: navigationTools.filter((tool) => !tool.external && canAccessPath(user, `/${tool.slug}`)).map((tool) => ({ href: `/${tool.slug}`, label: t(tool.labelKey), icon: tool.icon, external: false })) },
-        { title: "探索更多", items: navigationTools.filter((tool) => tool.external).map((tool) => ({ href: tool.href + ("localeAware" in tool && tool.localeAware && locale === "zh-CN" ? "/zh-CN" : ""), label: t(tool.labelKey), icon: tool.icon, external: true })) },
+        { title: "创作工具", items: tools.filter((tool) => tool.slug !== "free-image" && tool.slug !== "prompt-reverse").map((tool) => ({ href: `/${tool.slug}`, label: t(tool.labelKey), icon: tool.icon, external: false })) },
+        { title: "探索更多", items: tools.filter((tool) => tool.slug === "free-image" || tool.slug === "prompt-reverse").map((tool) => ({ href: `/${tool.slug}`, label: t(tool.labelKey), icon: tool.icon, external: false })) },
         { title: "我的空间", items: accountItems.filter((item) => canAccessPath(user, item.href)).map((item) => ({ ...item, external: false })) },
     ];
     return (

@@ -42,7 +42,10 @@ func SaveAsset(item model.Asset) (model.Asset, error) {
 }
 
 func DeleteAsset(id string) error {
-	return repository.DeleteAsset(id)
+	if err := repository.DeleteAsset(id); err != nil { return err }
+	files, err := repository.ReleasePublicAssetFiles(id)
+	if err != nil { return err }
+	return DeleteCloudFiles(files)
 }
 
 func assetCoverURL(item model.Asset) string {

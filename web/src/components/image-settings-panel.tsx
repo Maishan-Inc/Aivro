@@ -1,10 +1,12 @@
 "use client";
 
-import { type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { ConfigProvider } from "antd";
 
 import { type CanvasTheme } from "@/lib/canvas-theme";
-import type { AiConfig } from "@/stores/use-config-store";
+import { useConfigStore, type AiConfig } from "@/stores/use-config-store";
+import { clampImageSize, defaultImageResolutions, maxImagePixels } from "@/lib/model-resolutions";
+import { useI18n } from "@/hooks/use-i18n";
 
 const qualityOptions = [
     { value: "auto", label: "自动" },
@@ -20,11 +22,15 @@ const aspectOptions = [
     { value: "4:3", label: "4:3", width: 1344, height: 1024, icon: "landscape" },
     { value: "3:4", label: "3:4", width: 1024, height: 1344, icon: "portrait" },
     { value: "9:16", label: "9:16", width: 1024, height: 1792, icon: "portrait" },
-    { value: "1:1-2k", label: "1:1(2k)", size: "2048x2048", width: 2048, height: 2048, icon: "square" },
-    { value: "16:9-2k", label: "16:9(2k)", size: "2048x1152", width: 2048, height: 1152, icon: "landscape" },
-    { value: "9:16-2k", label: "9:16(2k)", size: "1152x2048", width: 1152, height: 2048, icon: "portrait" },
-    { value: "16:9-4k", label: "16:9(4k)", size: "3840x2160", width: 3840, height: 2160, icon: "landscape" },
-    { value: "9:16-4k", label: "9:16(4k)", size: "2160x3840", width: 2160, height: 3840, icon: "portrait" },
+    { value: "1:1-2k", label: "1:1(2K)", size: "2048x2048", width: 2048, height: 2048, icon: "square" },
+    { value: "16:9-2k", label: "16:9(2K)", size: "2048x1152", width: 2048, height: 1152, icon: "landscape" },
+    { value: "9:16-2k", label: "9:16(2K)", size: "1152x2048", width: 1152, height: 2048, icon: "portrait" },
+    { value: "16:9-4k", label: "16:9(4K)", size: "3840x2160", width: 3840, height: 2160, icon: "landscape" },
+    { value: "9:16-4k", label: "9:16(4K)", size: "2160x3840", width: 2160, height: 3840, icon: "portrait" },
+    { value: "1:1-4k", label: "1:1(4K)", size: "4096x4096", width: 4096, height: 4096, icon: "square" },
+    { value: "1:1-8k", label: "1:1(8K)", size: "8192x8192", width: 8192, height: 8192, icon: "square" },
+    { value: "16:9-8k", label: "16:9(8K)", size: "7680x4320", width: 7680, height: 4320, icon: "landscape" },
+    { value: "9:16-8k", label: "9:16(8K)", size: "4320x7680", width: 4320, height: 7680, icon: "portrait" },
     { value: "auto", label: "自动", width: 0, height: 0, icon: "auto" },
 ];
 
@@ -39,17 +45,27 @@ type ImageSettingsPanelProps = {
 };
 
 export function ImageSettingsPanel({ config, onConfigChange, theme, showTitle = true, className = "w-[320px] space-y-4 rounded-2xl px-1 py-0.5", maxCount = 15, quickCount = 10 }: ImageSettingsPanelProps) {
+    const { tr } = useI18n();
+    const resolutions = useConfigStore((state) => state.publicSettings?.modelChannel.modelCosts.find((item) => item.model === config.model)?.resolutions) || defaultImageResolutions;
+    const maxPixels = maxImagePixels(resolutions);
+    const options = aspectOptions.filter((item) => item.value === "auto" || resolutions.includes(item.value.match(/-(\d+k)$/)?.[1] || "1k")).map((item) => ({ ...item, size: item.value === "auto" ? "auto" : clampImageSize(`${item.width}x${item.height}`, maxPixels) }));
     const quality = config.quality || "auto";
     const count = Math.max(1, Math.min(maxCount, Math.floor(Math.abs(Number(config.count)) || 1)));
     const activeSize = config.size || "auto";
-    const selectedAspect = aspectOptions.find((item) => (item.size || item.value) === activeSize || item.value === activeSize);
-    const dimensions = readSizeDimensions(activeSize, selectedAspect || aspectOptions[0]);
+    const selectedAspect = options.find((item) => item.size === activeSize || item.value === activeSize);
+    const rawDimensions = readSizeDimensions(activeSize, selectedAspect || aspectOptions.find((item) => item.value === activeSize) || aspectOptions[0]);
+    const scale = Math.min(1, maxPixels / Math.max(rawDimensions.width, rawDimensions.height, 1));
+    const dimensions = { width: Math.max(1, Math.floor(rawDimensions.width * scale)), height: Math.max(1, Math.floor(rawDimensions.height * scale)) };
+    useEffect(() => {
+        if (/^\d+x\d+$/.test(activeSize) && scale < 1) onConfigChange("size", `${dimensions.width}x${dimensions.height}`);
+    }, [activeSize, scale, dimensions.width, dimensions.height, onConfigChange]);
     const selectAspect = (value: string) => {
-        const option = aspectOptions.find((item) => item.value === value);
-        onConfigChange("size", option?.size || option?.value || "auto");
+        const option = options.find((item) => item.value === value);
+        if (!option || option.value === "auto") { onConfigChange("size", "auto"); return; }
+        onConfigChange("size", option.size);
     };
     const updateDimension = (key: "width" | "height", value: number | null) => {
-        const next = Math.max(1, Math.floor(value || dimensions[key] || 1024));
+        const next = Math.min(maxPixels, Math.max(1, Math.floor(value || dimensions[key] || 1024)));
         onConfigChange("size", `${key === "width" ? next : dimensions.width}x${key === "height" ? next : dimensions.height}`);
     };
 
@@ -70,18 +86,20 @@ export function ImageSettingsPanel({ config, onConfigChange, theme, showTitle = 
                 <div className="space-y-2.5">
                     <SettingTitle color={theme.node.muted}>尺寸</SettingTitle>
                     <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2.5">
-                        <DimensionInput prefix="W" value={dimensions.width} disabled={activeSize === "auto"} theme={theme} onChange={(value) => updateDimension("width", value)} />
+                        <DimensionInput prefix="W" value={dimensions.width} max={maxPixels} disabled={activeSize === "auto"} theme={theme} onChange={(value) => updateDimension("width", value)} />
                         <span className="text-lg opacity-45">↔</span>
-                        <DimensionInput prefix="H" value={dimensions.height} disabled={activeSize === "auto"} theme={theme} onChange={(value) => updateDimension("height", value)} />
+                        <DimensionInput prefix="H" value={dimensions.height} max={maxPixels} disabled={activeSize === "auto"} theme={theme} onChange={(value) => updateDimension("height", value)} />
                     </div>
+                    <p className="text-[11px] leading-4" style={{ color: theme.node.muted }} data-i18n-skip>{tr("宽度和高度均不能超过 {0} 像素。").replace("{0}", String(maxPixels))}</p>
                 </div>
                 <div className="space-y-2.5">
                     <SettingTitle color={theme.node.muted}>宽高比</SettingTitle>
                     <div className="grid grid-cols-4 gap-2.5">
-                        {aspectOptions.map((item) => (
+                        {options.map((item) => (
                             <button
                                 key={item.value}
                                 type="button"
+                                aria-pressed={selectedAspect?.value === item.value}
                                 className="flex h-[72px] cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border bg-transparent text-sm transition hover:opacity-80"
                                 style={{ borderColor: selectedAspect?.value === item.value ? theme.node.text : theme.node.stroke, background: "transparent", color: theme.node.text }}
                                 onMouseDown={(event) => event.stopPropagation()}
@@ -127,7 +145,7 @@ export function imageQualityLabel(value: string) {
 }
 
 export function imageSizeLabel(size: string) {
-    return aspectOptions.find((item) => (item.size || item.value) === size || item.value === size)?.label || size;
+    return aspectOptions.find((item) => item.value === size || item.size === size || `${item.width}x${item.height}` === size)?.label || size;
 }
 
 function OptionPill({ selected, theme, onClick, children }: { selected: boolean; theme: CanvasTheme; onClick: () => void; children: ReactNode }) {
@@ -144,7 +162,8 @@ function OptionPill({ selected, theme, onClick, children }: { selected: boolean;
     );
 }
 
-function DimensionInput({ prefix, value, disabled, theme, onChange }: { prefix: string; value: number; disabled: boolean; theme: CanvasTheme; onChange: (value: number | null) => void }) {
+function DimensionInput({ prefix, value, max, disabled, theme, onChange }: { prefix: string; value: number; max: number; disabled: boolean; theme: CanvasTheme; onChange: (value: number | null) => void }) {
+    const { tr } = useI18n();
     return (
         <label className="flex h-9 overflow-hidden rounded-xl text-sm" style={{ background: theme.node.fill, color: theme.node.text, opacity: disabled ? 0.55 : 1 }}>
             <span className="grid w-9 place-items-center" style={{ color: theme.node.muted }}>
@@ -152,7 +171,9 @@ function DimensionInput({ prefix, value, disabled, theme, onChange }: { prefix: 
             </span>
             <input
                 type="number"
+                aria-label={tr(prefix === "W" ? "宽度" : "高度")}
                 min={1}
+                max={max}
                 disabled={disabled}
                 className="min-w-0 flex-1 bg-transparent px-2 outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 value={value || ""}

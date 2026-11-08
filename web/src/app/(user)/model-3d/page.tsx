@@ -1,5 +1,7 @@
 "use client";
 
+import { useGenerationRetention } from "@/hooks/use-generation-retention";
+
 import { Model3DPreview, type Model3DViewMode } from "@/components/model-3d-preview";
 import { Model3DLoading } from "@/components/model-3d-loading";
 import { useI18n } from "@/hooks/use-i18n";
@@ -91,7 +93,8 @@ export default function Model3DPage() {
     const [historyOpen, setHistoryOpen] = useState(false);
     const [settingsOpen, setSettingsOpen] = useState(false);
     const [histories, setHistories] = useState<GenerationHistory[]>([]);
-    const [retentionDays, setRetentionDays] = useState<number | null>(null);
+    const retention = useGenerationRetention();
+    const retentionDays = retention.data?.days.model3d ?? null;
     const [loadingHistory, setLoadingHistory] = useState(false);
     const [detailHistory, setDetailHistory] = useState<GenerationHistory | null>(null);
 
@@ -236,14 +239,12 @@ export default function Model3DPage() {
     const handleLoadHistory = useCallback(async () => {
         if (!token) {
             setHistories([]);
-            setRetentionDays(null);
             return;
         }
         setLoadingHistory(true);
         try {
             const result = await fetchGenerationHistories(token, { type: "model3d", page: 1, pageSize: 20 });
             setHistories(result.items);
-            setRetentionDays(result.retentionDays);
         } catch (err) {
             console.error(err);
         } finally {
@@ -253,7 +254,7 @@ export default function Model3DPage() {
 
     useEffect(() => {
         void handleLoadHistory();
-    }, [handleLoadHistory]);
+    }, [handleLoadHistory, retention.dataUpdatedAt]);
 
     const openHistory = () => {
         setHistoryOpen(true);
@@ -306,7 +307,7 @@ export default function Model3DPage() {
             <main className={studio.layout}>
                 <section className={studio.panels}>
                     <header className={studio.header}>
-                        <div><h1>3D 模型工作台</h1><p>从平面灵感，探索三维世界。</p></div>
+                        <h1>3D 模型工作台</h1>
                         <div className={studio.headerActions}>
                             <Button type="text" icon={<Plus size={15} />} disabled={generating || uploading} onClick={createSession}>新建</Button>
                             <div className={studio.historyActions}><Button type="text" icon={<History size={15} />} onClick={openHistory}>记录</Button></div>

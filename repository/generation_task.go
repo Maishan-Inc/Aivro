@@ -6,6 +6,7 @@ import (
 
 	"github.com/basketikun/aivro/model"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 func SaveGenerationTask(item model.GenerationTask) (model.GenerationTask, error) {
@@ -13,7 +14,16 @@ func SaveGenerationTask(item model.GenerationTask) (model.GenerationTask, error)
 	if err != nil {
 		return item, err
 	}
-	return item, db.Save(&item).Error
+	if item.CampaignID == "" { return item, db.Save(&item).Error }
+	err = db.Transaction(func(tx *gorm.DB) error {
+		usage := model.FreeImageUsage{CampaignID: item.CampaignID, UserID: item.UserID}
+		if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&usage).Error; err != nil { return err }
+		result := tx.Model(&usage).Where("used < ?", item.QuotaLimit).Update("used", gorm.Expr("used + 1"))
+		if result.Error != nil { return result.Error }
+		if result.RowsAffected == 0 { return ErrFreeImageQuota }
+		return tx.Create(&item).Error
+	})
+	return item, err
 }
 
 func GetGenerationTask(id string) (model.GenerationTask, bool, error) {
@@ -41,7 +51,7 @@ func ListUserGenerationTasks(userID string, limit int) ([]model.GenerationTask, 
 		limit = 50
 	}
 	items := []model.GenerationTask{}
-	err = db.Where("user_id = ?", userID).Order("created_at desc").Limit(limit).Find(&items).Error
+	err = db.Omit("parameters", "error_detail", "response_header").Where("user_id = ?", userID).Order("created_at desc").Limit(limit).Find(&items).Error
 	return items, err
 }
 
@@ -134,7 +144,7 @@ func MarkQueuedTaskExecuting(id string, startedAt string, workerID string, lease
 	return tx.RowsAffected > 0, tx.Error
 }
 
-func FinishGenerationTask(task model.GenerationTask, status model.GenerationTaskStatus, fields map[string]any, refund *model.CreditLog) (bool, error) {
+func FinishGenerationTask(task model.GenerationTask, status model.GenerationTaskStatus, fields map[string]any, refund *model.CreditLog, histories ...model.GenerationHistory) (bool, error) {
 	db, err := DB()
 	if err != nil { return false, err }
 	changed := false
@@ -143,6 +153,15 @@ func FinishGenerationTask(task model.GenerationTask, status model.GenerationTask
 		result := tx.Model(&model.GenerationTask{}).Where("id = ? AND status = ? AND worker_id = ?", task.ID, task.Status, task.WorkerID).Updates(fields)
 		if result.Error != nil || result.RowsAffected == 0 { return result.Error }
 		changed = true
+		for _, history := range histories {
+			if err := tx.Create(&history).Error; err != nil { return err }
+			ids := []string{}
+			for _, media := range history.Media { ids = append(ids, media.CloudFileID) }
+			if err := SetCloudFileReferencesTx(tx, task.UserID, "generation", history.ID, ids, history.ExpiresAt); err != nil { return err }
+		}
+		if task.CampaignID != "" && (status == model.GenerationTaskFailed || status == model.GenerationTaskCanceled) {
+			if err := tx.Model(&model.FreeImageUsage{}).Where("campaign_id = ? AND user_id = ? AND used > 0", task.CampaignID, task.UserID).Update("used", gorm.Expr("used - 1")).Error; err != nil { return err }
+		}
 		if refund == nil || refund.Amount == 0 { return nil }
 		creditQuery := tx.Model(&model.User{}).Where("id = ?", task.UserID)
 		if refund.Amount < 0 { creditQuery = creditQuery.Where("credits >= ? AND status = ?", -refund.Amount, model.UserStatusActive) }
@@ -199,7 +218,7 @@ func ListOldGenerationTasks(before string, limit int) ([]model.GenerationTask, e
 		limit = 100
 	}
 	items := []model.GenerationTask{}
-	err = db.Where("status IN ? AND finished_at != ? AND finished_at < ?", []model.GenerationTaskStatus{model.GenerationTaskSucceeded, model.GenerationTaskFailed, model.GenerationTaskCanceled}, "", before).Order("finished_at asc").Limit(limit).Find(&items).Error
+	err = db.Where("status IN ? AND finished_at != ? AND finished_at < ? AND (request_file_id != '' OR response_file_id != '')", []model.GenerationTaskStatus{model.GenerationTaskSucceeded, model.GenerationTaskFailed, model.GenerationTaskCanceled}, "", before).Order("finished_at asc").Limit(limit).Find(&items).Error
 	return items, err
 }
 

@@ -1,5 +1,25 @@
 // Generated translations. Source strings are Simplified Chinese (zh-CN).
 const frFR = {
+    "宽高不能超过模型配置的分辨率上限": "La largeur et la hauteur ne peuvent pas dépasser la résolution maximale configurée pour le modèle",
+    "请使用有效的像素尺寸": "Saisissez des dimensions valides en pixels",
+    "宽度和高度均不能超过 {0} 像素。": "La largeur et la hauteur ne doivent pas dépasser {0} pixels chacune.",
+    "宽度": "Largeur",
+    "高度": "Hauteur",
+    "生成接口未返回可用结果": "L’API de génération n’a renvoyé aucun résultat utilisable",
+
+    "工作流生成文件保存 {0} 天，具体到期时间见节点信息": "Les fichiers générés dans le workflow sont conservés {0} jours. Consultez les informations du nœud pour leur expiration.",
+    "服务器到期时间": "Expiration sur le serveur",
+
+    "快捷导航": "Navigation rapide",
+    "特惠": "Offre spéciale",
+    "新上": "Nouveau",
+    "热门": "Populaire",
+    "高速": "Rapide",
+    "高清": "HD",
+    "筛选模型厂商": "Filtrer les fournisseurs de modèles",
+    "阿里巴巴": "Alibaba",
+    "智谱 AI": "Zhipu AI",
+    "造好物": "Zaohao",
     "素材包超过大小或数量限制": "Le paquet de ressources dépasse la limite de taille ou de nombre d’éléments.",
     "素材包格式无效": "Le format du paquet de ressources est invalide.",
     "工单服务": "Tickets d’assistance",

@@ -56,6 +56,9 @@ type MailTemplateContext struct {
 type RequestLogMeta struct {
 	IP      string
 	Country string
+	Section string
+	TaskID string
+	Parameters map[string]any
 }
 
 type RegisterProfileInput struct {
@@ -598,6 +601,9 @@ func CountAuthProviderUsers() (map[string]int64, error) {
 }
 
 func SaveUser(user model.User, password string) (model.User, error) {
+	if user.MembershipGroup == "" { user.MembershipGroup = "free" }
+	if !validGenerationGroup(user.MembershipGroup) { return user, safeMessageError{message: "会员组别无效"} }
+	if err := validateGenerationDays(user.GenerationRetentionDays, true); err != nil { return user, err }
 	user.Username = strings.TrimSpace(user.Username)
 	if strings.ContainsAny(user.Username, " \t\r\n") {
 		return user, safeMessageError{message: "用户名不能包含空格"}
@@ -681,6 +687,10 @@ func SaveUser(user model.User, password string) (model.User, error) {
 		fields := map[string]any{"username": user.Username, "email": user.Email, "display_name": user.DisplayName, "account_type": user.AccountType, "profile_completed": user.ProfileCompleted, "role": user.Role, "status": user.Status, "email_verified": user.EmailVerified, "linux_do_id": user.LinuxDoID, "github_id": user.GithubID, "google_id": user.GoogleID, "metamask_address": user.MetaMaskAddress, "auth_provider": user.AuthProvider, "updated_at": user.UpdatedAt}
 		if password != "" { fields["password"] = user.Password }
 		// Administrative identity, role or status changes invalidate existing sessions.
+		fields["membership_group"] = user.MembershipGroup
+		retentionJSON, err := json.Marshal(user.GenerationRetentionDays)
+		if err != nil { return user, err }
+		fields["generation_retention_days"] = string(retentionJSON)
 		fields["token_version"] = gorm.Expr("token_version + 1")
 		user, err = repository.UpdateUser(user.ID, fields)
 	}
@@ -741,6 +751,7 @@ func applyAICreditLog(userID string, modelName string, amount int, path string, 
 	changed, err := repository.ApplyCreditLog(model.CreditLog{
 		ID: newID("credit"), UserID: userID, Category: creditLogCategory(logType), Type: logType,
 		Model: modelName, Path: path, Amount: amount, Remark: remark,
+		RelatedID: meta.TaskID, Parameters: meta.Parameters,
 		IP: meta.IP, Country: meta.Country, Extra: string(extra), CreatedAt: now(),
 	})
 	if err != nil { return err }
@@ -766,6 +777,7 @@ func ListUserCreditLogs(user model.AuthUser, q model.Query) (model.CreditLogList
 		logs[i].IP = ""
 		logs[i].Country = ""
 		logs[i].Extra = ""
+		logs[i].Parameters = nil
 		logs[i].User = nil
 	}
 	return model.CreditLogList{Items: logs, Total: int(total)}, nil
@@ -1727,7 +1739,7 @@ func requestHost(r *http.Request) string {
 
 func RequestLogMetaFromRequest(r *http.Request) RequestLogMeta {
 	context := MailTemplateContextFromRequest(r, "")
-	return normalizeRequestLogMeta(RequestLogMeta{IP: context.IP, Country: context.Country})
+	return normalizeRequestLogMeta(RequestLogMeta{IP: context.IP, Country: context.Country, Section: r.Header.Get("X-Aivro-Section")})
 }
 
 func normalizeRequestLogMeta(meta RequestLogMeta) RequestLogMeta {
@@ -1828,6 +1840,8 @@ func creditLogCategory(logType model.CreditLogType) string {
 		return "失败返还"
 	case model.CreditLogTypeAIConsume:
 		return "模型请求"
+	case model.CreditLogTypeFreeImageReward:
+		return "作品奖励"
 	default:
 		return "其他"
 	}

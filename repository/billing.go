@@ -26,7 +26,9 @@ func CompletePlanOrder(order model.PlanOrder, sessionID string, intentID string,
 		if changed.Error != nil || changed.RowsAffected == 0 {
 			return changed.Error
 		}
-		changed = tx.Model(&model.User{}).Where("id = ?", order.UserID).Updates(map[string]any{"credits": gorm.Expr("credits + ?", order.Credits), "workflow_create_credits": gorm.Expr("workflow_create_credits + ?", order.WorkflowCreateCredits), "updated_at": log.CreatedAt})
+		var plan model.Plan
+		if err := tx.Where("id = ?", order.PlanID).First(&plan).Error; err != nil { return err }
+		changed = tx.Model(&model.User{}).Where("id = ?", order.UserID).Updates(map[string]any{"membership_group": string(plan.Code), "credits": gorm.Expr("credits + ?", order.Credits), "workflow_create_credits": gorm.Expr("workflow_create_credits + ?", order.WorkflowCreateCredits), "updated_at": log.CreatedAt})
 		if changed.Error != nil {
 			return changed.Error
 		}

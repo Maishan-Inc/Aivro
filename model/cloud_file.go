@@ -34,6 +34,7 @@ type CloudFile struct {
 	ContentType string           `json:"contentType"`
 	Size        int64            `json:"size"`
 	Source      string           `json:"source"`
+	GenerationTaskID string      `json:"generationTaskId" gorm:"index"`
 	ExpiresAt   string           `json:"expiresAt" gorm:"index"`
 	DeletedAt   string           `json:"deletedAt" gorm:"index"`
 	CreatedAt   string           `json:"createdAt"`

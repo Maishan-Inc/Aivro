@@ -1,5 +1,15 @@
 # 前后端接口响应约定
 
+内置工具继续使用统一 `{ code, data, msg }`：
+
+- `public.explore` 公开 `freeImageEnabled`、`promptReverseEnabled`，均默认 `false`；后台 `GET/POST /api/admin/explore-settings` 返回和保存这两个开关及 `systemPrompt`，提示词仅对管理员开放。
+- `GET/POST /api/admin/free-image-campaigns` 分页读取或保存每期活动，字段为 `id/name/enabled/startsAt/endsAt/models/groupLimits`。起止时间使用 RFC3339，服务统一按 UTC 保存，会员次数按 `free/go/plus/pro/max` 配置，不允许活动时间重叠。
+- `GET /api/v1/free-image` 返回 `{ campaign, group, limit, used, remaining }`，没有进行中的活动时 `campaign=null`。`POST /api/v1/free-image/generations` 接受 `campaignId/agreement/model/prompt/size/quality`，`agreement` 必须为 `free-image-v1`，每次固定一张；返回既有排队任务结构，通过生成任务接口轮询。活动模型、期限、次数和协议均由后端校验，失败或撤销返还次数。
+- `POST /api/v1/prompt-reverse` 接受 `{ model, image }`，`image` 是最大 5MB 的 PNG/JPEG/WebP data URL；仅接受已开放的文本模型。成功返回 `type=prompt-reverse` 的生成历史及 `result` 六语言提示词、分析、标签和结构化结果，按文本模型价格结算；返回无效或缺少语言的模型结果时返还预扣额度。
+- 生成历史列表支持 `type=free-image|prompt-reverse`，返回当前会员保存天数和记录的实际 `expiresAt`。免费成功记录由后端自动保存，反推记录及参考图按有效期限删除；常规历史写入接口不能伪造活动或反推记录。
+- `GET /api/admin/free-image-histories` 分页读取活动作品；`POST /api/admin/free-image-publication` 接受 `{ historyId, title, prompt, rewardCredits }`，奖励范围 1–1000000 算力点。公开素材、作品状态和奖励流水在同一事务中写入，重复公开不能重复奖励。历史响应补充 `publishedAssetId/rewardCredits`。
+- 公开模型计费条目的 `freeUntil` 仅在免费功能开启且模型属于当前活动时返回，前端据此显示 `Free [限量]`。该标记不改变常规工作台或 API 的标准价。
+
 后端业务接口统一返回 JSON：
 
 ```json
@@ -106,3 +116,21 @@
 - `billingType` 接受 `fixed`（按次）或 `second`（按秒），省略默认 `fixed`。按秒要求配置 `videoSecondPrice` 并显式传入 `seconds`；费用为请求秒数乘以对应后端单价，不按实际成片时长结算。按次省略秒数时采用模型默认时长。视频不参与词元结算。
 - 创建响应 `data` 包含 `queued:true`、`taskId`、`status`、`billingType`、`seconds`、`unitCredits`、`energyCost`，费用与时长随任务保存。`GET /api/v1/videos/{taskId}` 返回本站任务视图，包含 `billingType`、`seconds`、`unitCredits`、`credits`；状态为 `succeeded` 时文件已转存。`GET /api/v1/videos/{taskId}/content` 读取当前账号已保存的视频文件，成功为文件流、失败为业务错误 JSON。`/generation-tasks/{taskId}/result` 返回带 `file` 的视频结果。
 - 渠道类型为视频时可选择专用 `adapter`，留空使用通用接口。公开配置派生 `videoAdapters` 与 `videoCapabilities`，不返回密钥；模型、地址、参数范围及官方来源见 [视频适配配置](video-adapters.md)。创建不自动重试，专用查询在执行期限内重试网络错误、429、5xx；后台完成下载和转存后才标记成功，失败沿用任务退款。
+
+## 模型分辨率配置与尺寸校验
+
+- 管理员在模型配置“信息扩充”维护 `public.modelChannel.modelCosts[].resolutions`，只编辑图片、视频模型；至少启用一个档位。`GET /api/settings` 返回已开放模型的配置，视频 `videoCapabilities.resolutions` 使用同一份档位。
+- 图片默认 `1k`、`2k`、`4k`，`8k` 默认关闭。启用 8K 后，共用宽高比面板显示 `8192x8192`、`7680x4320`、`4320x7680` 预设。`POST /api/v1/images/generations` 与 `/images/edits` 的 `size` 可省略、使用 `auto`、支持的比例或 `WIDTHxHEIGHT`；显式宽高必须为正整数，且每一边不能超过最高启用档位的上限：1K 1024、2K 2048、4K 4096、8K 8192。无效尺寸或超限在扣费前返回 `{ code: 1, data: null, msg }`。
+- 手动图片尺寸在前台限制输入上限；切换到上限较低的模型时按原比例缩小。请求生成与编辑共用提交校验，队列执行前再次使用当前配置校验；排队后下调档位导致超限时，任务失败并沿用已有退款流程。
+- 视频默认沿用当前适配器档位，新增 2K（`1440p`）默认关闭，主动启用后前台显示并提交 `resolution_name: "1440p"`；接口也接受 `2k` 并归一为 `1440p`。未启用的 `resolution_name` 被拒绝。显式像素 `size` 每边不得超过当前最高启用档位上限（480p 854、720p 1280、768p 1366、1080p 1920、2K 2560、4K 3840），符合已支持比例时转为比例参数；参考图、时长和比例限制继续沿用适配器。GPT.GE Kling、Jimeng 与 fal Kling 的现有适配没有可传递的清晰度参数，请求超出协议固定档位时明确拒绝，避免静默生成较低清晰度。
+
+## 生成保存规则与管理员任务记录
+
+- `GET /api/v1/generation-retention`：当前用户生效的 `{ group, days }`，`days` 包含 `workflow`、`image`、`video`、`model3d`。
+- `GET/POST /api/admin/generation-retention`：管理员读取会员组规则或保存 `{ group, days }`。组别天数为 1–3650；用户覆盖 0 跟随组别。
+- `POST /api/admin/users/:id/generation-retention`：独立保存用户会员组和覆盖天数，不修改其他资料或令牌版本。
+- `GET /api/admin/generation-tasks`：沿用 `model.Query` 分页，`category` 筛选任务状态，`type` 筛选工作台来源，返回 `{ items, total }`。
+- `GET /api/admin/generation-tasks/:id`：提示词、参数、阶段、真实进度、错误和可用媒体；文件删除或到期后 `media` 为空，任务记录继续保留。
+- `GET /api/admin/generation-tasks/:id/files/:fileId`：验证任务与文件归属后返回文件内容；过期或失败任务不能读取结果。
+
+业务接口继续返回 `{ code, data, msg }`；文件内容接口返回媒体流。工作流生成请求使用 `X-Aivro-Section: workflow` 标记来源，仍须通过当前账户的工作流与对应媒体生成权限校验。请求日志的管理员响应新增 `parameters`，仅用户侧钱包流水不返回参数。

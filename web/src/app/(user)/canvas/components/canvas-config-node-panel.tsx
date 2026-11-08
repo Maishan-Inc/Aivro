@@ -3,6 +3,7 @@
 import { resolveCanvasModel3D } from "../utils/canvas-model-3d";
 import { CanvasModel3DSettings } from "./canvas-model-3d-settings";
 import { resolveVideoConfig } from "@/lib/video-models";
+import { clampImageSize, imageSizeLimit } from "@/lib/model-resolutions";
 
 import type { CSSProperties } from "react";
 import { useState } from "react";
@@ -78,7 +79,7 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, inputs, o
                         size="small"
                         className="canvas-config-mode !rounded-md !p-0.5"
                         value={mode}
-                        onChange={(value) => onConfigChange(node.id, { generationMode: value as CanvasGenerationMode, model: value === "model3d" ? globalConfig.model3DModel : value === "video" ? globalConfig.videoModel : value === "image" ? globalConfig.imageModel : globalConfig.textModel })}
+                        onChange={(value) => onConfigChange(node.id, { generationMode: value as CanvasGenerationMode, model: value === "model3d" ? globalConfig.model3DModel : value === "video" ? globalConfig.videoModel : value === "image" ? globalConfig.imageModel : globalConfig.textModel, ...(value === "image" ? { size: clampImageSize(config.size, imageSizeLimit(globalConfig.imageModel)) } : {}) })}
                         options={[
                             { value: "model3d", label: "3D" },
                             {
@@ -123,7 +124,7 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, inputs, o
             </div>
 
             <div className="thin-scrollbar mt-auto flex min-w-0 shrink-0 cursor-default items-center gap-2 overflow-x-auto py-1" data-canvas-no-zoom onMouseDown={(event) => event.stopPropagation()}>
-                <ModelPicker showBilling={false} className="canvas-compact-control min-h-10 max-w-none" config={config} kind={mode} model3D={mode === "model3d" ? model3D.options : undefined} models={modelsForMode(config, mode)} value={config.model} onChange={(model) => onConfigChange(node.id, { model })} onMissingConfig={() => message.warning("管理员尚未配置可用模型")} />
+                <ModelPicker showBilling={false} className="canvas-compact-control min-h-10 max-w-none" config={config} kind={mode} model3D={mode === "model3d" ? model3D.options : undefined} models={modelsForMode(config, mode)} value={config.model} onChange={(model) => onConfigChange(node.id, { model, ...(mode === "image" ? { size: clampImageSize(config.size, imageSizeLimit(model)) } : {}) })} onMissingConfig={() => message.warning("管理员尚未配置可用模型")} />
                 {mode === "model3d" ? <CanvasModel3DSettings node={node} onChange={(patch) => onConfigChange(node.id, patch)} /> : mode === "video" ? (
                     <CanvasVideoSettingsPopover config={config} placement="topRight" buttonClassName="canvas-compact-control !min-h-10 !rounded-lg !px-2" onConfigChange={(key, value) => onConfigChange(node.id, key === "videoSeconds" ? { seconds: value } : { [key]: value })} />
                 ) : mode === "image" ? (

@@ -91,9 +91,14 @@ type Model3DCapabilities struct {
 // ModelCost 模型计费配置。Credits 是控制台标准价，套餐专属价留空时沿用标准价；
 // API 价默认按标准价的 ApiMultiplier 倍计算。
 type ModelCost struct {
+	FreeUntil string `json:"freeUntil,omitempty"`
 	ModelID       string         `json:"modelId"`
 	Model         string         `json:"model"`
 	Credits       int            `json:"credits"`
+	PriceConfigured bool        `json:"priceConfigured"`
+	FreeConfirmed bool          `json:"freeConfirmed"`
+	Tags          []string       `json:"tags"`
+	Resolutions   []string       `json:"resolutions"`
 	BillingType   string         `json:"billingType"`
 	Vendor        string         `json:"vendor"`
 	Icon          string         `json:"icon"`
@@ -140,6 +145,7 @@ type PublicModelChannelSetting struct {
 
 // PublicSetting 公开配置。
 type PublicSetting struct {
+	Explore      ExploreSetting            `json:"explore"`
 	ModelChannel PublicModelChannelSetting `json:"modelChannel"`
 	Auth         PublicAuthSetting         `json:"auth"`
 	Pages        PublicPagesSetting        `json:"pages"`
@@ -236,6 +242,7 @@ type PublicOAuthProviderSetting struct {
 
 // PrivateSetting 私有配置。
 type PrivateSetting struct {
+	PromptReverse PromptReverseSetting `json:"promptReverse"`
 	Channels     []ModelChannel      `json:"channels"`
 	ModelIDSeq   int                 `json:"modelIdSeq"`
 	Runtime      RuntimeSetting      `json:"runtime"`
@@ -250,6 +257,15 @@ type PrivateSetting struct {
 	CloudStorage CloudStorageSetting `json:"cloudStorage"`
 	Stripe       StripeSetting       `json:"stripe"`
 	KYC          KYCSetting          `json:"kyc"`
+}
+
+type ExploreSetting struct {
+	FreeImageEnabled bool `json:"freeImageEnabled"`
+	PromptReverseEnabled bool `json:"promptReverseEnabled"`
+}
+
+type PromptReverseSetting struct {
+	SystemPrompt string `json:"systemPrompt"`
 }
 
 type RuntimeSetting struct {

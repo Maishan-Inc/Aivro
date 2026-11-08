@@ -36,7 +36,7 @@ var modelVendorCatalog = []vendorProfile{
 	{Name: "造好物", Icon: "zaohao.jpeg", Tokens: []string{"zaohao", "造好物"}},
 	{Name: "Midjourney", Icon: "", Tokens: []string{"midjourney", "mj-"}},
 	{Name: "Stability AI", Icon: "", Tokens: []string{"stable-diffusion", "sdxl", "stability"}},
-	{Name: "阿里云", Icon: "", Tokens: []string{"qwen", "wanx", "tongyi", "通义"}},
+	{Name: "阿里巴巴", Icon: "alibaba.svg", Tokens: []string{"qwen", "wan", "tongyi", "通义", "万相", "alibaba", "aliyun", "bailian"}},
 	{Name: "MiniMax", Icon: "", Tokens: []string{"minimax", "hailuo", "海螺"}},
 	{Name: "Runway", Icon: "", Tokens: []string{"runway", "gen-3", "gen-4"}},
 	{Name: "Luma", Icon: "", Tokens: []string{"luma", "dream-machine", "ray-2"}},
@@ -84,6 +84,7 @@ func normalizeModelCostPricing(item model.ModelCost) model.ModelCost {
 		}
 	}
 	item.Vendor = strings.TrimSpace(item.Vendor)
+	item.Tags = uniqueNonEmptyStrings(item.Tags)
 	item.Icon = strings.TrimSpace(item.Icon)
 	// 图标统一存成可直接访问的路径，内置目录只登记文件名。
 	if item.Icon != "" && !strings.HasPrefix(item.Icon, "/") && !strings.HasPrefix(item.Icon, "http") {
@@ -100,4 +101,19 @@ func normalizeModelCostPricing(item model.ModelCost) model.ModelCost {
 		item.APIBilling = item.BillingType
 	}
 	return item
+}
+
+func hasFreeModelPrice(item model.ModelCost) bool {
+	return item.Credits == 0 || (item.VideoSecondPrice != nil && item.VideoSecondPrice.Credits == 0)
+}
+
+func validatePublicModelPricing(setting model.PublicModelChannelSetting) error {
+	prices := map[string]model.ModelCost{}
+	for _, item := range setting.ModelCosts { prices[item.Model] = item }
+	for _, name := range setting.AvailableModels {
+		item, ok := prices[name]
+		if !ok || !item.PriceConfigured { return safeMessageError{message: "开放模型前请先在模型定价中设置标准价"} }
+		if hasFreeModelPrice(item) && !item.FreeConfirmed { return safeMessageError{message: "零计费模型必须再次确认后才能开放"} }
+	}
+	return nil
 }

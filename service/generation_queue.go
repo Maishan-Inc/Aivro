@@ -57,7 +57,26 @@ func AIQueueEnabled() bool {
 	return queue.Enabled != nil && *queue.Enabled
 }
 
-func SubmitAITask(ctx context.Context, user model.AuthUser, body []byte, contentType string, modelName string, path string, meta RequestLogMeta) (model.GenerationTaskSubmitResult, *AIProxyResponse, error) {
+func SubmitAITask(ctx context.Context, user model.AuthUser, body []byte, contentType string, modelName string, path string, meta RequestLogMeta) (submitted model.GenerationTaskSubmitResult, response *AIProxyResponse, submitErr error) {
+	parameters, err := ReadAIRequestParameters(body, contentType)
+	if err != nil { return model.GenerationTaskSubmitResult{}, nil, err }
+	section := generationSource(path, meta.Section)
+	free, isFree := ctx.Value(freeImageContextKey{}).(freeImageReservation)
+	if isFree { section = model.UserSectionFreeImage }
+	meta.Parameters, meta.TaskID = parameters, newID("task")
+	submittedAt := now()
+	defer func() {
+		if submitErr == nil { return }
+		_, exists, err := repository.GetGenerationTask(meta.TaskID)
+		if err != nil || exists { return }
+		message := "生成任务提交失败"
+		if safe, ok := submitErr.(interface{ SafeMessage() string }); ok { message = safe.SafeMessage() }
+		_, err = repository.SaveGenerationTask(model.GenerationTask{ID: meta.TaskID, UserID: user.ID, Username: user.Username, Model: modelName, Path: path, Section: string(section), Prompt: parameterPrompt(parameters), Parameters: parameters, ContentType: contentType, Status: model.GenerationTaskFailed, Stage: "failed", Error: message, ErrorDetail: submitErr.Error(), CreatedAt: submittedAt, FinishedAt: now(), UpdatedAt: now()})
+		if err != nil { log.Printf("generation task rejection record failed: task=%s errorType=%T", meta.TaskID, err) }
+	}()
+	if err := CheckSectionAccess(user, section); err != nil { return model.GenerationTaskSubmitResult{}, nil, err }
+	retention, err := UserGenerationRetention(user.ID)
+	if err != nil { return model.GenerationTaskSubmitResult{}, nil, err }
 	if err := CheckSectionAccess(user, generationSection(path)); err != nil {
 		return model.GenerationTaskSubmitResult{}, nil, err
 	}
@@ -72,12 +91,19 @@ func SubmitAITask(ctx context.Context, user model.AuthUser, body []byte, content
 		videoInput, body, err = prepareVideoGeneration(ctx, user, body, contentType, modelName)
 		if err != nil { return model.GenerationTaskSubmitResult{}, nil, err }
 		contentType = "application/json"
+		var effective map[string]any
+		effective, err = ReadAIRequestParameters(body, contentType)
+		if err != nil { return model.GenerationTaskSubmitResult{}, nil, err }
+		parameters["effective"] = effective
 		billing, err = videoModelBilling(ctx, modelName, videoInput.BillingType)
 	} else { billing, err = RequestModelBilling(ctx, modelName) }
 	if err != nil {
 		return model.GenerationTaskSubmitResult{}, nil, err
 	}
 	credits := billing.Credits
+	if path == "/images/generations" || path == "/images/edits" {
+		if err := ValidateImageResolution(parameters, billing.Resolutions); err != nil { return model.GenerationTaskSubmitResult{}, nil, err }
+	}
 	requestCount, err := ReadAIRequestCount(body, contentType)
 	if err != nil { return model.GenerationTaskSubmitResult{}, nil, err }
 	if credits < 0 || credits > int(^uint(0)>>1)/requestCount { return model.GenerationTaskSubmitResult{}, nil, safeMessageError{message: "模型计费配置无效"} }
@@ -94,6 +120,7 @@ func SubmitAITask(ctx context.Context, user model.AuthUser, body []byte, content
 		if err != nil { return model.GenerationTaskSubmitResult{}, nil, err }
 		requestCount = input.Quantity
 	}
+	if isFree { credits = 0 }
 	if err := ConsumeUserCreditsWithMeta(user.ID, modelName, credits, path, meta); err != nil {
 		return model.GenerationTaskSubmitResult{}, nil, err
 	}
@@ -126,11 +153,20 @@ func SubmitAITask(ctx context.Context, user model.AuthUser, body []byte, content
 	now := time.Now().Format(time.RFC3339)
 	meta = normalizeRequestLogMeta(meta)
 	task := model.GenerationTask{
-		ID:            newID("task"),
+		CampaignID: free.CampaignID,
+		QuotaLimit: free.Limit,
+		AgreementAcceptedAt: free.AcceptedAt,
+		AgreementVersion: free.Agreement,
+		ID:            meta.TaskID,
 		UserID:        user.ID,
 		Username:      user.Username,
 		Model:         modelName,
 		Path:          path,
+		Section:       string(section),
+		Prompt:        parameterPrompt(parameters),
+		Parameters:    parameters,
+		RetentionDays: retention.Days[string(section)],
+		Stage:         "queued",
 		ContentType:   contentType,
 		RequestFileID: requestFile.File.ID,
 		Credits:       credits,
@@ -202,7 +238,7 @@ func GetGenerationTask(user model.AuthUser, id string) (model.GenerationTaskView
 	if !ok || task.UserID != user.ID {
 		return model.GenerationTaskView{}, safeMessageError{message: "任务不存在或无权限访问"}
 	}
-	if err := CheckSectionAccess(user, generationSection(task.Path)); err != nil {
+	if err := checkGenerationTaskAccess(user, task); err != nil {
 		return model.GenerationTaskView{}, err
 	}
 	return generationTaskView(task), nil
@@ -215,7 +251,7 @@ func ListGenerationTasks(user model.AuthUser) ([]model.GenerationTaskView, error
 	}
 	result := make([]model.GenerationTaskView, 0, len(items))
 	for _, item := range items {
-		if CheckSectionAccess(user, generationSection(item.Path)) != nil {
+		if checkGenerationTaskAccess(user, item) != nil {
 			continue
 		}
 		result = append(result, generationTaskView(item))
@@ -234,7 +270,7 @@ func GetGenerationTaskResult(ctx context.Context, user model.AuthUser, id string
 	if task.Status != model.GenerationTaskSucceeded || task.ResponseFileID == "" {
 		return GenerationTaskResultStream{}, safeMessageError{message: "任务结果尚未生成"}
 	}
-	if err := CheckSectionAccess(user, generationSection(task.Path)); err != nil {
+	if err := checkGenerationTaskAccess(user, task); err != nil {
 		return GenerationTaskResultStream{}, err
 	}
 	header := http.Header{}
@@ -259,11 +295,11 @@ func CancelGenerationTask(user model.AuthUser, id string) error {
 	if task.Status != model.GenerationTaskQueued {
 		return safeMessageError{message: "只能撤销排队中的任务"}
 	}
-	if err := CheckSectionAccess(user, generationSection(task.Path)); err != nil {
+	if err := checkGenerationTaskAccess(user, task); err != nil {
 		return err
 	}
 	now := time.Now().Format(time.RFC3339)
-	changed, err := repository.FinishGenerationTask(task, model.GenerationTaskCanceled, map[string]any{"canceled_at": now, "finished_at": now, "error": "用户已撤销", "queue_position": 0}, taskRefundLog(task))
+	changed, err := repository.FinishGenerationTask(task, model.GenerationTaskCanceled, map[string]any{"canceled_at": now, "finished_at": now, "error": "用户已撤销", "stage": "canceled", "queue_position": 0}, taskRefundLog(task))
 	if err != nil { return err }
 	if !changed { return safeMessageError{message: "任务状态已变化，无法撤销"} }
 
@@ -362,6 +398,8 @@ func runGenerationTask(task model.GenerationTask, timeout time.Duration) {
 func executeTask(ctx context.Context, user model.AuthUser, task model.GenerationTask, timeout time.Duration) (AIProxyResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
+	ctx = context.WithValue(ctx, generationTaskContextKey{}, task)
+	_ = repository.UpdateGenerationTaskProgress(task, map[string]any{"stage": "executing", "updated_at": now()})
 	if proxyExecutor == nil {
 		return failExecutingTask(task, "AI 执行器未初始化")
 	}
@@ -388,17 +426,21 @@ func executeTask(ctx context.Context, user model.AuthUser, task model.Generation
 	now := time.Now().Format(time.RFC3339)
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded { return failExecutingTask(task, "生成任务已超过执行时限，请核实上游结果后再重试") }
+		RecordGenerationTaskDiagnostic(ctx, err.Error())
 		if safe, ok := err.(interface{ SafeMessage() string }); ok { return failExecutingTask(task, safe.SafeMessage()) }
 		return failExecutingTask(task, "AI 接口请求失败")
 	}
 	resp.Header = SafeResponseHeaders(resp.Header)
+	files, err := repository.ListGenerationTaskFiles(task.ID)
+	if err != nil { return failExecutingTask(task, "AI 结果保存失败") }
+	if len(files) == 0 { return failExecutingTask(task, "生成接口未返回可用结果") }
 	headerJSON, _ := json.Marshal(resp.Header)
 	responseFile, err := StoreTaskPayload(ctx, user, "response-"+newID("file")+".bin", resp.Body, firstNonEmpty(resp.Header.Get("Content-Type"), "application/octet-stream"), task.Path)
 	if err != nil {
 		log.Printf("generation task persist response payload failed: task=%s errorType=%T", task.ID, err)
 		return failExecutingTask(task, "AI 结果保存失败")
 	}
-	fields := map[string]any{"response_status": resp.StatusCode, "response_header": string(headerJSON), "response_file_id": responseFile.File.ID, "finished_at": now}
+	fields := map[string]any{"response_status": resp.StatusCode, "response_header": string(headerJSON), "response_file_id": responseFile.File.ID, "finished_at": now, "stage": "succeeded", "progress": 100, "error_detail": ""}
 	var settlement *model.CreditLog
 	if task.APIBillingType == model.BillingTypeToken {
 		actual := apiUsageCredits(task.APIUnitCredits, task.Credits, resp.UsageTokens)
@@ -409,7 +451,9 @@ func executeTask(ctx context.Context, user model.AuthUser, task model.Generation
 			if delta < 0 { settlement.Type, settlement.Category = model.CreditLogTypeAIConsume, creditLogCategory(model.CreditLogTypeAIConsume) }
 		}
 	}
-	changed, err := repository.FinishGenerationTask(task, model.GenerationTaskSucceeded, fields, settlement)
+	histories := []model.GenerationHistory{}
+	if task.CampaignID != "" { histories = append(histories, freeImageHistory(task, files)) }
+	changed, err := repository.FinishGenerationTask(task, model.GenerationTaskSucceeded, fields, settlement, histories...)
 	if err != nil { return failExecutingTask(task, "AI 结果保存失败") }
 	if !changed { return AIProxyResponse{}, safeMessageError{message: "任务已结束，请刷新任务列表"} }
 	return resp, nil
@@ -418,11 +462,11 @@ func executeTask(ctx context.Context, user model.AuthUser, task model.Generation
 func taskRefundLog(task model.GenerationTask) *model.CreditLog {
 	meta := normalizeRequestLogMeta(RequestLogMeta{IP: task.IP, Country: task.Country})
 	extra, _ := json.Marshal(map[string]string{"model": task.Model, "path": task.Path, "ip": meta.IP, "country": meta.Country})
-	return &model.CreditLog{ID: newID("credit"), UserID: task.UserID, Type: model.CreditLogTypeAIRefund, Category: creditLogCategory(model.CreditLogTypeAIRefund), Model: task.Model, Path: task.Path, Amount: task.Credits, RelatedID: task.ID, Remark: "生成任务失败或撤销退款", IP: meta.IP, Country: meta.Country, Extra: string(extra), CreatedAt: now()}
+	return &model.CreditLog{ID: newID("credit"), UserID: task.UserID, Type: model.CreditLogTypeAIRefund, Category: creditLogCategory(model.CreditLogTypeAIRefund), Model: task.Model, Path: task.Path, Amount: task.Credits, RelatedID: task.ID, Parameters: task.Parameters, Remark: "生成任务失败或撤销退款", IP: meta.IP, Country: meta.Country, Extra: string(extra), CreatedAt: now()}
 }
 
 func failExecutingTask(task model.GenerationTask, message string) (AIProxyResponse, error) {
-	_, err := repository.FinishGenerationTask(task, model.GenerationTaskFailed, map[string]any{"error": message, "finished_at": now()}, taskRefundLog(task))
+	_, err := repository.FinishGenerationTask(task, model.GenerationTaskFailed, map[string]any{"error": message, "stage": "failed", "finished_at": now()}, taskRefundLog(task))
 	if err != nil { log.Printf("generation task settlement failed: task=%s errorType=%T", task.ID, err) }
 	return AIProxyResponse{}, safeMessageError{message: message}
 }
@@ -462,7 +506,7 @@ func cleanupOldGenerationTasks() error {
 				return err
 			}
 		}
-		if err := repository.DeleteGenerationTask(task.ID); err != nil {
+		if err := repository.ClearGenerationTaskPayloads(task.ID); err != nil {
 			return err
 		}
 	}

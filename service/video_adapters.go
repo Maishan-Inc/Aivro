@@ -79,6 +79,7 @@ func videoDurations(start, end int) []int {
 
 func videoPixelSize(ratio, resolution string) string {
 	height, _ := strconv.Atoi(strings.TrimSuffix(resolution, "p"))
+	if resolution == "4k" { height = 2160 }
 	if height == 0 { height = 720 }
 	parts := strings.Split(ratio, ":")
 	w, _ := strconv.Atoi(parts[0]); h, _ := strconv.Atoi(parts[1])
@@ -122,8 +123,9 @@ func videoProviderRequest(ctx context.Context, route ModelChannelRoute, method, 
 		}
 		payload, readErr := readLimited(response.Body, 4<<20, "视频接口响应过大")
 		_ = response.Body.Close()
-		if response.StatusCode < 200 || response.StatusCode >= 300 { return 0, SafeAIError(fmt.Sprintf("%s（HTTP %d）", failure, response.StatusCode)) }
+		if response.StatusCode < 200 || response.StatusCode >= 300 { RecordGenerationTaskDiagnostic(ctx, string(payload)); return 0, SafeAIError(fmt.Sprintf("%s（HTTP %d）", failure, response.StatusCode)) }
 		if readErr != nil { return 0, readErr }
+		RecordGenerationProviderProgress(ctx, payload)
 		if err := json.Unmarshal(payload, output); err != nil { return 0, SafeAIError("视频接口返回格式错误") }
 		return delay, nil
 	}

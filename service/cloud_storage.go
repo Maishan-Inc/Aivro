@@ -49,6 +49,7 @@ type CloudObjectUpload struct {
 	Filename    string
 	ContentType string
 	Source      string
+	GenerationTaskID string
 	Body        []byte
 	Reader      io.ReadSeeker
 	Size        int64
@@ -131,6 +132,7 @@ func (storage *CloudStorageService) UploadObject(ctx context.Context, request Cl
 		ContentType: request.ContentType,
 		Size:        size,
 		Source:      request.Source,
+		GenerationTaskID: request.GenerationTaskID,
 		ExpiresAt:   objectExpiresAt(request, storage.setting),
 		CreatedAt:   now(),
 		UpdatedAt:   now(),
@@ -204,6 +206,19 @@ func objectExpiresAt(request CloudObjectUpload, setting model.CloudStorageSettin
 }
 
 func storeObject(ctx context.Context, request CloudObjectUpload) (CloudObjectResult, error) {
+	if request.Purpose == model.CloudFilePurposeGeneration {
+		if task, ok := ctx.Value(generationTaskContextKey{}).(model.GenerationTask); ok {
+			request.GenerationTaskID = task.ID
+			request.ExpiresAt = generationExpiresAt(task.RetentionDays)
+			_ = repository.UpdateGenerationTaskProgress(task, map[string]any{"stage": "storing", "updated_at": now()})
+		} else {
+			retention, err := UserGenerationRetention(request.User.ID)
+			if err != nil { return CloudObjectResult{}, err }
+			section := string(request.FileType)
+			if request.Source == "/prompt-reverse" { section = "prompt-reverse" }
+			request.ExpiresAt = generationExpiresAt(retention.Days[section])
+		}
+	}
 	request.Filename = newID("file")+"-"+sanitizeFilename(request.Filename)
 	if err := hitRateBucket("storage:"+request.User.ID, 60, time.Minute, time.Minute); err != nil { return CloudObjectResult{}, err }
 	size := request.Size
@@ -290,6 +305,7 @@ func storeLocalObject(request CloudObjectUpload) (CloudObjectResult, error) {
 		ContentType: request.ContentType,
 		Size:        size,
 		Source:      request.Source,
+		GenerationTaskID: request.GenerationTaskID,
 		ExpiresAt:   request.ExpiresAt,
 		CreatedAt:   now(),
 		UpdatedAt:   now(),
@@ -319,6 +335,7 @@ func GetFileContent(ctx context.Context, user model.AuthUser, id string, accessT
 		}
 	}
 	if file.ExpiresAt != "" && file.ExpiresAt <= now() {
+		if file.Purpose == model.CloudFilePurposeGeneration { return file, nil, safeMessageError{message: "文件已过期"} }
 		retained, err := repository.HasCloudFileReference(file.ID, "", now())
 		if err != nil || !retained {
 			return file, nil, safeMessageError{message: "文件已过期"}
@@ -506,12 +523,11 @@ func StoreImageResponseToCloud(ctx context.Context, user model.AuthUser, body []
 		result, err := storeObject(ctx, CloudObjectUpload{
 			User:        user,
 			FileType:    model.CloudFileTypeImage,
-			Purpose:     model.CloudFilePurposeTemp,
+			Purpose:     model.CloudFilePurposeGeneration,
 			Filename:    "image-" + newID("file") + "-" + strconv.Itoa(index+1) + ext,
 			ContentType: contentType,
 			Source:      source,
 			Body:        content,
-			ExpiresAt:   defaultTempExpiresAt(model.CloudFileTypeImage),
 		})
 		if err != nil {
 			return nil, err
@@ -536,12 +552,11 @@ func StoreVideoContentToCloud(ctx context.Context, user model.AuthUser, body []b
 	result, err := storeObject(ctx, CloudObjectUpload{
 		User:        user,
 		FileType:    model.CloudFileTypeVideo,
-		Purpose:     model.CloudFilePurposeTemp,
+		Purpose:     model.CloudFilePurposeGeneration,
 		Filename:    "video-" + newID("file") + mediaExtension(mediaType, ".mp4"),
 		ContentType: mediaType,
 		Source:      source,
 		Body:        body,
-		ExpiresAt:   defaultTempExpiresAt(model.CloudFileTypeVideo),
 	})
 	if err != nil {
 		return nil, err
@@ -575,13 +590,12 @@ func StoreVideoReaderToCloud(ctx context.Context, user model.AuthUser, reader io
 	result, err := storeObject(ctx, CloudObjectUpload{
 		User:        user,
 		FileType:    model.CloudFileTypeVideo,
-		Purpose:     model.CloudFilePurposeTemp,
+		Purpose:     model.CloudFilePurposeGeneration,
 		Filename:    "video-" + newID("file") + mediaExtension(mediaType, ".mp4"),
 		ContentType: mediaType,
 		Source:      source,
 		Reader:      tmp,
 		Size:        size,
-		ExpiresAt:   defaultTempExpiresAt(model.CloudFileTypeVideo),
 	})
 	if err != nil {
 		return nil, err
@@ -622,6 +636,13 @@ func StartCloudStorageCleanupScheduler() {
 }
 
 func CleanupExpiredCloudFiles() error {
+	for {
+		generated, err := repository.ListExpiredGeneratedFiles(now(), 500)
+		if err != nil { return err }
+		if len(generated) == 0 { break }
+		if err := DeleteCloudFiles(generated); err != nil { return err }
+		if len(generated) < 500 { break }
+	}
 	settings, _, err := CloudStorageEnabled()
 	if err != nil || settings.AutoCleanupEnabled == nil || !*settings.AutoCleanupEnabled {
 		return err

@@ -1,6 +1,6 @@
 "use client";
 
-import { ApiOutlined, AuditOutlined, CommentOutlined, DatabaseOutlined, DollarOutlined, FileTextOutlined, GlobalOutlined, HomeOutlined, LogoutOutlined, MailOutlined, MenuOutlined, PictureOutlined, ShareAltOutlined, ShoppingOutlined, SettingOutlined, TransactionOutlined, UserOutlined } from "@ant-design/icons";
+import { ApiOutlined, AuditOutlined, CommentOutlined, DatabaseOutlined, DollarOutlined, FileTextOutlined, GlobalOutlined, HomeOutlined, LogoutOutlined, MailOutlined, MenuOutlined, PictureOutlined, ShareAltOutlined, ShoppingOutlined, SettingOutlined, TagsOutlined, TransactionOutlined, UserOutlined } from "@ant-design/icons";
 import { Button, Drawer, Dropdown, Flex, Layout, Menu, Typography, theme } from "antd";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -17,9 +17,13 @@ const adminMenus = [
     { key: "/admin/users", icon: <UserOutlined />, label: "用户管理" },
     { key: "/admin/tickets", icon: <CommentOutlined />, label: "工单回复" },
     { key: "/admin/request-logs", icon: <TransactionOutlined />, label: "请求日志" },
+    { key: "/admin/task-records", icon: <FileTextOutlined />, label: "任务记录" },
+    { key: "/admin/record-storage", icon: <DatabaseOutlined />, label: "记录保存" },
+    { key: "/admin/explore", icon: <PictureOutlined />, label: "内置工具与活动" },
     { key: "/admin/audit-logs", icon: <AuditOutlined />, label: "日志审计" },
     { key: "/admin/plans", icon: <ShoppingOutlined />, label: "套餐管理" },
     { key: "/admin/model-pricing", icon: <DollarOutlined />, label: "模型定价" },
+    { key: "/admin/model-tags", icon: <TagsOutlined />, label: "模型标签" },
     { key: "/admin/prompts", icon: <FileTextOutlined />, label: "提示词管理" },
     { key: "/admin/assets", icon: <PictureOutlined />, label: "素材库" },
     { key: "/admin/workflow-community", icon: <ShareAltOutlined />, label: "社区工作流" },
@@ -47,7 +51,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     const setLocale = useLocaleStore((state) => state.setLocale);
     const settingsTab = pathname.startsWith("/admin/settings") ? searchParams.get("tab") : "";
     const activeKey = settingsTab === "model" ? "/admin/settings?tab=model" : settingsTab === "mail" ? "/admin/settings?tab=mail" : adminMenus.find((item) => pathname.startsWith(item.key))?.key || "";
-    const pageTitle = settingsTab === "model" ? "模型配置" : settingsTab === "mail" ? "邮件设置" : pathname.startsWith("/admin/settings") ? "系统设置" : pathname.startsWith("/admin/model-pricing") ? "模型定价" : pathname.startsWith("/admin/database") ? "数据库配置" : pathname.startsWith("/admin/ads") ? "谷歌广告" : pathname.startsWith("/admin/workflow-community") ? "社区工作流" : pathname.startsWith("/admin/assets") ? "素材库管理" : pathname.startsWith("/admin/prompts") ? "提示词管理" : pathname.startsWith("/admin/plans") ? "套餐管理" : pathname.startsWith("/admin/audit-logs") ? "日志审计" : pathname.startsWith("/admin/tickets") ? "工单回复" : pathname.startsWith("/admin/request-logs") || pathname.startsWith("/admin/credit-logs") ? "请求日志" : "用户管理";
+    const pageTitle = pathname.startsWith("/admin/explore") ? "内置工具与活动" : pathname.startsWith("/admin/task-records") ? "任务记录" : pathname.startsWith("/admin/record-storage") ? "记录保存" : settingsTab === "model" ? "模型配置" : settingsTab === "mail" ? "邮件设置" : pathname.startsWith("/admin/settings") ? "系统设置" : pathname.startsWith("/admin/model-pricing") ? "模型定价" : pathname.startsWith("/admin/model-tags") ? "模型标签" : pathname.startsWith("/admin/database") ? "数据库配置" : pathname.startsWith("/admin/ads") ? "谷歌广告" : pathname.startsWith("/admin/workflow-community") ? "社区工作流" : pathname.startsWith("/admin/assets") ? "素材库管理" : pathname.startsWith("/admin/prompts") ? "提示词管理" : pathname.startsWith("/admin/plans") ? "套餐管理" : pathname.startsWith("/admin/audit-logs") ? "日志审计" : pathname.startsWith("/admin/tickets") ? "工单回复" : pathname.startsWith("/admin/request-logs") || pathname.startsWith("/admin/credit-logs") ? "请求日志" : "用户管理";
     const languageItems = adminLocaleOptions.map((item) => ({ key: item, label: localeLabels[item] }));
     const menuItems = useMemo(
         () =>

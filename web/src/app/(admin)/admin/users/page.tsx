@@ -3,13 +3,15 @@
 import { DeleteOutlined, EditOutlined, FilterOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from "@ant-design/icons";
 import { ProTable, type ProColumns } from "@ant-design/pro-components";
 import { Avatar, Button, Card, Checkbox, Col, Drawer, Flex, Form, Grid, Input, InputNumber, Modal, Row, Select, Space, Tag, Tooltip, Typography } from "antd";
-import { ShieldCheck } from "lucide-react";
+import { Clock3, ShieldCheck } from "lucide-react";
 import dayjs from "dayjs";
 import { useEffect, useState } from "react";
 
 import type { AdminUser } from "@/services/api/admin";
 import { userSections, type UserSection } from "@/lib/user-sections";
 import { useAdminUsers } from "./use-admin-users";
+import { GenerationRetentionFields } from "@/components/generation-retention-fields";
+import { generationGroups, generationSections, type GenerationRetention } from "@/services/api/generation-retention";
 
 type UserFormValues = Partial<AdminUser> & { password?: string };
 
@@ -34,7 +36,9 @@ const profileCompletedOptions = [
 ];
 
 export default function AdminUsersPage() {
-    const { users, keyword, page, pageSize, total, isLoading, searchUsers, changePage, changePageSize, resetFilters, refreshUsers, saveUser: saveAdminUser, saveSections, isSavingSections, adjustCredits, adjustWorkflowCreateCredits, deleteUser } = useAdminUsers();
+    const [retentionForm] = Form.useForm<GenerationRetention>();
+    const [retentionUser, setRetentionUser] = useState<AdminUser | null>(null);
+    const { users, keyword, page, pageSize, total, isLoading, searchUsers, changePage, changePageSize, resetFilters, refreshUsers, saveUser: saveAdminUser, saveSections, isSavingSections, adjustCredits, adjustWorkflowCreateCredits, deleteUser, saveRetention, isSavingRetention } = useAdminUsers();
     const screens = Grid.useBreakpoint();
     const isCompact = !screens.lg;
     const [form] = Form.useForm<UserFormValues>();
@@ -111,6 +115,7 @@ export default function AdminUsersPage() {
     );
 
     const columns: ProColumns<AdminUser>[] = [
+        { title: "会员组别", dataIndex: "membershipGroup", width: 100, render: (_, item) => <Tag data-i18n-skip>{(item.membershipGroup || "free").toUpperCase()}</Tag> },
         {
             title: "用户",
             dataIndex: "username",
@@ -193,12 +198,18 @@ export default function AdminUsersPage() {
         {
             title: "操作",
             key: "actions",
-            width: 128,
+            width: 164,
             align: "right",
             render: (_, item) => (
                 <Space size={4}>
                     <Tooltip title="区块访问">
                         <Button type="text" size="small" aria-label="区块访问" icon={<ShieldCheck className="size-4" />} onClick={() => openSectionAccess(item)} />
+                    </Tooltip>
+                    <Tooltip title="记录保存">
+                        <Button type="text" size="small" aria-label="记录保存" icon={<Clock3 className="size-4" />} onClick={() => {
+                            retentionForm.setFieldsValue({ group: item.membershipGroup || "free", days: Object.fromEntries(generationSections.map((section) => [section.key, item.generationRetentionDays?.[section.key] || 0])) });
+                            setRetentionUser(item);
+                        }} />
                     </Tooltip>
                     <Tooltip title="编辑">
                         <Button type="text" size="small" icon={<EditOutlined />} onClick={() => setEditingUser(item)} />
@@ -266,6 +277,18 @@ export default function AdminUsersPage() {
                 {filterForm(true)}
             </Drawer>
 
+            <Modal title="用户记录保存" open={Boolean(retentionUser)} confirmLoading={isSavingRetention} onCancel={() => setRetentionUser(null)} okText="保存" cancelText="取消" onOk={async () => {
+                if (!retentionUser) return;
+                await saveRetention(retentionUser.id, await retentionForm.validateFields());
+                setRetentionUser(null);
+            }}>
+                <Typography.Paragraph data-i18n-skip>{retentionUser?.displayName || retentionUser?.username}</Typography.Paragraph>
+                <Typography.Paragraph type="secondary">保存天数填写 0 时跟随会员组；单独设置只影响该用户的新生成结果，不会让用户退出登录。</Typography.Paragraph>
+                <Form form={retentionForm} layout="vertical">
+                    <Form.Item name="group" label="会员组别" rules={[{ required: true }]}><Select options={generationGroups.map((value) => ({ value, label: value.toUpperCase() }))} /></Form.Item>
+                    <GenerationRetentionFields inherit />
+                </Form>
+            </Modal>
             <Modal title="区块访问" open={Boolean(accessUser)} onCancel={() => setAccessUser(null)} confirmLoading={isSavingSections} okText="保存权限" cancelText="取消" onOk={async () => {
                 if (!accessUser) return;
                 await saveSections(accessUser.id, userSections.filter((section) => !enabledSections.includes(section.key)).map((section) => section.key));

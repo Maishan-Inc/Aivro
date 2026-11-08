@@ -74,6 +74,10 @@ func normalizeVideoInput(input VideoGenerationInput, route ModelChannelRoute) (V
 	if route.Capability != "video" { return input, SafeAIError("该模型未开放此功能") }
 	caps, err := videoCapabilities(route)
 	if err != nil { return input, err }
+	nativeResolutions := caps.Resolutions
+	billing, err := ModelBilling(input.Model)
+	if err != nil { return input, err }
+	caps.Resolutions = billing.Resolutions
 	if input.BillingType == "" { input.BillingType = model.BillingTypeFixed }
 	if input.BillingType != model.BillingTypeFixed && input.BillingType != model.BillingTypeSecond { return input, SafeAIError("视频计费方式仅支持按次或按秒") }
 	if input.Seconds == "" {
@@ -83,9 +87,24 @@ func normalizeVideoInput(input VideoGenerationInput, route ModelChannelRoute) (V
 	seconds, err := strconv.Atoi(input.Seconds.String())
 	if err != nil || !slices.Contains(caps.Durations, seconds) { return input, SafeAIError("当前视频模型不支持此时长") }
 	input.Seconds = json.Number(strconv.Itoa(seconds))
+	input.Resolution = strings.ToLower(strings.TrimSpace(input.Resolution))
+	if input.Resolution == "2k" { input.Resolution = "1440p" }
+	if len(caps.Resolutions) == 0 { return input, SafeAIError("当前视频模型不支持此清晰度") }
 	if input.Resolution == "" { input.Resolution = caps.Resolutions[0] }
 	if !slices.Contains(caps.Resolutions, input.Resolution) { return input, SafeAIError("当前视频模型不支持此清晰度") }
+	if slices.Contains([]string{model.VideoAdapterKling, model.VideoAdapterJimeng, model.VideoAdapterFalKling}, route.Adapter) && !slices.Contains(nativeResolutions, input.Resolution) { return input, SafeAIError("当前视频模型不支持此清晰度") }
 	if input.Size == "" { input.Size = caps.AspectRatios[0] }
+	if pixelSizePattern.MatchString(input.Size) {
+		if err := validatePixelSize(input.Size, maxResolutionPixels(caps.Resolutions, videoResolutionPixels)); err != nil { return input, err }
+		match := pixelSizePattern.FindStringSubmatch(input.Size)
+		width, _ := strconv.Atoi(match[1]); height, _ := strconv.Atoi(match[2])
+		for _, ratio := range caps.AspectRatios {
+			parts := strings.Split(ratio, ":")
+			if len(parts) != 2 { continue }
+			w, _ := strconv.Atoi(parts[0]); h, _ := strconv.Atoi(parts[1])
+			if width*h == height*w { input.Size = ratio; break }
+		}
+	}
 	if ratio := map[string]string{"1280x720": "16:9", "1920x1080": "16:9", "720x1280": "9:16", "1080x1920": "9:16", "1024x1024": "1:1"}[input.Size]; ratio != "" { input.Size = ratio }
 	if !slices.Contains(caps.AspectRatios, input.Size) { return input, SafeAIError("当前视频模型不支持此画面比例") }
 	if len(input.Images) < caps.MinImages || len(input.Images) > caps.MaxImages { return input, SafeAIError("参考图数量不符合当前视频模型要求") }

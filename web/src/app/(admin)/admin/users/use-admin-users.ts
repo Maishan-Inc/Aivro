@@ -8,6 +8,7 @@ import { adjustAdminUserCredits, adjustAdminUserWorkflowCreateCredits, deleteAdm
 import type { UserSection } from "@/lib/user-sections";
 import { useUserStore } from "@/stores/use-user-store";
 import { adminRealtimeQueryOptions } from "../admin-query-options";
+import { saveAdminUserGenerationRetention, type GenerationRetention } from "@/services/api/generation-retention";
 
 const defaultPageSize = 10;
 
@@ -44,6 +45,16 @@ export function useAdminUsers() {
             message.success("用户已删除");
         },
         onError: (error) => message.error(error instanceof Error ? error.message : "删除失败"),
+    });
+
+    const retentionMutation = useMutation({
+        mutationFn: ({ id, value }: { id: string; value: GenerationRetention }) => saveAdminUserGenerationRetention(token, id, value),
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+            await queryClient.invalidateQueries({ queryKey: ["generation-retention"] });
+            message.success("保存规则已更新");
+        },
+        onError: (error) => message.error(error.message),
     });
 
     const sectionsMutation = useMutation({
@@ -107,6 +118,8 @@ export function useAdminUsers() {
         refreshUsers: () => query.refetch(),
         saveUser: (user: Partial<AdminUser> & { password?: string }) => saveMutation.mutateAsync(user),
         saveSections: (id: string, disabledSections: UserSection[]) => sectionsMutation.mutateAsync({ id, disabledSections }),
+        saveRetention: (id: string, value: GenerationRetention) => retentionMutation.mutateAsync({ id, value }),
+        isSavingRetention: retentionMutation.isPending,
         isSavingSections: sectionsMutation.isPending,
         adjustCredits: (id: string, credits: number) => creditMutation.mutateAsync({ id, credits }),
         adjustWorkflowCreateCredits: (id: string, workflowCreateCredits: number) => workflowCreateCreditMutation.mutateAsync({ id, workflowCreateCredits }),

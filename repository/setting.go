@@ -48,6 +48,26 @@ func SaveAITimeouts(setting model.AITimeoutSetting, now string) error {
 }
 
 // SaveSettings 保存 public 和 private 两行配置。
+func SaveExploreSettings(explore model.ExploreSetting, reverse model.PromptReverseSetting, at string) error {
+	db, err := DB()
+	if err != nil { return err }
+	return db.Transaction(func(tx *gorm.DB) error {
+		for _, entry := range []struct { key model.SettingKey; field string; value any }{{model.SettingKeyPublic, "explore", explore}, {model.SettingKeyPrivate, "promptReverse", reverse}} {
+			item := model.Setting{Key: entry.key, Value: []byte("{}"), CreatedAt: at, UpdatedAt: at}
+			if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&item).Error; err != nil { return err }
+			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("key = ?", entry.key).First(&item).Error; err != nil { return err }
+			var fields map[string]json.RawMessage
+			if err := json.Unmarshal(item.Value, &fields); err != nil { return err }
+			if fields == nil { fields = map[string]json.RawMessage{} }
+			fields[entry.field], _ = json.Marshal(entry.value)
+			body, err := json.Marshal(fields)
+			if err != nil { return err }
+			if err := tx.Model(&model.Setting{}).Where("key = ?", entry.key).Updates(model.Setting{Value: body, UpdatedAt: at}).Error; err != nil { return err }
+		}
+		return nil
+	})
+}
+
 func SaveSettings(settings model.Settings, now string) (model.Settings, error) {
 	db, err := DB()
 	if err != nil {

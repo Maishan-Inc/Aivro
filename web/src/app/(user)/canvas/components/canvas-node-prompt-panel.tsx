@@ -3,6 +3,7 @@
 import { resolveCanvasModel3D } from "../utils/canvas-model-3d";
 import { CanvasModel3DSettings } from "./canvas-model-3d-settings";
 import { resolveVideoConfig } from "@/lib/video-models";
+import { clampImageSize, imageSizeLimit } from "@/lib/model-resolutions";
 
 import { useEffect, useState } from "react";
 import { ArrowUp, LoaderCircle } from "lucide-react";
@@ -89,7 +90,7 @@ export function CanvasNodePromptPanel({ node, isRunning, inputs, onHighlightInpu
             />
 
             <div className="thin-scrollbar flex min-w-0 shrink-0 items-center gap-2 overflow-x-auto py-1 [&_.canvas-composer-model-picker]:min-h-10" data-canvas-no-zoom>
-                <ModelPicker showBilling={false} className="max-w-none" config={config} kind={mode} model3D={mode === "model3d" ? model3D.options : undefined} models={mode === "model3d" ? config.model3DModels : mode === "image" ? config.imageModels : mode === "video" ? config.videoModels : config.textModels} value={config.model} onChange={(model) => onConfigChange(node.id, { model })} onMissingConfig={warnMissingModel} />
+                <ModelPicker showBilling={false} className="max-w-none" config={config} kind={mode} model3D={mode === "model3d" ? model3D.options : undefined} models={mode === "model3d" ? config.model3DModels : mode === "image" ? config.imageModels : mode === "video" ? config.videoModels : config.textModels} value={config.model} onChange={(model) => onConfigChange(node.id, { model, ...(mode === "image" ? { size: clampImageSize(config.size, imageSizeLimit(model)) } : {}) })} onMissingConfig={warnMissingModel} />
                 {mode === "model3d" ? <CanvasModel3DSettings node={node} onChange={(patch) => onConfigChange(node.id, patch)} /> : mode === "image" ? (
                     <CanvasImageSettingsPopover
                         config={config}

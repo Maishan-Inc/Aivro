@@ -5,6 +5,7 @@ import { Empty, Input, Select, Skeleton } from "antd";
 import { Box, Building2, Image, Layers, Search, Type, Video } from "lucide-react";
 
 import { ModelLogo } from "@/components/model-logo";
+import { ModelTags } from "@/components/model-tags";
 import { apiCostOf, billingUnit, capabilityLabels, capabilityOf, planCostOf, planPricingCodes } from "@/lib/model-pricing";
 import { useI18n } from "@/hooks/use-i18n";
 import { useCopyText } from "@/hooks/use-copy-text";
@@ -26,6 +27,13 @@ export function ModelPricingTable({ preview }: { preview?: PricingRow[] }) {
     const [keyword, setKeyword] = useState("");
     const [vendor, setVendor] = useState("all");
     const [capability, setCapability] = useState("all");
+    const [at, setAt] = useState(Date.now);
+    useEffect(() => {
+        const ends = (publicSettings?.modelChannel.modelCosts || []).map((item) => Date.parse(item.freeUntil || "")).filter((end) => end > Date.now());
+        if (!ends.length) return;
+        const timer = window.setTimeout(() => { setAt(Date.now()); void loadPublicSettings(); }, Math.min(2147483647, Math.min(...ends) - Date.now() + 50));
+        return () => window.clearTimeout(timer);
+    }, [publicSettings, loadPublicSettings, at]);
 
     useEffect(() => {
         if (!preview && !publicSettings) void loadPublicSettings();
@@ -81,7 +89,7 @@ export function ModelPricingTable({ preview }: { preview?: PricingRow[] }) {
                                 <button type="button" className={styles.row} onClick={() => copyText(item.model, "模型 ID 已复制")} aria-label={`${tr("复制模型 ID")} ${item.model}`} title={tr("复制模型 ID")}>
                                     <span className={styles.model}>
                                         <ModelLogo icon={item.icon} name={item.vendor || item.model} />
-                                        <span className={styles.modelName}>{item.model}</span>
+                                        <span className="min-w-0"><span className={styles.modelName} data-i18n-skip>{item.model}</span>{Date.parse(item.freeUntil || "") > at ? <span className="mt-1 block text-xs text-muted-foreground">{tr("Free [限量]")}</span> : null}{item.tags?.length ? <span className="mt-1 flex"><ModelTags tags={item.tags} /></span> : null}</span>
                                     </span>
                                     <span className={styles.vendor}>{item.vendor || "—"}</span>
                                     <span><span className={styles.badge}>{tr(capabilityLabels[item.capability] || item.capability)}</span></span>
@@ -100,7 +108,7 @@ export function ModelPricingTable({ preview }: { preview?: PricingRow[] }) {
                     })}
                 </div>
             )}
-            {!preview && filtered.length > 0 ? <p className={styles.note}>{tr("未单独定价的套餐沿用标准价。")} {tr("价格由站点管理员统一配置，实际扣费以工作台显示为准。")}</p> : null}
+            {!preview && filtered.length > 0 ? <p className={styles.note}>{tr("未单独定价的套餐沿用标准价。")} {tr("价格由站点管理员统一配置，实际扣费以工作台显示为准。")} {rows.some((item) => Date.parse(item.freeUntil || "") > at) ? tr("Free [限量] 仅用于免费生图活动，常规工作台和 API 仍按原价计费。") : null}</p> : null}
         </div>
     );
 }

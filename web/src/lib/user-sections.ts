@@ -8,6 +8,8 @@ export const userSections = [
     { key: "model3d", label: "3D 模型工作台", path: "/model-3d" },
     { key: "shares", label: "我的分享", path: "/console/shares" },
     { key: "community", label: "社区工作流", path: "/console/community" },
+    { key: "free-image", label: "免费生成图片", path: "/free-image" },
+    { key: "prompt-reverse", label: "提示词反推", path: "/prompt-reverse" },
 ] as const;
 
 export type UserSection = (typeof userSections)[number]["key"];

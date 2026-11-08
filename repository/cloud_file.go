@@ -45,6 +45,14 @@ func ListExpiredCloudFiles(now string, limit int) ([]model.CloudFile, error) {
 	return items, err
 }
 
+func ListExpiredGeneratedFiles(now string, limit int) ([]model.CloudFile, error) {
+	db, err := DB()
+	if err != nil { return nil, err }
+	items := []model.CloudFile{}
+	err = db.Where("purpose = ? AND expires_at != '' AND expires_at <= ? AND deleted_at = ''", model.CloudFilePurposeGeneration, now).Order("expires_at asc").Limit(limit).Find(&items).Error
+	return items, err
+}
+
 func MarkCloudFileDeleted(id string, deletedAt string) error {
 	db, err := DB()
 	if err != nil {

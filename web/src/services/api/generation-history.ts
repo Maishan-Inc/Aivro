@@ -1,12 +1,12 @@
 import { apiDelete, apiGet, apiPost, compactApiParams } from "@/services/api/request";
 
-export type GenerationHistoryType = "image" | "video" | "model3d";
+export type GenerationHistoryType = "image" | "video" | "model3d" | "free-image" | "prompt-reverse";
 
 export type GenerationHistoryMedia = {
     cloudFileId: string;
     storageKey: string;
     url: string;
-    fileType: GenerationHistoryType;
+    fileType: "image" | "video" | "model3d";
     contentType: string;
     size: number;
     width: number;
@@ -22,6 +22,10 @@ export type GenerationHistoryReference = {
 };
 
 export type GenerationHistory = {
+    publishedAssetId?: string;
+    rewardCredits?: number;
+    result?: Record<string, unknown>;
+    campaignId?: string;
     id: string;
     userId: string;
     type: GenerationHistoryType;

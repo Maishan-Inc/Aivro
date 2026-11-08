@@ -9,6 +9,7 @@ import type { AdminPublicSettings } from "@/services/api/admin";
 import { useUserStore } from "@/stores/use-user-store";
 
 export type AiConfig = {
+    generationSource?: "workflow";
     model: string;
     imageModel: string;
     videoModel: string;

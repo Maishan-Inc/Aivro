@@ -9,12 +9,13 @@ import { MobileNavDrawer } from "@/components/layout/mobile-nav-drawer";
 import { UserStatusActions } from "@/components/layout/user-status-actions";
 import { useLocalizedPath } from "@/hooks/use-localized-path";
 import { useI18n } from "@/hooks/use-i18n";
-import { navigationTools } from "@/constant/navigation-tools";
+import { useNavigationTools } from "@/hooks/use-navigation-tools";
 import { stripLocalePath } from "@/i18n/routing";
 import { useUserStore } from "@/stores/use-user-store";
 import { canAccessPath, defaultWorkspacePath } from "@/lib/user-sections";
 
 export function AppTopNav() {
+    const navigationTools = useNavigationTools();
     const [mobileOpen, setMobileOpen] = useState(false);
     const [scrolled, setScrolled] = useState(false);
     const [videoEnabled, setVideoEnabled] = useState(false);
@@ -48,7 +49,7 @@ export function AppTopNav() {
                         <Link href={localizedPath(`${homePath}#showcase`)} className="transition hover:opacity-70">灵感探索</Link>
                         <Link href={localizedPath("/pricing")} className="transition hover:opacity-70">套餐</Link>
                         <Link href={localizedPath(`${homePath}#faq`)} className="transition hover:opacity-70">常见问题</Link>
-                        {navigationTools.filter((tool) => tool.slug !== "assets" && canAccessPath(user, `/${tool.slug}`)).map((tool) => <Link key={tool.slug} href={tool.external ? tool.href + ("localeAware" in tool && tool.localeAware && locale === "zh-CN" ? "/zh-CN" : "") : localizedPath(`/${tool.slug}`)} target={tool.external ? "_blank" : undefined} rel={tool.external ? "noopener noreferrer" : undefined} className="transition hover:opacity-70">{tool.label}</Link>)}
+                        {navigationTools.filter((tool) => tool.slug !== "assets").map((tool) => <Link key={tool.slug} href={localizedPath(`/${tool.slug}`)} className="transition hover:opacity-70">{tool.label}</Link>)}
                         {canAccessPath(user, "/console/community") ? <Link href={localizedPath("/console/community")} className="transition hover:opacity-70">社区工作流</Link> : null}
                         <Link href={localizedPath("/models")} className="transition hover:opacity-70">模型定价</Link>
                         <Link href={localizedPath("/developers")} className="transition hover:opacity-70">开发文档</Link>

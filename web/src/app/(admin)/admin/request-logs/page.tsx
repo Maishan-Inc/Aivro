@@ -10,6 +10,8 @@ import type { AdminCreditLog } from "@/services/api/admin";
 import { useAdminRequestLogs } from "./use-admin-request-logs";
 
 const requestLogCategoryLabels: Record<string, string> = {
+    free_image_reward: "作品奖励",
+    作品奖励: "作品奖励",
     admin_adjust: "后台调整",
     ai_consume: "模型请求",
     ai_refund: "失败返还",
@@ -19,12 +21,14 @@ const requestLogCategoryLabels: Record<string, string> = {
 };
 
 const requestLogTypeLabels: Record<string, string> = {
+    free_image_reward: "作品奖励",
     admin_adjust: "后台调整",
     ai_consume: "模型请求",
     ai_refund: "失败返还",
 };
 
 const requestLogCategoryOptions = [
+    { label: "作品奖励", value: "作品奖励" },
     { label: "全部分类", value: "" },
     { label: "后台调整", value: "后台调整" },
     { label: "模型请求", value: "模型请求" },
@@ -38,6 +42,7 @@ export default function AdminRequestLogsPage() {
     const [keywordText, setKeywordText] = useState(keyword);
     const [categoryValue, setCategoryValue] = useState(category);
     const [rangeValue, setRangeValue] = useState<[Dayjs, Dayjs] | null>(startTime && endTime ? [dayjs(startTime), dayjs(endTime)] : null);
+    const [parameters, setParameters] = useState<Record<string, unknown> | null>(null);
     const [filtersOpen, setFiltersOpen] = useState(false);
 
     const applySearch = () => {
@@ -86,6 +91,7 @@ export default function AdminRequestLogsPage() {
     );
 
     const columns: ProColumns<AdminCreditLog>[] = [
+        { title: "请求参数", key: "parameters", width: 110, render: (_, item) => <Button type="link" disabled={!item.parameters} onClick={() => setParameters(item.parameters || {})}>查看参数</Button> },
         {
             title: "分类",
             dataIndex: "category",
@@ -201,6 +207,9 @@ export default function AdminRequestLogsPage() {
                     }}
                 />
             </Flex>
+            <Drawer title="完整请求参数" open={parameters !== null} onClose={() => setParameters(null)} width="min(720px, 100vw)">
+                <pre data-i18n-skip className="whitespace-pre-wrap break-all text-xs">{JSON.stringify(parameters, null, 2)}</pre>
+            </Drawer>
             <Drawer title="筛选请求日志" placement="bottom" height="74vh" open={filtersOpen} onClose={() => setFiltersOpen(false)} destroyOnHidden>
                 {filterForm(true)}
             </Drawer>

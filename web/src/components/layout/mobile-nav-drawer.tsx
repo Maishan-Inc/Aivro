@@ -4,7 +4,8 @@ import { Drawer } from "antd";
 import { LayoutDashboard } from "lucide-react";
 import Link from "next/link";
 
-import { navigationTools, type NavigationToolSlug } from "@/constant/navigation-tools";
+import type { NavigationToolSlug } from "@/constant/navigation-tools";
+import { useNavigationTools } from "@/hooks/use-navigation-tools";
 import { useI18n } from "@/hooks/use-i18n";
 import { withLocalePath } from "@/i18n/routing";
 import { cn } from "@/lib/utils";
@@ -18,6 +19,7 @@ type MobileNavDrawerProps = {
 };
 
 export function MobileNavDrawer({ open, activeToolSlug, onClose }: MobileNavDrawerProps) {
+    const navigationTools = useNavigationTools();
     const { locale, t } = useI18n();
     const user = useUserStore((state) => state.user);
     const homePath = user ? "/home" : "/";
@@ -35,13 +37,10 @@ export function MobileNavDrawer({ open, activeToolSlug, onClose }: MobileNavDraw
                 {navigationTools.filter((tool) => canAccessPath(user, `/${tool.slug}`)).map((tool) => {
                     const Icon = tool.icon;
                     const active = tool.slug === activeToolSlug;
-                    const externalHref = "localeAware" in tool && tool.localeAware && locale === "zh-CN" ? `${tool.href}/zh-CN` : tool.href ?? "#";
                     return (
                         <Link
                             key={tool.slug}
-                            href={tool.external ? externalHref : withLocalePath(tool.href || `/${tool.slug}`, locale)}
-                            target={tool.external ? "_blank" : undefined}
-                            rel={tool.external ? "noreferrer" : undefined}
+                            href={withLocalePath(`/${tool.slug}`, locale)}
                             onClick={onClose}
                             className={cn(
                                 "flex items-center gap-3 rounded-lg px-3 py-3 text-base transition",

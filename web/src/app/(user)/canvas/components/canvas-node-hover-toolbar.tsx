@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperti
 import { Modal, Segmented, Tooltip, theme as antdTheme } from "antd";
 import { Camera, Download, FolderPlus, Image as ImageIcon, Lock, LockOpen, Maximize2, MessageSquare, Minus, Pencil, Plus, RefreshCw, Scissors, Settings2, Trash2, Upload, Video } from "lucide-react";
 
+import { formatDateTime } from "@/lib/datetime";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { formatBytes, getDataUrlByteSize } from "@/lib/image-utils";
 import { useThemeStore } from "@/stores/use-theme-store";
@@ -181,7 +182,8 @@ export function CanvasNodeInfoModal({ node, open, onClose }: { node: CanvasNodeD
                             <InfoRow label="位置" value={`${Math.round(node.position.x)}, ${Math.round(node.position.y)}`} />
                             <InfoRow label="状态" value={{ idle: "待生成", loading: "生成中", success: "成功", error: "失败" }[node.metadata?.status || "idle"]} />
                             {batchCount > 1 ? <InfoRow label="图片组" value={`${batchCount} 张`} /> : null}
-                            {node.metadata?.prompt ? <InfoRow label="提示词" value={node.metadata.prompt} /> : null}
+                            {node.metadata?.expiresAt ? <InfoRow label="服务器到期时间" value={<span data-i18n-skip>{formatDateTime(node.metadata.expiresAt)}</span>} /> : null}
+                            {node.metadata?.prompt ? <InfoRow label="提示词" value={<span data-i18n-skip>{node.metadata.prompt}</span>} /> : null}
                             {imageBytes ? <InfoRow label="图片大小" value={formatBytes(imageBytes)} /> : null}
                             {node.metadata?.errorDetails ? (
                                 <div className="rounded-lg border p-3 text-red-400" style={{ borderColor: theme.node.stroke }}>

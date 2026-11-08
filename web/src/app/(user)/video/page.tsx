@@ -1,5 +1,7 @@
 "use client";
 
+import { useGenerationRetention } from "@/hooks/use-generation-retention";
+
 import { StudioEmptyState } from "@/components/studio-empty-state";
 import { StudioGenerationSettings } from "@/components/studio-generation-settings";
 import { StudioHistorySidebar } from "@/components/studio-history-sidebar";
@@ -86,7 +88,8 @@ export default function VideoPage() {
     const [references, setReferences] = useState<ReferenceImage[]>([]);
     const [results, setResults] = useState<GenerationResult[]>([]);
     const [logs, setLogs] = useState<GenerationLog[]>([]);
-    const [retentionDays, setRetentionDays] = useState<number | null>(null);
+    const retention = useGenerationRetention();
+    const retentionDays = retention.data?.days.video ?? null;
     const [running, setRunning] = useState(false);
     const [logsOpen, setLogsOpen] = useState(false);
     const [promptDialogOpen, setPromptDialogOpen] = useState(false);
@@ -115,8 +118,8 @@ export default function VideoPage() {
     }, [running, startedAt]);
 
     useEffect(() => {
-        void refreshLogs();
-    }, [token]);
+        void refreshLogs().catch(() => {});
+    }, [token, retention.dataUpdatedAt]);
 
     const addReferences = async (files?: FileList | File[] | null) => {
         const imageFiles = Array.from(files || []).filter((file) => file.type.startsWith("image/"));
@@ -293,12 +296,10 @@ export default function VideoPage() {
     const refreshLogs = async () => {
         if (!token) {
             setLogs([]);
-            setRetentionDays(null);
             return;
         }
         const data = await fetchGenerationHistories(token, { type: "video", pageSize: 100 });
         setLogs(data.items.map(historyToVideoLog));
-        setRetentionDays(data.retentionDays);
     };
 
     const previewGenerationLog = (log: GenerationLog) => {
@@ -319,7 +320,7 @@ export default function VideoPage() {
             <main className={studio.layout}>
                 <section className={studio.panels}>
                     <header className={studio.header}>
-                        <div><h1>视频创作台</h1><p>让画面拥有时间，让故事继续发生。</p></div>
+                        <h1>视频创作台</h1>
                         <div className={studio.headerActions}>
                             <Button type="text" icon={<Plus size={15} />} disabled={running} onClick={createSession}>新建</Button>
                             <div className={studio.historyActions}><Button type="text" icon={<History size={15} />} onClick={() => setLogsOpen(true)}>记录</Button></div>

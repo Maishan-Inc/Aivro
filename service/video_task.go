@@ -67,8 +67,9 @@ func completeVideoTask(ctx context.Context, user model.AuthUser, body []byte) ([
 		if err != nil { return nil, err }
 		status, err := readVideoTaskStatus(payload)
 		if err != nil { return nil, err }
+		RecordGenerationProviderProgress(ctx, payload)
 		if status.Status == "completed" { break }
-		if status.Status == "failed" || status.Status == "cancelled" || status.Status == "canceled" { return nil, safeMessageError{message: "视频生成失败"} }
+		if status.Status == "failed" || status.Status == "cancelled" || status.Status == "canceled" { RecordGenerationTaskDiagnostic(ctx, status.Error.Message); return nil, safeMessageError{message: "视频生成失败"} }
 		select {
 		case <-ctx.Done(): return nil, ctx.Err()
 		case <-ticker.C:
@@ -91,6 +92,8 @@ func getVideoResponse(ctx context.Context, channel model.ModelChannel, path stri
 	response, err := AIHTTPClientForContext(ctx).Do(request)
 	if err != nil { return nil, err }
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		payload, _ := readLimited(response.Body, 1<<20, "视频响应过大")
+		RecordGenerationTaskDiagnostic(ctx, string(payload))
 		_ = response.Body.Close()
 		return nil, safeMessageError{message: "视频接口请求失败"}
 	}

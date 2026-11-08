@@ -1,5 +1,25 @@
 // Generated translations. Source strings are Simplified Chinese (zh-CN).
 const enUS = {
+    "宽高不能超过模型配置的分辨率上限": "Width and height cannot exceed the model's configured resolution limit",
+    "请使用有效的像素尺寸": "Enter valid pixel dimensions",
+    "宽度和高度均不能超过 {0} 像素。": "Width and height must each be at most {0} pixels.",
+    "宽度": "Width",
+    "高度": "Height",
+    "生成接口未返回可用结果": "The generation API returned no usable results",
+
+    "工作流生成文件保存 {0} 天，具体到期时间见节点信息": "Workflow generated files are kept for {0} days. See node info for expiration.",
+    "服务器到期时间": "Server expiration",
+
+    "快捷导航": "Quick navigation",
+    "特惠": "Special offer",
+    "新上": "New",
+    "热门": "Popular",
+    "高速": "Fast",
+    "高清": "HD",
+    "筛选模型厂商": "Filter model vendors",
+    "阿里巴巴": "Alibaba",
+    "智谱 AI": "Zhipu AI",
+    "造好物": "Zaohao",
     "素材包超过大小或数量限制": "The asset package exceeds the size or item limit.",
     "素材包格式无效": "The asset package format is invalid.",
     "工单服务": "Support tickets",

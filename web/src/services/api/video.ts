@@ -22,7 +22,7 @@ function aiApiUrl(_config: AiConfig, path: string) {
 
 function aiHeaders(_config: AiConfig) {
     const token = useUserStore.getState().token;
-    return authHeader(token);
+    return { ...authHeader(token), ...(_config.generationSource ? { "X-Aivro-Section": _config.generationSource } : {}) };
 }
 
 function refreshRemoteUser(_config: AiConfig) {

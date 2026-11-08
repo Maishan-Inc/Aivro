@@ -29,7 +29,7 @@ func generationSection(path string) model.UserSection {
 }
 
 func SaveUserSections(id string, sections []model.UserSection) (model.User, error) {
-	valid := []model.UserSection{model.UserSectionWorkflow, model.UserSectionImage, model.UserSectionVideo, model.UserSectionModel3D, model.UserSectionShares, model.UserSectionCommunity}
+	valid := []model.UserSection{model.UserSectionWorkflow, model.UserSectionImage, model.UserSectionVideo, model.UserSectionModel3D, model.UserSectionShares, model.UserSectionCommunity, model.UserSectionFreeImage, model.UserSectionPromptReverse}
 	for _, section := range sections {
 		if !slices.Contains(valid, section) {
 			return model.User{}, safeMessageError{message: "区块权限无效"}

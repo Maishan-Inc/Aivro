@@ -18,6 +18,8 @@ import { previewMailTemplate, type AdminMailPreview } from "@/services/api/admin
 import { localeLabels, type Locale } from "@/i18n/messages";
 import { locales } from "@/i18n/routing";
 import { OrderedModelSelect } from "./components/ordered-model-select";
+import { useConfirmModelPricing } from "@/hooks/use-confirm-model-pricing";
+import { imageResolutionOptions, videoResolutionOptions } from "@/lib/model-resolutions";
 
 const CodeMirror = dynamic(() => import("@uiw/react-codemirror"), { ssr: false });
 const model3DAdapterOptions = [
@@ -135,6 +137,7 @@ We may update these terms for feature and compliance reasons. Updated content wi
 
 const emptySettings: AdminSettings = {
     public: {
+        explore: { freeImageEnabled: false, promptReverseEnabled: false },
         home: defaultHomeSettings,
         modelChannel: {
             availableModels: [],
@@ -209,6 +212,7 @@ const emptySettings: AdminSettings = {
         aiQueue: { enabled: true, backend: "database", redisUrl: "", defaultPerMinute: 50, modelPerMinute: [], maxQueuedPerUser: 20, taskRetentionHours: 24 },
         aiTimeouts: { imageMinutes: 10, videoMinutes: 15, model3DMinutes: 30, textMinutes: 5 },
         canvasAssist: { historyRetentionDays: 7 },
+        promptReverse: { systemPrompt: "" },
         captcha: { enabled: false, provider: "turnstile", turnstile: { siteKey: "", secretKey: "" }, hcaptcha: { siteKey: "", secretKey: "" } },
         turnstile: { enabled: false, siteKey: "", secretKey: "" },
         auth: {
@@ -273,7 +277,7 @@ const emptyChannel: AdminModelChannel = { protocol: "openai", name: "", color: "
 
 type SettingsTabKey = "model" | "public" | "runtime" | "private" | "mail" | "thirdParty" | "cloudStorage" | "billingKyc" | "pages";
 type EditorMode = "visual" | "json";
-type ModelConfigTabKey = "publicModels" | "channels";
+type ModelConfigTabKey = "publicModels" | "channels" | "info";
 type ModelSelectTabKey = "new" | "current";
 type MailTemplateKey = "register" | "reset" | "metamask";
 type AuthProviderEditorState = { type: "oauth"; providerKey: "linuxDo" | "google" | "github" } | { type: "metamask" } | { type: "custom"; index: number };
@@ -290,6 +294,8 @@ export default function AdminSettingsPage() {
     const [editorMode, setEditorMode] = useState<Record<string, EditorMode>>({ public: "visual", private: "visual" });
     const [jsonText, setJsonText] = useState<Record<string, string>>({ public: "", private: "" });
     const [channels, setChannels] = useState<AdminModelChannel[]>([]);
+    const confirmPricing = useConfirmModelPricing();
+    const savedSettingsRef = useRef<AdminSettings | null>(null);
     const [channelForm] = Form.useForm<AdminModelChannel>();
     const [editingChannelIndex, setEditingChannelIndex] = useState<number | null>(null);
     const [isChannelDrawerOpen, setIsChannelDrawerOpen] = useState(false);
@@ -323,6 +329,11 @@ export default function AdminSettingsPage() {
     const [currentOrigin, setCurrentOrigin] = useState("");
     const [knownModels, setKnownModels] = useState<string[]>([]);
     const publicModels = Form.useWatch(["public", "modelChannel", "availableModels"], form) || [];
+    const modelCosts: AdminModelCost[] = Form.useWatch(["public", "modelChannel", "modelCosts"], { form, preserve: true }) || [];
+    const modelInfoRows = useMemo(() => {
+        const mappings = channels.flatMap((channel) => channel.modelMappings);
+        return modelCosts.map((item, index) => ({ ...item, _index: index, capability: mappings.find((mapping) => mapping.id === item.modelId)?.capability })).filter((item) => item.capability === "image" || item.capability === "video");
+    }, [channels, modelCosts]);
     const customAuthProviders = Form.useWatch(["private", "auth", "customProviders"], { form, preserve: true }) || [];
     const channelModels = useMemo(() => collectChannelModels(channels), [channels]);
     const channelColorByModel = useMemo(() => collectChannelModelColors(channels), [channels]);
@@ -358,7 +369,9 @@ export default function AdminSettingsPage() {
         setIsSaving(true);
         setSaveHint("保存中");
         try {
+            if (!await confirmPricing(values, savedSettingsRef.current?.public.modelChannel.availableModels)) { setSaveHint("有修改未保存"); return; }
             const saved = normalizeSettings(await saveAdminSettings(token, values));
+            savedSettingsRef.current = saved;
             const merged = mergeSavedSecrets(values, saved);
             form.setFieldsValue(merged);
             setChannels(merged.private.channels);
@@ -376,7 +389,7 @@ export default function AdminSettingsPage() {
         } finally {
             setIsSaving(false);
         }
-    }, [editorMode, form, message, token]);
+    }, [confirmPricing, editorMode, form, message, token]);
 
     const saveTimeouts = useCallback(async () => {
         if (!token || !settingsLoadedRef.current) return;
@@ -425,6 +438,7 @@ export default function AdminSettingsPage() {
         setIsLoading(true);
         try {
             const data = normalizeSettings(await fetchAdminSettings(token));
+            savedSettingsRef.current = data;
             form.setFieldsValue(data);
             setChannels(data.private.channels);
             setKnownModels(collectKnownModels(data));
@@ -591,8 +605,7 @@ export default function AdminSettingsPage() {
         const nextChannels = [...channels];
         if (editingChannelIndex === null) nextChannels.push(channel);
         else nextChannels[editingChannelIndex] = channel;
-        await persistChannels(nextChannels);
-        closeChannelDrawer();
+        if (await persistChannels(nextChannels)) closeChannelDrawer();
     };
 
     const fetchChannelModelList = async () => {
@@ -736,7 +749,7 @@ export default function AdminSettingsPage() {
     const testModels = (testChannel?.models || []).filter((model) => model.toLowerCase().includes(testKeyword.trim().toLowerCase()));
 
     async function persistChannels(nextChannels: AdminModelChannel[]) {
-        if (!token) return;
+        if (!token) return false;
         const values = normalizeSettings(form.getFieldsValue(true) as AdminSettings);
         const nextChannelModels = collectChannelModels(nextChannels);
         const availableModels = filterModels(values.public.modelChannel.availableModels, nextChannelModels);
@@ -747,7 +760,9 @@ export default function AdminSettingsPage() {
             public: { ...values.public, modelChannel: { ...modelChannel, modelCosts } },
             private: { ...values.private, channels: nextChannels },
         });
+        if (!await confirmPricing(nextSettings, savedSettingsRef.current?.public.modelChannel.availableModels)) return false;
         const saved = normalizeSettings(await saveAdminSettings(token, nextSettings));
+        savedSettingsRef.current = saved;
         const merged = mergeSavedSecrets(nextSettings, saved);
         setChannels(merged.private.channels);
         rememberKnownModels(merged);
@@ -757,6 +772,7 @@ export default function AdminSettingsPage() {
             private: JSON.stringify(merged.private, null, 2),
         });
         message.success("已保存");
+        return true;
     }
 
     return (
@@ -843,8 +859,12 @@ export default function AdminSettingsPage() {
                                             <Card size="small" extra={sectionSaveButton()}>
                                                 <Row gutter={16}>
                                                     <Col span={24}>
-                                                        <Form.Item name={["public", "modelChannel", "availableModels"]} label="系统可用模型" extra="可选项来自已启用渠道中的前台模型名。使用左右箭头调整展示顺序，最左侧的模型排在最上面并作为默认模型；各类型模型也按相同规则排序。">
-                                                            <OrderedModelSelect placeholder="请选择系统可用模型" options={channelModels.map((item) => ({ label: <ModelTag model={item} color={channelColorByModel[item]} />, value: item }))} />
+                                                        <Typography.Paragraph type="secondary">先在 <a href="/admin/model-pricing">模型定价</a> 设置价格并保存，再开放模型；在 <a href="/admin/model-tags">模型标签</a> 配置特惠、清晰度等展示标签。</Typography.Paragraph>
+                                                        <Form.Item name={["public", "modelChannel", "availableModels"]} label="系统可用模型" extra="拖拽模型标签或使用箭头调整顺序，最左侧模型排在最上面并作为默认模型；未设置价格的模型不能开放。">
+                                                            <OrderedModelSelect placeholder="请选择系统可用模型" options={channelModels.map((item) => {
+                                                                const configured = form.getFieldValue(["public", "modelChannel", "modelCosts"])?.find((cost: AdminModelCost) => cost.model === item)?.priceConfigured;
+                                                                return { label: <span><ModelTag model={item} color={channelColorByModel[item]} />{configured ? null : <span className="ml-1 text-xs">未设置价格</span>}</span>, value: item, disabled: !configured };
+                                                            })} />
                                                         </Form.Item>
                                                     </Col>
                                                     <Col xs={24} md={12}>
@@ -875,6 +895,20 @@ export default function AdminSettingsPage() {
                                                 </Row>
                                             </Card>
                                         ),
+                                    },
+                                    {
+                                        key: "info",
+                                        label: "信息扩充",
+                                        children: <Card size="small" extra={sectionSaveButton()}>
+                                            <Typography.Paragraph type="secondary">图片默认启用 1K、2K、4K，8K 默认关闭；视频沿用当前规格，2K 默认关闭。只启用模型实际支持的档位，手动宽高不得超过最高启用分辨率。</Typography.Paragraph>
+                                            <Table rowKey={(item) => item.modelId || item.model} dataSource={modelInfoRows} size="small" pagination={{ pageSize: 20 }} scroll={{ x: 760 }} columns={[
+                                                { title: "模型", dataIndex: "model", width: 260, render: (value: string) => <span data-i18n-skip>{value}</span> },
+                                                { title: "类型", dataIndex: "capability", width: 90, render: (value: string) => tr(value === "image" ? "图片" : "视频") },
+                                                { title: "支持的分辨率", render: (_, item) => <Form.Item name={["public", "modelChannel", "modelCosts", item._index, "resolutions"]} className="!mb-0">
+                                                    <Checkbox.Group options={(item.capability === "image" ? imageResolutionOptions : videoResolutionOptions).map((option) => ({ ...option, disabled: item.resolutions?.length === 1 && item.resolutions.includes(option.value) }))} />
+                                                </Form.Item> },
+                                            ]} />
+                                        </Card>,
                                     },
                                     {
                                         key: "channels",
@@ -1192,22 +1226,22 @@ export default function AdminSettingsPage() {
                                         </Form.Item>
                                     </Col>
                                     <Col xs={24} md={6}>
-                                        <Form.Item name={["private", "cloudStorage", "imageExpireDays"]} label={t("cloud.imageExpireDays")} extra={t("cloud.expire.extra")}>
+                                        <Form.Item name={["private", "cloudStorage", "imageExpireDays"]} label={t("cloud.imageExpireDays")} extra="这里只控制上传临时文件；生成文件的保存期限请在“记录保存”中按会员组和用户配置。">
                                             <InputNumber min={1} max={3650} precision={0} addonAfter="天" className="!w-full" />
                                         </Form.Item>
                                     </Col>
                                     <Col xs={24} md={6}>
-                                        <Form.Item name={["private", "cloudStorage", "videoExpireDays"]} label={t("cloud.videoExpireDays")} extra={t("cloud.expire.extra")}>
+                                        <Form.Item name={["private", "cloudStorage", "videoExpireDays"]} label={t("cloud.videoExpireDays")} extra="这里只控制上传临时文件；生成文件的保存期限请在“记录保存”中按会员组和用户配置。">
                                             <InputNumber min={1} max={3650} precision={0} addonAfter="天" className="!w-full" />
                                         </Form.Item>
                                     </Col>
                                     <Col xs={24} md={6}>
-                                        <Form.Item name={["private", "cloudStorage", "model3dExpireDays"]} label="3D 模型保存天数" extra={t("cloud.expire.extra")}>
+                                        <Form.Item name={["private", "cloudStorage", "model3dExpireDays"]} label="3D 模型保存天数" extra="这里只控制上传临时文件；生成文件的保存期限请在“记录保存”中按会员组和用户配置。">
                                             <InputNumber min={1} max={3650} precision={0} addonAfter="天" className="!w-full" />
                                         </Form.Item>
                                     </Col>
                                     <Col xs={24} md={6}>
-                                        <Form.Item name={["private", "cloudStorage", "autoCleanupEnabled"]} label={t("cloud.autoCleanup")} extra={t("cloud.autoCleanup.extra")} valuePropName="checked">
+                                        <Form.Item name={["private", "cloudStorage", "autoCleanupEnabled"]} label={t("cloud.autoCleanup")} extra="仅控制普通上传临时文件的清理；生成文件仍按记录保存规则自动删除。" valuePropName="checked">
                                             <Switch />
                                         </Form.Item>
                                     </Col>
@@ -1448,7 +1482,7 @@ export default function AdminSettingsPage() {
                                             </Form.Item>
                                         </Col>
                                         <Col xs={24} md={6}>
-                                            <Form.Item name={["private", "aiQueue", "taskRetentionHours"]} label="任务保留小时">
+                                            <Form.Item name={["private", "aiQueue", "taskRetentionHours"]} label="任务载荷保留小时" extra="仅控制原始请求与响应文件的保存时间，后台任务记录持续保留。">
                                                 <InputNumber min={1} style={{ width: "100%" }} />
                                             </Form.Item>
                                         </Col>
@@ -2226,6 +2260,7 @@ function normalizePublicSetting(setting: Partial<AdminSettings["public"]> = {}):
     const modelChannel = (setting.modelChannel || {}) as Partial<AdminSettings["public"]["modelChannel"]>;
     return {
         ...emptySettings.public,
+        explore: setting.explore || { freeImageEnabled: false, promptReverseEnabled: false },
         modelChannel: {
             ...emptySettings.public.modelChannel,
             availableModels: modelChannel.availableModels || [],
@@ -2370,6 +2405,7 @@ function normalizePrivateSetting(setting: Partial<AdminSettings["private"]> = {}
         canvasAssist: {
             historyRetentionDays: Math.max(1, Number(setting.canvasAssist?.historyRetentionDays) || 7),
         },
+        promptReverse: { systemPrompt: setting.promptReverse?.systemPrompt || "" },
         captcha: normalizedCaptcha,
         turnstile: {
             ...emptySettings.private.turnstile,

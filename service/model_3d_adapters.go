@@ -137,8 +137,9 @@ func model3DRequest(ctx context.Context, route ModelChannelRoute, method, path s
 		}
 		payload, readErr := readLimited(response.Body, 4<<20, "3D 接口响应过大")
 		_ = response.Body.Close()
-		if response.StatusCode < 200 || response.StatusCode >= 300 { return 0, SafeAIError(fmt.Sprintf("%s（HTTP %d）", failure, response.StatusCode)) }
+		if response.StatusCode < 200 || response.StatusCode >= 300 { RecordGenerationTaskDiagnostic(ctx, string(payload)); return 0, SafeAIError(fmt.Sprintf("%s（HTTP %d）", failure, response.StatusCode)) }
 		if readErr != nil { return 0, readErr }
+		RecordGenerationProviderProgress(ctx, payload)
 		if err := json.Unmarshal(payload, output); err != nil { return 0, SafeAIError("3D 接口返回格式错误") }
 		return delay, nil
 	}

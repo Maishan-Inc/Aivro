@@ -32,7 +32,7 @@ export function VideoSettingsPanel({ config: input, onConfigChange, theme, showT
             {groups.map((group) => <div key={group.key} className="space-y-2.5">
                 <div className="text-xs font-medium" style={{ color: theme.node.muted }}>{tr(group.title)}</div>
                 <div className="grid grid-cols-3 gap-2.5">
-                    {group.values.map((value) => <OptionPill key={value} selected={group.current === value} theme={theme} onClick={() => onConfigChange(group.key, value)}>{group.key === "videoSeconds" ? `${value}s` : value === "auto" ? tr("自动") : value}</OptionPill>)}
+                    {group.values.map((value) => <OptionPill key={value} selected={group.current === value} theme={theme} onClick={() => onConfigChange(group.key, value)}>{group.key === "videoSeconds" ? `${value}s` : group.key === "vquality" ? videoResolutionLabel(value) : value === "auto" ? tr("自动") : value}</OptionPill>)}
                 </div>
             </div>)}
             <div className="space-y-2.5">
@@ -48,7 +48,7 @@ export function VideoSettingsPanel({ config: input, onConfigChange, theme, showT
     </ImageSettingsTheme>;
 }
 
-export function videoResolutionLabel(value: string) { return videoResolution(value); }
+export function videoResolutionLabel(value: string) { const resolution = videoResolution(value); return resolution === "1440p" ? "2K (1440p)" : resolution === "4k" ? "4K" : resolution; }
 export function videoSizeLabel(value: string) { return value === "auto" ? "自动" : videoAspectRatio(value); }
 export function videoSecondsLabel(value: string) { return `${value || "6"}s`; }
 

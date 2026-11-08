@@ -34,7 +34,7 @@ const vendorCatalog: Array<{ vendor: string; icon: string; tokens: string[] }> =
     { vendor: "造好物", icon: "zaohao.jpeg", tokens: ["zaohao", "造好物"] },
     { vendor: "Midjourney", icon: "", tokens: ["midjourney", "mj-"] },
     { vendor: "Stability AI", icon: "", tokens: ["stable-diffusion", "sdxl", "stability"] },
-    { vendor: "阿里云", icon: "", tokens: ["qwen", "wanx", "tongyi", "通义"] },
+    { vendor: "阿里巴巴", icon: "alibaba.svg", tokens: ["qwen", "wan", "tongyi", "通义", "万相", "alibaba", "aliyun", "bailian"] },
     { vendor: "MiniMax", icon: "", tokens: ["minimax", "hailuo", "海螺"] },
     { vendor: "Runway", icon: "", tokens: ["runway", "gen-3", "gen-4"] },
     { vendor: "Luma", icon: "", tokens: ["luma", "dream-machine", "ray-2"] },
@@ -53,7 +53,7 @@ export function guessModelVendor(model: string) {
 }
 
 export function blankModelCost(model: string, modelId = ""): AdminModelCost {
-    return { modelId, model, credits: 0, billingType: "fixed", vendor: "", icon: "", planCredits: {}, apiCredits: 0, apiBilling: "fixed", apiMultiplier: defaultAPIMultiplier };
+    return { modelId, model, credits: 0, priceConfigured: false, freeConfirmed: false, tags: [], billingType: "fixed", vendor: "", icon: "", planCredits: {}, apiCredits: 0, apiBilling: "fixed", apiMultiplier: defaultAPIMultiplier };
 }
 
 // 统一补齐默认值：套餐价只保留大于 0 的档位，厂商和图标留空时按模型名自动识别。
@@ -74,6 +74,10 @@ export function normalizeModelCost(item: Partial<AdminModelCost>): AdminModelCos
         } : undefined,
         model: item.model || "",
         credits: Math.max(0, Math.floor(Number(item.credits) || 0)),
+        priceConfigured: Boolean(item.priceConfigured),
+        freeConfirmed: Boolean(item.freeConfirmed),
+        tags: Array.from(new Set(item.tags || [])),
+        resolutions: item.resolutions,
         billingType,
         vendor: (item.vendor || "").trim() || guessed.vendor,
         icon: (item.icon || "").trim() || guessed.icon,
@@ -116,7 +120,7 @@ export function syncModelCostsWithPublicModels(items: AdminModelCost[], publicMo
     const byID = new Map(items.filter((item) => item.modelId).map((item) => [item.modelId, item]));
     const byModel = new Map(items.map((item) => [item.model, item]));
     const seen = new Set<string>();
-    return filterModels(publicModels, collectChannelModels(channels))
+    return uniqueModels([...filterModels(publicModels, collectChannelModels(channels)), ...channels.flatMap((channel) => channel.models || [])])
         .map((model) => {
             const modelId = channelModelId(channels, model);
             const saved = (modelId && byID.get(modelId)) || byModel.get(model);
@@ -131,8 +135,7 @@ export function syncModelCostsWithPublicModels(items: AdminModelCost[], publicMo
 }
 
 export function channelModelId(channels: AdminModelChannel[], model: string) {
-    for (const channel of channels) {
-        if (!channel.enabled) continue;
+    for (const channel of [...channels.filter((item) => item.enabled), ...channels.filter((item) => !item.enabled)]) {
         const mapping = (channel.modelMappings || []).find((item) => item.name === model);
         if (mapping?.id) return mapping.id;
     }
@@ -141,6 +144,10 @@ export function channelModelId(channels: AdminModelChannel[], model: string) {
 
 export function modelCostKey(item: Pick<AdminModelCost, "modelId" | "model">) {
     return item.modelId || `model:${item.model}`;
+}
+
+export function hasFreeModelPrice(item: AdminModelCost) {
+    return item.credits === 0 || item.videoSecondPrice?.credits === 0;
 }
 
 export function collectChannelModels(channels: AdminModelChannel[]) {

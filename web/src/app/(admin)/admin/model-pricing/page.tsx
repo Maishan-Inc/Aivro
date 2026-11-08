@@ -9,16 +9,16 @@ import { ModelLogo } from "@/components/model-logo";
 import { ModelPricingTable } from "@/components/model-pricing-table";
 import { apiCostOf, billingUnit, capabilityOf, planPricingCodes, vendorIconOptions } from "@/lib/model-pricing";
 import type { AdminModelCost } from "@/services/api/admin";
-import { useAdminModelPricing } from "./use-admin-model-pricing";
+import { useAdminModelPricing } from "@/hooks/use-admin-model-pricing";
 
 export default function AdminModelPricingPage() {
     const { modal } = App.useApp();
     const { settings, rows, isLoading, isSaving, dirty, load, save, updateRow, updateAllRows } = useAdminModelPricing();
-    const isVideo = (item: AdminModelCost) => settings?.public.modelChannel.videoModels.includes(item.model);
+    const isVideo = (item: AdminModelCost) => settings?.private.channels.some((channel) => channel.enabled && channel.modelMappings.some((mapping) => mapping.name === item.model && mapping.capability === "video"));
     const [view, setView] = useState<"edit" | "preview">("edit");
     const [multiplier, setMultiplier] = useState(2);
     // 预览要显示模型类型，直接复用后台已保存的模型范围配置。
-    const previewRows = rows.map((item) => ({ ...item, capability: capabilityOf(item.model, settings?.public.modelChannel) }));
+    const previewRows = rows.filter((item) => settings?.public.modelChannel.availableModels.includes(item.model)).map((item) => ({ ...item, capability: capabilityOf(item.model, settings?.public.modelChannel) }));
 
     const changeMultiplier = (value: number) => {
         const next = Math.max(1, Math.floor(Number(value) || 1));
@@ -58,7 +58,7 @@ export default function AdminModelPricingPage() {
                 ) : (
                     <Card variant="borderless" title="计费配置" extra={<Typography.Text type={dirty ? "warning" : "secondary"}>{dirty ? "有修改未保存" : "已与后台同步"}</Typography.Text>}>
                         <Typography.Paragraph type="secondary" style={{ marginTop: 0 }}>
-                            只显示已开放到前台的模型。需要新增或移除模型，请先在「模型配置 · 开放给前台的模型」中调整；厂商图标留空时会按模型名自动识别。
+                            先为渠道模型设置标准价并保存，再在模型配置中开放给前台。零计费需要等待 5 秒再次确认；厂商图标留空时自动识别。
                         </Typography.Paragraph>
                         <Table<AdminModelCost>
                             rowKey={(item) => item.modelId || item.model}
@@ -92,7 +92,7 @@ export default function AdminModelPricingPage() {
                                     render: (value: string, item) => (
                                         <Space size={8}>
                                             <ModelLogo icon={item.icon} name={item.vendor || value} size={18} />
-                                            <Typography.Text strong>{value}</Typography.Text>
+                                            <div><Typography.Text strong data-i18n-skip>{value}</Typography.Text><div><Typography.Text type={item.priceConfigured ? "secondary" : "warning"} className="!text-xs">{!item.priceConfigured ? "未设置价格" : settings?.public.modelChannel.availableModels.includes(value) ? "已开放" : "未开放"}</Typography.Text></div></div>
                                         </Space>
                                     ),
                                 },
@@ -120,7 +120,7 @@ export default function AdminModelPricingPage() {
                                     dataIndex: "credits",
                                     width: 160,
                                     render: (_: unknown, item) => (
-                                        <InputNumber size="small" min={0} step={1} precision={0} className="!w-full" value={item.credits} addonAfter={billingUnit(item.billingType)} onChange={(value) => updateRow(item.modelId || item.model, { credits: Number(value) || 0 })} />
+                                        <InputNumber size="small" min={0} step={1} precision={0} className="!w-full" placeholder="设置价格" value={item.priceConfigured ? item.credits : undefined} addonAfter={billingUnit(item.billingType)} onChange={(value) => updateRow(item.modelId || item.model, { credits: Number(value) || 0, priceConfigured: value !== null })} />
                                     ),
                                 },
                                 ...planPricingCodes.map((code) => ({
@@ -160,7 +160,7 @@ export default function AdminModelPricingPage() {
                             ]}
                         />
                         <Typography.Paragraph type="secondary" style={{ marginBottom: 0, marginTop: 16 }}>
-                            {settings ? `当前前台开放 ${settings.public.modelChannel.availableModels.length} 个模型，共 ${rows.length} 条计费配置。` : "正在读取配置…"}
+                            {settings ? `当前前台开放 ${settings.public.modelChannel.availableModels.length} 个模型，共 ${rows.length} 条渠道模型配置。` : "正在读取配置…"}
                         </Typography.Paragraph>
                     </Card>
                 )}

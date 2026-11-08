@@ -12,7 +12,7 @@ import { FlowBackground } from "@/components/flow-background";
 import { ImagePromptComposer } from "@/components/image-prompt-composer";
 import { CookiePreferences } from "@/components/cookie-preferences";
 import { PromptLibraryImage } from "@/components/prompt-library-image";
-import { navigationTools } from "@/constant/navigation-tools";
+import { useNavigationTools } from "@/hooks/use-navigation-tools";
 import { defaultHomeSettings, homeSocialPlatforms } from "@/constant/home-settings";
 import { useI18n } from "@/hooks/use-i18n";
 import { useLocalizedPath } from "@/hooks/use-localized-path";
@@ -20,7 +20,7 @@ import { davidWuPromptSource, usePromptGallery } from "@/hooks/use-prompt-galler
 import { questions, toolDescriptions } from "./home-content";
 import { homeWordmarkPaths } from "./home-wordmark";
 import { useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
-import { useImageComposerStore } from "@/stores/use-image-composer-store";
+import { useHomeImageComposerStore } from "@/stores/use-image-composer-store";
 import { useUserStore } from "@/stores/use-user-store";
 import { useHomeScroll } from "./use-home-scroll";
 import { HomeModels } from "./home-models";
@@ -32,6 +32,7 @@ import styles from "./home.module.css";
 import { canAccessPath } from "@/lib/user-sections";
 
 export function HomeClientPage() {
+    const navigationTools = useNavigationTools();
     const router = useRouter();
     const { message } = App.useApp();
     const localizedPath = useLocalizedPath();
@@ -63,7 +64,7 @@ export function HomeClientPage() {
             return;
         }
         if (sending) return;
-        const { prompt, references } = useImageComposerStore.getState();
+        const { prompt, references } = useHomeImageComposerStore.getState();
         if (!prompt.trim()) return;
         if (!useConfigStore.getState().isAiConfigReady(config, config.imageModel || config.model)) {
             message.warning("管理员尚未配置可用模型，或配置仍在加载");
@@ -89,7 +90,7 @@ export function HomeClientPage() {
                 <div className={styles.heroCopy}>
                     <a href="#platform" className={styles.announcement}><span className={styles.liveDot} />一个空间，无限创作可能<ChevronRight size={14} /></a>
                     <h1>让想象成为作品</h1>
-                    <div className={styles.heroComposer}><ImagePromptComposer onSubmit={() => void startImage()} running={sending} /></div>
+                    <div className={styles.heroComposer}><ImagePromptComposer scope="home" onSubmit={() => void startImage()} running={sending} /></div>
                 </div>
             </section>
 
@@ -124,7 +125,7 @@ export function HomeClientPage() {
 
             <section className={styles.section} data-reveal>
                 <div className={styles.sectionHeading}><div><span className={styles.eyebrow}>06 / 创作工具箱</span><h2>各有所长<br />也彼此相连</h2></div><p>生成、整理、探索、复用。<br />为每一个想法，找到合适的工具。</p></div>
-                <div className={styles.toolGrid}>{navigationTools.filter((tool) => canAccessPath(user, "/" + tool.slug)).map((tool) => <Link key={tool.slug} href={tool.external ? tool.href + ("localeAware" in tool && tool.localeAware && locale === "zh-CN" ? "/zh-CN" : "") : localizedPath("/" + tool.slug)} target={tool.external ? "_blank" : undefined} rel={tool.external ? "noopener noreferrer" : undefined} className={styles.toolCard}><tool.icon size={30} strokeWidth={1.2} /><h3>{tool.label}<ArrowUpRight size={19} /></h3><p>{toolDescriptions[tool.slug]}</p><span>{tool.external ? "在独立站点打开" : "在工作空间中打开"}</span></Link>)}</div>
+                <div className={styles.toolGrid}>{navigationTools.map((tool) => <Link key={tool.slug} href={localizedPath("/" + tool.slug)} className={styles.toolCard}><tool.icon size={30} strokeWidth={1.2} /><h3>{tool.label}<ArrowUpRight size={19} /></h3><p>{toolDescriptions[tool.slug]}</p><span>在工作空间中打开</span></Link>)}</div>
             </section>
 
             <section className={styles.stepsSection} data-reveal><span className={styles.eyebrow}>07 / 现在，轮到你了</span><h2>从想法到作品<br className="sm:hidden" />就从这三步开始</h2><div className={styles.steps}>{[{ title: "找到一个起点", text: "一句描述、一张参考图，或图库里让你心动的画面。", href: "/prompts", link: "寻找灵感" }, { title: "选择你的表达", text: "打开图片、视频或 3D 工作台，把想象写下来。", href: "/image", link: "尝试生成" }, { title: "让创作继续", text: "保存作品，在画布中连接下一步，建立自己的工作流。", href: "/canvas", link: "打开画布" }].map((step, index) => <div key={step.title}><span className={styles.stepNumber}>0{index + 1}</span><h3>{step.title}</h3><p>{step.text}</p><Link href={localizedPath(step.href)} className={styles.textLink}>{step.link}<ArrowRight size={17} /></Link></div>)}</div></section>

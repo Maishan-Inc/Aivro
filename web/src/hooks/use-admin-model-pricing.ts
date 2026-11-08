@@ -6,12 +6,14 @@ import { App } from "antd";
 import { fetchAdminSettings, saveAdminSettings, type AdminModelCost, type AdminSettings } from "@/services/api/admin";
 import { syncModelCostsWithPublicModels } from "@/lib/model-pricing";
 import { useUserStore } from "@/stores/use-user-store";
+import { useConfirmModelPricing } from "@/hooks/use-confirm-model-pricing";
 
 // 模型定价页的数据读写。计费数据仍保存在 public.modelChannel.modelCosts，
 // 这里只负责把它和渠道模型、前台开放模型对齐后交给页面编辑。
 export function useAdminModelPricing() {
     const token = useUserStore((state) => state.token);
     const { message } = App.useApp();
+    const confirmPricing = useConfirmModelPricing();
     const [settings, setSettings] = useState<AdminSettings | null>(null);
     const [rows, setRows] = useState<AdminModelCost[]>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -43,7 +45,11 @@ export function useAdminModelPricing() {
     }, [load]);
 
     const updateRow = useCallback((key: string, patch: Partial<AdminModelCost>) => {
-        setRows((current) => current.map((item) => (item.modelId || item.model) === key ? { ...item, ...patch } : item));
+        setRows((current) => current.map((item) => (item.modelId || item.model) === key ? {
+            ...item, ...patch,
+            ...(patch.credits !== undefined ? { priceConfigured: patch.priceConfigured ?? true } : {}),
+            ...("credits" in patch || "videoSecondPrice" in patch ? { freeConfirmed: false } : {}),
+        } : item));
         setDirty(true);
     }, []);
 
@@ -57,10 +63,12 @@ export function useAdminModelPricing() {
         if (!token || !base) return;
         setIsSaving(true);
         try {
-            const saved = await saveAdminSettings(token, {
+            const next = {
                 ...base,
-                public: { ...base.public, modelChannel: { ...base.public.modelChannel, modelCosts: rows } },
-            });
+                public: { ...base.public, modelChannel: { ...base.public.modelChannel, modelCosts: rows.map((item) => ({ ...item })) } },
+            };
+            if (!await confirmPricing(next, base.public.modelChannel.availableModels)) return;
+            const saved = await saveAdminSettings(token, next);
             applySettings(saved);
             setDirty(false);
             message.success("已保存");
@@ -69,7 +77,7 @@ export function useAdminModelPricing() {
         } finally {
             setIsSaving(false);
         }
-    }, [applySettings, message, rows, token]);
+    }, [applySettings, confirmPricing, message, rows, token]);
 
     return { settings, rows, isLoading, isSaving, dirty, load, save, updateRow, updateAllRows };
 }

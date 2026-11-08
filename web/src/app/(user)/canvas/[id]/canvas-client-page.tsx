@@ -22,6 +22,7 @@ import { canvasThemes, type CanvasBackgroundMode } from "@/lib/canvas-theme";
 import { UserStatusActions } from "@/components/layout/user-status-actions";
 import { useWorkflowModals, workflowConfirmName } from "@/hooks/use-workflow-modals";
 import { useI18n } from "@/hooks/use-i18n";
+import { useGenerationRetention } from "@/hooks/use-generation-retention";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { useUserStore } from "@/stores/use-user-store";
@@ -242,7 +243,8 @@ export function InfiniteCanvasPage({ playback }: { playback?: CanvasPlayback } =
         initialSelectedNodes: new Map(),
     });
 
-    const effectiveConfig = useEffectiveConfig();
+    const baseConfig = useEffectiveConfig();
+    const effectiveConfig = useMemo(() => ({ ...baseConfig, generationSource: "workflow" as const }), [baseConfig]);
     const isAiConfigReady = useConfigStore((state) => state.isAiConfigReady);
     const addAsset = useAssetStore((state) => state.addAsset);
     const token = useUserStore((state) => state.token);
@@ -2126,10 +2128,10 @@ export function InfiniteCanvasPage({ playback }: { playback?: CanvasPlayback } =
                     runningNodeIdsRef.current.add(id);
                     setNodes((prev) => inPlace ? prev.map((node) => node.id === id ? resultNode : node) : [...prev, resultNode]);
                     if (!inPlace) setConnections((prev) => [...prev, { id: nanoid(), fromNodeId: nodeId, toNodeId: id }]);
-                    const result = playback ? await waitForPlayback(3400, playback.signal).then(() => ({ status: "completed", results: [playback.model3D!], error: "" })) : await requestModel3DGeneration(useUserStore.getState().token, input);
+                    const result = playback ? await waitForPlayback(3400, playback.signal).then(() => ({ status: "completed", results: [playback.model3D!], error: "" })) : await requestModel3DGeneration(useUserStore.getState().token, input, "workflow");
                     const asset = result.results[0];
                     if (result.status !== "completed" || !asset?.url) throw new Error(result.error || "生成失败");
-                    setNodes((prev) => prev.map((node) => node.id === id ? { ...node, metadata: { ...node.metadata, content: asset.url, storageKey: asset.storageKey, mimeType: asset.mimeType, bytes: asset.bytes, status: NODE_STATUS_SUCCESS } } : node.id === nodeId && markSourceStatus ? { ...node, metadata: { ...node.metadata, status: NODE_STATUS_SUCCESS } } : node));
+                    setNodes((prev) => prev.map((node) => node.id === id ? { ...node, metadata: { ...node.metadata, content: asset.url, storageKey: asset.storageKey, expiresAt: asset.expiresAt, mimeType: asset.mimeType, bytes: asset.bytes, status: NODE_STATUS_SUCCESS } } : node.id === nodeId && markSourceStatus ? { ...node, metadata: { ...node.metadata, status: NODE_STATUS_SUCCESS } } : node));
                     return;
                 }
 
@@ -2866,6 +2868,8 @@ function CanvasTopBar({
     onExpandAssistant: () => void;
 }) {
     const colorTheme = useThemeStore((state) => state.theme);
+    const retention = useGenerationRetention();
+    const { tr } = useI18n();
     const theme = canvasThemes[colorTheme];
     const titleRef = useRef<HTMLDivElement>(null);
     const accountRef = useRef<HTMLDivElement>(null);
@@ -2975,6 +2979,9 @@ function CanvasTopBar({
                     ) : null}
                 </div>
             </div>
+            {retention.data ? <div data-i18n-skip className="pointer-events-none absolute left-4 top-16 z-40 max-w-[calc(100vw-32px)] truncate text-xs opacity-50" style={{ color: theme.node.text }}>
+                {tr("工作流生成文件保存 {0} 天，具体到期时间见节点信息").replace("{0}", String(retention.data.days.workflow))}
+            </div> : null}
             {linked ? (
                 <div className="pointer-events-none absolute left-1/2 top-16 z-40 -translate-x-1/2 rounded-lg border px-3 py-2 text-xs shadow-sm backdrop-blur" style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.node.text }}>
                     该工作流来自分享，并设置为自动更新。原作者更新分享后，本工作流可能被覆盖。
@@ -3036,11 +3043,11 @@ function imageExtension(dataUrl: string) {
 }
 
 function imageMetadata(image: UploadedImage): CanvasNodeMetadata {
-    return { content: image.url, storageKey: image.storageKey, status: "success", naturalWidth: image.width, naturalHeight: image.height, bytes: image.bytes, mimeType: image.mimeType };
+    return { content: image.url, storageKey: image.storageKey, expiresAt: image.expiresAt, status: "success", naturalWidth: image.width, naturalHeight: image.height, bytes: image.bytes, mimeType: image.mimeType };
 }
 
 function videoMetadata(video: UploadedFile): CanvasNodeMetadata {
-    return { content: video.url, storageKey: video.storageKey, status: "success", queuePosition: undefined, errorDetails: undefined, naturalWidth: video.width, naturalHeight: video.height, bytes: video.bytes, mimeType: video.mimeType || "video/mp4" };
+    return { content: video.url, storageKey: video.storageKey, expiresAt: video.expiresAt, status: "success", queuePosition: undefined, errorDetails: undefined, naturalWidth: video.width, naturalHeight: video.height, bytes: video.bytes, mimeType: video.mimeType || "video/mp4" };
 }
 
 function buildImageGenerationMetadata(type: CanvasImageGenerationType, config: AiConfig, count: number, references: ReferenceImage[]): CanvasNodeMetadata {

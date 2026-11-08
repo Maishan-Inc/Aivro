@@ -6,15 +6,16 @@ import { App, Button, Dropdown, Input } from "antd";
 import { ArrowUp, BookOpen, ClipboardPaste, FolderPlus, Plus, Upload, X } from "lucide-react";
 import { nanoid } from "nanoid";
 import { StudioGenerationSettings } from "@/components/studio-generation-settings";
-import { useImageComposerStore } from "@/stores/use-image-composer-store";
+import { useHomeImageComposerStore, useImageComposerStore } from "@/stores/use-image-composer-store";
 import styles from "./image-prompt-composer.module.css";
 
 const PromptSelectDialog = dynamic(() => import("@/components/prompts/prompt-select-dialog").then((module) => module.PromptSelectDialog), { ssr: false });
 const AssetPickerModal = dynamic(() => import("@/app/(user)/canvas/components/asset-picker-modal").then((module) => module.AssetPickerModal), { ssr: false });
 
-export function ImagePromptComposer({ onSubmit, running = false }: { onSubmit: () => void; running?: boolean }) {
+export function ImagePromptComposer({ onSubmit, running = false, scope = "image" }: { onSubmit: () => void; running?: boolean; scope?: "home" | "image" }) {
     const { message } = App.useApp();
-    const { prompt, references, setPrompt, setReferences } = useImageComposerStore();
+    const useComposerStore = scope === "home" ? useHomeImageComposerStore : useImageComposerStore;
+    const { prompt, references, setPrompt, setReferences } = useComposerStore();
     const fileInput = useRef<HTMLInputElement>(null);
     const [focused, setFocused] = useState(false);
     const [dragging, setDragging] = useState(false);

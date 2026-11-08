@@ -8,6 +8,7 @@ export function getVideoCapabilities(model: string) {
 }
 
 export function videoResolution(value: string) {
+    if (value.toLowerCase() === "2k") return "1440p";
     if (value === "4k") return value;
     if (value === "low") return "480p";
     if (["", "auto", "high", "medium"].includes(value)) return "720p";

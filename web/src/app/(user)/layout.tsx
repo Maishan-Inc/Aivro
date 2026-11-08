@@ -9,7 +9,7 @@ import { stripLocalePath } from "@/i18n/routing";
 
 export default function UserLayout({ children }: { children: ReactNode }) {
     const cleanPathname = stripLocalePath(usePathname());
-    const workspacePath = ["/canvas", "/image", "/video", "/model-3d", "/prompts", "/assets", "/asset-library", "/console"].includes(cleanPathname) || cleanPathname.startsWith("/console/");
+    const workspacePath = ["/canvas", "/image", "/video", "/model-3d", "/prompts", "/assets", "/asset-library", "/console", "/free-image", "/prompt-reverse"].includes(cleanPathname) || cleanPathname.startsWith("/console/");
     const immersivePath = cleanPathname === "/pricing" || cleanPathname.startsWith("/canvas/");
 
     if (workspacePath) return <div className="h-dvh overflow-hidden"><ConsoleShell>{children}</ConsoleShell></div>;

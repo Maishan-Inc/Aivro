@@ -47,11 +47,11 @@ func SaveGenerationHistory(user model.AuthUser, input GenerationHistoryInput) (m
 		status = "成功"
 	}
 	if expiresAt == "" {
-		setting, _, err := CloudStorageEnabled()
+		retention, err := UserGenerationRetention(user.ID)
 		if err != nil {
 			return model.GenerationHistory{}, err
 		}
-		expiresAt = cloudExpiresAt(setting, historyCloudFileType(input.Type))
+		expiresAt = generationExpiresAt(retention.Days[string(input.Type)])
 	}
 	item := model.GenerationHistory{
 		ID:         newID("history"),
@@ -91,7 +91,7 @@ func ListGenerationHistories(user model.AuthUser, historyType model.GenerationHi
 		return model.GenerationHistoryList{}, err
 	}
 	types := []model.GenerationHistoryType{}
-	for _, kind := range []model.GenerationHistoryType{model.GenerationHistoryTypeImage, model.GenerationHistoryTypeVideo, model.GenerationHistoryTypeModel3D} {
+	for _, kind := range []model.GenerationHistoryType{model.GenerationHistoryTypeImage, model.GenerationHistoryTypeVideo, model.GenerationHistoryTypeModel3D, model.GenerationHistoryTypeFreeImage, model.GenerationHistoryTypePromptReverse} {
 		if (historyType == "" || historyType == kind) && CheckSectionAccess(user, model.UserSection(kind)) == nil {
 			types = append(types, kind)
 		}
@@ -105,11 +105,11 @@ func ListGenerationHistories(user model.AuthUser, historyType model.GenerationHi
 		return model.GenerationHistoryList{}, err
 	}
 	if historyType != "" {
-		setting, _, err := CloudStorageEnabled()
+		retention, err := UserGenerationRetention(user.ID)
 		if err != nil {
 			return model.GenerationHistoryList{}, err
 		}
-		items.RetentionDays = cloudRetentionDays(setting, historyCloudFileType(historyType))
+		items.RetentionDays = retention.Days[string(historyType)]
 	}
 	return items, nil
 }
@@ -188,6 +188,7 @@ func normalizeGenerationHistoryMedia(userID string, media []model.GenerationHist
 		file, ok := fileByID[id]
 		if !ok { continue }
 		if file.ExpiresAt != "" && file.ExpiresAt <= currentTime {
+			if file.Purpose == model.CloudFilePurposeGeneration { continue }
 			retained, err := repository.HasCloudFileReference(file.ID, "", currentTime)
 			if err != nil { return nil, "", err }
 			if !retained { continue }

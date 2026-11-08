@@ -52,6 +52,7 @@ export type CanvasNodeMetadata = {
     imageBatchExpanded?: boolean;
     inputOrder?: string[];
     storageKey?: string;
+    expiresAt?: string;
     mimeType?: string;
     bytes?: number;
     model3D?: Partial<Pick<import("@/services/api/model-3d").Model3DGenerationInput, "meshQuality" | "textureEnabled" | "pbrEnabled" | "targetFaceCount">>;

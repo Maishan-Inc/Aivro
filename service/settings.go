@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/basketikun/aivro/config"
 	"github.com/basketikun/aivro/model"
@@ -24,6 +25,18 @@ func PublicSettings() (model.PublicSetting, error) {
 	settings.Public.Auth.CustomProviders = publicCustomAuthProviders(settings.Private.Auth.CustomProviders)
 	syncMetaMaskSignatureSetting(&settings)
 	syncPublicCaptchaSetting(&settings)
+	prices := make([]model.ModelCost, 0, len(settings.Public.ModelChannel.AvailableModels))
+	var campaign *model.FreeImageCampaign
+	if settings.Public.Explore.FreeImageEnabled {
+		campaign, err = repository.ActiveFreeImageCampaign(time.Now().UTC().Format(time.RFC3339))
+		if err != nil { return model.PublicSetting{}, err }
+	}
+	for _, item := range settings.Public.ModelChannel.ModelCosts {
+		item.FreeUntil = ""
+		if campaign != nil && containsModel(campaign.Models, item.Model) && containsModel(settings.Public.ModelChannel.ImageModels, item.Model) { item.FreeUntil = campaign.EndsAt }
+		if containsModel(settings.Public.ModelChannel.AvailableModels, item.Model) { prices = append(prices, item) }
+	}
+	settings.Public.ModelChannel.ModelCosts = prices
 	return settings.Public, nil
 }
 
@@ -58,6 +71,15 @@ func SaveSettings(settings model.Settings) (model.Settings, error) {
 		return model.Settings{}, err
 	}
 	settings = normalizeSettings(settings)
+	if err := validatePublicModelPricing(settings.Public.ModelChannel); err != nil { return model.Settings{}, err }
+	for _, channel := range settings.Private.Channels {
+		for _, mapping := range channel.ModelMappings {
+			if mapping.Capability != "image" && mapping.Capability != "video" { continue }
+			for _, cost := range settings.Public.ModelChannel.ModelCosts {
+				if cost.Model == mapping.Name && len(cost.Resolutions) == 0 { return model.Settings{}, SafeAIError("图片和视频模型至少需要启用一个分辨率档位") }
+			}
+		}
+	}
 	if err := validateHomeSetting(settings.Public.Home); err != nil {
 		return model.Settings{}, err
 	}
@@ -230,7 +252,7 @@ func normalizePublicSettingWithChannels(setting model.PublicSetting, channels []
 			if caps, err := videoCapabilities(routes[0]); err == nil { setting.ModelChannel.VideoCapabilities[name] = caps }
 		}
 	}
-	setting.ModelChannel.TextModels = normalizeScopedModels(setting.ModelChannel.TextModels, setting.ModelChannel.AvailableModels, collectChannelModelNamesByCapability(channels, "text"))
+	setting.ModelChannel.TextModels = orderedCapabilityModels(setting.ModelChannel.TextModels, setting.ModelChannel.AvailableModels, collectChannelModelNamesByCapability(channels, "text"))
 	model3DModels := orderedCapabilityModels(setting.ModelChannel.Model3DModels, setting.ModelChannel.AvailableModels, collectChannelModelNamesByCapability(channels, "model3d"))
 	setting.ModelChannel.Model3DModels = model3DModels
 	setting.ModelChannel.Model3DAdapters = map[string]string{}
@@ -244,7 +266,12 @@ func normalizePublicSettingWithChannels(setting model.PublicSetting, channels []
 	if setting.ModelChannel.ModelCosts == nil {
 		setting.ModelChannel.ModelCosts = []model.ModelCost{}
 	}
-	setting.ModelChannel.ModelCosts = normalizeModelCosts(setting.ModelChannel.ModelCosts, setting.ModelChannel.AvailableModels, channels)
+	pricingModels := append([]string{}, setting.ModelChannel.AvailableModels...)
+	for _, channel := range channels { for _, item := range channel.ModelMappings { pricingModels = append(pricingModels, item.Name) } }
+	setting.ModelChannel.ModelCosts = normalizeModelCosts(setting.ModelChannel.ModelCosts, uniqueNonEmptyStrings(pricingModels), channels)
+	for _, cost := range setting.ModelChannel.ModelCosts {
+		if caps, ok := setting.ModelChannel.VideoCapabilities[cost.Model]; ok { caps.Resolutions = cost.Resolutions; setting.ModelChannel.VideoCapabilities[cost.Model] = caps }
+	}
 	setting.ModelChannel.DefaultImageModel = defaultScopedModel(setting.ModelChannel.ImageModels)
 	setting.ModelChannel.DefaultVideoModel = defaultScopedModel(setting.ModelChannel.VideoModels)
 	setting.ModelChannel.DefaultTextModel = defaultScopedModel(setting.ModelChannel.TextModels)
@@ -472,6 +499,7 @@ func ModelBilling(modelName string) (model.ModelCost, error) {
 	}
 	modelID := modelIDForName(settings.Private.Channels, modelName)
 	for _, item := range settings.Public.ModelChannel.ModelCosts {
+		if !item.PriceConfigured || (hasFreeModelPrice(item) && !item.FreeConfirmed) { continue }
 		if modelID != "" && item.ModelID == modelID {
 			item.Model = modelName
 			return item, nil
@@ -523,6 +551,7 @@ func normalizePrivateSetting(setting model.PrivateSetting) model.PrivateSetting 
 	setting.AIQueue = normalizeAIQueueSetting(setting.AIQueue)
 	setting.AITimeouts = normalizeAITimeouts(setting.AITimeouts)
 	setting.CanvasAssist = normalizeCanvasAssistSetting(setting.CanvasAssist)
+	setting.PromptReverse.SystemPrompt = firstNonEmpty(strings.TrimSpace(setting.PromptReverse.SystemPrompt), defaultReversePrompt)
 	setting.Turnstile = normalizeTurnstileSetting(setting.Turnstile)
 	setting.Captcha = normalizeCaptchaSetting(setting.Captcha, setting.Turnstile)
 	setting.Auth = normalizePrivateAuthSetting(setting.Auth)
@@ -1111,7 +1140,8 @@ func normalizeModelCosts(items []model.ModelCost, availableModels []string, chan
 			byName[item.Model] = item
 		}
 	}
-	videoModels := collectChannelModelNamesByCapability(channels, "video")
+	videoModels := []string{}
+	for _, channel := range channels { for _, item := range channel.ModelMappings { if item.Capability == "video" { videoModels = append(videoModels, item.Name) } } }
 	result := make([]model.ModelCost, 0, len(availableModels))
 	seenIDs := map[string]bool{}
 	for _, modelName := range availableModels {
@@ -1120,9 +1150,12 @@ func normalizeModelCosts(items []model.ModelCost, availableModels []string, chan
 			continue
 		}
 		modelID := modelIDForName(channels, modelName)
+		if modelID == "" {
+			for _, channel := range channels { for _, mapping := range channel.ModelMappings { if mapping.Name == modelName { modelID = mapping.ID; break } }; if modelID != "" { break } }
+		}
 		item, configured := byID[modelID]
 		if !configured { item, configured = byName[modelName] }
-		if !configured { continue }
+		if !configured { item = model.ModelCost{} }
 		item.ModelID = modelID
 		item.Model = modelName
 		if item.BillingType != "token" {
@@ -1132,6 +1165,7 @@ func normalizeModelCosts(items []model.ModelCost, availableModels []string, chan
 			item.Credits = 0
 		}
 		item = normalizeModelCostPricing(item)
+		for _, channel := range channels { for _, mapping := range channel.ModelMappings { if mapping.ID == modelID && mapping.Name == modelName { item = normalizeModelResolutions(item, mapping) } } }
 		if containsModel(videoModels, modelName) {
 			item.BillingType, item.APIBilling = model.BillingTypeFixed, model.BillingTypeFixed
 		} else { item.VideoSecondPrice = nil }

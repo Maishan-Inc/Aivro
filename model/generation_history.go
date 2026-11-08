@@ -6,6 +6,8 @@ const (
 	GenerationHistoryTypeImage   GenerationHistoryType = "image"
 	GenerationHistoryTypeVideo   GenerationHistoryType = "video"
 	GenerationHistoryTypeModel3D GenerationHistoryType = "model3d"
+	GenerationHistoryTypeFreeImage GenerationHistoryType = "free-image"
+	GenerationHistoryTypePromptReverse GenerationHistoryType = "prompt-reverse"
 )
 
 type GenerationHistoryMedia struct {
@@ -29,6 +31,10 @@ type GenerationHistoryReference struct {
 
 // GenerationHistory 记录用户生成历史。媒体文件生命周期跟随关联的 cloud_files。
 type GenerationHistory struct {
+	PublishedAssetID string `json:"publishedAssetId,omitempty"`
+	RewardCredits int `json:"rewardCredits,omitempty"`
+	Result map[string]any `json:"result,omitempty" gorm:"serializer:json"`
+	CampaignID string `json:"campaignId,omitempty" gorm:"index"`
 	ID         string                       `json:"id" gorm:"primaryKey"`
 	UserID     string                       `json:"userId" gorm:"index"`
 	Type       GenerationHistoryType        `json:"type" gorm:"index"`
