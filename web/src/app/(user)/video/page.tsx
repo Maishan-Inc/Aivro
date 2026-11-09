@@ -362,6 +362,9 @@ export default function VideoPage() {
                             </div>
                             <div className={composer.controls}><div><div className={composer.toolbar} inert={!composerExpanded}>
                                 <div className={composer.toolbarRow}>
+                                <StudioGenerationSettings kind="video" part="model" onModelOpenChange={setModelOpen} />
+                                </div>
+                                <div className={composer.toolbarRow}>
                                 <Dropdown trigger={["click"]} placement="topLeft" disabled={running} menu={{ items: [
                                     { key: "upload", icon: <Upload size={15} />, label: "上传参考图" },
                                     { key: "clipboard", icon: <ClipboardPaste size={15} />, label: "读取剪切板图片" },
@@ -373,11 +376,10 @@ export default function VideoPage() {
                                     if (key === "assets") setAssetPickerOpen(true);
                                     if (key === "prompts") setPromptDialogOpen(true);
                                 } }}>
-                                    <Button type="text" shape="circle" icon={<Plus size={19} />} aria-label="添加参考图或选择灵感" />
+                                    <Button className={composer.upload} type="text" shape="circle" icon={<Plus size={19} />} aria-label="添加参考图或选择灵感" />
                                 </Dropdown>
-                                <StudioGenerationSettings kind="video" part="model" onModelOpenChange={setModelOpen} />
+                                <StudioGenerationSettings kind="video" part="settings" />
                                 </div>
-                                <div className={composer.toolbarRow}><StudioGenerationSettings kind="video" part="settings" /></div>
                             </div></div></div>
                             </div>
                                 <Button className={composer.send} type="primary" shape="circle" icon={<ArrowUp size={20} />} loading={running} disabled={!canGenerate || running} onClick={() => void generate()} aria-label="开始生成" title="开始生成" />

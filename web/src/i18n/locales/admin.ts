@@ -1,5 +1,8 @@
 // Admin-console-only strings (zh/en). These never render on the user-facing site.
 export const adminTranslations: Record<string, string> = {
+    "网站横幅": "Site banner",
+    "启用网站横幅": "Enable site banner",
+    "默认关闭，开启后显示在前台页面顶部。各语言文案独立保存，留空使用该语言的默认上线公告。": "Disabled by default. When enabled, the banner appears at the top of user-facing pages. Text is saved separately for each language; leave it blank to use that language's default launch announcement.",
     "信息扩充": "Additional information",
     "支持的分辨率": "Supported resolutions",
     "图片和视频模型至少需要启用一个分辨率档位": "Image and video models must have at least one resolution enabled",

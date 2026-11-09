@@ -1,5 +1,7 @@
 // Generated translations. Source strings are Simplified Chinese (zh-CN).
 const frFR = {
+    "网站公告": "Annonce du site",
+    "0DAY GPT-Image-2.6 模型系列已全量上线，尽情使用吧": "0DAY Tous les modèles GPT-Image-2.6 sont désormais disponibles. Profitez-en pour créer !",
     "宽高不能超过模型配置的分辨率上限": "La largeur et la hauteur ne peuvent pas dépasser la résolution maximale configurée pour le modèle",
     "请使用有效的像素尺寸": "Saisissez des dimensions valides en pixels",
     "宽度和高度均不能超过 {0} 像素。": "La largeur et la hauteur ne doivent pas dépasser {0} pixels chacune.",

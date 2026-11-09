@@ -78,6 +78,9 @@ export function ImagePromptComposer({ onSubmit, running = false, scope = "image"
                     </div>
                     <div className={styles.controls}><div><div className={styles.toolbar} inert={!expanded}>
                         <div className={styles.toolbarRow}>
+                            <StudioGenerationSettings kind="image" part="model" onModelOpenChange={setModelOpen} />
+                        </div>
+                        <div className={styles.toolbarRow}>
                             <Dropdown trigger={["click"]} placement="bottomLeft" disabled={running || reading} menu={{ items: [
                                 { key: "upload", icon: <Upload size={15} />, label: "添加参考图" },
                                 { key: "clipboard", icon: <ClipboardPaste size={15} />, label: "读取剪切板图片" },
@@ -88,10 +91,7 @@ export function ImagePromptComposer({ onSubmit, running = false, scope = "image"
                                 if (key === "clipboard") void pasteImages();
                                 if (key === "assets") setAssetsOpen(true);
                                 if (key === "prompts") setPromptsOpen(true);
-                            } }}><Button type="text" shape="circle" icon={<Plus size={19} />} aria-label="添加参考图或选择灵感" /></Dropdown>
-                            <StudioGenerationSettings kind="image" part="model" onModelOpenChange={setModelOpen} />
-                        </div>
-                        <div className={styles.toolbarRow}>
+                            } }}><Button className={styles.upload} type="text" shape="circle" icon={<Plus size={19} />} aria-label="添加参考图或选择灵感" /></Dropdown>
                             <StudioGenerationSettings kind="image" part="settings" />
                         </div>
                     </div></div></div>

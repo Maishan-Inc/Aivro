@@ -213,6 +213,7 @@ MetaMask 登录服务端签名挑战表。nonce 与钱包地址绑定，短时�
 
 `public.value` 常放前端展示和可公开读取的配置，例如模型列表、登录开关等。
 其中 `home` 保存首页视频开关 `videoEnabled`、视频地址 `videoUrl` 和 `socialLinks`；社交平台固定为 `x`、`facebook`、`discord`、`tiktok`、`bilibili`，分别保存 `enabled` 与 `url`。视频和社交入口默认开启，未填写社交地址时前台不可点击。
+`home.bannerEnabled` 保存网站横幅开关，默认 `false`；`home.bannerText` 按 `zh-CN`、`zh-TW`、`en-US`、`ja-JP`、`ko-KR`、`fr-FR` 保存独立文案，空字符串使用前台对应语言的默认公告。横幅设置与现有首页配置共用 `settings.public`，不新增表。
 `private.value` 常放渠道密钥、登录密钥、后台内部开关等。
 
 当前系统设置接口会按后端结构体序列化和反序列化已知字段；数据库 JSON 中额外存在的旧字段会被忽略。

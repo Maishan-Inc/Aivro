@@ -8,6 +8,8 @@ import { ArrowRight, BadgeCheck, Layers3, Sparkles } from "lucide-react";
 import { useI18n } from "@/hooks/use-i18n";
 import { useLocalizedPath } from "@/hooks/use-localized-path";
 import { fetchPlans, resolvePlanLocale, type Plan } from "@/services/api/billing";
+import { planCostOf } from "@/lib/model-pricing";
+import { useConfigStore } from "@/stores/use-config-store";
 import styles from "./pricing-cards.module.css";
 
 const planDefaults = [
@@ -18,23 +20,7 @@ const planDefaults = [
 ] as const;
 const featureIcons = [Sparkles, Layers3, BadgeCheck];
 
-// Model perks granted by each plan. Only these two models are discounted, and the
-// rates are display data until the backend can price per plan.
-const planPerks: Record<string, { model: string; credits: number; original: number }[]> = {
-    go: [{ model: "gpt-image-2.5-flare", credits: 2, original: 4 }],
-    plus: [
-        { model: "gpt-image-2.5-flare", credits: 2, original: 4 },
-        { model: "gpt-image-2.5-sunburst", credits: 3, original: 4 },
-    ],
-    pro: [
-        { model: "gpt-image-2.5-flare", credits: 1, original: 4 },
-        { model: "gpt-image-2.5-sunburst", credits: 2, original: 4 },
-    ],
-    max: [
-        { model: "gpt-image-2.5-flare", credits: 1, original: 4 },
-        { model: "gpt-image-2.5-sunburst", credits: 2, original: 4 },
-    ],
-};
+const featuredModels = ["gpt-image-2.6-sunburst", "gpt-image-2.5-sunburst", "gpt-image-2.5-flare"];
 
 // Inlined from public/icons/openai.svg so the mark inherits the card's ink colour.
 const gptLogoPath =
@@ -47,6 +33,11 @@ function GptLogo() {
 export function PricingCards({ onBuy, loadingPlanId = "", carousel = false }: { onBuy?: (plan: Plan) => void; loadingPlanId?: string; carousel?: boolean }) {
     const { locale, tr } = useI18n();
     const localizedPath = useLocalizedPath();
+    const modelCosts = useConfigStore((state) => state.publicSettings?.modelChannel.modelCosts);
+    const perks = featuredModels.flatMap((name) => {
+        const cost = modelCosts?.find((item) => item.model.toLowerCase() === name && item.priceConfigured && item.billingType === "fixed");
+        return cost ? [cost] : [];
+    });
     const { data = [], isPending, isError, refetch } = useQuery({ queryKey: ["plans"], queryFn: fetchPlans, staleTime: 60_000 });
     const plans = data.filter((plan) => plan.enabled).map((plan) => resolvePlanLocale(plan, locale));
     const number = new Intl.NumberFormat(locale, { maximumFractionDigits: 0 });
@@ -78,7 +69,6 @@ export function PricingCards({ onBuy, loadingPlanId = "", carousel = false }: { 
                     "图像、视频、3D 与创作工作流",
                 ] : ["图像、视频与 3D 创作", "连接灵感的创作工作流", "灵感图库与素材管理"];
                 const cta = <>{tr("升级至 {0}").replace("{0}", title)}<ArrowRight size={15} /></>;
-                const perks = planPerks[fallback.code] || [];
 
                 return <section key={fallback.code} className={styles.card} data-recommended={recommended}>
                     <div className={styles.cardTop}><h2>{title}</h2>{recommended ? <span className={styles.badge}>推荐</span> : null}</div>
@@ -93,7 +83,7 @@ export function PricingCards({ onBuy, loadingPlanId = "", carousel = false }: { 
                     {perks.length ? <div className={styles.perks}>
                         {perks.map((perk) => <div key={perk.model} className={styles.perk}>
                             <GptLogo />
-                            <span>{tr("享受 {0} {1} 算力点/张").replace("{0}", perk.model).replace("{1}", number.format(perk.credits))}</span>
+                            <span data-i18n-skip>{tr("享受 {0} {1} 算力点/张").replace("{0}", perk.model).replace("{1}", number.format(planCostOf(perk, fallback.code)))}</span>
                         </div>)}
                     </div> : null}
                     <span className={styles.cardFoot}>图像 · 视频 · 3D · 工作流</span>

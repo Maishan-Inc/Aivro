@@ -1,5 +1,7 @@
 // Generated translations. Source strings are Simplified Chinese (zh-CN).
 const zhTW = {
+    "网站公告": "網站公告",
+    "0DAY GPT-Image-2.6 模型系列已全量上线，尽情使用吧": "0DAY GPT-Image-2.6 模型系列已全面上線，盡情使用吧",
     "宽高不能超过模型配置的分辨率上限": "寬高不能超過模型設定的解析度上限",
     "请使用有效的像素尺寸": "請使用有效的像素尺寸",
     "宽度和高度均不能超过 {0} 像素。": "寬度和高度均不能超過 {0} 像素。",

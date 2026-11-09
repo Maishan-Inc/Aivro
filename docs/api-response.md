@@ -1,5 +1,7 @@
 # 前后端接口响应约定
 
+网站横幅沿用现有设置接口：`GET /api/settings` 在 `data.home` 中返回 `bannerEnabled`（默认 `false`）和 `bannerText`（六语言文案对象）；管理员通过现有 `POST /api/admin/settings` 保存 `public.home`。文案按语言分别保存并去除首尾空格，留空由前台显示该语言的默认公告，不改变统一 `{ code, data, msg }` 响应结构。
+
 内置工具继续使用统一 `{ code, data, msg }`：
 
 - `public.explore` 公开 `freeImageEnabled`、`promptReverseEnabled`，均默认 `false`；后台 `GET/POST /api/admin/explore-settings` 返回和保存这两个开关及 `systemPrompt`，提示词仅对管理员开放。

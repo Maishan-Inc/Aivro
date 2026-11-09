@@ -156,6 +156,8 @@ type PublicSetting struct {
 }
 
 type PublicHomeSetting struct {
+	BannerEnabled bool                        `json:"bannerEnabled"`
+	BannerText    map[string]string           `json:"bannerText"`
 	VideoEnabled *bool                        `json:"videoEnabled"`
 	VideoURL     string                       `json:"videoUrl"`
 	SocialLinks  map[string]SocialLinkSetting `json:"socialLinks"`

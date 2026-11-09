@@ -413,10 +413,10 @@ export default function Model3DPage() {
                             </div>
                             <div className={composer.controls}><div><div className={composer.toolbar} inert={!composerExpanded}>
                                 <div className={composer.toolbarRow}>
-                                <Button type="text" shape="circle" icon={<Upload size={17} />} loading={uploading} disabled={generating} onClick={() => fileInputRef.current?.click()} aria-label="上传参考图" title="上传参考图" />
                                 <ModelPicker onOpenChange={setModelOpen} config={effectiveConfig} kind="model3d" model3D={generationOptions} models={effectiveConfig.model3DModels} value={model} onChange={(value) => updateConfig("model3DModel", value)} onMissingConfig={() => message.warning("管理员尚未配置可用3D模型")} />
                                 </div>
                                 <div className={composer.toolbarRow}>
+                                <Button className={composer.upload} type="text" shape="circle" icon={<Upload size={17} />} loading={uploading} disabled={generating} onClick={() => fileInputRef.current?.click()} aria-label="上传参考图" title="上传参考图" />
                                 <Dropdown trigger={["click"]} placement="topLeft" menu={{ selectable: true, selectedKeys: [generationMode], items: [
                                     { key: "text", label: "文字生成", disabled: !capabilities.modes.includes("text") }, { key: "image", label: "图片生成", disabled: !capabilities.modes.includes("image") }, { key: "multi_image", label: "多图生成", disabled: !capabilities.modes.includes("multi_image") },
                                 ], onClick: ({ key }) => setMode(key as typeof mode) }}>

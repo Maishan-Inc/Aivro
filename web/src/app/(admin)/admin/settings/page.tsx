@@ -12,11 +12,12 @@ import { fetchAdminSettings, fetchAuthProviderStats, fetchChannelModels, saveAdm
 import { useI18n } from "@/hooks/use-i18n";
 import { saveAdminAITimeouts, type AdminAITimeoutSettings } from "@/services/api/admin";
 import { useUserStore } from "@/stores/use-user-store";
-import { defaultHomeSettings, homeSocialPlatforms } from "@/constant/home-settings";
+import { defaultBannerText, defaultHomeSettings, homeSocialPlatforms } from "@/constant/home-settings";
 import { collectChannelModelColors, collectChannelModels, filterModels, modelCostKey, normalizeModelCost, syncModelCostsWithPublicModels, uniqueModels } from "@/lib/model-pricing";
 import { previewMailTemplate, type AdminMailPreview } from "@/services/api/admin";
 import { localeLabels, type Locale } from "@/i18n/messages";
 import { locales } from "@/i18n/routing";
+import { translate } from "@/i18n/runtime-translations";
 import { OrderedModelSelect } from "./components/ordered-model-select";
 import { useConfirmModelPricing } from "@/hooks/use-confirm-model-pricing";
 import { imageResolutionOptions, videoResolutionOptions } from "@/lib/model-resolutions";
@@ -1000,6 +1001,15 @@ export default function AdminSettingsPage() {
                                         </Form.Item>
                                     </Col>
                                     <Col span={24}>
+                                        <Card size="small" title="网站横幅" extra={sectionSaveButton()} className="mb-4">
+                                            <Form.Item name={["public", "home", "bannerEnabled"]} label="启用网站横幅" valuePropName="checked"><Switch /></Form.Item>
+                                            <Typography.Paragraph type="secondary">默认关闭，开启后显示在前台页面顶部。各语言文案独立保存，留空使用该语言的默认上线公告。</Typography.Paragraph>
+                                            <Row gutter={16}>{locales.map((value) => <Col key={value} xs={24} md={12}>
+                                                <Form.Item name={["public", "home", "bannerText", value]} label={<span data-i18n-skip>{localeLabels[value]}</span>}>
+                                                    <Input data-i18n-skip placeholder={translate(defaultBannerText, value)} />
+                                                </Form.Item>
+                                            </Col>)}</Row>
+                                        </Card>
                                         <Card size="small" title="首页视频背景" extra={sectionSaveButton()} className="mb-4">
                                             <Typography.Paragraph type="secondary">视频静音循环播放并叠加灰色蒙层；关闭后首屏恢复流线动画。流线背景覆盖整个首页。</Typography.Paragraph>
                                             <Row gutter={16}>
@@ -2297,6 +2307,8 @@ function normalizePublicSetting(setting: Partial<AdminSettings["public"]> = {}):
         home: {
             ...defaultHomeSettings,
             ...setting.home,
+            bannerEnabled: setting.home?.bannerEnabled === true,
+            bannerText: setting.home?.bannerText || {},
             socialLinks: Object.fromEntries(homeSocialPlatforms.map(({ id }) => [id, { ...defaultHomeSettings.socialLinks[id], ...setting.home?.socialLinks?.[id] }])),
         },
         pageAccess: normalizePublicPageAccessSetting(setting.pageAccess),

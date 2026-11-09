@@ -364,6 +364,8 @@ export type AdminPublicCaptchaSettings = {
 };
 
 export type AdminPublicHomeSettings = {
+    bannerEnabled: boolean;
+    bannerText: Partial<Record<Locale, string>>;
     videoEnabled: boolean;
     videoUrl: string;
     socialLinks: Record<string, { enabled: boolean; url: string }>;

@@ -312,6 +312,11 @@ func normalizePublicSettingWithChannels(setting model.PublicSetting, channels []
 }
 
 func normalizeHomeSetting(setting model.PublicHomeSetting) model.PublicHomeSetting {
+	texts := make(map[string]string, 6)
+	for _, locale := range []string{"zh-CN", "zh-TW", "en-US", "ja-JP", "ko-KR", "fr-FR"} {
+		texts[locale] = strings.TrimSpace(setting.BannerText[locale])
+	}
+	setting.BannerText = texts
 	if setting.VideoEnabled == nil {
 		enabled := true
 		setting.VideoEnabled = &enabled
