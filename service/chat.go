@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -11,8 +12,17 @@ import (
 	"github.com/gin-contrib/sse"
 )
 
+type chatUsageContextKey struct{}
+type chatUsageCollection struct { UnitCredits int; Tokens int }
+
 // RequestChatCompletion shares reservation and usage settlement across chat entry points.
-func RequestChatCompletion(ctx context.Context, userID string, body []byte, modelName string, path string, meta RequestLogMeta, consume func(*http.Response) ([]byte, error)) ([]byte, error) {
+func RequestChatCompletion(ctx context.Context, userID string, body []byte, modelName string, path string, meta RequestLogMeta, consume func(*http.Response) ([]byte, error)) (resultBody []byte, requestErr error) {
+	collection, collecting := ctx.Value(chatUsageContextKey{}).(*chatUsageCollection)
+	if !collecting {
+		finish, err := beginLoggedAIRequest(userID, modelName, path, body, &meta)
+		if err != nil { return nil, err }
+		defer func() { finish(requestErr) }()
+	}
 	if err := ValidateModelRequest(modelName, "/chat/completions"); err != nil { return nil, err }
 	var payload map[string]any
 	if err := json.Unmarshal(body, &payload); err != nil { return nil, safeMessageError{message: "对话请求格式无效"} }
@@ -35,15 +45,18 @@ func RequestChatCompletion(ctx context.Context, userID string, body []byte, mode
 	billingBody := body
 	if path == "/prompt-reverse" { billingBody, _ = json.Marshal(meta.Parameters) }
 	if len(body) > 8<<20 { return nil, safeMessageError{message: "对话内容过大"} }
-	billing, err := RequestModelBilling(ctx, modelName)
+	billing := model.ModelCost{BillingType: model.BillingTypeToken}
+	var err error
+	if collecting { billing.Credits = collection.UnitCredits } else { billing, err = RequestModelBilling(ctx, modelName) }
 	if err != nil { return nil, err }
 	if path == "/prompt-reverse" && billing.BillingType != model.BillingTypeToken { return nil, SafeAIError("提示词反推需要按词元计费的文本模型") }
 	routes, err := SelectModelChannelRoutes(modelName)
 	if err != nil { return nil, err }
 	reserved := canvasAgentReserveCredits(billingBody, maxTokens, billing)
-	if err := ConsumeUserCreditsWithMeta(userID, modelName, reserved, path, meta); err != nil { return nil, err }
+	if collecting { reserved = 0 } else if err := ConsumeUserCreditsWithMeta(userID, modelName, reserved, path, meta); err != nil { return nil, err }
 	ctx, cancel := context.WithTimeout(ctx, AIRequestTimeoutForPath("/chat/completions"))
 	defer cancel()
+	lastError := "AI 对话请求失败"
 	for _, route := range ModelChannelRouteAttempts(routes) {
 		payload["model"] = route.UpstreamModel
 		requestBody, _ := json.Marshal(payload)
@@ -53,7 +66,7 @@ func RequestChatCompletion(ctx context.Context, userID string, body []byte, mode
 		request.Header.Set("Content-Type", "application/json")
 		response, err := AIHTTPClientForContext(ctx).Do(request)
 		if err != nil { continue }
-		if response.StatusCode < 200 || response.StatusCode >= 300 { _ = response.Body.Close(); continue }
+		if response.StatusCode < 200 || response.StatusCode >= 300 { lastError = fmt.Sprintf("AI 接口请求失败：%d", response.StatusCode); _ = response.Body.Close(); continue }
 		var result []byte
 		if consume == nil { result, err = readLimited(response.Body, 8<<20, "对话响应过大") } else { result, err = consume(response) }
 		_ = response.Body.Close()
@@ -66,12 +79,17 @@ func RequestChatCompletion(ctx context.Context, userID string, body []byte, mode
 			if err := RefundUserCreditsWithMeta(userID, modelName, reserved, path, meta); err != nil { return nil, err }
 			return nil, SafeAIError("模型未返回词元用量，本次反推未扣费")
 		}
+		if collecting {
+			collection.Tokens = usage.TotalTokens
+			if collection.Tokens <= 0 { collection.Tokens = firstPositive(usage.InputTokens, usage.PromptTokens) + firstPositive(usage.OutputTokens, usage.CompletionTokens) }
+			return result, err
+		}
 		_, billErr := billAIUsage(userID, modelName, billing, reserved, usage, billingBody, result, meta, path)
 		if billErr != nil { return nil, billErr }
 		return result, err
 	}
 	if err := RefundUserCreditsWithMeta(userID, modelName, reserved, path, meta); err != nil { return nil, err }
-	return nil, safeMessageError{message: "AI 对话请求失败"}
+	return nil, safeMessageError{message: lastError}
 }
 
 func chatResponseUsage(body []byte, contentType string) canvasAgentResponseUsage {

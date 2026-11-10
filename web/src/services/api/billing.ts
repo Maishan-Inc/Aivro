@@ -27,6 +27,7 @@ export type Plan = {
 };
 
 export type CreditLog = {
+    parameters?: { items?: import("./explore").PromptReverseItem[] };
     id: string;
     userId: string;
     category: string;

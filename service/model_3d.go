@@ -72,18 +72,6 @@ type Model3DGeneratedAsset struct {
 
 func CreateModel3DGeneration(ctx context.Context, user model.AuthUser, input Model3DGenerationInput, meta RequestLogMeta) (model.GenerationTaskSubmitResult, *AIProxyResponse, error) {
 	input = normalizeModel3DInput(input)
-	if err := validateModel3DInput(input); err != nil {
-		return model.GenerationTaskSubmitResult{}, nil, err
-	}
-	if err := ValidateModelRequest(input.Model, model3DPath); err != nil {
-		return model.GenerationTaskSubmitResult{}, nil, err
-	}
-	route, err := SelectModelChannelRoute(input.Model)
-	if err != nil { return model.GenerationTaskSubmitResult{}, nil, err }
-	caps := model3DCapabilities(route)
-	if input.TargetFaceCount <= 0 { input.TargetFaceCount = caps.DefaultFaces }
-	if route.Adapter == "" && input.TargetFaceCount > 1000000 { input.TargetFaceCount = 1000000 }
-	if err := validateModel3DAdapterInput(route, input); err != nil { return model.GenerationTaskSubmitResult{}, nil, err }
 	body, err := json.Marshal(input)
 	if err != nil { return model.GenerationTaskSubmitResult{}, nil, err }
 	return SubmitAITask(ctx, user, body, "application/json", input.Model, model3DPath, meta)

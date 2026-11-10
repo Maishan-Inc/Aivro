@@ -395,7 +395,7 @@ func requestCanvasAssistantAnswer(ctx context.Context, userID string, input Canv
 	return answer, modelName, nil
 }
 
-func requestCanvasAgentPlan(ctx context.Context, userID string, input CanvasAgentPlanInput, messages []CanvasAssistantMessage, meta RequestLogMeta) (canvasAgentPlanPayload, string, CanvasAgentUsage, error) {
+func requestCanvasAgentPlan(ctx context.Context, userID string, input CanvasAgentPlanInput, messages []CanvasAssistantMessage, meta RequestLogMeta) (planResult canvasAgentPlanPayload, resultModel string, resultUsage CanvasAgentUsage, requestErr error) {
 	ctx, cancel := context.WithTimeout(ctx, AIRequestTimeoutForPath("/chat/completions"))
 	defer cancel()
 	settings, err := repository.GetSettings()
@@ -406,15 +406,6 @@ func requestCanvasAgentPlan(ctx context.Context, userID string, input CanvasAgen
 	modelName := canvasAssistantModel(settings, input.Model)
 	if modelName == "" {
 		return canvasAgentPlanPayload{}, "", CanvasAgentUsage{}, safeMessageError{message: "管理员尚未配置默认对话模型"}
-	}
-	if err := ValidateModelRequest(modelName, "/chat/completions"); err != nil { return canvasAgentPlanPayload{}, "", CanvasAgentUsage{}, err }
-	routes, err := SelectModelChannelRoutes(modelName)
-	if err != nil {
-		return canvasAgentPlanPayload{}, "", CanvasAgentUsage{}, safeMessageError{message: "管理员尚未配置可用文本模型渠道"}
-	}
-	billing, err := ModelBilling(modelName)
-	if err != nil {
-		return canvasAgentPlanPayload{}, "", CanvasAgentUsage{}, err
 	}
 	messagesPayload := canvasAgentOpenAIMessages(input, messages)
 	body, _ := json.Marshal(map[string]any{
@@ -427,6 +418,19 @@ func requestCanvasAgentPlan(ctx context.Context, userID string, input CanvasAgen
 	if len(body) > canvasAgentModelRequestMaxBytes {
 		return canvasAgentPlanPayload{}, "", CanvasAgentUsage{}, safeMessageError{message: "画布上下文过大，请减少选中内容后重试"}
 	}
+	finish, err := beginLoggedAIRequest(userID, modelName, "/canvas-agent/plan", body, &meta)
+	if err != nil { return canvasAgentPlanPayload{}, "", CanvasAgentUsage{}, err }
+	defer func() { finish(requestErr) }()
+	if err := ValidateModelRequest(modelName, "/chat/completions"); err != nil { return canvasAgentPlanPayload{}, "", CanvasAgentUsage{}, err }
+	routes, err := SelectModelChannelRoutes(modelName)
+	if err != nil {
+		return canvasAgentPlanPayload{}, "", CanvasAgentUsage{}, safeMessageError{message: "管理员尚未配置可用文本模型渠道"}
+	}
+	billing, err := ModelBilling(modelName)
+	if err != nil {
+		return canvasAgentPlanPayload{}, "", CanvasAgentUsage{}, err
+	}
+
 	reservedCredits := canvasAgentReserveCredits(body, canvasAgentMaxOutputTokens, billing)
 	meta.Parameters, _ = ReadAIRequestParameters(body, "application/json")
 	if reservedCredits > 0 {

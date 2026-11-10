@@ -211,7 +211,7 @@ func New() *gin.Engine {
 	admin.DELETE("/users/:id", func(c *gin.Context) {
 		handler.AdminDeleteUser(c.Writer, c.Request, c.Param("id"))
 	})
-	admin.GET("/request-logs", gin.WrapF(handler.AdminCreditLogs))
+	admin.GET("/request-logs", gin.WrapF(handler.AdminGenerationTasks))
 	admin.GET("/generation-tasks", gin.WrapF(handler.AdminGenerationTasks))
 	admin.GET("/generation-tasks/:id", func(c *gin.Context) { handler.AdminGenerationTask(c.Writer, c.Request, c.Param("id")) })
 	admin.GET("/generation-tasks/:id/files/:fileId", func(c *gin.Context) { handler.AdminGenerationTaskFile(c.Writer, c.Request, c.Param("id"), c.Param("fileId")) })

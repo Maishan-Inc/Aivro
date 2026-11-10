@@ -21,7 +21,7 @@ func SaveGenerationTask(item model.GenerationTask) (model.GenerationTask, error)
 		result := tx.Model(&usage).Where("used < ?", item.QuotaLimit).Update("used", gorm.Expr("used + 1"))
 		if result.Error != nil { return result.Error }
 		if result.RowsAffected == 0 { return ErrFreeImageQuota }
-		return tx.Create(&item).Error
+		return tx.Save(&item).Error
 	})
 	return item, err
 }
@@ -51,7 +51,8 @@ func ListUserGenerationTasks(userID string, limit int) ([]model.GenerationTask, 
 		limit = 50
 	}
 	items := []model.GenerationTask{}
-	err = db.Omit("parameters", "error_detail", "response_header").Where("user_id = ?", userID).Order("created_at desc").Limit(limit).Find(&items).Error
+	recent := db.Model(&model.GenerationTask{}).Select("id").Where("user_id = ?", userID).Order("created_at desc, id desc").Limit(limit)
+	err = db.Omit("parameters", "error_detail", "response_header").Where("user_id = ? AND (status IN ? OR id IN (?))", userID, []model.GenerationTaskStatus{model.GenerationTaskSubmitting, model.GenerationTaskQueued, model.GenerationTaskExecuting}, db.Table("(?) AS recent_tasks", recent).Select("id")).Order("created_at desc, id desc").Find(&items).Error
 	return items, err
 }
 
@@ -162,12 +163,12 @@ func FinishGenerationTask(task model.GenerationTask, status model.GenerationTask
 		if task.CampaignID != "" && (status == model.GenerationTaskFailed || status == model.GenerationTaskCanceled) {
 			if err := tx.Model(&model.FreeImageUsage{}).Where("campaign_id = ? AND user_id = ? AND used > 0", task.CampaignID, task.UserID).Update("used", gorm.Expr("used - 1")).Error; err != nil { return err }
 		}
-		if refund == nil || refund.Amount == 0 { return nil }
+		if refund == nil || (refund.Amount == 0 && refund.Type == model.CreditLogTypeAIRefund) { return nil }
 		creditQuery := tx.Model(&model.User{}).Where("id = ?", task.UserID)
 		if refund.Amount < 0 { creditQuery = creditQuery.Where("credits >= ? AND status = ?", -refund.Amount, model.UserStatusActive) }
 		creditResult := creditQuery.Updates(map[string]any{"credits": gorm.Expr("credits + ?", refund.Amount), "updated_at": refund.CreatedAt})
 		if creditResult.Error != nil { return creditResult.Error }
-		if creditResult.RowsAffected == 0 { return errors.New("用户不存在或算力点不足") }
+		if creditResult.RowsAffected == 0 && refund.Amount != 0 { return errors.New("用户不存在或算力点不足") }
 		var user model.User
 		if err := tx.Where("id = ?", task.UserID).First(&user).Error; err != nil { return err }
 		refund.Balance = user.Credits
@@ -180,7 +181,7 @@ func ListExpiredExecutingTasks(now string) ([]model.GenerationTask, error) {
 	db, err := DB()
 	if err != nil { return nil, err }
 	items := []model.GenerationTask{}
-	err = db.Where("status = ? AND lease_expires_at != ? AND lease_expires_at <= ?", model.GenerationTaskExecuting, "", now).Limit(100).Find(&items).Error
+	err = db.Where("status IN ? AND lease_expires_at != ? AND lease_expires_at <= ?", []model.GenerationTaskStatus{model.GenerationTaskSubmitting, model.GenerationTaskExecuting}, "", now).Limit(100).Find(&items).Error
 	return items, err
 }
 
@@ -228,4 +229,12 @@ func DeleteGenerationTask(id string) error {
 		return err
 	}
 	return db.Delete(&model.GenerationTask{}, "id = ?", id).Error
+}
+
+func GenerationTaskChargedCredits(id string) (int, error) {
+	db, err := DB()
+	if err != nil { return 0, err }
+	var amount int
+	err = db.Model(&model.CreditLog{}).Where("related_id = ?", id).Select("COALESCE(SUM(amount), 0)").Scan(&amount).Error
+	return -amount, err
 }

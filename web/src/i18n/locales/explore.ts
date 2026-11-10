@@ -1,5 +1,20 @@
 // 内置工具的六语言文案；模型名、协议字段和用户内容保持原样。
 const rows: Record<string, string[]> = {
+    "提交中": ["提交中", "Submitting", "送信中", "제출 중", "Envoi en cours"],
+    "统一扣费": ["統一扣費", "Total charged", "一括請求", "통합 차감", "Total débité"],
+    "待统一扣费": ["待統一扣費", "Pending settlement", "一括精算待ち", "통합 정산 대기", "En attente de règlement"],
+    "反推任务统一扣费": ["反推任務統一扣費", "Prompt reconstruction batch charge", "プロンプト逆生成タスクの一括請求", "프롬프트 역추출 작업 통합 차감", "Débit groupé de reconstruction de prompts"],
+    "反推结算失败，请检查余额后重试": ["反推結算失敗，請檢查餘額後重試", "Reconstruction settlement failed. Check your balance and try again.", "逆生成の精算に失敗しました。残高を確認して再試行してください。", "역추출 정산에 실패했습니다. 잔액을 확인한 후 다시 시도하세요.", "Le règlement a échoué. Vérifiez votre solde et réessayez."],
+    "按上传顺序逐张请求，按实际 token 分别四舍五入，完成后合计统一扣费，失败图片不计费。": ["依上傳順序逐張請求，按實際 token 分別四捨五入，完成後合計統一扣費，失敗圖片不計費。", "Images are processed in upload order. Each image’s actual token cost is rounded separately, then charged together when the batch finishes. Failed images are not charged.", "アップロード順に1枚ずつ処理します。画像ごとの実際のトークン料金を四捨五入し、完了後に一括請求します。失敗した画像は課金されません。", "업로드 순서대로 이미지를 처리합니다. 각 이미지의 실제 토큰 비용을 반올림한 뒤 완료 시 합산하여 차감합니다. 실패한 이미지는 과금하지 않습니다.", "Les images sont traitées dans l’ordre d’importation. Le coût réel en tokens de chaque image est arrondi séparément, puis le total est débité à la fin. Les images en échec ne sont pas facturées."],
+    "{0} 点": ["{0} 點", "{0} credits", "{0}ポイント", "{0}포인트", "{0} crédits"],
+    "请求日志": ["請求日誌", "Request logs", "リクエストログ", "요청 로그", "Journaux des requêtes"],
+    "状态 / 进度": ["狀態 / 進度", "Status / progress", "状態 / 進捗", "상태 / 진행률", "État / progression"],
+    "任务报错": ["任務錯誤", "Task error", "タスクエラー", "작업 오류", "Erreur de tâche"],
+    "等待处理": ["等待處理", "Waiting", "処理待ち", "처리 대기", "En attente"],
+    "生成中": ["生成中", "Generating", "生成中", "생성 중", "Génération en cours"],
+    "队列位置 {0}": ["佇列位置 {0}", "Queue position {0}", "待機順位 {0}", "대기 순서 {0}", "Position dans la file : {0}"],
+    "已撤销": ["已撤銷", "Canceled", "取り消し済み", "취소됨", "Annulé"],
+
     "模型发布后第一时间接入，添加后 7 天自动消失": ["模型發布後第一時間接入，新增後 7 天自動消失", "Integrated as soon as the model is released; the tag disappears automatically 7 days after it is added", "モデル公開後すぐに導入。タグは追加から7日後に自動的に消えます", "모델 출시 즉시 연동되었으며, 태그는 추가 후 7일 뒤 자동으로 사라집니다", "Intégré dès la sortie du modèle ; le tag disparaît automatiquement 7 jours après son ajout"],
     "选择生成记录": ["選擇生成記錄", "Select generation record", "生成履歴を選択", "생성 기록 선택", "Sélectionner un historique de génération"],
     "每次最多上传 6 张图片": ["每次最多上傳 6 張圖片", "Upload up to 6 images at a time", "一度にアップロードできる画像は6枚までです", "한 번에 최대 6장의 이미지를 업로드할 수 있습니다", "Importez jusqu’à 6 images à la fois"],

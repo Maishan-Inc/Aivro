@@ -152,7 +152,7 @@ export async function fetchAdminCreditLogs(token: string, query: AdminLogQuery =
 }
 
 export async function fetchAdminRequestLogs(token: string, query: AdminLogQuery = {}) {
-    return apiGet<AdminCreditLogListResponse>("/api/admin/request-logs", compactApiParams(query), token);
+    return apiGet<{ items: import("./admin-generation-tasks").AdminGenerationTask[]; total: number }>("/api/admin/request-logs", compactApiParams(query), token);
 }
 
 

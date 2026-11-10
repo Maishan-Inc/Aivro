@@ -76,10 +76,6 @@ func proxyAIRequest(w http.ResponseWriter, r *http.Request, path string) {
 		Fail(w, "未登录或权限不足")
 		return
 	}
-	if err := service.ValidateModelRequest(modelName, path); err != nil {
-		FailError(w, err)
-		return
-	}
 	if path == "/chat/completions" {
 		directAIProxyRequest(w, r, user, body, contentType, modelName, path)
 		return

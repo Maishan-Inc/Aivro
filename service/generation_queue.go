@@ -67,14 +67,29 @@ func SubmitAITask(ctx context.Context, user model.AuthUser, body []byte, content
 	submittedAt := now()
 	defer func() {
 		if submitErr == nil { return }
-		_, exists, err := repository.GetGenerationTask(meta.TaskID)
-		if err != nil || exists { return }
+		previous, exists, err := repository.GetGenerationTask(meta.TaskID)
+		if err != nil || (exists && previous.Status != model.GenerationTaskSubmitting) { return }
 		message := "生成任务提交失败"
 		if safe, ok := submitErr.(interface{ SafeMessage() string }); ok { message = safe.SafeMessage() }
-		_, err = repository.SaveGenerationTask(model.GenerationTask{ID: meta.TaskID, UserID: user.ID, Username: user.Username, Model: modelName, Path: path, Section: string(section), Prompt: parameterPrompt(parameters), Parameters: parameters, ContentType: contentType, Status: model.GenerationTaskFailed, Stage: "failed", Error: message, ErrorDetail: submitErr.Error(), CreatedAt: submittedAt, FinishedAt: now(), UpdatedAt: now()})
+		for index := range previous.Items { previous.Items[index].Status, previous.Items[index].Error = "failed", message }
+		_, err = repository.SaveGenerationTask(model.GenerationTask{Items: previous.Items, ID: meta.TaskID, UserID: user.ID, Username: user.Username, Model: modelName, Path: path, Section: string(section), Prompt: parameterPrompt(parameters), Parameters: parameters, ContentType: contentType, Status: model.GenerationTaskFailed, Stage: "failed", Error: message, ErrorDetail: submitErr.Error(), CreatedAt: submittedAt, FinishedAt: now(), UpdatedAt: now()})
 		if err != nil { log.Printf("generation task rejection record failed: task=%s errorType=%T", meta.TaskID, err) }
+		if err == nil && path == "/prompt-reverse" {
+			task, _, _ := repository.GetGenerationTask(meta.TaskID)
+			history := reverseTaskHistory(task, "失败", message)
+			if _, err := repository.SaveGenerationHistory(history, nil); err != nil { log.Printf("reverse rejection history failed: task=%s errorType=%T", task.ID, err) }
+		}
 	}()
+	initialItems := []model.PromptReverseItem{}
+	if path == "/prompt-reverse" {
+		var input PromptReverseInput
+		if json.Unmarshal(body, &input) == nil { for _, image := range input.Images { initialItems = append(initialItems, model.PromptReverseItem{Name: image.Name, Status: "queued"}) } }
+	}
+	if _, err := repository.SaveGenerationTask(model.GenerationTask{Items: initialItems, ID: meta.TaskID, UserID: user.ID, Username: user.Username, Model: modelName, Path: path, Section: string(section), Prompt: parameterPrompt(parameters), Parameters: parameters, ContentType: contentType, Status: model.GenerationTaskSubmitting, Stage: "submitting", CreatedAt: submittedAt, UpdatedAt: submittedAt, LeaseExpiresAt: time.Now().Add(AIRequestTimeoutForPath(path) + time.Minute).Format(time.RFC3339)}); err != nil { return model.GenerationTaskSubmitResult{}, nil, err }
 	if err := CheckSectionAccess(user, section); err != nil { return model.GenerationTaskSubmitResult{}, nil, err }
+	validationPath := path
+	if path == "/prompt-reverse" { validationPath = "/chat/completions" }
+	if err := ValidateModelRequest(modelName, validationPath); err != nil { return model.GenerationTaskSubmitResult{}, nil, err }
 	retention, err := UserGenerationRetention(user.ID)
 	if err != nil { return model.GenerationTaskSubmitResult{}, nil, err }
 	if err := CheckSectionAccess(user, generationSection(path)); err != nil {
@@ -100,6 +115,11 @@ func SubmitAITask(ctx context.Context, user model.AuthUser, body []byte, content
 	if err != nil {
 		return model.GenerationTaskSubmitResult{}, nil, err
 	}
+	var reverseItems []model.PromptReverseItem
+	if path == "/prompt-reverse" {
+		reverseItems, err = preparePromptReverse(user, body, billing)
+		if err != nil { return model.GenerationTaskSubmitResult{}, nil, err }
+	}
 	credits := billing.Credits
 	if path == "/images/generations" || path == "/images/edits" {
 		if err := ValidateImageResolution(parameters, billing.Resolutions); err != nil { return model.GenerationTaskSubmitResult{}, nil, err }
@@ -116,15 +136,28 @@ func SubmitAITask(ctx context.Context, user model.AuthUser, body []byte, content
 	if path == model3DPath {
 		var input Model3DGenerationInput
 		if err := json.Unmarshal(body, &input); err != nil { return model.GenerationTaskSubmitResult{}, nil, err }
+		if err := validateModel3DInput(input); err != nil {
+			return model.GenerationTaskSubmitResult{}, nil, err
+		}
+		route, err := SelectModelChannelRoute(input.Model)
+		if err != nil { return model.GenerationTaskSubmitResult{}, nil, err }
+		caps := model3DCapabilities(route)
+		if input.TargetFaceCount <= 0 { input.TargetFaceCount = caps.DefaultFaces }
+		if route.Adapter == "" && input.TargetFaceCount > 1000000 { input.TargetFaceCount = 1000000 }
+		if err := validateModel3DAdapterInput(route, input); err != nil { return model.GenerationTaskSubmitResult{}, nil, err }
+		body, err = json.Marshal(input)
+		if err != nil { return model.GenerationTaskSubmitResult{}, nil, err }
+		effective, err := ReadAIRequestParameters(body, contentType)
+		if err != nil { return model.GenerationTaskSubmitResult{}, nil, err }
+		parameters["effective"] = effective
 		credits, err = Model3DCredits(input, billing.Credits)
 		if err != nil { return model.GenerationTaskSubmitResult{}, nil, err }
 		requestCount = input.Quantity
 	}
-	if isFree { credits = 0 }
-	if err := ConsumeUserCreditsWithMeta(user.ID, modelName, credits, path, meta); err != nil {
-		return model.GenerationTaskSubmitResult{}, nil, err
+	if isFree || path == "/prompt-reverse" { credits = 0 }
+	if path != "/prompt-reverse" {
+		if err := ConsumeUserCreditsWithMeta(user.ID, modelName, credits, path, meta); err != nil { return model.GenerationTaskSubmitResult{}, nil, err }
 	}
-
 	refund := func() {
 		if err := RefundUserCreditsWithMeta(user.ID, modelName, credits, path, meta); err != nil {
 			log.Printf("generation task refund failed: user=%s model=%s credits=%d errorType=%T", user.ID, modelName, credits, err)
@@ -153,6 +186,7 @@ func SubmitAITask(ctx context.Context, user model.AuthUser, body []byte, content
 	now := time.Now().Format(time.RFC3339)
 	meta = normalizeRequestLogMeta(meta)
 	task := model.GenerationTask{
+		Items: reverseItems,
 		CampaignID: free.CampaignID,
 		QuotaLimit: free.Limit,
 		AgreementAcceptedAt: free.AcceptedAt,
@@ -178,6 +212,7 @@ func SubmitAITask(ctx context.Context, user model.AuthUser, body []byte, content
 		UpdatedAt:     now,
 	}
 	if IsAPIKeyRequest(ctx) { task.APIBillingType, task.APIUnitCredits = billing.BillingType, billing.Credits }
+	if path == "/prompt-reverse" { task.APIUnitCredits, task.RequestCount = billing.Credits, len(reverseItems) }
 	if path == "/videos" {
 		task.VideoBillingType, task.VideoUnitCredits = videoInput.BillingType, billing.Credits
 		task.VideoSeconds, _ = strconv.Atoi(videoInput.Seconds.String())
@@ -191,6 +226,7 @@ func SubmitAITask(ctx context.Context, user model.AuthUser, body []byte, content
 	}
 	if !*queue.Enabled || canRun {
 		timeout := aiTimeout(settings.Private.AITimeouts, path)
+		if path == "/prompt-reverse" { timeout *= time.Duration(task.RequestCount) }
 		task.Status = model.GenerationTaskExecuting
 		task.StartedAt = now
 		task.WorkerID = queueWorkerID
@@ -254,6 +290,7 @@ func ListGenerationTasks(user model.AuthUser) ([]model.GenerationTaskView, error
 		if checkGenerationTaskAccess(user, item) != nil {
 			continue
 		}
+		for index := range item.Items { item.Items[index].Result = nil }
 		result = append(result, generationTaskView(item))
 	}
 	return result, nil
@@ -299,7 +336,7 @@ func CancelGenerationTask(user model.AuthUser, id string) error {
 		return err
 	}
 	now := time.Now().Format(time.RFC3339)
-	changed, err := repository.FinishGenerationTask(task, model.GenerationTaskCanceled, map[string]any{"canceled_at": now, "finished_at": now, "error": "用户已撤销", "stage": "canceled", "queue_position": 0}, taskRefundLog(task))
+	changed, err := repository.FinishGenerationTask(task, model.GenerationTaskCanceled, map[string]any{"canceled_at": now, "finished_at": now, "error": "用户已撤销", "stage": "canceled", "queue_position": 0, "credits": 0}, taskRefundLog(task))
 	if err != nil { return err }
 	if !changed { return safeMessageError{message: "任务状态已变化，无法撤销"} }
 
@@ -367,6 +404,7 @@ func dispatchQueuedTasks() error {
 		for _, task := range items {
 			startedAt := time.Now().Format(time.RFC3339)
 			timeout := aiTimeout(settings.Private.AITimeouts, task.Path)
+			if task.Path == "/prompt-reverse" { timeout *= time.Duration(task.RequestCount) }
 			lease := time.Now().Add(timeout + time.Minute).Format(time.RFC3339)
 			changed, err := repository.MarkQueuedTaskExecuting(task.ID, startedAt, queueWorkerID, lease)
 			if err != nil {
@@ -415,6 +453,10 @@ func executeTask(ctx context.Context, user model.AuthUser, task model.Generation
 		return failExecutingTask(task, "AI 请求内容读取失败")
 	}
 	var resp AIProxyResponse
+	if task.Path == "/prompt-reverse" {
+		defer content.Close()
+		return executePromptReverse(ctx, user, task, content)
+	}
 	if task.Path == model3DPath {
 		resp, err = executeModel3DTask(ctx, user, task, content)
 	} else if task.Path == "/videos" {
@@ -466,7 +508,18 @@ func taskRefundLog(task model.GenerationTask) *model.CreditLog {
 }
 
 func failExecutingTask(task model.GenerationTask, message string) (AIProxyResponse, error) {
-	_, err := repository.FinishGenerationTask(task, model.GenerationTaskFailed, map[string]any{"error": message, "stage": "failed", "finished_at": now()}, taskRefundLog(task))
+	histories := []model.GenerationHistory{}
+	fields := map[string]any{"error": message, "stage": "failed", "finished_at": now(), "credits": 0}
+	if task.Path == "/prompt-reverse" {
+		for index := range task.Items {
+			task.Items[index].Result = nil
+			if task.Items[index].Status != "failed" { task.Items[index].Status, task.Items[index].Error, task.Items[index].Credits = "failed", message, 0 }
+		}
+		items, _ := json.Marshal(task.Items)
+		fields["items"] = string(items)
+		histories = append(histories, reverseTaskHistory(task, "失败", message))
+	}
+	_, err := repository.FinishGenerationTask(task, model.GenerationTaskFailed, fields, taskRefundLog(task), histories...)
 	if err != nil { log.Printf("generation task settlement failed: task=%s errorType=%T", task.ID, err) }
 	return AIProxyResponse{}, safeMessageError{message: message}
 }
@@ -474,7 +527,14 @@ func failExecutingTask(task model.GenerationTask, message string) (AIProxyRespon
 func recoverExecutingTasks() error {
 	items, err := repository.ListExpiredExecutingTasks(now())
 	if err != nil { return err }
-	for _, item := range items { _, _ = failExecutingTask(item, "任务执行超时或执行实例已离线") }
+	for _, item := range items {
+		if item.Status == model.GenerationTaskSubmitting || item.Path == "/chat/completions" || strings.HasPrefix(item.Path, "/canvas-assistant/") || strings.HasPrefix(item.Path, "/canvas-agent/") {
+			credits, err := repository.GenerationTaskChargedCredits(item.ID)
+			if err != nil { continue }
+			item.Credits = credits
+		}
+		_, _ = failExecutingTask(item, "任务执行超时或执行实例已离线")
+	}
 	return nil
 }
 
@@ -518,7 +578,11 @@ func generationTaskView(task model.GenerationTask) model.GenerationTaskView {
 	if task.Status == model.GenerationTaskQueued && task.QueuePosition > 0 {
 		ahead = task.QueuePosition - 1
 	}
-	return model.GenerationTaskView{BillingType: task.VideoBillingType, Seconds: task.VideoSeconds, UnitCredits: task.VideoUnitCredits, ID: task.ID, Model: task.Model, Path: task.Path, Status: string(task.Status), QueuePosition: task.QueuePosition, AheadCount: ahead, Credits: task.Credits, Error: task.Error, CreatedAt: task.CreatedAt, StartedAt: task.StartedAt, FinishedAt: task.FinishedAt, ResultAvailable: task.Status == model.GenerationTaskSucceeded && task.ResponseFileID != "", ResponseStatus: task.ResponseStatus}
+	for index := range task.Items {
+		if task.Status != model.GenerationTaskSucceeded { task.Items[index].Result = nil }
+		if task.Items[index].Media != nil && task.Items[index].Media.ExpiresAt <= now() { task.Items[index].Media = nil; task.Items[index].Result = nil }
+	}
+	return model.GenerationTaskView{Items: task.Items, Stage: task.Stage, Progress: task.Progress, BillingType: task.VideoBillingType, Seconds: task.VideoSeconds, UnitCredits: task.VideoUnitCredits, ID: task.ID, Model: task.Model, Path: task.Path, Status: string(task.Status), QueuePosition: task.QueuePosition, AheadCount: ahead, Credits: task.Credits, Error: task.Error, CreatedAt: task.CreatedAt, StartedAt: task.StartedAt, FinishedAt: task.FinishedAt, ResultAvailable: task.Status == model.GenerationTaskSucceeded && task.ResponseFileID != "", ResponseStatus: task.ResponseStatus}
 }
 
 func canDispatchModel(modelName string, queue model.AIQueueSetting) (bool, error) {

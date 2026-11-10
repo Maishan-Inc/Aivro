@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { usePathname } from "next/navigation";
+import { PromptReverseBilling } from "@/components/prompt-reverse-billing";
 import { useQuery } from "@tanstack/react-query";
 import { Avatar, Button, Card, DatePicker, Descriptions, Drawer, Empty, Flex, Image, Input, Progress, Select, Space, Table, Tag, Typography } from "antd";
 import { fetchAdminGenerationTask, fetchAdminGenerationTasks, type AdminGenerationTask } from "@/services/api/admin-generation-tasks";
@@ -11,10 +13,11 @@ import { useUserStore } from "@/stores/use-user-store";
 import { Model3DPreview } from "@/components/model-3d-preview";
 import { adminRealtimeQueryOptions } from "../admin-query-options";
 
-const statuses: Record<string, string> = { queued: "排队中", executing: "生成中", succeeded: "成功", failed: "失败", canceled: "已撤销" };
+const statuses: Record<string, string> = { submitting: "提交中", queued: "排队中", executing: "生成中", succeeded: "成功", failed: "失败", canceled: "已撤销" };
 const stages: Record<string, string> = { ...statuses, storing: "保存结果中", pending: "等待处理", processing: "生成中", running: "生成中", completed: "生成完成", IN_QUEUE: "排队中", IN_PROGRESS: "生成中", COMPLETED: "生成完成" };
 
 export default function TaskRecordsPage() {
+    const pathname = usePathname();
     const token = useUserStore((state) => state.token);
     const { tr } = useI18n();
     const [filters, setFilters] = useState({ keyword: "", category: "", type: "", startTime: "", endTime: "", page: 1, pageSize: 20 });
@@ -37,13 +40,14 @@ export default function TaskRecordsPage() {
                 </Space>
                 {query.isError ? <Typography.Paragraph type="danger" data-i18n-skip>{tr(query.error.message)}</Typography.Paragraph> : null}
             </Card>
-            <Card variant="borderless" title="任务记录">
+            <Card variant="borderless" title={tr(pathname.endsWith("/request-logs") ? "请求日志" : "任务记录")}>
                 <Table<AdminGenerationTask> rowKey="id" loading={query.isLoading} dataSource={query.data?.items || []} scroll={{ x: 1150 }} columns={[
                     { title: "用户", key: "user", width: 170, render: (_, item) => <Space><Avatar size={28} src={item.user?.avatarUrl}>{(item.user?.displayName || item.username).slice(0, 1)}</Avatar><span data-i18n-skip>{item.user?.displayName || item.username}</span></Space> },
                     { title: "模型", dataIndex: "model", width: 170, render: (value: string) => <span data-i18n-skip>{value}</span> },
                     { title: "任务来源", dataIndex: "section", width: 150, render: (value: string) => <span data-i18n-skip>{tr(generationSections.find((item) => item.key === value)?.label || value)}</span> },
                     { title: "提示词", dataIndex: "prompt", ellipsis: true, render: (value: string) => <span data-i18n-skip>{value}</span> },
                     { title: "状态 / 进度", key: "status", width: 170, render: (_, item) => <div>{statusTag(item)}{item.status === "executing" && item.progress > 0 ? <Progress size="small" percent={item.progress} /> : item.status === "queued" ? <span data-i18n-skip>{tr("队列位置 {0}").replace("{0}", String(item.queuePosition))}</span> : null}</div> },
+                    { title: "任务报错", dataIndex: "error", width: 200, render: (value: string) => <span className="text-destructive" data-i18n-skip>{tr(value)}</span> },
                     { title: "时间", dataIndex: "createdAt", width: 180, render: (value: string) => <span data-i18n-skip>{formatDateTime(value)}</span> },
                     { title: "操作", key: "action", width: 95, render: (_, item) => <Button type="link" onClick={() => setSelected(item.id)}>查看详情</Button> },
                 ]} pagination={{ current: filters.page, pageSize: filters.pageSize, total: query.data?.total || 0, showSizeChanger: true, onChange: (page, pageSize) => setFilters((previous) => ({ ...previous, page: pageSize === previous.pageSize ? page : 1, pageSize })) }} />
@@ -65,10 +69,11 @@ export default function TaskRecordsPage() {
                     { key: "started", label: tr("开始时间"), children: <span data-i18n-skip>{task.startedAt ? formatDateTime(task.startedAt) : "—"}</span> },
                     { key: "finished", label: tr("完成时间"), children: <span data-i18n-skip>{task.finishedAt ? formatDateTime(task.finishedAt) : "—"}</span> },
                 ]} />
+                {task.items?.length ? <PromptReverseBilling items={task.items} credits={task.credits} settled={!["submitting", "queued", "executing"].includes(task.status)} /> : null}
                 <div><Typography.Title level={5}>提示词</Typography.Title><Typography.Paragraph data-i18n-skip copyable style={{ whiteSpace: "pre-wrap" }}>{task.prompt}</Typography.Paragraph></div>
                 <div><Typography.Title level={5}>完整请求参数</Typography.Title><pre data-i18n-skip className="max-h-96 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-[var(--muted)] p-3 text-xs">{JSON.stringify(task.parameters, null, 2)}</pre></div>
                 {task.error || task.errorDetail ? <div><Typography.Title level={5}>任务报错</Typography.Title><Typography.Paragraph data-i18n-skip type="danger">{tr(task.error)}</Typography.Paragraph>{task.errorDetail ? <pre data-i18n-skip className="whitespace-pre-wrap break-all text-xs">{task.errorDetail}</pre> : null}</div> : null}
-                {task.status === "succeeded" ? <div>
+                {task.status === "succeeded" && !["/chat/completions", "/canvas-assistant/chat", "/canvas-agent/plan"].includes(task.path) ? <div>
                     <Typography.Title level={5}>生成结果</Typography.Title>
                     {task.media?.length ? <Image.PreviewGroup><Flex vertical gap={12}>{task.media.map((file) => <div key={file.cloudFileId}>
                         {file.fileType === "image" ? <Image alt={tr("生成结果")} src={file.url} style={{ maxHeight: 360, objectFit: "contain" }} /> : file.fileType === "video" ? <video controls src={file.url} className="max-h-96 w-full" /> : <div><Model3DPreview url={file.url} className="h-80" /><Typography.Link href={file.url} target="_blank" rel="noreferrer">下载 3D 模型</Typography.Link></div>}

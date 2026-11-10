@@ -4,6 +4,7 @@ package model
 type GenerationTaskStatus string
 
 const (
+	GenerationTaskSubmitting GenerationTaskStatus = "submitting"
 	GenerationTaskQueued    GenerationTaskStatus = "queued"
 	GenerationTaskExecuting GenerationTaskStatus = "executing"
 	GenerationTaskSucceeded GenerationTaskStatus = "succeeded"
@@ -11,8 +12,20 @@ const (
 	GenerationTaskCanceled  GenerationTaskStatus = "canceled"
 )
 
-// GenerationTask 记录进入限流队列的 AI 请求。
+// PromptReverseItem 保存单张反推图片的状态、用量和结果。
+type PromptReverseItem struct {
+	Name string `json:"name"`
+	Media *GenerationHistoryMedia `json:"media,omitempty"`
+	Status string `json:"status"`
+	Error string `json:"error,omitempty"`
+	Tokens int `json:"tokens"`
+	Credits int `json:"credits"`
+	Result map[string]any `json:"result,omitempty"`
+}
+
+// GenerationTask 记录 AI 请求从提交到结算的完整生命周期。
 type GenerationTask struct {
+	Items []PromptReverseItem `json:"items,omitempty" gorm:"serializer:json"`
 	CampaignID string `json:"campaignId,omitempty" gorm:"index"`
 	QuotaLimit int `json:"-" gorm:"-"`
 	AgreementAcceptedAt string `json:"agreementAcceptedAt,omitempty"`
@@ -70,6 +83,9 @@ type VideoTask struct {
 
 // GenerationTaskView 是前端轮询使用的轻量任务视图。
 type GenerationTaskView struct {
+	Items []PromptReverseItem `json:"items,omitempty"`
+	Progress int `json:"progress"`
+	Stage string `json:"stage"`
 	BillingType string `json:"billingType,omitempty"`
 	Seconds int `json:"seconds,omitempty"`
 	UnitCredits int `json:"unitCredits"`

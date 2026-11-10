@@ -777,7 +777,9 @@ func ListUserCreditLogs(user model.AuthUser, q model.Query) (model.CreditLogList
 		logs[i].IP = ""
 		logs[i].Country = ""
 		logs[i].Extra = ""
-		logs[i].Parameters = nil
+		if logs[i].Path == "/prompt-reverse" {
+			logs[i].Parameters = map[string]any{"items": logs[i].Parameters["items"]}
+		} else { logs[i].Parameters = nil }
 		logs[i].User = nil
 	}
 	return model.CreditLogList{Items: logs, Total: int(total)}, nil

@@ -33,10 +33,13 @@ export type GenerationTaskSubmitResult = {
 };
 
 export type GenerationTaskView = {
+    items?: import("./explore").PromptReverseItem[];
+    progress: number;
+    stage: string;
     id: string;
     model: string;
     path: string;
-    status: "queued" | "executing" | "succeeded" | "failed" | "canceled";
+    status: "submitting" | "queued" | "executing" | "succeeded" | "failed" | "canceled";
     queuePosition: number;
     aheadCount: number;
     credits: number;

@@ -6,6 +6,8 @@ import { Alert, Button, Empty, Select, Space, Table } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { CreditCard, Plus, RefreshCw, WalletCards } from "lucide-react";
 
+import { PromptReverseBilling } from "@/components/prompt-reverse-billing";
+import { RequestTasks } from "./components/request-tasks";
 import { CreditSymbol } from "@/constant/credits";
 import { useLocalizedPath } from "@/hooks/use-localized-path";
 import { useI18n } from "@/hooks/use-i18n";
@@ -23,7 +25,7 @@ export default function ConsoleWalletPage() {
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(20);
     const [type, setType] = useState("");
-    const query = useQuery({ queryKey: ["wallet-credit-logs", user?.id, type, page, pageSize], queryFn: () => fetchCreditLogs(token, { type, page, pageSize }), enabled: Boolean(token && user?.id), retry: false, staleTime: 0 });
+    const query = useQuery({ queryKey: ["wallet-credit-logs", user?.id, type, page, pageSize], queryFn: () => fetchCreditLogs(token, { type, page, pageSize }), enabled: Boolean(token && user?.id), retry: false, staleTime: 0, refetchInterval: 3000 });
 
     useEffect(() => { if (token) void hydrateUser(); }, [token, hydrateUser]);
     useEffect(() => { setPage(1); setType(""); }, [user?.id]);
@@ -59,6 +61,7 @@ export default function ConsoleWalletPage() {
                     <WalletMetric icon={<WalletCards className="size-5" />} label={tr("当前套餐")} value="Free" helper={tr("套餐状态后续接入账单接口后展示")} />
                 </section>
 
+                <RequestTasks />
                 <section className="rounded-lg border border-stone-200 bg-background p-5 dark:border-stone-800">
                     <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                         <div>
@@ -68,7 +71,7 @@ export default function ConsoleWalletPage() {
                         <Space wrap><Select aria-label={tr("筛选流水类型")} value={type} className="min-w-36" onChange={(value) => { setType(value); setPage(1); }} options={[{ value: "", label: tr("全部变动") }, ...Object.entries(creditLogTypeLabels).map(([value, label]) => ({ value, label: tr(label) }))]} /><Button type="text" icon={<RefreshCw className="size-4" />} loading={query.isFetching} onClick={() => { void query.refetch(); void hydrateUser(); }}>{tr("刷新")}</Button></Space>
                     </div>
                     {query.isError ? <Alert className="mb-4" type="error" showIcon title={tr(query.error instanceof Error ? query.error.message : "读取扣费记录失败")} /> : null}
-                    <Table<CreditLog> columns={columns} dataSource={query.data?.items || []} rowKey="id" loading={query.isFetching} pagination={{ current: page, pageSize, total: query.data?.total || 0, showSizeChanger: true, onChange: (value, size) => { setPage(size === pageSize ? value : 1); setPageSize(size); } }} scroll={{ x: 1100 }} locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={tr(query.isError ? "暂时无法加载扣费记录" : "暂无扣费记录")} /> }} />
+                    <Table<CreditLog> expandable={{ rowExpandable: (item) => Boolean(item.parameters?.items?.length), expandedRowRender: (item) => <PromptReverseBilling items={item.parameters?.items || []} credits={-item.amount} settled /> }} columns={columns} dataSource={query.data?.items || []} rowKey="id" loading={query.isFetching} pagination={{ current: page, pageSize, total: query.data?.total || 0, showSizeChanger: true, onChange: (value, size) => { setPage(size === pageSize ? value : 1); setPageSize(size); } }} scroll={{ x: 1100 }} locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={tr(query.isError ? "暂时无法加载扣费记录" : "暂无扣费记录")} /> }} />
                 </section>
             </div>
         </div>

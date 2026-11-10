@@ -12,6 +12,8 @@ export const saveExploreSettings = (token: string, input: ExploreSettings) => ap
 export const fetchFreeImageCampaigns = (token: string, page = 1) => apiGet<{ items: FreeImageCampaign[]; total: number }>("/api/admin/free-image-campaigns", { page, pageSize: 20 }, token);
 export const saveFreeImageCampaign = (token: string, input: FreeImageCampaign) => apiPost<FreeImageCampaign>("/api/admin/free-image-campaigns", input, token);
 export const fetchFreeImageState = (token: string) => apiGet<FreeImageState>("/api/v1/free-image", undefined, token);
-export const reverseImagePrompt = (token: string, model: string, image: string) => apiPost<GenerationHistory>("/api/v1/prompt-reverse", { model, image }, token);
+export type PromptReverseItem = { name: string; media?: import("./generation-history").GenerationHistoryMedia; status: string; error?: string; tokens: number; credits: number; result?: Record<string, unknown> };
+export const reverseImagePrompt = (token: string, model: string, images: { name: string; image: string }[]) => apiPost<import("./image").GenerationTaskSubmitResult>("/api/v1/prompt-reverse", { model, images }, token);
+export const fetchUserGenerationTasks = (token: string) => apiGet<import("./image").GenerationTaskView[]>("/api/v1/generation-tasks", undefined, token);
 export const fetchFreeImageSubmissions = (token: string, page = 1) => apiGet<{ items: GenerationHistory[]; total: number }>("/api/admin/free-image-histories", { page, pageSize: 20 }, token);
 export const publishFreeImage = (token: string, input: { historyId: string; title: string; prompt: string; rewardCredits: number }) => apiPost("/api/admin/free-image-publication", input, token);

@@ -551,6 +551,8 @@ MetaMask 私有配置字段：
 
 免费活动任务另保存 `campaign_id`、`agreement_version` 与 `agreement_accepted_at`，常规任务留空；活动任务的 `credits=0`，次数在任务创建事务中扣减，失败或撤销事务中返还。
 
+AI 生成队列、文本请求与用户/后台请求日志共用表。准备请求时先保存 `submitting`，同步文本请求保存 `executing`；反推在后台顺序处理，成功部分的结果、单条历史与汇总扣款原子提交，失败原因和用量仍保留。反推执行期限为图片数量乘以文本请求期限，每张请求仍受独立文本期限约束。
+
 AI 生成队列与后台任务记录共用表。一次生成请求只创建一条任务，供应商重试和轮询只更新状态；任务参数、提示词、错误及时间长期保留。原始请求体与响应体保存为 `cloud_files.file_type=task`，按载荷保留小时清理，不删除任务行。
 
 | 字段 | 类型 | 说明 |
@@ -562,16 +564,17 @@ AI 生成队列与后台任务记录共用表。一次生成请求只创建一�
 | `path` | string | 后端代理路径，例如 `/images/generations` |
 | `content_type` | string | 原始请求 Content-Type |
 | `request_file_id` | string | 请求体对象 `cloud_files.id` |
-| `credits` | number | 本任务预扣算力点；API 词元任务成功后更新为实际结算值 |
+| `credits` | number | 媒体任务预扣点数；终态按实际结算更新，失败/撤销退款后为 0；反推执行中为 0，成功后为整批统一扣款 |
+| `items` | JSON | 反推批任务有序列表：`name`、`media`、`status`、`error`、`tokens`、`credits`、`result`；每张独立请求，整批只占一条任务 |
 | `api_billing_type` | string | API 请求提交时的计费方式快照，登录会话任务为空，不返回前端 |
-| `api_unit_credits` | number | API 请求提交时的单价快照，不返回前端 |
+| `api_unit_credits` | number | API 请求或反推批任务提交时的单价快照，不返回前端 |
 | `video_billing_type` | string | 视频请求计费方式快照：`fixed` 或 `second` |
 | `video_seconds` | number | 视频请求的生成秒数，按秒费用采用此值 |
 | `video_unit_credits` | number | 视频单价快照，登录会话为标准价，API 请求为 API 价 |
 | `ip` | string | 提交任务的客户端 IP，供退款和用量结算流水使用，不返回前端 |
 | `country` | string | 提交任务的客户端国家或地区，不返回前端 |
 | `request_count` | number | 本次请求生成数量 |
-| `status` | string | `queued`、`executing`、`succeeded`、`failed`、`canceled` |
+| `status` | string | `submitting`、`queued`、`executing`、`succeeded`、`failed`、`canceled` |
 | `queue_position` | number | 排队位置 |
 | `response_status` | number | 上游响应状态码 |
 | `response_header` | text | 上游响应头 JSON |

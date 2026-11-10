@@ -55,7 +55,7 @@ func FreeImageGeneration(w http.ResponseWriter, r *http.Request) {
 
 func PromptReverse(w http.ResponseWriter, r *http.Request) {
 	var input service.PromptReverseInput
-	if json.NewDecoder(http.MaxBytesReader(w, r.Body, 8<<20)).Decode(&input) != nil { Fail(w, "请求参数错误"); return }
+	if json.NewDecoder(http.MaxBytesReader(w, r.Body, 42<<20)).Decode(&input) != nil { Fail(w, "请求参数错误"); return }
 	user, _ := service.UserFromContext(r.Context())
 	result, err := service.ReverseImagePrompt(r.Context(), user, input, service.RequestLogMetaFromRequest(r))
 	if err != nil { FailError(w, err); return }

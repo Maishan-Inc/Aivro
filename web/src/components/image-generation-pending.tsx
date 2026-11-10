@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 
 const pendingMessages = ["正在创建图片", "马上就好了", "再等等", "正在整理细节"];
 
-export function ImageGenerationPending({ className, label, compact = false }: { className?: string; label?: string; compact?: boolean }) {
+export function ImageGenerationPending({ className, label, compact = false, progress: actualProgress }: { className?: string; label?: string; compact?: boolean; progress?: number }) {
     const [tick, setTick] = useState(0);
 
     useEffect(() => {
@@ -17,7 +17,7 @@ export function ImageGenerationPending({ className, label, compact = false }: { 
     }, []);
 
     const index = Math.floor(tick / 2) % pendingMessages.length;
-    const progress = Math.min(98, 10 + (1 - Math.exp(-tick / 28)) * 88);
+    const progress = actualProgress ?? Math.min(98, 10 + (1 - Math.exp(-tick / 28)) * 88);
 
     return (
         <div className={cn("relative overflow-hidden bg-stone-100 dark:bg-white/10", compact ? "min-h-24" : "aspect-[4/3]", className)}>

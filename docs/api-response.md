@@ -7,7 +7,7 @@
 - `public.explore` 公开 `freeImageEnabled`、`promptReverseEnabled`，均默认 `false`；后台 `GET/POST /api/admin/explore-settings` 返回和保存这两个开关及 `systemPrompt`，提示词仅对管理员开放。
 - `GET/POST /api/admin/free-image-campaigns` 分页读取或保存每期活动，字段为 `id/name/enabled/startsAt/endsAt/models/groupLimits`。起止时间使用 RFC3339，服务统一按 UTC 保存，会员次数按 `free/go/plus/pro/max` 配置，不允许活动时间重叠。
 - `GET /api/v1/free-image` 返回 `{ campaign, group, limit, used, remaining }`，没有进行中的活动时 `campaign=null`。`POST /api/v1/free-image/generations` 接受 `campaignId/agreement/model/prompt/size/quality`，`agreement` 必须为 `free-image-v1`，每次固定一张；返回既有排队任务结构，通过生成任务接口轮询。活动模型、期限、次数和协议均由后端校验，失败或撤销返还次数。
-- `POST /api/v1/prompt-reverse` 接受 `{ model, image }`，`image` 是最大 5MB 的 PNG/JPEG/WebP data URL；仅接受已开放且按词元计费的文本模型，每次请求仅处理一张图片，前端每批最多 6 张独立请求。成功返回 `type=prompt-reverse` 的生成历史及 `result` 六语言提示词、分析、标签和结构化结果，逐张按 `round(实际总 token × 每千 token 单价 / 1000)` 结算整数点数（不足半点可为 0 点），不先合并多张用量。沿用先预扣、后补扣或返还差额的流程；未返回实际用量、返回无效或缺少语言的模型结果时返还预扣额度。
+- `POST /api/v1/prompt-reverse` 接受 `{ model, images: [{ name, image }] }`，每批 1–6 张最大 5MB 的 PNG/JPEG/WebP data URL，仅接受已开放且按词元计费的文本模型；立即返回 `{ taskId, status, queued, model, path, ... }`。后端按上传顺序独立请求每张图片，`GET /api/v1/generation-tasks` 与 `/:id` 返回批次状态、真实已处理进度及有序 `items`（名称、参考图、状态、错误、token 和点数）；完成前不返回生成提示词。每张以提交时单价按 `round(实际总 token × 每千 token 单价 / 1000)` 取整后求和，终态事务统一扣费并保存单条历史，缺失真实 usage 或无效结果的图片不计费；零费用成功批次仍写入 0 点流水。成功与失败历史的 `result.items` 保留各图明细，成功项结果含六语言提示词、分析、标签与结构化内容，`result.credits` 为整批实际扣费；反推结果从生成历史读取，`resultAvailable` 仅表示通用二进制结果接口可用。
 - 生成历史列表支持 `type=free-image|prompt-reverse`，返回当前会员保存天数和记录的实际 `expiresAt`。免费成功记录由后端自动保存，反推记录及参考图按有效期限删除；常规历史写入接口不能伪造活动或反推记录。
 - `GET /api/admin/free-image-histories` 分页读取活动作品；`POST /api/admin/free-image-publication` 接受 `{ historyId, title, prompt, rewardCredits }`，奖励范围 1–1000000 算力点。公开素材、作品状态和奖励流水在同一事务中写入，重复公开不能重复奖励。历史响应补充 `publishedAssetId/rewardCredits`。
 - 公开模型计费条目的 `freeUntil` 仅在免费功能开启且模型属于当前活动时返回，前端据此显示 `Free [限量]`。该标记不改变常规工作台或 API 的标准价。
@@ -135,4 +135,4 @@
 - `GET /api/admin/generation-tasks/:id`：提示词、参数、阶段、真实进度、错误和可用媒体；文件删除或到期后 `media` 为空，任务记录继续保留。
 - `GET /api/admin/generation-tasks/:id/files/:fileId`：验证任务与文件归属后返回文件内容；过期或失败任务不能读取结果。
 
-业务接口继续返回 `{ code, data, msg }`；文件内容接口返回媒体流。工作流生成请求使用 `X-Aivro-Section: workflow` 标记来源，仍须通过当前账户的工作流与对应媒体生成权限校验。请求日志的管理员响应新增 `parameters`，仅用户侧钱包流水不返回参数。
+业务接口继续返回 `{ code, data, msg }`；文件内容接口返回媒体流。工作流生成请求使用 `X-Aivro-Section: workflow` 标记来源，仍须通过当前账户的工作流与对应媒体生成权限校验。管理员 `/api/admin/request-logs` 与 `/api/admin/generation-tasks` 统一返回任务列表，使用同一详情接口查看参数与错误；`submitting` 表示请求正在准备，之后更新排队、执行与终态。用户钱包流水不返回原始参数，反推流水只返回 `parameters.items` 的名称、状态、错误、token 和费用明细。

@@ -18,6 +18,8 @@ func CheckSectionAccess(user model.AuthUser, section model.UserSection) error {
 
 func generationSection(path string) model.UserSection {
 	switch {
+	case path == "/prompt-reverse":
+		return model.UserSectionPromptReverse
 	case strings.HasPrefix(path, "/images/"):
 		return model.UserSectionImage
 	case strings.HasPrefix(path, "/videos"):
