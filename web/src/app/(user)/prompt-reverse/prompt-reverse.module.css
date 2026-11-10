@@ -1,7 +1,7 @@
 .panels { grid-template-rows: auto minmax(0, 1fr); }
 .workspace { display: flex; flex-direction: column; padding-top: 12px; }
-.uploadArea { display: grid; place-items: center; width: 100%; flex: 1; padding-block: 16px; min-height: min-content; }
-.upload { display: flex; width: min(100%, 720px, calc(100dvh - 240px)); aspect-ratio: 1; min-height: 0; flex-direction: column; align-items: center; justify-content: center; gap: 14px; border: 1px dashed var(--ring); border-radius: 24px; background: color-mix(in srgb, var(--muted) 40%, var(--background)); text-align: center; cursor: pointer; transition: background .2s, border-color .2s; }
+.uploadArea { display: flex; align-items: center; justify-content: center; width: 100%; flex: none; margin-block: auto; padding-block: 16px; }
+.upload { display: flex; width: min(100%, 720px, calc(100dvh - 240px)); aspect-ratio: 1; min-height: 0; flex-shrink: 0; flex-direction: column; align-items: center; justify-content: center; gap: 14px; border: 1px dashed var(--ring); border-radius: 24px; background: color-mix(in srgb, var(--muted) 40%, var(--background)); text-align: center; cursor: pointer; transition: background .2s, border-color .2s; }
 .upload:hover, .upload[data-dragging="true"] { border-color: var(--foreground); background: var(--muted); }
 .upload:disabled { cursor: wait; }
 .uploadIcon { display: grid; place-items: center; width: 76px; height: 76px; margin-bottom: 12px; border-radius: 22px; background: var(--background); color: var(--foreground); }
@@ -35,7 +35,7 @@
 .workspace { align-items: center; }
 @container (min-width: 1040px) { .header { padding-right: 32px; } }
 @container (max-width: 600px) {
-    .workspace { padding: 12px 16px 24px; }
+    .workspace { padding: 16px; }
     .uploadArea { padding: 16px 0; }
     .upload { width: min(100%, 420px); padding: 16px; gap: 10px; border-radius: 20px; }
     .uploadIcon { width: 60px; height: 60px; margin-bottom: 4px; }

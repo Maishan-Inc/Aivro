@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useDeferredValue, useEffect, useId, useMemo, useRef, useState } from "react";
-import { Input, Select, type RefSelectProps } from "antd";
+import { Grid, Input, Select, type RefSelectProps } from "antd";
 import { Building2, ChevronDown, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useConfigStore, type AiConfig } from "@/stores/use-config-store";
@@ -34,6 +34,8 @@ type ModelPickerProps = {
 
 export function ModelPicker({ config, kind, count, model3D, value, onChange, onOpenChange, models, className, fullWidth = false, showBilling = true, billingLabel, placeholder = "选择模型", onMissingConfig }: ModelPickerProps) {
     const { tr, locale } = useI18n();
+    const mobile = Grid.useBreakpoint().xs;
+    const itemHeight = mobile ? 56 : 64;
     const channel = useConfigStore((state) => state.publicSettings?.modelChannel);
     const pickerId = useId();
     const selectRef = useRef<RefSelectProps>(null);
@@ -101,12 +103,12 @@ export function ModelPicker({ config, kind, count, model3D, value, onChange, onO
         onChange={(model) => { onChange(model); setOpen(false); }}
         options={filtered}
         virtual
-        listHeight={384}
-        listItemHeight={64}
-        popupMatchSelectWidth={420}
+        listHeight={itemHeight * 6}
+        listItemHeight={itemHeight}
+        popupMatchSelectWidth={mobile ? 320 : 420}
         placement="bottomLeft"
         classNames={{ popup: { root: styles.popup } }}
-        styles={{ popup: { listItem: { height: 64, minHeight: 64, padding: "8px 10px", boxSizing: "border-box" } } }}
+        styles={{ popup: { listItem: { height: itemHeight, minHeight: itemHeight, padding: mobile ? "6px 8px" : "8px 10px", boxSizing: "border-box" } } }}
         notFoundContent={<span className="text-xs text-muted-foreground">{tr("没有匹配的模型")}</span>}
         popupRender={(menu) => <div data-canvas-no-zoom onPointerDown={(event) => event.stopPropagation()} onMouseDown={(event) => event.stopPropagation()} onWheel={(event) => event.stopPropagation()}>
             <div className="mb-1 flex items-center gap-2 border-b border-border/60 px-1 pb-2 pt-1">
