@@ -122,9 +122,9 @@ export default function PromptReversePage() {
     if (!enabled) return <div className="grid h-full place-items-center"><Empty description={tr("提示词反推尚未开启")} /></div>;
     return <main className={`${studio.studio} relative`}>
         <div className={studio.layout}>
-            <div className={`${studio.panels} ${styles.panels}`}>
+            <div className={styles.panels}>
                 <header className={`${studio.header} ${styles.header}`}><h1>{tr("提示词反推")}</h1></header>
-                <section className={`${studio.results} ${styles.workspace}`}>
+                <section className={styles.workspace}>
                     {recordError ? <p className="text-sm text-destructive" role="alert">{tr(recordError.message)}</p> : null}
                     {!token ? <div className={studio.empty}><SearchCheck size={36} /><h3>{tr("登录后使用提示词反推")}</h3><Link href={localizedPath("/login?redirect=/prompt-reverse")}>{tr("登录")}</Link></div> : !active ? <div className={styles.uploadArea}>
                         <button type="button" className={styles.upload} data-dragging={dragging} disabled={loading || submitting.current} onClick={() => fileInput.current?.click()}
