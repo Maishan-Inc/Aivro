@@ -4,7 +4,6 @@ import { useState } from "react";
 import { App, Button, Checkbox, Drawer, Empty, Popconfirm } from "antd";
 import { CheckSquare, History, Plus, Trash2 } from "lucide-react";
 import { StudioHistorySidebar } from "@/components/studio-history-sidebar";
-import { AivroDrawableLoader } from "@/components/aivro-drawable-loader";
 import { useGenerationRetention } from "@/hooks/use-generation-retention";
 import { useI18n } from "@/hooks/use-i18n";
 import { useUserStore } from "@/stores/use-user-store";
@@ -12,6 +11,7 @@ import { deleteGenerationHistory } from "@/services/api/generation-history";
 import { formatDateTime } from "@/lib/datetime";
 import { reverseRunning, type ReverseRecord } from "./use-reverse-records";
 import studio from "@/components/studio-layout.module.css";
+import styles from "./prompt-reverse.module.css";
 
 export function ReverseHistory({ records, activeId, onSelect, onNew, refresh }: { records: ReverseRecord[]; activeId?: string; onSelect: (id: string) => void; onNew: () => void; refresh: () => Promise<void> }) {
     const { tr } = useI18n();
@@ -41,9 +41,9 @@ export function ReverseHistory({ records, activeId, onSelect, onNew, refresh }: 
         <div className="space-y-3">{records.map((record) => <article key={record.id} className={`rounded-xl border p-3 ${activeId === record.id ? "border-foreground bg-muted" : "border-border"}`}>
             <div className="mb-2 flex items-center gap-2"><Checkbox aria-label={tr("选择生成记录")} disabled={!record.history || removing} checked={selected.includes(record.id)} onChange={(event) => setSelected((ids) => event.target.checked ? [...ids, record.id] : ids.filter((id) => id !== record.id))} /><span className="truncate text-xs" data-i18n-skip>{record.model}</span></div>
             <button type="button" onClick={() => select(record.id)} className="block w-full text-left" aria-label={tr("查看详情")} aria-pressed={activeId === record.id}>
-                <div className="grid grid-cols-3 gap-1.5">{record.items.map((item, index) => <div key={index} className="relative aspect-square overflow-hidden rounded-md bg-muted">
-                    {item.media?.url ? <img src={item.media.url} alt="" className="size-full object-cover" /> : null}
-                    {reverseRunning(record.status) && reverseRunning(item.status) ? <div className="absolute inset-0 grid place-items-center bg-background/70"><AivroDrawableLoader compact className="w-10" /></div> : null}
+                <div className={styles.historyPreviews}>{record.items.map((item, index) => <div key={index} className={styles.historyPreview}>
+                    {item.media?.url ? <img src={item.media.url} alt="" /> : null}
+                    {reverseRunning(record.status) && item.status === "executing" ? <span className={styles.scan} aria-hidden="true" /> : null}
                 </div>)}</div>
                 <p className="mt-2 text-xs text-muted-foreground" data-i18n-skip>{reverseRunning(record.status) ? `${tr(record.status === "submitting" ? "提交中" : record.status === "queued" ? "排队中" : "正在反推")} · ${record.items.filter((item) => !reverseRunning(item.status)).length}/${record.items.length}` : tr(record.status === "succeeded" ? "反推完成" : "反推失败")}</p>
             </button>

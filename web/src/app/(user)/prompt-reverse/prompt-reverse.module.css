@@ -1,44 +1,60 @@
 .panels { display: flex; flex: 1; min-width: 0; min-height: 0; flex-direction: column; overflow: hidden; }
-.workspace { display: flex; flex: 1; width: 100%; min-width: 0; min-height: 0; flex-direction: column; align-items: center; overflow-y: auto; padding: 12px clamp(24px, 4cqw, 64px) 24px; background: var(--background); }
-.uploadArea { width: 100%; flex: none; margin: auto; padding-block: 16px; }
-.upload { display: flex; box-sizing: border-box; width: 100%; max-width: min(720px, calc(100dvh - 240px)); margin-inline: auto; aspect-ratio: 1; min-height: 0; flex-shrink: 0; flex-direction: column; align-items: center; justify-content: center; gap: 14px; border: 1px dashed var(--ring); border-radius: 24px; background: color-mix(in srgb, var(--muted) 40%, var(--background)); text-align: center; cursor: pointer; transition: background .2s, border-color .2s; }
+.workspace { display: flex; box-sizing: border-box; flex: 1; width: 100%; min-width: 0; min-height: 0; flex-direction: column; align-items: center; overflow-x: hidden; overflow-y: auto; scrollbar-gutter: stable both-edges; scrollbar-width: thin; scrollbar-color: var(--border) transparent; padding: 12px clamp(24px, 4cqw, 64px) 24px; background: var(--background); }
+.uploadArea { display: grid; place-items: center; width: 100%; flex: none; margin: auto; padding-block: 16px; }
+.upload { display: flex; box-sizing: border-box; width: 100%; max-width: clamp(280px, calc(100dvh - 240px), 720px); margin-inline: auto; aspect-ratio: 1; min-height: 0; flex-shrink: 0; flex-direction: column; align-items: center; justify-content: center; gap: 14px; border: 1px dashed var(--ring); border-radius: 24px; background: color-mix(in srgb, var(--muted) 40%, var(--background)); text-align: center; cursor: pointer; transition: background .2s, border-color .2s; }
 .upload:hover, .upload[data-dragging="true"] { border-color: var(--foreground); background: var(--muted); }
 .upload:disabled { cursor: wait; }
 .uploadIcon { display: grid; place-items: center; width: 76px; height: 76px; margin-bottom: 12px; border-radius: 22px; background: var(--background); color: var(--foreground); }
-.taskGrid { display: grid; width: 100%; grid-template-columns: repeat(3, minmax(0, 1fr)); align-content: start; gap: 24px; padding-block: 12px 24px; }
-.taskGrid[data-count="1"], .taskGrid[data-count="2"], .taskGrid[data-count="3"] { flex: 1; align-content: safe center; padding-block: 24px; }
-.taskGrid[data-count="1"] { max-width: 560px; margin-inline: auto; grid-template-columns: minmax(0, 1fr); }
-.taskGrid[data-count="2"] { max-width: 860px; margin-inline: auto; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.taskGrid[data-count="3"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.task { min-width: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 18px; background: var(--card); }
+.taskGrid { --task-columns: 3; --task-gap: 20px; display: flex; flex-wrap: wrap; justify-content: center; align-items: stretch; gap: var(--task-gap); width: 100%; }
+.taskGrid[data-count="1"] { --task-columns: 1; }
+.taskGrid[data-count="2"], .taskGrid[data-count="4"] { --task-columns: 2; }
+.task { display: flex; flex: 0 0 calc((100% - (var(--task-columns) - 1) * var(--task-gap)) / var(--task-columns)); min-width: 0; flex-direction: column; overflow: hidden; border: 1px solid var(--border); border-radius: 18px; background: var(--card); }
 .taskImage { position: relative; display: block; width: 100%; aspect-ratio: 4 / 3; overflow: hidden; background: var(--muted); cursor: default; }
-.taskImage img { width: 100%; height: 100%; object-fit: contain; }
+.taskImage > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center; }
 .task[data-status="success"] .taskImage { cursor: zoom-in; }
-.taskInfo { padding: 14px 16px; }
+.taskInfo { min-width: 0; flex: 1; padding: 14px 16px; }
+.taskActions { display: flex; min-height: 32px; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; font-size: 14px; }
+.scan { position: absolute; inset: 0; overflow: hidden; color: var(--foreground); background: color-mix(in srgb, var(--background) 12%, transparent); pointer-events: none; }
+.scan::after { content: ""; position: absolute; inset-inline: 0; top: 0; height: 22%; border-bottom: 2px solid currentColor; background: linear-gradient(transparent, color-mix(in srgb, currentColor 24%, transparent)); box-shadow: 0 8px 24px color-mix(in srgb, currentColor 24%, transparent); animation: scan 2.8s ease-in-out infinite alternate; will-change: transform; }
 .completed, .failed { position: absolute; left: 50%; top: 50%; display: grid; place-items: center; width: 88px; height: 88px; border-radius: 50%; background: var(--background); color: var(--foreground); transform: translate(-50%, -50%); box-shadow: 0 4px 24px #0002; pointer-events: none; }
 .completed { animation: complete .6s cubic-bezier(.16, 1, .3, 1) both; }
 .failed { color: var(--destructive); width: 64px; height: 64px; }
-.previews { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 20px; }
-.preview { position: relative; min-width: 0; border-radius: 12px; background: var(--muted); overflow: hidden; }
+.previews { --preview-columns: 3; --preview-gap: 12px; display: flex; flex-wrap: wrap; justify-content: center; gap: var(--preview-gap); margin-top: 20px; }
+.previews[data-count="1"] { --preview-columns: 1; max-width: 360px; margin-inline: auto; }
+.previews[data-count="2"], .previews[data-count="4"] { --preview-columns: 2; }
+.preview { position: relative; flex: 0 0 calc((100% - (var(--preview-columns) - 1) * var(--preview-gap)) / var(--preview-columns)); min-width: 0; border-radius: 12px; background: var(--muted); overflow: hidden; }
 .preview :global(.ant-image) { display: block; width: 100%; }
-.preview img { width: 100%; aspect-ratio: 4 / 3; object-fit: contain; }
+.preview img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; object-position: center; }
 .preview > button { position: absolute; right: 6px; top: 6px; display: grid; place-items: center; width: 26px; height: 26px; background: var(--background); color: var(--foreground); border-radius: 50%; cursor: pointer; }
 .detail { display: grid; grid-template-columns: minmax(0, .75fr) minmax(0, 1.25fr); align-items: start; gap: 24px; padding-top: 16px; }
+.historyPreviews { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.historyPreview { position: relative; flex: 0 0 calc((100% - 12px) / 3); min-width: 0; aspect-ratio: 1; overflow: hidden; border-radius: 8px; background: var(--muted); }
+.historyPreview > img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center; }
+@keyframes scan { from { transform: translateY(-100%); } to { transform: translateY(455%); } }
 @keyframes complete { from { opacity: 0; transform: translate(-50%, -50%) scale(.35) rotate(-15deg); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
-@container (max-width: 760px) { .taskGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }.uploadArea { padding-bottom: 24px; } }
-@container (max-width: 440px) { .taskGrid[data-count] { grid-template-columns: minmax(0, 1fr); }.taskImage { aspect-ratio: 3 / 2; }.upload { padding: 20px; } }
-@media (max-width: 640px) { .detail { grid-template-columns: minmax(0, 1fr); }.previews { gap: 8px; } }
-@media (prefers-reduced-motion: reduce) { .completed { animation: none; }.upload { transition: none; } }
+@container (max-width: 760px) { .taskGrid { --task-columns: 2; --task-gap: 14px; } }
+@container (max-width: 359px) { .taskGrid[data-count] { --task-columns: 1; --task-gap: 12px; } }
+@media (max-width: 640px) { .detail { grid-template-columns: minmax(0, 1fr); }.previews { --preview-columns: 2; --preview-gap: 8px; } }
+@media (prefers-reduced-motion: reduce) { .completed { animation: none; }.scan::after { animation: none; top: 40%; }.upload { transition: none; } }
 
 .header { padding-right: 132px; }
 .batch { width: 100%; max-width: 1080px; margin: auto; padding-block: 12px 24px; }
+.batch[data-count="1"] { max-width: 480px; }
+.batch[data-count="2"], .batch[data-count="4"] { max-width: 860px; }
 @container (min-width: 1040px) { .header { padding-right: 32px; } }
 @container (max-width: 600px) {
     .workspace { padding: 16px; }
     .uploadArea { padding: 16px 0; }
     .upload { max-width: 420px; padding: 16px; gap: 10px; border-radius: 20px; }
     .uploadIcon { width: 60px; height: 60px; margin-bottom: 4px; }
-    .taskInfo { padding: 10px; }
+    .taskGrid { --task-gap: 12px; }
+    .taskImage { aspect-ratio: 1; }
+    .taskInfo { padding: 10px; text-align: center; }
+    .taskActions { min-height: 56px; flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 4px; font-size: 13px; }
+    .taskActions > span { justify-content: center; }
+    .taskActions :global(.ant-btn) { height: auto; min-height: 28px; white-space: normal; font-size: 12px; }
+    .completed { width: 56px; height: 56px; }
+    .completed svg { width: 32px; height: 32px; }
+    .failed { width: 44px; height: 44px; }
+    .failed svg { width: 24px; height: 24px; }
 }
-
-@container (min-width: 441px) and (max-width: 760px) { .taskGrid[data-count]:not([data-count="1"]) { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; } }

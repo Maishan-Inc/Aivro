@@ -6,7 +6,6 @@ import { Check, Copy, ImagePlus, LoaderCircle, SearchCheck, X } from "lucide-rea
 import { nanoid } from "nanoid";
 import Link from "next/link";
 import { ModelPicker } from "@/components/model-picker";
-import { ImageGenerationPending } from "@/components/image-generation-pending";
 import { PromptReverseBilling } from "@/components/prompt-reverse-billing";
 import { ReverseHistory } from "./reverse-history";
 import { useReverseRecords, reverseRunning, type ReverseRecord } from "./use-reverse-records";
@@ -57,9 +56,11 @@ export default function PromptReversePage() {
     const visibleRecords = submitting.current ? savedRecords.filter((record) => beforeSubmit.current.has(record.id) || record.id === optimistic?.id) : savedRecords;
     const records = optimistic && !visibleRecords.some((record) => record.id === optimistic.id) ? [optimistic, ...visibleRecords] : visibleRecords.map((record) => record.id === optimistic?.id ? { ...record, items: record.items.map((item, index) => ({ ...item, media: item.media || optimistic.items[index]?.media })) } : record);
     const active = records.find((record) => record.id === activeId) || (activeId === null ? records.find((record) => reverseRunning(record.status)) : undefined);
+    const activeRunning = reverseRunning(active?.status || "");
     const tasks = (active?.items || []).map((item, index) => ({
-        id: String(index), name: item.name, image: item.media?.url, error: item.error,
-        status: reverseRunning(item.status) ? "running" : item.status === "succeeded" ? "success" : "error",
+        id: String(index), name: item.name, image: item.media?.url, error: item.error || (reverseRunning(item.status) && !activeRunning ? active?.error : undefined),
+        processing: activeRunning && item.status === "executing",
+        status: item.status === "succeeded" ? "success" : reverseRunning(item.status) && activeRunning ? "running" : "error",
         result: item.result && active?.history ? { ...active.history, result: item.result, media: item.media ? [item.media] : [] } : undefined,
     }));
     const enabled = Boolean(settings?.explore?.promptReverseEnabled && canAccessPath(user, "/prompt-reverse"));
@@ -135,28 +136,28 @@ export default function PromptReversePage() {
                             <span className="text-sm text-muted-foreground">{tr("最多 6 张图片 · 每张不超过 5MB")}</span>
                             <span className="text-sm text-muted-foreground" data-i18n-skip>PNG / JPEG / WebP</span>
                         </button>
-                    </div> : <div className={styles.batch}><div className={styles.taskGrid} data-count={tasks.length}>
+                    </div> : <div className={styles.batch} data-count={tasks.length}><div className={styles.taskGrid} data-count={tasks.length}>
                         {tasks.map((task) => <article key={task.id} className={styles.task} data-status={task.status}>
-                            <button type="button" className={styles.taskImage} onDoubleClick={() => task.result && setSelected(task.result)} onKeyDown={(event) => { if (task.result && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); setSelected(task.result); } }} aria-label={tr(task.status === "success" ? "双击查看提示词" : task.status === "running" ? "正在反推" : "反推失败")}>
+                            <button type="button" className={styles.taskImage} onDoubleClick={() => task.result && setSelected(task.result)} onKeyDown={(event) => { if (task.result && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); setSelected(task.result); } }} aria-label={tr(task.status === "success" ? "双击查看提示词" : task.status === "running" ? task.processing ? "正在反推" : "等待处理" : "反推失败")}>
                                 {task.image ? <img src={task.image} alt={task.name} data-i18n-skip /> : null}
-                                {task.status === "running" ? <ImageGenerationPending className="!absolute inset-0 !h-full !min-h-0" label={tr("正在反推")} progress={active.progress} /> : task.status === "success" ? <span className={styles.completed} aria-hidden="true"><Check size={52} strokeWidth={3} /></span> : <span className={styles.failed} aria-hidden="true"><X size={32} /></span>}
+                                {task.processing ? <span className={styles.scan} aria-hidden="true" /> : task.status === "success" ? <span className={styles.completed} aria-hidden="true"><Check size={52} strokeWidth={3} /></span> : task.status === "error" ? <span className={styles.failed} aria-hidden="true"><X size={32} /></span> : null}
                             </button>
                             <div className={styles.taskInfo}><p className="truncate text-sm font-medium" title={task.name} data-i18n-skip>{task.name}</p>
-                                <div className="mt-2 flex min-h-8 flex-wrap items-center justify-between gap-2 text-sm" aria-live="polite">
-                                    <span className="flex items-center gap-2 text-muted-foreground">{task.status === "running" ? <LoaderCircle size={14} className="animate-spin" /> : null}{tr(task.status === "running" ? "正在反推" : task.status === "success" ? "反推完成" : "反推失败")}</span>
+                                <div className={styles.taskActions} aria-live="polite">
+                                    <span className="flex items-center gap-2 text-muted-foreground">{tr(task.status === "running" ? task.processing ? "正在反推" : "等待处理" : task.status === "success" ? "反推完成" : "反推失败")}</span>
                                     {task.result ? <Button type="text" size="small" onClick={() => setSelected(task.result!)}>{tr("查看提示词")}</Button> : null}
                                 </div>
                                 {task.error ? <p className="mt-1 break-words text-sm text-destructive" role="alert">{tr(task.error)}</p> : null}
                             </div>
                         </article>)}
-                    </div><div className="mx-auto mt-4 w-full max-w-2xl"><PromptReverseBilling items={active.items} credits={active.credits} settled={!reverseRunning(active.status)} />{active.error ? <p className="mt-3 text-sm text-destructive" role="alert">{tr(active.error)}</p> : null}</div></div>}
+                    </div><div className="mx-auto mt-4 w-full max-w-2xl"><PromptReverseBilling items={active.items} credits={active.credits} settled={!activeRunning} />{active.error ? <p className="mt-3 text-sm text-destructive" role="alert">{tr(active.error)}</p> : null}</div></div>}
                 </section>
             </div>
             {token ? <ReverseHistory key={user?.id} records={records} activeId={active?.id} onSelect={setActiveId} onNew={newTask} refresh={refresh} /> : null}
         </div>
         <input ref={fileInput} hidden multiple type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => { void readImages(Array.from(event.target.files || [])); event.target.value = ""; }} />
         <Modal centered title={tr("确认反推任务")} open={pending.length > 0} width={680} onCancel={() => setPending([])} onOk={() => void reverse()} okText={tr("确认反推 {0} 张图片").replace("{0}", String(pending.length))} cancelText={tr("取消")} okButtonProps={{ disabled: !currentModel }}>
-            <div className={styles.previews}>{pending.map((item) => <div key={item.id} className={styles.preview}>
+            <div className={styles.previews} data-count={pending.length}>{pending.map((item) => <div key={item.id} className={styles.preview}>
                 <Image src={item.image} alt={item.name} data-i18n-skip /><button type="button" aria-label={tr("移除参考图")} onClick={() => setPending((items) => items.filter((image) => image.id !== item.id))}><X size={14} /></button>
             </div>)}</div>
             <div className="my-5"><ModelPicker config={config} kind="text" models={models} value={currentModel} onChange={setModel} fullWidth /></div>
