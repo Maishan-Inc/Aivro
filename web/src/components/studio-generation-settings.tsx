@@ -13,7 +13,7 @@ import { useThemeStore } from "@/stores/use-theme-store";
 import { getVideoCapabilities, resolveVideoConfig, videoDurationsFor } from "@/lib/video-models";
 import { clampImageSize, imageSizeLimit } from "@/lib/model-resolutions";
 
-export function StudioGenerationSettings({ kind, part, onModelOpenChange }: { kind: "image" | "video"; part?: "model" | "settings"; onModelOpenChange?: (open: boolean) => void }) {
+export function StudioGenerationSettings({ kind, part, onModelOpenChange, disabled = false }: { kind: "image" | "video"; part?: "model" | "settings"; onModelOpenChange?: (open: boolean) => void; disabled?: boolean }) {
     const { message } = App.useApp();
     const baseConfig = useEffectiveConfig();
     const config = kind === "video" ? resolveVideoConfig(baseConfig, baseConfig.videoModel) : baseConfig;
@@ -28,19 +28,19 @@ export function StudioGenerationSettings({ kind, part, onModelOpenChange }: { ki
     const quantityOptions = image ? Array.from({ length: 10 }, (_, index) => String(index + 1)) : videoDurationsFor(model, config.vquality).map(String);
     const changeModel = (value: string) => image ? setConfig({ imageModel: value, size: clampImageSize(config.size, imageSizeLimit(value)) }) : updateConfig("videoModel", value);
 
-    if (part === "model") return <ModelPicker config={config} kind={kind} count={count} models={image ? config.imageModels : config.videoModels} value={model} onChange={changeModel} onOpenChange={onModelOpenChange} onMissingConfig={() => message.warning("管理员尚未配置可用模型")} />;
+    if (part === "model") return <ModelPicker disabled={disabled} config={config} kind={kind} count={count} models={image ? config.imageModels : config.videoModels} value={model} onChange={changeModel} onOpenChange={onModelOpenChange} onMissingConfig={() => message.warning("管理员尚未配置可用模型")} />;
 
     return <>
-        {part ? null : <ModelPicker config={config} kind={kind} count={count} models={image ? config.imageModels : config.videoModels} value={model} onChange={changeModel} onOpenChange={onModelOpenChange} onMissingConfig={() => message.warning("管理员尚未配置可用模型")} />}
-        <Button type="text" icon={<Scan size={14} />} onClick={() => setOpen(true)} title="调整宽高比和尺寸">{image ? imageSizeLabel(config.size) : videoSizeLabel(config.size)}<ChevronDown size={12} /></Button>
-        <Dropdown trigger={["click"]} placement="bottomLeft" menu={{ selectable: true, selectedKeys: [image ? config.quality : config.vquality], items: qualityOptions.map((key) => ({ key, label: image ? imageQualityLabel(key) : videoResolutionLabel(key) })), onClick: ({ key }) => updateConfig(image ? "quality" : "vquality", key) }}>
-            <Button type="text" title={image ? "图像质量" : "视频清晰度"}>{image ? imageQualityLabel(config.quality) : videoResolutionLabel(config.vquality)}<ChevronDown size={12} /></Button>
+        {part ? null : <ModelPicker disabled={disabled} config={config} kind={kind} count={count} models={image ? config.imageModels : config.videoModels} value={model} onChange={changeModel} onOpenChange={onModelOpenChange} onMissingConfig={() => message.warning("管理员尚未配置可用模型")} />}
+        <Button disabled={disabled} type="text" icon={<Scan size={14} />} onClick={() => setOpen(true)} title="调整宽高比和尺寸">{image ? imageSizeLabel(config.size) : videoSizeLabel(config.size)}<ChevronDown size={12} /></Button>
+        <Dropdown disabled={disabled} trigger={["click"]} placement="bottomLeft" menu={{ selectable: true, selectedKeys: [image ? config.quality : config.vquality], items: qualityOptions.map((key) => ({ key, label: image ? imageQualityLabel(key) : videoResolutionLabel(key) })), onClick: ({ key }) => updateConfig(image ? "quality" : "vquality", key) }}>
+            <Button disabled={disabled} type="text" title={image ? "图像质量" : "视频清晰度"}>{image ? imageQualityLabel(config.quality) : videoResolutionLabel(config.vquality)}<ChevronDown size={12} /></Button>
         </Dropdown>
-        <Dropdown trigger={["click"]} placement="bottomLeft" menu={{ selectable: true, selectedKeys: [image ? count : config.videoSeconds], items: quantityOptions.map((key) => ({ key, label: image ? `${key} 张` : `${key} 秒` })), onClick: ({ key }) => updateConfig(image ? "count" : "videoSeconds", key) }}>
-            <Button type="text" title={image ? "生成张数" : "视频时长"}>{image ? `${count} 张` : videoSecondsLabel(config.videoSeconds)}<ChevronDown size={12} /></Button>
+        <Dropdown disabled={disabled} trigger={["click"]} placement="bottomLeft" menu={{ selectable: true, selectedKeys: [image ? count : config.videoSeconds], items: quantityOptions.map((key) => ({ key, label: image ? `${key} 张` : `${key} 秒` })), onClick: ({ key }) => updateConfig(image ? "count" : "videoSeconds", key) }}>
+            <Button disabled={disabled} type="text" title={image ? "生成张数" : "视频时长"}>{image ? `${count} 张` : videoSecondsLabel(config.videoSeconds)}<ChevronDown size={12} /></Button>
         </Dropdown>
-        <Button type="text" icon={<SlidersHorizontal size={14} />} onClick={() => setOpen(true)} aria-label="打开生成参数" title="更多参数" />
-        <Modal centered title={image ? "图像生成参数" : "视频生成参数"} open={open} onCancel={() => setOpen(false)} footer={<Button type="primary" onClick={() => setOpen(false)}>完成</Button>} width={540}>
+        <Button disabled={disabled} type="text" icon={<SlidersHorizontal size={14} />} onClick={() => setOpen(true)} aria-label="打开生成参数" title="更多参数" />
+        <Modal centered title={image ? "图像生成参数" : "视频生成参数"} open={open && !disabled} onCancel={() => setOpen(false)} footer={<Button type="primary" onClick={() => setOpen(false)}>完成</Button>} width={540}>
             {image ? <ImageSettingsPanel config={{ ...config, model }} onConfigChange={(key, value) => updateConfig(key, value)} theme={theme} showTitle={false} className="space-y-5 py-4" maxCount={10} /> : <VideoSettingsPanel config={config} onConfigChange={(key, value) => updateConfig(key, value)} theme={theme} showTitle={false} className="space-y-5 py-4" />}
             <ModelBilling model={model} kind={kind} count={count} video={config} />
         </Modal>

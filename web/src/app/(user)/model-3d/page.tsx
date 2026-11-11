@@ -7,12 +7,14 @@ import { Model3DLoading } from "@/components/model-3d-loading";
 import { useI18n } from "@/hooks/use-i18n";
 import { StudioEmptyState } from "@/components/studio-empty-state";
 import { StudioHistorySidebar } from "@/components/studio-history-sidebar";
+import { PromptInput } from "@/components/prompt-input";
+import { usePromptComposer } from "@/hooks/use-prompt-composer";
 import studio from "@/components/studio-layout.module.css";
 import composer from "@/components/image-prompt-composer.module.css";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { App, Button, Checkbox, Drawer, Dropdown, Empty, Input, InputNumber, Modal, Popconfirm, Select, Spin, Tag } from "antd";
+import { App, Button, Checkbox, Drawer, Dropdown, Empty, InputNumber, Modal, Popconfirm, Select, Spin, Tag } from "antd";
 import { ArrowUp, CheckSquare, ChevronDown, Download, FileText, FolderPlus, History, Plus, SlidersHorizontal, Trash2, Upload, X } from "lucide-react";
 import { useUserStore } from "@/stores/use-user-store";
 import { useAssetStore } from "@/stores/use-asset-store";
@@ -61,8 +63,6 @@ export default function Model3DPage() {
 
     const [mode, setMode] = useState<"image" | "multi_image" | "text">("text");
     const [prompt, setPrompt] = useState("");
-    const [composerFocused, setComposerFocused] = useState(false);
-    const [modelOpen, setModelOpen] = useState(false);
     const [images, setImages] = useState<UploadedReference[]>([]);
     const [textureEnabled, setTextureEnabled] = useState(true);
     const [pbrEnabled, setPbrEnabled] = useState(true);
@@ -84,6 +84,7 @@ export default function Model3DPage() {
     const referenceViews = generationMode === "multi_image" ? capabilities.referenceViews || [] : [];
 
     const [generating, setGenerating] = useState(false);
+    const promptComposer = usePromptComposer(generating);
     const [uploading, setUploading] = useState(false);
     const [dragging, setDragging] = useState(false);
     const [previewIndex, setPreviewIndex] = useState(0);
@@ -189,6 +190,8 @@ export default function Model3DPage() {
             return;
         }
 
+        promptComposer.close();
+        setDragging(false);
         setGenerating(true);
         setCurrentResult(null);
         setPreviewIndex(0);
@@ -263,6 +266,7 @@ export default function Model3DPage() {
     };
 
     const createSession = () => {
+        if (generating || uploading) return;
         setPrompt("");
         setImages([]);
         setCurrentResult(null);
@@ -301,7 +305,7 @@ export default function Model3DPage() {
     };
 
     const canGenerate = !uploading && (generationMode === "text" ? Boolean(prompt.trim()) : imageCountValid);
-    const composerExpanded = modelOpen || dragging || composerFocused || Boolean(prompt.trim()) || images.length > 0;
+    const composerExpanded = promptComposer.expanded || (!generating && dragging);
 
     return (
         <div className={studio.studio}>
@@ -389,13 +393,13 @@ export default function Model3DPage() {
                         </div> : null}
                     </div>
                     <div className={studio.form}>
-                        <div className={composer.composer} data-expanded={composerExpanded} data-dragging={dragging}
+                        <div ref={promptComposer.ref} className={composer.composer} data-expanded={composerExpanded} data-dragging={dragging}
                             onDragOver={(event) => { if (event.dataTransfer.types.includes("Files")) { event.preventDefault(); event.dataTransfer.dropEffect = generating || uploading ? "none" : "copy"; if (!generating && !uploading) setDragging(true); } }}
                             onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false); }}
-                            onDrop={(event) => { event.preventDefault(); setDragging(false); void handleImageUpload(Array.from(event.dataTransfer.files)); }}
-                            onFocus={() => setComposerFocused(true)} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setComposerFocused(false); }}>
+                            onDrop={(event) => { event.preventDefault(); setDragging(false); if (!generating) { promptComposer.open(); void handleImageUpload(Array.from(event.dataTransfer.files)); } }}
+                            onFocus={promptComposer.open} onBlur={promptComposer.onBlur}>
                             {dragging ? <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-[inherit] border-2 border-dashed border-foreground bg-background/95 text-sm">{tr("松开以上传参考图")}</div> : null}
-                            {images.length ? <div className={composer.references}>
+                            {composerExpanded && images.length ? <div className={composer.references}>
                                 {images.map((img, index) => <div key={img.id} className={composer.reference}>
                                     <img src={img.dataUrl} alt={img.name} data-i18n-skip />
                                     <button type="button" disabled={generating || uploading} onClick={() => setImages((value) => value.filter((item) => item.id !== img.id))} aria-label="移除参考图"><X size={13} /></button>
@@ -404,33 +408,33 @@ export default function Model3DPage() {
                             </div> : null}
                             <div className={composer.main}><div className={composer.body}>
                             <div className={composer.inputRow}>
-                            <Input.TextArea value={prompt} onChange={(event) => setPrompt(event.target.value)} variant="borderless" autoSize={{ minRows: 1 }} disabled={generating} aria-label="模型描述" placeholder={recordOnlyPrompt ? "上传参考图，描述仅用于记录…" : generationMode === "text" ? "描述你想创造的形体、材质和风格…" : "添加参考图，也可以补充模型描述…"} onKeyDown={(event) => {
+                            <PromptInput expanded={composerExpanded} onExpand={promptComposer.open} value={prompt} onChange={(event) => { if (!generating) setPrompt(event.target.value); }} variant="borderless" autoSize={{ minRows: 1 }} readOnly={generating} aria-label="模型描述" placeholder={recordOnlyPrompt ? "上传参考图，描述仅用于记录…" : generationMode === "text" ? "描述你想创造的形体、材质和风格…" : "添加参考图，也可以补充模型描述…"} onKeyDown={(event) => {
                                 if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
                                     event.preventDefault();
                                     if (canGenerate && !generating) void handleGenerate();
                                 }
                             }} />
                             </div>
-                            <div className={composer.controls}><div><div className={composer.toolbar} inert={!composerExpanded}>
+                            <div className={composer.controls}><div><div className={composer.toolbar} inert={!composerExpanded || generating}>
                                 <div className={composer.toolbarRow}>
-                                <ModelPicker onOpenChange={setModelOpen} config={effectiveConfig} kind="model3d" model3D={generationOptions} models={effectiveConfig.model3DModels} value={model} onChange={(value) => updateConfig("model3DModel", value)} onMissingConfig={() => message.warning("管理员尚未配置可用3D模型")} />
+                                <ModelPicker disabled={generating} config={effectiveConfig} kind="model3d" model3D={generationOptions} models={effectiveConfig.model3DModels} value={model} onChange={(value) => updateConfig("model3DModel", value)} onMissingConfig={() => message.warning("管理员尚未配置可用3D模型")} />
                                 </div>
                                 <div className={composer.toolbarRow}>
                                 <Button className={composer.upload} type="text" shape="circle" icon={<Upload size={17} />} loading={uploading} disabled={generating} onClick={() => fileInputRef.current?.click()} aria-label="上传参考图" title="上传参考图" />
-                                <Dropdown trigger={["click"]} placement="topLeft" menu={{ selectable: true, selectedKeys: [generationMode], items: [
+                                <Dropdown disabled={generating} trigger={["click"]} placement="topLeft" menu={{ selectable: true, selectedKeys: [generationMode], items: [
                                     { key: "text", label: "文字生成", disabled: !capabilities.modes.includes("text") }, { key: "image", label: "图片生成", disabled: !capabilities.modes.includes("image") }, { key: "multi_image", label: "多图生成", disabled: !capabilities.modes.includes("multi_image") },
                                 ], onClick: ({ key }) => setMode(key as typeof mode) }}>
-                                    <Button type="text">{generationMode === "text" ? "文字生成" : generationMode === "image" ? "图片生成" : "多图生成"}<ChevronDown size={12} /></Button>
+                                    <Button disabled={generating} type="text">{generationMode === "text" ? "文字生成" : generationMode === "image" ? "图片生成" : "多图生成"}<ChevronDown size={12} /></Button>
                                 </Dropdown>
-                                <Dropdown trigger={["click"]} placement="topLeft" menu={{ selectable: true, selectedKeys: [generationOptions.meshQuality], items: [
+                                <Dropdown disabled={generating} trigger={["click"]} placement="topLeft" menu={{ selectable: true, selectedKeys: [generationOptions.meshQuality], items: [
                                     { key: "standard", label: "标准网格" }, { key: "high", label: "高质量网格", disabled: !capabilities.qualities.includes("high") }, { key: "ultra", label: "超高质量网格", disabled: !capabilities.qualities.includes("ultra") },
                                 ], onClick: ({ key }) => setMeshQuality(key as typeof meshQuality) }}>
-                                    <Button type="text" disabled={capabilities.qualities.length === 1}>{generationOptions.meshQuality === "standard" ? "标准" : generationOptions.meshQuality === "high" ? "高质量" : "超高质量"}<ChevronDown size={12} /></Button>
+                                    <Button type="text" disabled={generating || capabilities.qualities.length === 1}>{generationOptions.meshQuality === "standard" ? "标准" : generationOptions.meshQuality === "high" ? "高质量" : "超高质量"}<ChevronDown size={12} /></Button>
                                 </Dropdown>
-                                <Dropdown trigger={["click"]} placement="topLeft" menu={{ selectable: true, selectedKeys: [String(generationOptions.quantity)], items: [1, 2, 3, 4].map((value) => ({ key: String(value), label: value > 1 ? `${value} 个 Pro` : "1 个", disabled: value > capabilities.maxQuantity })), onClick: ({ key }) => setQuantity(Number(key)) }}>
-                                    <Button type="text">{generationOptions.quantity} 个<ChevronDown size={12} /></Button>
+                                <Dropdown disabled={generating} trigger={["click"]} placement="topLeft" menu={{ selectable: true, selectedKeys: [String(generationOptions.quantity)], items: [1, 2, 3, 4].map((value) => ({ key: String(value), label: value > 1 ? `${value} 个 Pro` : "1 个", disabled: value > capabilities.maxQuantity })), onClick: ({ key }) => setQuantity(Number(key)) }}>
+                                    <Button disabled={generating} type="text">{generationOptions.quantity} 个<ChevronDown size={12} /></Button>
                                 </Dropdown>
-                                <Button type="text" icon={<SlidersHorizontal size={14} />} onClick={() => setSettingsOpen(true)} aria-label="调整材质和面数" title="材质和面数" />
+                                <Button disabled={generating} type="text" icon={<SlidersHorizontal size={14} />} onClick={() => setSettingsOpen(true)} aria-label="调整材质和面数" title="材质和面数" />
                                 </div>
                             </div></div></div>
                             </div>
@@ -465,7 +469,7 @@ export default function Model3DPage() {
             <Drawer title="生成记录" placement="right" size={340} open={historyOpen} onClose={() => setHistoryOpen(false)}>
                 <HistoryPanel histories={histories} retentionDays={retentionDays} activeId={currentResult?.id} loading={loadingHistory} onNew={generating || uploading ? undefined : () => { createSession(); setHistoryOpen(false); }} onRefresh={handleLoadHistory} onPreview={previewHistory} onOpenDetail={setDetailHistory} />
             </Drawer>
-            <Modal centered title="模型生成参数" open={settingsOpen} onCancel={() => setSettingsOpen(false)} footer={<Button type="primary" onClick={() => setSettingsOpen(false)}>完成</Button>} width={500}>
+            <Modal centered title="模型生成参数" open={settingsOpen && !generating} onCancel={() => setSettingsOpen(false)} footer={<Button type="primary" onClick={() => setSettingsOpen(false)}>完成</Button>} width={500}>
                 <div className="grid grid-cols-2 gap-5 py-4">
                     <label className="space-y-2"><span className="block text-sm">纹理</span><Select className="w-full" disabled={!capabilities.texture} value={generationOptions.textureEnabled ? "on" : "off"} onChange={(value) => setTextureEnabled(value === "on")} options={[{ value: "on", label: "生成纹理" }, { value: "off", label: "关闭纹理" }]} /></label>
                     <label className="space-y-2"><span className="block text-sm">PBR 材质</span><Select className="w-full" disabled={!capabilities.pbr || !generationOptions.textureEnabled} value={generationOptions.pbrEnabled ? "on" : "off"} onChange={(value) => setPbrEnabled(value === "on")} options={[{ value: "on", label: "开启 PBR" }, { value: "off", label: "关闭 PBR" }]} /></label>

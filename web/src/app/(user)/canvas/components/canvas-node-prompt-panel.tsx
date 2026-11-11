@@ -11,6 +11,8 @@ import { App, Button } from "antd";
 
 import { ModelPicker } from "@/components/model-picker";
 import { ModelBilling } from "@/components/model-billing";
+import { PromptInput } from "@/components/prompt-input";
+import { usePromptComposer } from "@/hooks/use-prompt-composer";
 import { defaultConfig, resolveVideoModel, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { useThemeStore } from "@/stores/use-theme-store";
@@ -46,14 +48,16 @@ export function CanvasNodePromptPanel({ node, isRunning, inputs, onHighlightInpu
     const hasImageContent = node.type === CanvasNodeType.Image && Boolean(node.metadata?.content);
     const isEditingExistingContent = hasTextContent || hasImageContent;
     const [prompt, setPrompt] = useState(isEditingExistingContent ? "" : node.metadata?.prompt || "");
+    const promptComposer = usePromptComposer(isRunning, true);
     const canGenerate = Boolean(prompt.trim() || inputs.some((input) => input.text?.trim() || (!hasImageContent && input.image)));
     const warnMissingModel = () => message.warning(tr("管理员尚未配置可用模型"));
 
     useEffect(() => {
         setPrompt(isEditingExistingContent ? "" : node.metadata?.prompt || "");
-    }, [isEditingExistingContent, node.id]);
+    }, [node.id]);
 
     const updatePrompt = (value: string) => {
+        if (isRunning) return;
         setPrompt(value);
         if (!isEditingExistingContent) onPromptChange(node.id, value);
     };
@@ -61,21 +65,29 @@ export function CanvasNodePromptPanel({ node, isRunning, inputs, onHighlightInpu
     const submit = () => {
         const text = prompt.trim();
         if (!canGenerate || isRunning) return;
+        promptComposer.close();
         onGenerate(node.id, mode, text);
     };
 
     return (
         <div
+            ref={promptComposer.ref}
             data-canvas-prompt-panel
-            className="flex flex-col gap-5 rounded-2xl border p-4 shadow-2xl backdrop-blur"
+            className={`flex flex-col ${promptComposer.expanded ? "gap-5" : "gap-0"} rounded-2xl border p-4 shadow-2xl backdrop-blur`}
             style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.node.text }}
             onMouseDown={(event) => event.stopPropagation()}
             onPointerDown={(event) => event.stopPropagation()}
             onWheel={(event) => event.stopPropagation()}
+            onFocus={promptComposer.open}
+            onBlur={promptComposer.onBlur}
         >
-            <CanvasNodeReferences inputs={inputs} onHighlight={onHighlightInput} />
-            {mode === "video" ? <p className="m-0 text-xs" style={{ color: theme.node.muted }}>{tr("视频生成最多支持 7 张参考图")}</p> : null}
-            <textarea
+            {promptComposer.expanded ? <CanvasNodeReferences inputs={inputs} onHighlight={onHighlightInput} /> : null}
+            {promptComposer.expanded && mode === "video" ? <p className="m-0 text-xs" style={{ color: theme.node.muted }}>{tr("视频生成最多支持 7 张参考图")}</p> : null}
+            <PromptInput
+                expanded={promptComposer.expanded}
+                onExpand={promptComposer.open}
+                readOnly={isRunning}
+                autoFocus={false}
                 value={prompt}
                 onChange={(event) => updatePrompt(event.target.value)}
                 onKeyDown={(event) => {
@@ -83,25 +95,27 @@ export function CanvasNodePromptPanel({ node, isRunning, inputs, onHighlightInpu
                     event.preventDefault();
                     submit();
                 }}
-                className="thin-scrollbar m-0 block h-28 min-h-28 w-full shrink-0 resize-none rounded-xl border px-3 py-2 text-sm leading-5 outline-none"
+                variant="borderless"
+                autoSize={{ minRows: 4, maxRows: 8 }}
+                className="thin-scrollbar m-0 w-full shrink-0 resize-none rounded-xl border px-3 py-2 text-sm leading-5 outline-none"
                 aria-label={tr("提示词")}
                 style={{ background: theme.node.fill, borderColor: theme.node.stroke, color: theme.node.text }}
                 placeholder={tr(mode === "model3d" ? "描述你想创造的形体、材质和风格…" : mode === "video" ? "描述要生成的视频内容" : mode === "image" ? (hasImageContent ? "请输入你想要把这张图修改成什么" : "描述要生成的图片内容") : hasTextContent ? "请输入你想要将本段文本修改成什么" : "请输入你想要生成的文本内容")}
             />
 
-            <div className="thin-scrollbar flex min-w-0 shrink-0 items-center gap-2 overflow-x-auto py-1 [&_.canvas-composer-model-picker]:min-h-10" data-canvas-no-zoom>
-                <ModelPicker showBilling={false} className="max-w-none" config={config} kind={mode} model3D={mode === "model3d" ? model3D.options : undefined} models={mode === "model3d" ? config.model3DModels : mode === "image" ? config.imageModels : mode === "video" ? config.videoModels : config.textModels} value={config.model} onChange={(model) => onConfigChange(node.id, { model, ...(mode === "image" ? { size: clampImageSize(config.size, imageSizeLimit(model)) } : {}) })} onMissingConfig={warnMissingModel} />
-                {mode === "model3d" ? <CanvasModel3DSettings node={node} onChange={(patch) => onConfigChange(node.id, patch)} /> : mode === "image" ? (
+            <div hidden={!promptComposer.expanded} className={`${promptComposer.expanded ? "flex" : "hidden"} thin-scrollbar min-w-0 shrink-0 items-center gap-2 overflow-x-auto py-1 [&_.canvas-composer-model-picker]:min-h-10`} data-canvas-no-zoom inert={isRunning}>
+                <ModelPicker disabled={isRunning} showBilling={false} className="max-w-none" config={config} kind={mode} model3D={mode === "model3d" ? model3D.options : undefined} models={mode === "model3d" ? config.model3DModels : mode === "image" ? config.imageModels : mode === "video" ? config.videoModels : config.textModels} value={config.model} onChange={(model) => { if (!isRunning) onConfigChange(node.id, { model, ...(mode === "image" ? { size: clampImageSize(config.size, imageSizeLimit(model)) } : {}) }); }} onMissingConfig={warnMissingModel} />
+                {mode === "model3d" ? <CanvasModel3DSettings node={node} onChange={(patch) => { if (!isRunning) onConfigChange(node.id, patch); }} /> : mode === "image" ? (
                     <CanvasImageSettingsPopover
                         config={config}
                         placement="topLeft"
                         buttonClassName="!h-10 !justify-start !rounded-full !px-3"
-                        onConfigChange={(key, value) => onConfigChange(node.id, key === "count" ? { count: Number(value) || 1 } : { [key]: value })}
+                        onConfigChange={(key, value) => { if (!isRunning) onConfigChange(node.id, key === "count" ? { count: Number(value) || 1 } : { [key]: value }); }}
                         onMissingConfig={warnMissingModel}
                         onOpenChange={onImageSettingsOpenChange}
                     />
                 ) : mode === "video" ? (
-                    <CanvasVideoSettingsPopover config={config} buttonClassName="!min-h-10 !rounded-full !px-3" onConfigChange={(key, value) => onConfigChange(node.id, key === "videoSeconds" ? { seconds: value } : { [key]: value })} />
+                    <CanvasVideoSettingsPopover config={config} buttonClassName="!min-h-10 !rounded-full !px-3" onConfigChange={(key, value) => { if (!isRunning) onConfigChange(node.id, key === "videoSeconds" ? { seconds: value } : { [key]: value }); }} />
                 ) : null}
                 <Button
                     type="primary"

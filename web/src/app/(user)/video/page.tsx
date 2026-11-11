@@ -4,13 +4,15 @@ import { useGenerationRetention } from "@/hooks/use-generation-retention";
 
 import { StudioEmptyState } from "@/components/studio-empty-state";
 import { StudioGenerationSettings } from "@/components/studio-generation-settings";
+import { PromptInput } from "@/components/prompt-input";
+import { usePromptComposer } from "@/hooks/use-prompt-composer";
 import { StudioHistorySidebar } from "@/components/studio-history-sidebar";
 import studio from "@/components/studio-layout.module.css";
 import composer from "@/components/image-prompt-composer.module.css";
 
 import { ArrowUp, BookOpen, CheckSquare, ClipboardPaste, Download, FileText, FolderPlus, History, LoaderCircle, Plus, Trash2, Upload, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { App, Button, Checkbox, Drawer, Dropdown, Input, Modal, Tag, Typography } from "antd";
+import { App, Button, Checkbox, Drawer, Dropdown, Modal, Tag, Typography } from "antd";
 import { useSearchParams } from "next/navigation";
 import { nanoid } from "nanoid";
 import { saveAs } from "file-saver";
@@ -84,14 +86,13 @@ export default function VideoPage() {
     const addAsset = useAssetStore((state) => state.addAsset);
     const token = useUserStore((state) => state.token);
     const [prompt, setPrompt] = useState("");
-    const [composerFocused, setComposerFocused] = useState(false);
-    const [modelOpen, setModelOpen] = useState(false);
     const [references, setReferences] = useState<ReferenceImage[]>([]);
     const [results, setResults] = useState<GenerationResult[]>([]);
     const [logs, setLogs] = useState<GenerationLog[]>([]);
     const retention = useGenerationRetention();
     const retentionDays = retention.data?.days.video ?? null;
     const [running, setRunning] = useState(false);
+    const promptComposer = usePromptComposer(running);
     const [logsOpen, setLogsOpen] = useState(false);
     const [promptDialogOpen, setPromptDialogOpen] = useState(false);
     const [assetPickerOpen, setAssetPickerOpen] = useState(false);
@@ -105,7 +106,7 @@ export default function VideoPage() {
     const model = effectiveConfig.videoModel;
     const maxReferences = getVideoCapabilities(model).maxImages;
     const canGenerate = Boolean(prompt.trim());
-    const composerExpanded = modelOpen || composerFocused || canGenerate || references.length > 0;
+    const composerExpanded = promptComposer.expanded;
 
     useEffect(() => {
         const urlPrompt = searchParams.get("prompt");
@@ -123,6 +124,7 @@ export default function VideoPage() {
     }, [token, retention.dataUpdatedAt]);
 
     const addReferences = async (files?: FileList | File[] | null) => {
+        if (running) return;
         const imageFiles = Array.from(files || []).filter((file) => file.type.startsWith("image/"));
         if (imageFiles.length + references.length > maxReferences) { message.warning("参考图数量不符合当前视频模型要求"); return; }
         const nextReferences = await Promise.all(
@@ -135,6 +137,7 @@ export default function VideoPage() {
     };
 
     const addReferencesFromClipboard = async () => {
+        if (running) return;
         try {
             const items = await navigator.clipboard.read();
             const blobs = await Promise.all(items.flatMap((item) => item.types.filter((type) => type.startsWith("image/")).map((type) => item.getType(type))));
@@ -157,8 +160,10 @@ export default function VideoPage() {
     };
 
     const generate = async () => {
+        if (running) return;
         const snapshot = buildRequestSnapshot();
         if (!snapshot) return;
+        promptComposer.close();
         setElapsedMs(0);
         setRunning(true);
         setPreviewLog(null);
@@ -232,6 +237,7 @@ export default function VideoPage() {
     };
 
     const insertPickedAsset = async (payload: InsertAssetPayload) => {
+        if (running) return;
         if (payload.kind === "text") {
             setPrompt(payload.content);
         } else if (payload.kind === "image") {
@@ -243,6 +249,7 @@ export default function VideoPage() {
     };
 
     const createSession = () => {
+        if (running) return;
         setPrompt("");
         setReferences([]);
         setResults([]);
@@ -304,6 +311,7 @@ export default function VideoPage() {
     };
 
     const previewGenerationLog = (log: GenerationLog) => {
+        if (running) return;
         setPreviewLog(log);
         setLogsOpen(false);
         setPrompt(log.prompt);
@@ -341,16 +349,16 @@ export default function VideoPage() {
                         )}
                     </div>
                     <div className={studio.form}>
-                        <div className={composer.composer} data-expanded={composerExpanded} onFocus={() => setComposerFocused(true)} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setComposerFocused(false); }}>
-                            {references.length ? <div className={composer.references}>
+                        <div ref={promptComposer.ref} className={composer.composer} data-expanded={composerExpanded} onFocus={promptComposer.open} onBlur={promptComposer.onBlur}>
+                            {composerExpanded && references.length ? <div className={composer.references}>
                                 {references.map((item) => <div key={item.id} className={composer.reference}>
                                     <img src={item.dataUrl} alt={item.name} />
-                                    <button type="button" onClick={() => setReferences((value) => value.filter((ref) => ref.id !== item.id))} aria-label="移除参考图"><X size={13} /></button>
+                                    <button type="button" disabled={running} onClick={() => setReferences((value) => value.filter((ref) => ref.id !== item.id))} aria-label="移除参考图"><X size={13} /></button>
                                 </div>)}
                             </div> : null}
                             <div className={composer.main}><div className={composer.body}>
                             <div className={composer.inputRow}>
-                            <Input.TextArea value={prompt} onChange={(event) => setPrompt(event.target.value)} variant="borderless" autoSize={{ minRows: 1 }} disabled={running} aria-label="视频提示词" placeholder="描述你的故事、镜头运动和场景氛围…" onKeyDown={(event) => {
+                            <PromptInput expanded={composerExpanded} onExpand={promptComposer.open} value={prompt} onChange={(event) => { if (!running) setPrompt(event.target.value); }} variant="borderless" autoSize={{ minRows: 1 }} readOnly={running} aria-label="视频提示词" placeholder="描述你的故事、镜头运动和场景氛围…" onKeyDown={(event) => {
                                 if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
                                     event.preventDefault();
                                     if (canGenerate && !running) void generate();
@@ -360,9 +368,9 @@ export default function VideoPage() {
                                 if (files.length) { event.preventDefault(); void addReferences(files); }
                             }} />
                             </div>
-                            <div className={composer.controls}><div><div className={composer.toolbar} inert={!composerExpanded}>
+                            <div className={composer.controls}><div><div className={composer.toolbar} inert={!composerExpanded || running}>
                                 <div className={composer.toolbarRow}>
-                                <StudioGenerationSettings kind="video" part="model" onModelOpenChange={setModelOpen} />
+                                <StudioGenerationSettings kind="video" part="model" disabled={running} />
                                 </div>
                                 <div className={composer.toolbarRow}>
                                 <Dropdown trigger={["click"]} placement="topLeft" disabled={running} menu={{ items: [
@@ -378,7 +386,7 @@ export default function VideoPage() {
                                 } }}>
                                     <Button className={composer.upload} type="text" shape="circle" icon={<Plus size={19} />} aria-label="添加参考图或选择灵感" />
                                 </Dropdown>
-                                <StudioGenerationSettings kind="video" part="settings" />
+                                <StudioGenerationSettings kind="video" part="settings" disabled={running} />
                                 </div>
                             </div></div></div>
                             </div>
@@ -407,8 +415,8 @@ export default function VideoPage() {
                 <LogPanel logs={logs} retentionDays={retentionDays} selectedLogIds={selectedLogIds} activeLogId={previewLog?.id} onSelectedLogIdsChange={setSelectedLogIds} onCreateSession={createSession} onDeleteSelected={() => setDeleteConfirmOpen(true)} onPreviewLog={previewGenerationLog} onOpenDetail={(log) => log.history && setDetailHistory(log.history)} />
             </Drawer>
 
-            <PromptSelectDialog open={promptDialogOpen} onOpenChange={setPromptDialogOpen} onSelect={setPrompt} />
-            <AssetPickerModal open={assetPickerOpen} defaultTab="my-assets" onInsert={(payload) => void insertPickedAsset(payload)} onClose={() => setAssetPickerOpen(false)} />
+            <PromptSelectDialog open={promptDialogOpen && !running} onOpenChange={setPromptDialogOpen} onSelect={setPrompt} />
+            <AssetPickerModal open={assetPickerOpen && !running} defaultTab="my-assets" onInsert={(payload) => void insertPickedAsset(payload)} onClose={() => setAssetPickerOpen(false)} />
             <Modal title="删除生成记录" open={deleteConfirmOpen} onCancel={() => setDeleteConfirmOpen(false)} onOk={deleteSelectedLogs} okText="删除" okButtonProps={{ danger: true }} cancelText="取消">
                 确定删除选中的 {selectedLogIds.length} 条生成记录吗？
             </Modal>

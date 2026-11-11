@@ -30,9 +30,10 @@ type ModelPickerProps = {
     billingLabel?: string;
     placeholder?: string;
     onMissingConfig?: () => void;
+    disabled?: boolean;
 };
 
-export function ModelPicker({ config, kind, count, model3D, value, onChange, onOpenChange, models, className, fullWidth = false, showBilling = true, billingLabel, placeholder = "选择模型", onMissingConfig }: ModelPickerProps) {
+export function ModelPicker({ config, kind, count, model3D, value, onChange, onOpenChange, models, className, fullWidth = false, showBilling = true, billingLabel, placeholder = "选择模型", onMissingConfig, disabled = false }: ModelPickerProps) {
     const { tr, locale } = useI18n();
     const mobile = Grid.useBreakpoint().xs;
     const itemHeight = mobile ? 56 : 64;
@@ -62,9 +63,10 @@ export function ModelPicker({ config, kind, count, model3D, value, onChange, onO
     const selected = options.find((item) => item.value === current);
 
     useEffect(() => {
-        onOpenChange?.(open);
+        onOpenChange?.(open && !disabled);
         return () => onOpenChange?.(false);
-    }, [open, onOpenChange]);
+    }, [open, disabled, onOpenChange]);
+    useEffect(() => { if (disabled) setOpen(false); }, [disabled]);
 
     useEffect(() => {
         const closeOtherPicker = (event: Event) => {
@@ -76,7 +78,8 @@ export function ModelPicker({ config, kind, count, model3D, value, onChange, onO
 
     return <div className="contents" onPointerDown={(event) => event.stopPropagation()}><Select
         ref={selectRef}
-        open={open}
+        open={open && !disabled}
+        disabled={disabled}
         value={current || undefined}
         showSearch={false}
         aria-label={tr(placeholder)}

@@ -7,6 +7,8 @@ import { App, Button, Modal, Segmented, Tooltip } from "antd";
 import { ImageGenerationPending } from "@/components/image-generation-pending";
 import { ModelPicker } from "@/components/model-picker";
 import { ModelBilling } from "@/components/model-billing";
+import { PromptInput } from "@/components/prompt-input";
+import { usePromptComposer } from "@/hooks/use-prompt-composer";
 import { useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { nanoid } from "nanoid";
@@ -201,6 +203,7 @@ export function CanvasAssistantPanel({ workflowId, nodes, selectedNodeIds, snaps
     };
 
     const sendMessage = async (text: string, history: CanvasAssistantMessage[], savedReferences?: CanvasAssistantReference[]) => {
+        if (isRunning) return;
         const requestConfig = { ...effectiveConfig, model: assistantModel || effectiveConfig.textModel || effectiveConfig.model };
         if (!token) {
             message.warning("请先登录后使用画布助手");
@@ -222,7 +225,7 @@ export function CanvasAssistantPanel({ workflowId, nodes, selectedNodeIds, snaps
         const assistantId = nanoid();
         appendMessage(session.id, userMessage);
         appendMessage(session.id, { id: assistantId, role: "assistant", mode: "ask", text: assistantMode === "chat" ? "正在思考" : "正在规划画布修改", isLoading: true });
-        setPrompt("");
+        setPrompt(text);
         setIsRunning(true);
 
         try {
@@ -462,38 +465,48 @@ function AssistantComposer({
     previewing?: boolean;
 }) {
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
+    const promptComposer = usePromptComposer(isRunning);
     return (
-        <div className="px-2 pb-2" onWheelCapture={(event) => event.stopPropagation()}>
-            {references.length ? (
+        <div ref={promptComposer.ref} className="px-2 pb-2" onWheelCapture={(event) => event.stopPropagation()} onFocus={promptComposer.open} onBlur={promptComposer.onBlur}>
+            {promptComposer.expanded && references.length ? (
                 <div className="thin-scrollbar mb-1.5 flex max-w-full gap-1.5 overflow-x-auto px-1 pb-1">
                     {references.map((item) => (
-                        <AssistantReferenceChip key={item.id} item={item} onRemove={() => onRemoveReference(item.id)} />
+                        <AssistantReferenceChip key={item.id} item={item} onRemove={isRunning ? undefined : () => onRemoveReference(item.id)} />
                     ))}
                 </div>
             ) : null}
-            <div className="relative rounded-[28px] border px-3 pb-3 pt-3 shadow-lg" style={{ background: theme.toolbar.panel, borderColor: theme.node.stroke }}>
-                <textarea
+            <div className="relative rounded-[28px] border px-3 pb-3 pt-3 shadow-lg" style={{ background: theme.toolbar.panel, borderColor: theme.node.stroke, color: theme.node.text }}>
+                <PromptInput
+                    expanded={promptComposer.expanded}
+                    onExpand={promptComposer.open}
+                    readOnly={isRunning}
+                    variant="borderless"
+                    autoSize={{ minRows: 3, maxRows: 6 }}
                     value={prompt}
-                    onChange={(event) => onPromptChange(event.target.value)}
+                    onChange={(event) => { if (!isRunning) onPromptChange(event.target.value); }}
                     onPaste={(event) => {
+                        if (isRunning) return;
                         const file = Array.from(event.clipboardData.files).find((item) => item.type.startsWith("image/"));
                         if (!file) return;
                         event.preventDefault();
                         onPasteImage(file);
                     }}
                     onKeyDown={(event) => {
-                        if (event.key !== "Enter" || event.ctrlKey || event.metaKey || event.shiftKey) return;
+                        if (isRunning || event.nativeEvent.isComposing || event.key !== "Enter" || event.ctrlKey || event.metaKey || event.shiftKey) return;
                         event.preventDefault();
+                        promptComposer.close();
                         void onSubmit();
                     }}
-                    className="thin-scrollbar h-20 w-full resize-none border-0 bg-transparent px-1 py-1 text-sm leading-5 outline-none placeholder:text-stone-400"
+                    className="thin-scrollbar w-full resize-none border-0 bg-transparent px-1 py-1 text-sm leading-5 outline-none"
                     style={{ color: theme.node.text }}
+                    aria-label="提示词"
                     placeholder={previewing ? "告诉 AI 哪里需要调整" : "描述你想让 AI 如何操作画布"}
                 />
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <div className="canvas-composer-tools flex w-full min-w-0 flex-wrap items-center gap-1">
+                <div className={`${promptComposer.expanded ? "flex" : "hidden"} mt-2 flex-wrap items-center gap-2`}>
+                    <div className="canvas-composer-tools flex w-full min-w-0 flex-wrap items-center gap-1" inert={isRunning}>
                         <CanvasPromptLibrary onSelect={onPromptChange} />
                         <Segmented
+                            disabled={isRunning}
                             size="small"
                             value={mode}
                             onChange={(value) => onModeChange(value as "plan" | "chat")}
@@ -502,13 +515,13 @@ function AssistantComposer({
                                 { label: "对话", value: "chat" },
                             ]}
                         />
-                        <ModelPicker showBilling={false} config={config} kind="text" models={config.textModels} value={model} onChange={onModelChange} placeholder="对话模型" onMissingConfig={() => undefined} />
+                        <ModelPicker disabled={isRunning} showBilling={false} config={config} kind="text" models={config.textModels} value={model} onChange={onModelChange} placeholder="对话模型" onMissingConfig={() => undefined} />
                     </div>
                     <Button
                         type="primary"
                         className="!ml-auto !h-auto !min-h-10 !max-w-full !rounded-full !px-3 !py-2"
                         disabled={isRunning || !prompt.trim()}
-                        onClick={() => void onSubmit()}
+                        onClick={() => { promptComposer.close(); void onSubmit(); }}
                         aria-label="发送"
                     >
                         <ModelBilling summaryOnly model={model} kind="text" />

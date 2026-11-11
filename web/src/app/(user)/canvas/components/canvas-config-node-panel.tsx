@@ -47,6 +47,7 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, inputs, o
     const imageInputs = inputs.filter((input) => input.type === "image");
 
     const moveInput = (input: NodeGenerationInput, offset: number) => {
+        if (isRunning) return;
         const sameTypeInputs = inputs.filter((item) => item.type === input.type);
         const sameTypeIndex = sameTypeInputs.findIndex((item) => item.nodeId === input.nodeId);
         const targetInput = sameTypeInputs[sameTypeIndex + offset];
@@ -59,11 +60,12 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, inputs, o
         message.success("已调整输入顺序");
     };
     const startTextEdit = (input: NodeGenerationInput) => {
+        if (isRunning) return;
         setEditingTextId(input.nodeId);
         setEditingText(input.text || "");
     };
     const saveTextEdit = () => {
-        if (!editingTextId) return;
+        if (isRunning || !editingTextId) return;
         onTextInputChange(editingTextId, editingText);
         setEditingText("");
         setEditingTextId(null);
@@ -76,6 +78,7 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, inputs, o
                 <div className="shrink-0 text-sm font-semibold">生成配置</div>
                 <div className="cursor-default" onMouseDown={(event) => event.stopPropagation()}>
                     <Segmented
+                        disabled={isRunning}
                         size="small"
                         className="canvas-config-mode !rounded-md !p-0.5"
                         value={mode}
@@ -123,12 +126,12 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, inputs, o
                 </button>
             </div>
 
-            <div className="thin-scrollbar mt-auto flex min-w-0 shrink-0 cursor-default items-center gap-2 overflow-x-auto py-1" data-canvas-no-zoom onMouseDown={(event) => event.stopPropagation()}>
-                <ModelPicker showBilling={false} className="canvas-compact-control min-h-10 max-w-none" config={config} kind={mode} model3D={mode === "model3d" ? model3D.options : undefined} models={modelsForMode(config, mode)} value={config.model} onChange={(model) => onConfigChange(node.id, { model, ...(mode === "image" ? { size: clampImageSize(config.size, imageSizeLimit(model)) } : {}) })} onMissingConfig={() => message.warning("管理员尚未配置可用模型")} />
-                {mode === "model3d" ? <CanvasModel3DSettings node={node} onChange={(patch) => onConfigChange(node.id, patch)} /> : mode === "video" ? (
-                    <CanvasVideoSettingsPopover config={config} placement="topRight" buttonClassName="canvas-compact-control !min-h-10 !rounded-lg !px-2" onConfigChange={(key, value) => onConfigChange(node.id, key === "videoSeconds" ? { seconds: value } : { [key]: value })} />
+            <div className="thin-scrollbar mt-auto flex min-w-0 shrink-0 cursor-default items-center gap-2 overflow-x-auto py-1" data-canvas-no-zoom inert={isRunning} onMouseDown={(event) => event.stopPropagation()}>
+                <ModelPicker disabled={isRunning} showBilling={false} className="canvas-compact-control min-h-10 max-w-none" config={config} kind={mode} model3D={mode === "model3d" ? model3D.options : undefined} models={modelsForMode(config, mode)} value={config.model} onChange={(model) => onConfigChange(node.id, { model, ...(mode === "image" ? { size: clampImageSize(config.size, imageSizeLimit(model)) } : {}) })} onMissingConfig={() => message.warning("管理员尚未配置可用模型")} />
+                {mode === "model3d" ? <CanvasModel3DSettings node={node} onChange={(patch) => { if (!isRunning) onConfigChange(node.id, patch); }} /> : mode === "video" ? (
+                    <CanvasVideoSettingsPopover config={config} placement="topRight" buttonClassName="canvas-compact-control !min-h-10 !rounded-lg !px-2" onConfigChange={(key, value) => { if (!isRunning) onConfigChange(node.id, key === "videoSeconds" ? { seconds: value } : { [key]: value }); }} />
                 ) : mode === "image" ? (
-                    <CanvasImageSettingsPopover config={config} placement="topRight" autoAdjustOverflow={false} buttonClassName="canvas-compact-control !h-10 !justify-start !rounded-lg !px-2" onConfigChange={(key, value) => onConfigChange(node.id, key === "count" ? { count: Number(value) || 1 } : { [key]: value })} />
+                    <CanvasImageSettingsPopover config={config} placement="topRight" autoAdjustOverflow={false} buttonClassName="canvas-compact-control !h-10 !justify-start !rounded-lg !px-2" onConfigChange={(key, value) => { if (!isRunning) onConfigChange(node.id, key === "count" ? { count: Number(value) || 1 } : { [key]: value }); }} />
                 ) : null}
                 <Button
                     type="primary"
@@ -191,12 +194,12 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, inputs, o
                                                     收起
                                                 </Button>
                                             </div>
-                                            <Input.TextArea className="thin-scrollbar !flex-1 !resize-none !text-xs !leading-5" value={editingText} onChange={(event) => setEditingText(event.target.value)} />
+                                            <Input.TextArea readOnly={isRunning} className="thin-scrollbar !flex-1 !resize-none !text-xs !leading-5" value={editingText} onChange={(event) => { if (!isRunning) setEditingText(event.target.value); }} />
                                             <div className="mt-2 flex justify-end gap-2">
                                                 <Button size="small" onClick={() => setEditingTextId(null)}>
                                                     取消
                                                 </Button>
-                                                <Button size="small" type="primary" onClick={saveTextEdit}>
+                                                <Button disabled={isRunning} size="small" type="primary" onClick={saveTextEdit}>
                                                     保存
                                                 </Button>
                                             </div>

@@ -286,6 +286,7 @@ export default function ImagePage() {
     };
 
     const createSession = () => {
+        if (running || submittingRef.current) return;
         setPrompt("");
         setReferences([]);
         setResults([]);
@@ -353,6 +354,7 @@ export default function ImagePage() {
     };
 
     const previewGenerationLog = async (log: GenerationLog) => {
+        if (running || submittingRef.current) return;
         setPreviewLog(log);
         setLogsOpen(false);
         setPrompt(log.prompt);

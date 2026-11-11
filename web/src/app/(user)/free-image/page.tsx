@@ -2,11 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { App, Button, Checkbox, Empty, Image, Input, Modal, Select, Skeleton, Spin } from "antd";
+import { App, Button, Checkbox, Empty, Image, Modal, Select, Skeleton, Spin } from "antd";
 import { ArrowUp, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ModelPicker } from "@/components/model-picker";
+import { PromptInput } from "@/components/prompt-input";
+import { usePromptComposer } from "@/hooks/use-prompt-composer";
 import { ExploreHistory } from "@/components/explore-history";
 import { useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
@@ -39,9 +41,8 @@ export default function FreeImagePage() {
     const [prompt, setPrompt] = useState("");
     const [model, setModel] = useState("");
     const [size, setSize] = useState("1024x1024");
-    const [focused, setFocused] = useState(false);
-    const [modelOpen, setModelOpen] = useState(false);
     const [running, setRunning] = useState(false);
+    const promptComposer = usePromptComposer(running);
     const submitting = useRef(false);
     const [images, setImages] = useState<ImageApiResult[]>([]);
     const [queue, setQueue] = useState<GenerationQueueUpdate | null>(null);
@@ -78,6 +79,7 @@ export default function FreeImagePage() {
     };
     const generate = async () => {
         if (submitting.current || !accepted || !active || !state.data?.remaining || !currentModel || !requestSize || !prompt.trim()) return;
+        promptComposer.close();
         submitting.current = true;
         setRunning(true); setQueue(null); setSelected(null);
         try {
@@ -109,10 +111,10 @@ export default function FreeImagePage() {
                     </div>}
                 </section>
                 <div className={studio.form}>
-                    {token && accepted && active ? <div className={composer.composer} data-expanded={modelOpen || focused || Boolean(prompt.trim())} onFocus={() => setFocused(true)} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocused(false); }}>
+                    {token && accepted && active ? <div ref={promptComposer.ref} className={composer.composer} data-expanded={promptComposer.expanded} onFocus={promptComposer.open} onBlur={promptComposer.onBlur}>
                         <div className={composer.main}><div className={composer.body}>
-                            <div className={composer.inputRow}><Input.TextArea variant="borderless" value={prompt} onChange={(event) => setPrompt(event.target.value)} disabled={running} autoSize={{ minRows: 1, maxRows: 6 }} aria-label={tr("生图提示词")} placeholder={tr("描述你想免费生成的画面...")} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void generate(); } }} /></div>
-                            <div className={composer.controls}><div><div className={composer.toolbar} inert={!modelOpen && !focused && !prompt.trim()}><div className={composer.toolbarRow}><ModelPicker onOpenChange={setModelOpen} config={config} kind="image" models={models} value={currentModel} onChange={setModel} billingLabel="Free [限量]" /></div><div className={composer.toolbarRow}><Select value={requestSize || undefined} onChange={setSize} aria-label={tr("分辨率")} options={sizes} disabled={running} /></div></div></div></div>
+                            <div className={composer.inputRow}><PromptInput expanded={promptComposer.expanded} onExpand={promptComposer.open} variant="borderless" value={prompt} onChange={(event) => { if (!running) setPrompt(event.target.value); }} readOnly={running} autoSize={{ minRows: 1, maxRows: 6 }} aria-label="生图提示词" placeholder="描述你想免费生成的画面..." onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void generate(); } }} /></div>
+                            <div className={composer.controls}><div><div className={composer.toolbar} inert={!promptComposer.expanded || running}><div className={composer.toolbarRow}><ModelPicker disabled={running} config={config} kind="image" models={models} value={currentModel} onChange={setModel} billingLabel="Free [限量]" /></div><div className={composer.toolbarRow}><Select value={requestSize || undefined} onChange={setSize} aria-label={tr("分辨率")} options={sizes} disabled={running} /></div></div></div></div>
                         </div><Button className={composer.send} shape="circle" type="primary" icon={<ArrowUp size={18} />} loading={running} disabled={!prompt.trim() || !currentModel || !requestSize || !state.data?.remaining} aria-label={tr("免费生成图片")} onClick={() => void generate()} /></div>
                     </div> : null}
                 </div>

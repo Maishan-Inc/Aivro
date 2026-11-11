@@ -6,6 +6,8 @@
 .inputRow { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .inputRow > :global(.ant-input-textarea) { flex: 1; min-width: 0; }
 .inputRow :global(textarea.ant-input) { width: 100%; min-width: 0; flex: 1; padding: 8px 10px; font-size: 15px; line-height: 24px; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; overflow-x: hidden; background: transparent; }
+.promptPreview { display: block; width: 100%; min-width: 0; flex: 1; padding: 8px 10px; border: 0; background: transparent; color: inherit; font-size: 15px; line-height: 24px; text-align: left; cursor: pointer; }
+.promptPreview > span { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .send:global(.ant-btn) { position: absolute; top: 50%; right: 12px; transform: translateY(-50%); flex: none !important; width: 40px !important; min-width: 40px !important; max-width: 40px !important; height: 40px !important; aspect-ratio: 1; padding: 0 !important; border-radius: 50% !important; }
 .controls { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows .25s ease, opacity .2s ease; }
 .controls > div { min-height: 0; overflow: hidden; }
@@ -26,6 +28,7 @@
     .send:global(.ant-btn) { right: 8px; }
     .main { gap: 4px; padding-right: 44px; }
     .inputRow { gap: 4px; }
+    .promptPreview { font-size: 13px; }
     /* 占位提示固定一行，超出显示省略号；有输入内容时恢复正常换行。 */
     .inputRow :global(textarea.ant-input) { font-size: 13px; white-space: nowrap; text-overflow: ellipsis; }
     .inputRow :global(textarea.ant-input::placeholder) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
