@@ -86,7 +86,7 @@ export function ExploreHistory({ type, activeId, onSelect, onNew, newDisabled, p
         </div>
     </>;
     return <>
-        <Button type="text" className={`${studio.historyActions} absolute right-4 top-6 z-10`} icon={<History size={16} />} onClick={() => setOpen(true)}>{tr("生成记录")}</Button>
+        <div className={`${studio.historyActions} absolute right-4 top-6 z-10`}><Button type="text" icon={<History size={16} />} onClick={() => setOpen(true)}>{tr("生成记录")}</Button></div>
         <StudioHistorySidebar onNew={onNew ? create : undefined} newDisabled={newDisabled} selectOnDoubleClick={type === "prompt-reverse"} items={records.map((record) => ({ id: record.id, title: record.title, prompt: record.status === "running" ? tr("正在反推") : record.status === "error" ? tr(record.error || "反推失败") : record.prompt, preview: record.preview, disabled: !record.history }))} activeId={activeId} onSelect={(id) => { const record = records.find((item) => item.id === id); if (record?.history) onSelect(record.history); }}>{content}</StudioHistorySidebar>
         <Drawer title={tr("生成记录")} open={open} onClose={() => setOpen(false)} size={360}>{content}</Drawer>
     </>;

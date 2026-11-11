@@ -52,7 +52,7 @@ export function ReverseHistory({ records, activeId, onSelect, onNew, refresh }: 
         </article>)}{!records.length ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={tr("暂无记录")} /> : null}</div>
     </>;
     return <>
-        <Button type="text" className={`${studio.historyActions} absolute right-3 top-5 z-10`} icon={<History size={16} />} onClick={() => setOpen(true)}>{tr("生成记录")}</Button>
+        <div className={`${studio.historyActions} absolute right-3 top-5 z-10`}><Button type="text" icon={<History size={16} />} onClick={() => setOpen(true)}>{tr("生成记录")}</Button></div>
         <StudioHistorySidebar items={records.map((record) => ({ id: record.id, title: record.model, prompt: tr(reverseRunning(record.status) ? "正在反推" : record.status === "succeeded" ? "反推完成" : "反推失败"), preview: record.items[0]?.media?.url }))} activeId={activeId} onSelect={select} onNew={create}>{content}</StudioHistorySidebar>
         <Drawer title={tr("生成记录")} open={open} onClose={() => setOpen(false)} size="min(360px, 100vw)">{content}</Drawer>
     </>;
