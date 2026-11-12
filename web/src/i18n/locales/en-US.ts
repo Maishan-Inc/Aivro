@@ -27,6 +27,8 @@ const enUS = {
     "工单服务": "Support tickets",
     "工单回复": "Ticket replies",
     "工单详情": "Ticket details",
+    "工单信息": "Ticket information",
+    "查看工单信息": "View ticket information",
     "创建工单": "Create ticket",
     "创建工单失败": "Failed to create ticket",
     "提交工单": "Submit ticket",

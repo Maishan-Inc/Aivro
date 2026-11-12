@@ -27,6 +27,8 @@ const frFR = {
     "工单服务": "Tickets d’assistance",
     "工单回复": "Réponses aux tickets",
     "工单详情": "Détails du ticket",
+    "工单信息": "Informations du ticket",
+    "查看工单信息": "Voir les informations du ticket",
     "创建工单": "Créer un ticket",
     "创建工单失败": "Impossible de créer le ticket",
     "提交工单": "Envoyer le ticket",

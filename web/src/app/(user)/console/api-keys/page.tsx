@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Alert, App, Button, Empty, Form, Input, Modal, Table, Tag } from "antd";
+import { Alert, App, Button, Empty, Form, Grid, Input, Modal, Table, Tag } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { ArrowUpRight, BookOpen, Copy, Plus, RefreshCw } from "lucide-react";
 
@@ -15,6 +15,7 @@ import { createAPIKey, listAPIKeys, revokeAPIKey, type CreatedUserAPIKey, type U
 const dateText = (value: string) => value ? formatDateTime(value) : "尚未使用";
 
 export default function APIKeysPage() {
+    const desktop = Grid.useBreakpoint().md;
     const token = useUserStore((state) => state.token);
     const userID = useUserStore((state) => state.user?.id);
     const localizedPath = useLocalizedPath();
@@ -88,12 +89,12 @@ export default function APIKeysPage() {
     ];
 
     return <div className="thin-scrollbar h-full overflow-y-auto p-4 lg:p-8">
-        <div className="mx-auto max-w-6xl space-y-6">
+        <div className="mx-auto flex max-w-6xl flex-col gap-6">
             <header className="flex items-center justify-between gap-3 border-b border-border pb-6">
                 <h1 className="min-w-0 text-xl font-semibold tracking-tight sm:text-2xl">密钥管理</h1>
                 <Button className="shrink-0" type="primary" icon={<Plus className="size-4" />} onClick={() => setCreateOpen(true)}>创建密钥</Button>
             </header>
-            <Alert type="info" showIcon classNames={{ description: "hidden sm:block" }} title="完整密钥只显示一次" description="创建成功后请立即复制保存。本站仅保存密钥摘要，之后无法再次查看。名称在当前账号内唯一，忽略首尾空格与字母大小写；已撤销的名称仍保留。" />
+            <Alert type="info" showIcon title="完整密钥只显示一次" description={desktop ? "创建成功后请立即复制保存。本站仅保存密钥摘要，之后无法再次查看。名称在当前账号内唯一，忽略首尾空格与字母大小写；已撤销的名称仍保留。" : undefined} />
             <section className="min-w-0 rounded-xl border border-border p-4 sm:p-6">
                 <div className="mb-5 flex items-center justify-between gap-3"><h2 className="text-sm font-medium">我的密钥 <span className="ml-2 font-normal tabular-nums text-muted-foreground">{data.total}</span></h2><Button type="text" icon={<RefreshCw className="size-3.5" />} loading={loading} onClick={() => setRevision((value) => value + 1)}>刷新</Button></div>
                 {error ? <Alert className="mb-4" type="error" showIcon title={error} /> : null}
