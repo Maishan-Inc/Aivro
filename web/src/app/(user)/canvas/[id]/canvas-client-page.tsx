@@ -140,20 +140,20 @@ function CanvasRefreshShell() {
                 }}
             />
 
-            <div className="absolute bottom-5 left-1/2 z-50 flex h-14 -translate-x-1/2 items-center gap-1 rounded-xl border px-2 shadow-lg backdrop-blur" style={{ background: "var(--background)", borderColor: "var(--border)" }} aria-hidden="true">
+            <div className="absolute bottom-[calc(env(safe-area-inset-bottom)+76px)] right-2 z-50 flex w-14 flex-col items-center gap-1 rounded-xl border py-2 shadow-lg backdrop-blur md:bottom-5 md:left-1/2 md:right-auto md:h-14 md:w-auto md:-translate-x-1/2 md:flex-row md:px-2 md:py-0" style={{ background: "var(--background)", borderColor: "var(--border)" }} aria-hidden="true">
                 {Array.from({ length: 7 }).map((_, index) => (
                     <div key={index} className="size-8 rounded-md bg-current opacity-10" />
                 ))}
             </div>
 
-            <div className="absolute bottom-24 left-6 z-50 h-40 w-[240px] rounded-lg border shadow-2xl backdrop-blur-sm" style={{ background: "var(--background)", borderColor: "var(--border)" }} aria-hidden="true">
+            <div className="absolute bottom-24 left-6 z-50 hidden h-40 w-[240px] rounded-lg border shadow-2xl backdrop-blur-sm md:block" style={{ background: "var(--background)", borderColor: "var(--border)" }} aria-hidden="true">
                 <div className="absolute left-7 top-7 h-5 w-12 rounded-sm bg-current opacity-10" />
                 <div className="absolute left-28 top-16 h-6 w-16 rounded-sm bg-current opacity-10" />
                 <div className="absolute bottom-7 left-16 h-8 w-20 rounded-sm bg-current opacity-10" />
                 <div className="absolute inset-5 rounded border border-current opacity-15" />
             </div>
 
-            <div className="absolute bottom-5 left-5 z-50 flex h-14 w-[260px] items-center gap-2 rounded-xl border px-2 shadow-lg backdrop-blur" style={{ background: "var(--background)", borderColor: "var(--border)" }} aria-hidden="true">
+            <div className="absolute bottom-[calc(env(safe-area-inset-bottom)+12px)] left-2 right-2 z-50 flex h-12 items-center gap-2 rounded-xl border px-2 shadow-lg backdrop-blur md:bottom-5 md:left-5 md:right-auto md:h-14 md:w-[260px]" style={{ background: "var(--background)", borderColor: "var(--border)" }} aria-hidden="true">
                 <div className="size-8 rounded-md bg-current opacity-10" />
                 <div className="size-8 rounded-md bg-current opacity-10" />
                 <div className="h-1 flex-1 rounded-full bg-current opacity-10" />
@@ -2449,7 +2449,7 @@ export function InfiniteCanvasPage({ playback }: { playback?: CanvasPlayback } =
     if (!projectLoaded) return <CanvasRefreshShell />;
 
     return (
-        <main className="flex h-full min-h-0 overflow-hidden" style={{ background: theme.canvas.background, color: theme.node.text }}>
+        <main className="relative flex h-full min-h-0 overflow-hidden" style={{ background: theme.canvas.background, color: theme.node.text }}>
             <section className="relative min-w-0 flex-1 overflow-hidden">
                 <CanvasTopBar
                     title={playback?.workflow.title || currentProject?.title || "未命名工作流"}
@@ -2516,6 +2516,15 @@ export function InfiniteCanvasPage({ playback }: { playback?: CanvasPlayback } =
                     }}
                     onCanvasMouseDown={handleCanvasMouseDown}
                     onCanvasDeselect={agentPreview ? () => undefined : deselectCanvas}
+                    onGestureStart={() => {
+                        dragRef.current.hasMoved = true;
+                        finishNodeDrag();
+                        selectionBoxRef.current = null;
+                        setSelectionBox(null);
+                        cancelPendingConnectionCreate();
+                        setToolbarNodeId(null);
+                        setContextMenu(null);
+                    }}
                     onContextMenu={handleCanvasContextMenu}
                     onDrop={handleDrop}
                 >
@@ -2711,9 +2720,9 @@ export function InfiniteCanvasPage({ playback }: { playback?: CanvasPlayback } =
                 <CanvasZoomControls scale={displayViewport.k} onScaleChange={agentPreview ? () => undefined : setZoomScale} onReset={agentPreview ? () => undefined : resetViewport} isMiniMapOpen={isMiniMapOpen} onToggleMiniMap={() => setIsMiniMapOpen((value) => !value)} />
 
                 {agentPreview ? (
-                    <div className="pointer-events-auto absolute left-1/2 top-16 z-[80] flex -translate-x-1/2 items-center gap-3 rounded-xl border px-3 py-2 shadow-lg backdrop-blur" style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.node.text }}>
-                        <span className="text-sm font-medium">AI 预览中</span>
-                        <span className="max-w-[360px] truncate text-xs opacity-65">{agentPreview.ops.length} 个操作，确认后才会保存和触发生成</span>
+                    <div className="pointer-events-auto absolute left-2 right-[72px] top-16 z-[80] flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2 shadow-lg backdrop-blur md:left-1/2 md:right-auto md:-translate-x-1/2 md:flex-nowrap md:gap-3" style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.node.text }}>
+                        <span className="shrink-0 text-sm font-medium">AI 预览中</span>
+                        <span className="w-full truncate text-xs opacity-65 md:w-auto md:max-w-[360px]">{agentPreview.ops.length} 个操作，确认后才会保存和触发生成</span>
                         <Button size="small" onClick={cancelAgentPreview}>取消预览</Button>
                         <Button size="small" type="primary" onClick={confirmAgentPreview}>确认修改</Button>
                     </div>
@@ -2875,6 +2884,7 @@ function CanvasTopBar({
     const accountRef = useRef<HTMLDivElement>(null);
     const [shortcutsOpen, setShortcutsOpen] = useState(false);
     const [accountOpen, setAccountOpen] = useState(false);
+    const saveLabel = saveStatus === "saving" ? "保存中" : saveStatus === "saved" ? "已保存" : saveStatus === "error" ? "保存失败" : "";
 
     useEffect(() => {
         if (!isTitleEditing) return;
@@ -2896,15 +2906,30 @@ function CanvasTopBar({
 
     return (
         <>
-            <div className="pointer-events-none absolute left-0 right-0 top-0 z-50 flex h-16 items-center justify-between px-4">
-                <div className="pointer-events-auto flex min-w-0 items-center gap-3">
+            <div className="pointer-events-none absolute left-0 right-0 top-[env(safe-area-inset-top)] z-50 flex h-14 items-center justify-between gap-2 pl-[max(8px,env(safe-area-inset-left))] pr-[max(8px,env(safe-area-inset-right))] md:h-16 md:px-4">
+                <div className="pointer-events-auto flex min-w-0 flex-1 items-center gap-2 md:gap-3">
                     <Dropdown
                         trigger={["click"]}
+                        styles={{ root: { maxWidth: "calc(100vw - 16px)", maxHeight: "calc(100dvh - 80px)", overflowY: "auto" } }}
+                        popupRender={(menu) => <div style={{ background: theme.node.panel }}>
+                            {menu}
+                            <div className="border-t p-2 md:hidden" style={{ borderColor: theme.toolbar.border }}>
+                                <div className="max-w-64 space-y-1 px-1 pb-2 text-xs opacity-60">
+                                    {saveLabel ? <p>{tr(saveLabel)}</p> : null}
+                                    {retention.data ? <p>{tr("工作流生成文件保存 {0} 天，具体到期时间见节点信息").replace("{0}", String(retention.data.days.workflow))}</p> : null}
+                                    {linked ? <p>该工作流来自分享，并设置为自动更新。原作者更新分享后，本工作流可能被覆盖。</p> : null}
+                                    <p>{tr("单指拖动")} · {tr("双指缩放/移动")}</p>
+                                </div>
+                                <UserStatusActions variant="canvas" onOpenShortcuts={() => setShortcutsOpen(true)} />
+                            </div>
+                        </div>}
                         menu={{
                             items: [
                                 { key: "home", icon: <Home className="size-4" />, label: "主页", onClick: onHome },
                                 { key: "projects", icon: <Images className="size-4" />, label: "工作流", onClick: onProjects },
                                 { type: "divider" },
+                                { key: "rename", icon: <Settings2 className="size-4" />, label: tr("修改工作流名称"), onClick: onStartTitleEditing },
+                                { key: "share", icon: <Share2 className="size-4" />, label: "分享工作流", onClick: onShare },
                                 { key: "new", icon: <Plus className="size-4" />, label: "新建工作流", onClick: onCreateProject },
                                 { key: "delete", danger: true, icon: <Trash2 className="size-4" />, label: "删除当前工作流", onClick: onDeleteProject },
                                 { type: "divider" },
@@ -2915,12 +2940,12 @@ function CanvasTopBar({
                             ],
                         }}
                     >
-                        <button type="button" className="grid size-9 place-items-center rounded-full transition hover:bg-black/5 dark:hover:bg-white/10" style={{ color: theme.node.text }} aria-label="打开工作流菜单">
+                        <button type="button" className="grid size-10 shrink-0 place-items-center rounded-full transition hover:bg-black/5 dark:hover:bg-white/10 md:size-9" style={{ color: theme.node.text }} aria-label="打开工作流菜单">
                             <Menu className="size-5" />
                         </button>
                     </Dropdown>
 
-                    <div ref={titleRef} className="flex min-w-0 items-center gap-2">
+                    <div ref={titleRef} className="flex min-w-0 flex-1 items-center gap-2">
                         {isTitleEditing ? (
                             <input
                                 autoFocus
@@ -2931,28 +2956,27 @@ function CanvasTopBar({
                                     if (event.key === "Enter") onFinishTitleEditing();
                                     if (event.key === "Escape") onCancelTitleEditing();
                                 }}
-                                className="max-w-[280px] bg-transparent p-0 text-left text-lg font-semibold tracking-normal outline-none"
+                                className="w-full min-w-0 max-w-[280px] bg-transparent p-0 text-left text-base font-semibold tracking-normal outline-none md:text-lg"
                                 style={{ color: theme.node.text }}
                             />
                         ) : (
                             <button
                                 type="button"
-                                className="max-w-[280px] truncate border-b border-dashed border-transparent text-left text-lg font-semibold tracking-normal transition hover:border-current"
+                                className="min-w-0 max-w-[280px] truncate border-b border-dashed border-transparent text-left text-sm font-semibold tracking-normal transition hover:border-current md:text-lg"
                                 onDoubleClick={onStartTitleEditing}
-                                title="双击修改工作流名称"
+                                data-i18n-skip
+                                title={tr("双击修改工作流名称")}
                             >
                                 {title}
                             </button>
                         )}
-                        <Button type="text" size="small" icon={<Share2 className="size-4" />} onClick={onShare}>
-                            分享
-                        </Button>
-                        <span className="text-xs opacity-55">{saveStatus === "saving" ? "保存中" : saveStatus === "saved" ? "已保存" : saveStatus === "error" ? "保存失败" : ""}</span>
+                        <div className="hidden shrink-0 md:block"><Button type="text" size="small" icon={<Share2 className="size-4" />} onClick={onShare}>分享</Button></div>
+                        <span className="hidden shrink-0 text-xs opacity-55 md:inline">{saveLabel}</span>
                     </div>
                 </div>
 
-                <div className="pointer-events-auto flex items-center gap-1.5">
-                    <UserStatusActions
+                <div className="pointer-events-auto flex shrink-0 items-center gap-1.5">
+                    <div className="hidden md:block"><UserStatusActions
                         variant="canvas"
                         accountOpen={accountOpen}
                         onAccountOpenChange={setAccountOpen}
@@ -2962,28 +2986,29 @@ function CanvasTopBar({
                             setShortcutsOpen(true);
                             setAccountOpen(false);
                         }}
-                    />
+                    /></div>
                     {assistantCollapsed ? (
                         <>
-                            <span className="h-6 w-px" style={{ background: theme.toolbar.border }} />
+                            <span className="hidden h-6 w-px md:block" style={{ background: theme.toolbar.border }} />
                             <Button
                                 type="text"
-                                className="!h-10 !rounded-xl !px-3 !font-medium"
-                                style={{ background: theme.toolbar.panel, color: theme.node.text, boxShadow: "0 10px 30px rgba(28,25,23,.10)" }}
+                                className="!h-10 !w-10 !p-0 !font-medium md:!w-auto md:!px-3"
+                                style={{ color: theme.node.text }}
                                 icon={<MessageSquare className="size-4" />}
                                 onClick={onExpandAssistant}
+                                aria-label="助手"
                             >
-                                助手
+                                <span className="hidden md:inline">助手</span>
                             </Button>
                         </>
                     ) : null}
                 </div>
             </div>
-            {retention.data ? <div data-i18n-skip className="pointer-events-none absolute left-4 top-16 z-40 max-w-[calc(100vw-32px)] truncate text-xs opacity-50" style={{ color: theme.node.text }}>
+            {retention.data ? <div data-i18n-skip className="pointer-events-none absolute left-4 top-16 z-40 hidden max-w-[calc(100vw-32px)] truncate text-xs opacity-50 md:block" style={{ color: theme.node.text }}>
                 {tr("工作流生成文件保存 {0} 天，具体到期时间见节点信息").replace("{0}", String(retention.data.days.workflow))}
             </div> : null}
             {linked ? (
-                <div className="pointer-events-none absolute left-1/2 top-16 z-40 -translate-x-1/2 rounded-lg border px-3 py-2 text-xs shadow-sm backdrop-blur" style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.node.text }}>
+                <div className="pointer-events-none absolute left-1/2 top-16 z-40 hidden -translate-x-1/2 rounded-lg border px-3 py-2 text-xs shadow-sm backdrop-blur md:block" style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.node.text }}>
                     该工作流来自分享，并设置为自动更新。原作者更新分享后，本工作流可能被覆盖。
                 </div>
             ) : null}
@@ -2991,6 +3016,8 @@ function CanvasTopBar({
                 <div className="space-y-2 border-t pt-4 text-sm" style={{ borderColor: theme.node.stroke }}>
                     <Shortcut keys={["拖动画布"]} value="平移视图" />
                     <Shortcut keys={["滚轮"]} value="缩放画布" />
+                    <Shortcut keys={["单指拖动"]} value="平移视图" />
+                    <Shortcut keys={["双指缩放/移动"]} value="缩放画布" />
                     <Shortcut keys={["缩放滑杆"]} value="精确调整缩放" />
                     <Shortcut keys={["Ctrl / Cmd", "拖动"]} value="框选多个节点" />
                     <Shortcut keys={["Shift / Ctrl / Cmd", "点击"]} value="追加选择节点" />

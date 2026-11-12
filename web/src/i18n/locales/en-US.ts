@@ -2116,6 +2116,9 @@ const enUS = {
     "上游模型地址不安全": "The provider's model URL is unsafe.",
     "下载上游模型失败": "Failed to download the model from the provider.",
     "已完成": "Completed",
+    "修改工作流名称": "Rename workflow",
+    "单指拖动": "Drag with one finger",
+    "双指缩放/移动": "Pinch or pan with two fingers",
 };
 
 export default enUS;

@@ -88,7 +88,7 @@ export function Minimap({ nodes, viewport, viewportSize, onViewportChange }: { n
         const rect = containerRef.current?.getBoundingClientRect();
         if (!rect) return;
 
-        const world = toWorld(event.clientX - rect.left, event.clientY - rect.top);
+        const world = toWorld((event.clientX - rect.left) * width / rect.width, (event.clientY - rect.top) * height / rect.height);
         onViewportChange({
             x: viewportSize.width / 2 - world.x * viewport.k,
             y: viewportSize.height / 2 - world.y * viewport.k,
@@ -97,10 +97,10 @@ export function Minimap({ nodes, viewport, viewportSize, onViewportChange }: { n
     };
 
     return (
-        <div className="absolute bottom-24 left-6 z-50 overflow-hidden rounded-lg border shadow-2xl backdrop-blur-sm" style={{ width, height, background: theme.toolbar.panel, borderColor: theme.toolbar.border }}>
+        <div className="absolute bottom-[calc(env(safe-area-inset-bottom)+76px)] left-[max(8px,env(safe-area-inset-left))] z-50 origin-bottom-left scale-[0.833333] overflow-hidden rounded-lg border shadow-2xl backdrop-blur-sm md:bottom-24 md:left-6 md:scale-100" style={{ width, height, background: theme.toolbar.panel, borderColor: theme.toolbar.border }}>
             <div
                 ref={containerRef}
-                className="relative h-full w-full cursor-crosshair"
+                className="relative h-full w-full touch-none cursor-crosshair"
                 onPointerDown={(event) => {
                     event.preventDefault();
                     event.currentTarget.setPointerCapture(event.pointerId);
@@ -111,6 +111,8 @@ export function Minimap({ nodes, viewport, viewportSize, onViewportChange }: { n
                     if (isDragging) updateViewportFromEvent(event);
                 }}
                 onPointerUp={() => setIsDragging(false)}
+                onPointerCancel={() => setIsDragging(false)}
+                onLostPointerCapture={() => setIsDragging(false)}
                 onPointerLeave={() => setIsDragging(false)}
             >
                 {nodes.map((node) => {

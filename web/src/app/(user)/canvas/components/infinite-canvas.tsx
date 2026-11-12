@@ -5,6 +5,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { canvasThemes, type CanvasBackgroundMode } from "@/lib/canvas-theme";
 import { useThemeStore } from "@/stores/use-theme-store";
 import type { ViewportTransform } from "../types";
+import { useCanvasTouch } from "../hooks/use-canvas-touch";
 
 type InfiniteCanvasProps = {
     containerRef: React.RefObject<HTMLDivElement | null>;
@@ -13,13 +14,15 @@ type InfiniteCanvasProps = {
     onViewportChange: (viewport: ViewportTransform) => void;
     onCanvasMouseDown?: (event: React.PointerEvent<HTMLDivElement>) => void;
     onCanvasDeselect?: () => void;
+    onGestureStart?: () => void;
     onContextMenu?: (event: React.MouseEvent) => void;
     onDrop?: (event: React.DragEvent<HTMLDivElement>) => void;
     children: React.ReactNode;
 };
 
-export function InfiniteCanvas({ containerRef, viewport, backgroundMode = "lines", onViewportChange, onCanvasMouseDown, onCanvasDeselect, onContextMenu, onDrop, children }: InfiniteCanvasProps) {
+export function InfiniteCanvas({ containerRef, viewport, backgroundMode = "lines", onViewportChange, onCanvasMouseDown, onCanvasDeselect, onGestureStart, onContextMenu, onDrop, children }: InfiniteCanvasProps) {
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
+    useCanvasTouch({ containerRef, viewport, onViewportChange, onCanvasDeselect, onGestureStart });
     const panState = useRef({
         isPanning: false,
         startX: 0,
@@ -86,6 +89,7 @@ export function InfiniteCanvas({ containerRef, viewport, backgroundMode = "lines
     };
 
     const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+        if (event.pointerType === "touch") return;
         const target = event.target instanceof Element ? event.target : null;
         if (target?.closest("[data-canvas-no-zoom]")) return;
         if (target?.closest("[data-connection-create-menu]")) return;
@@ -120,6 +124,7 @@ export function InfiniteCanvas({ containerRef, viewport, backgroundMode = "lines
 
     useEffect(() => {
         const handlePointerMove = (event: PointerEvent) => {
+            if (event.pointerType === "touch") return;
             if (!panState.current.isPanning) return;
 
             const dx = event.clientX - panState.current.startX;
@@ -140,7 +145,8 @@ export function InfiniteCanvas({ containerRef, viewport, backgroundMode = "lines
             });
         };
 
-        const handlePointerUp = () => {
+        const handlePointerUp = (event: PointerEvent) => {
+            if (event.pointerType === "touch") return;
             if (!panState.current.isPanning) return;
 
             if (!panState.current.hasMoved) {

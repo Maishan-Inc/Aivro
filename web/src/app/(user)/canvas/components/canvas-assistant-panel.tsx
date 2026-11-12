@@ -291,15 +291,15 @@ export function CanvasAssistantPanel({ workflowId, nodes, selectedNodeIds, snaps
     return (
         <div
             ref={rootRef}
-            className="flex shrink-0"
+            className="absolute inset-0 z-[90] flex shrink-0 max-md:!w-full md:static md:z-auto"
             style={{ width: width + 1, opacity: 1, overflow: "clip", pointerEvents: closing ? "none" : undefined }}
         >
             <aside
                 ref={asideRef}
-                className="relative flex shrink-0 flex-col border-l"
+                className="relative flex min-w-0 shrink-0 flex-col border-l pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] max-md:!w-full md:py-0"
                 style={{ width, background: theme.node.panel, borderColor: theme.node.stroke, color: theme.node.text }}
             >
-                <button type="button" className="absolute inset-y-0 left-0 z-40 w-4 -translate-x-1/2 cursor-col-resize" onMouseDown={startResize} aria-label="调整右侧面板宽度" />
+                <button type="button" className="absolute inset-y-0 left-0 z-40 hidden w-4 -translate-x-1/2 cursor-col-resize md:block" onMouseDown={startResize} aria-label="调整右侧面板宽度" />
                 <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: theme.node.stroke }}>
                     <div className="flex items-center gap-2 text-sm font-medium">
                         <Sparkles className="size-4" />

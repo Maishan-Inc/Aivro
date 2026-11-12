@@ -2104,6 +2104,9 @@ const frFR = {
     "上游模型地址不安全": "L’URL du modèle fournie n’est pas sûre.",
     "下载上游模型失败": "Échec du téléchargement du modèle auprès du fournisseur.",
     "已完成": "Terminé",
+    "修改工作流名称": "Renommer le workflow",
+    "单指拖动": "Glisser avec un doigt",
+    "双指缩放/移动": "Zoomer ou déplacer avec deux doigts",
 };
 
 export default frFR;
