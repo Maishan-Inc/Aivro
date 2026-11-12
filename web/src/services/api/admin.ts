@@ -597,7 +597,10 @@ export async function fetchAdminSettings(token: string) {
 }
 
 export async function saveAdminSettings(token: string, settings: AdminSettings) {
-    return apiPost<AdminSettings>("/api/admin/settings", settings, token);
+    const saved = await apiPost<AdminSettings>("/api/admin/settings", settings, token);
+    const { useConfigStore } = await import("@/stores/use-config-store");
+    await useConfigStore.getState().invalidatePublicSettings().catch(() => {});
+    return saved;
 }
 
 export async function saveAdminAITimeouts(token: string, settings: AdminAITimeoutSettings) {

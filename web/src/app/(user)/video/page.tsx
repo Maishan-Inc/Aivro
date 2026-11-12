@@ -85,6 +85,7 @@ export default function VideoPage() {
     const isAiConfigReady = useConfigStore((state) => state.isAiConfigReady);
     const addAsset = useAssetStore((state) => state.addAsset);
     const token = useUserStore((state) => state.token);
+    const userId = useUserStore((state) => state.user?.id);
     const [prompt, setPrompt] = useState("");
     const [references, setReferences] = useState<ReferenceImage[]>([]);
     const [results, setResults] = useState<GenerationResult[]>([]);
@@ -108,6 +109,8 @@ export default function VideoPage() {
     const canGenerate = Boolean(prompt.trim());
     const composerExpanded = promptComposer.expanded;
 
+    useEffect(() => setLogs([]), [userId]);
+
     useEffect(() => {
         const urlPrompt = searchParams.get("prompt");
         if (urlPrompt) setPrompt(urlPrompt);
@@ -120,8 +123,8 @@ export default function VideoPage() {
     }, [running, startedAt]);
 
     useEffect(() => {
-        void refreshLogs().catch(() => {});
-    }, [token, retention.dataUpdatedAt]);
+        void refreshLogs(false).catch(() => {});
+    }, [token, userId, retention.dataUpdatedAt]);
 
     const addReferences = async (files?: FileList | File[] | null) => {
         if (running) return;
@@ -250,6 +253,7 @@ export default function VideoPage() {
 
     const createSession = () => {
         if (running) return;
+        setLogsOpen(false);
         setPrompt("");
         setReferences([]);
         setResults([]);
@@ -261,7 +265,7 @@ export default function VideoPage() {
 
     const deleteSelectedLogs = () => {
         if (!token) return;
-        void Promise.all(selectedLogIds.map((id) => deleteGenerationHistory(token, id))).then(refreshLogs);
+        void Promise.all(selectedLogIds.map((id) => deleteGenerationHistory(token, id))).then(() => refreshLogs());
         if (previewLog && selectedLogIds.includes(previewLog.id)) {
             setPreviewLog(null);
             setResults([]);
@@ -298,15 +302,16 @@ export default function VideoPage() {
             status: log.status,
             error: log.error || "",
             durationMs: Math.round(log.durationMs),
-        }).then(refreshLogs);
+        }).then(() => refreshLogs());
     };
 
-    const refreshLogs = async () => {
+    const refreshLogs = async (force = true) => {
         if (!token) {
             setLogs([]);
             return;
         }
-        const data = await fetchGenerationHistories(token, { type: "video", pageSize: 100 });
+        const data = await fetchGenerationHistories(token, { type: "video", pageSize: 100 }, force);
+        if (useUserStore.getState().user?.id !== userId) return;
         setLogs(data.items.map(historyToVideoLog));
     };
 
@@ -336,10 +341,7 @@ export default function VideoPage() {
                         </div>
                     </header>
                     <div className={studio.results}>
-                        <div className="mb-4 flex items-center justify-between gap-3">
-                            <h2 className="text-xl font-semibold">生成结果</h2>
-                            {running ? <Tag className="m-0 px-2 py-1">等待 {formatDuration(elapsedMs)}</Tag> : null}
-                        </div>
+                        {running ? <div className="mb-4 flex justify-end"><Tag className="m-0 px-2 py-1">等待 {formatDuration(elapsedMs)}</Tag></div> : null}
                         {results.length ? (
                             <div className="grid gap-4">
                                 {results.map((result) => (result.status === "success" && result.video ? <ResultVideoCard key={result.id} video={result.video} onDownload={downloadVideo} onSaveAsset={saveResultToAssets} /> : result.status === "failed" ? <FailedVideoCard key={result.id} error={result.error || "生成失败"} onRetry={retryResult} /> : <PendingVideoCard key={result.id} />))}

@@ -9,7 +9,7 @@
 .promptPreview { display: block; width: 100%; min-width: 0; flex: 1; padding: 8px 10px; border: 0; background: transparent; color: inherit; font-size: 15px; line-height: 24px; text-align: left; cursor: pointer; }
 .promptPreview > span { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .send:global(.ant-btn) { position: absolute; top: 50%; right: 12px; transform: translateY(-50%); flex: none !important; width: 40px !important; min-width: 40px !important; max-width: 40px !important; height: 40px !important; aspect-ratio: 1; padding: 0 !important; border-radius: 50% !important; }
-.controls { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows .25s ease, opacity .2s ease; }
+.controls { display: grid; grid-template-rows: 0fr; opacity: 0; transition: opacity .2s ease; }
 .controls > div { min-height: 0; overflow: hidden; }
 .composer[data-expanded="true"] .controls { grid-template-rows: 1fr; opacity: 1; }
 .toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; min-width: 0; padding-top: 8px; }

@@ -1,9 +1,9 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useEffect } from "react";
-import { ProConfigProvider } from "@ant-design/pro-components";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { App, ConfigProvider } from "antd";
 import enUS from "antd/locale/en_US";
 import frFR from "antd/locale/fr_FR";
@@ -20,19 +20,10 @@ import { RuntimeI18nTranslator } from "@/components/layout/runtime-i18n-translat
 import { useEffectiveLocale } from "@/hooks/use-effective-locale";
 import type { Locale } from "@/i18n/messages";
 import { getAntThemeConfig } from "@/lib/app-theme";
+import { getQueryClient } from "@/lib/query-client";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { useUserStore } from "@/stores/use-user-store";
 import { useCanvasStore } from "@/app/(user)/canvas/stores/use-canvas-store";
-
-const queryClient = new QueryClient({
-    defaultOptions: {
-        queries: {
-            staleTime: 30_000,
-            retry: false,
-            refetchOnWindowFocus: false,
-        },
-    },
-});
 
 const antdLocales: Record<Locale, AntdLocale> = {
     "zh-CN": zhCN,
@@ -44,6 +35,8 @@ const antdLocales: Record<Locale, AntdLocale> = {
 };
 
 export function AppProviders({ children }: { children: ReactNode }) {
+    const [queryClient] = useState(getQueryClient);
+    const router = useRouter();
     const theme = useThemeStore((state) => state.theme);
     const locale = useEffectiveLocale();
     const dark = theme === "dark";
@@ -52,8 +45,9 @@ export function AppProviders({ children }: { children: ReactNode }) {
         if (state.user?.id !== previous.user?.id) {
             queryClient.clear();
             useCanvasStore.getState().setProjects([]);
+            if (previous.isReady) router.refresh();
         }
-    }), []);
+    }), [queryClient, router]);
 
     useEffect(() => {
         document.documentElement.classList.toggle("dark", dark);
@@ -66,16 +60,14 @@ export function AppProviders({ children }: { children: ReactNode }) {
 
     return (
         <ConfigProvider locale={antdLocales[locale] || zhCN} theme={getAntThemeConfig(dark)} button={{ autoInsertSpace: false }} modal={{ centered: true }}>
-            <ProConfigProvider dark={dark}>
-                <App>
-                    <QueryClientProvider client={queryClient}>
-                        <LocalePathSync />
-                        <RuntimeI18nTranslator />
-                        <GoogleAdSenseScript />
-                        <ClientRootInit>{children}</ClientRootInit>
-                    </QueryClientProvider>
-                </App>
-            </ProConfigProvider>
+            <App>
+                <QueryClientProvider client={queryClient}>
+                    <LocalePathSync />
+                    <RuntimeI18nTranslator />
+                    <GoogleAdSenseScript />
+                    <ClientRootInit>{children}</ClientRootInit>
+                </QueryClientProvider>
+            </App>
         </ConfigProvider>
     );
 }

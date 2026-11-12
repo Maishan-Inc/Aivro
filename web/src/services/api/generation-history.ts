@@ -1,4 +1,6 @@
 import { apiDelete, apiGet, apiPost, compactApiParams } from "@/services/api/request";
+import { getQueryClient } from "@/lib/query-client";
+import { useUserStore } from "@/stores/use-user-store";
 
 export type GenerationHistoryType = "image" | "video" | "model3d" | "free-image" | "prompt-reverse";
 
@@ -51,14 +53,23 @@ export type GenerationHistoryList = {
 
 export type SaveGenerationHistoryInput = Pick<GenerationHistory, "type" | "title" | "prompt" | "model" | "config" | "references" | "media" | "status" | "error" | "durationMs">;
 
-export async function fetchGenerationHistories(token: string, query: { type: GenerationHistoryType; page?: number; pageSize?: number }) {
-    return apiGet<GenerationHistoryList>("/api/v1/generation-histories", compactApiParams(query), token);
+export async function fetchGenerationHistories(token: string, query: { type: GenerationHistoryType; page?: number; pageSize?: number }, force = true) {
+    const userId = useUserStore.getState().user?.id;
+    return getQueryClient().fetchQuery({
+        queryKey: ["generation-histories", userId, token, query],
+        queryFn: () => apiGet<GenerationHistoryList>("/api/v1/generation-histories", compactApiParams(query), token),
+        staleTime: force ? 0 : 30_000,
+    });
 }
 
 export async function saveGenerationHistory(token: string, input: SaveGenerationHistoryInput) {
-    return apiPost<GenerationHistory>("/api/v1/generation-histories", input, token);
+    const history = await apiPost<GenerationHistory>("/api/v1/generation-histories", input, token);
+    getQueryClient().removeQueries({ queryKey: ["generation-histories"] });
+    return history;
 }
 
 export async function deleteGenerationHistory(token: string, id: string) {
-    return apiDelete<boolean>(`/api/v1/generation-histories/${encodeURIComponent(id)}`, token);
+    const deleted = await apiDelete<boolean>(`/api/v1/generation-histories/${encodeURIComponent(id)}`, token);
+    getQueryClient().removeQueries({ queryKey: ["generation-histories"] });
+    return deleted;
 }

@@ -71,12 +71,13 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
                         <span className="hidden text-muted-foreground sm:inline">工作空间</span><ChevronRight className="hidden size-3 text-muted-foreground sm:block" /><span className="truncate font-medium">{title}</span>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
-                        <nav className="mr-1 flex items-center gap-2 text-xs sm:gap-3" aria-label={tr("快捷导航")}>
-                            <Link href={localizedPath("/models")} aria-label={tr("模型定价")} title={tr("模型定价")} className="inline-flex h-8 items-center gap-1.5 whitespace-nowrap text-muted-foreground transition hover:text-foreground"><CircleDollarSign className="size-4" aria-hidden="true" /><span className="hidden md:inline">{tr("模型定价")}</span></Link>
-                            <Link href={localizedPath("/developers")} aria-label={tr("开发文档")} title={tr("开发文档")} className="inline-flex h-8 items-center gap-1.5 whitespace-nowrap text-muted-foreground transition hover:text-foreground"><BookOpen className="size-4" aria-hidden="true" /><span className="hidden md:inline">{tr("开发文档")}</span></Link>
-                        </nav>
                         {user ? <Link href={localizedPath("/console/wallet")} className="mr-2 hidden text-xs tabular-nums text-muted-foreground sm:block">{formatNumber(user.credits ?? 0)} 算力点</Link> : null}
-                        <LocaleMenu /><UserStatusActions />
+                        <nav className="flex shrink-0 items-center gap-2" aria-label={tr("快捷导航")}>
+                            <Link href={localizedPath("/models")} aria-label={tr("模型定价")} title={tr("模型定价")} className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition hover:bg-muted hover:text-foreground"><CircleDollarSign className="size-4" aria-hidden="true" /></Link>
+                            <Link href={localizedPath("/developers")} aria-label={tr("开发文档")} title={tr("开发文档")} className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition hover:bg-muted hover:text-foreground"><BookOpen className="size-4" aria-hidden="true" /></Link>
+                            <LocaleMenu />
+                        </nav>
+                        <UserStatusActions />
                     </div>
                 </header>
                 <div className="min-h-0 flex-1 overflow-hidden">{children}</div>

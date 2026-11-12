@@ -36,19 +36,32 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
     const redirectGuestHome = cleanPathname === "/home" && isUserReady && !user;
 
     useEffect(() => {
-        void loadPublicSettings();
+        void loadPublicSettings(false).catch(() => {});
     }, [loadPublicSettings, pathname]);
 
     useEffect(() => {
-        if (!isLoginPage) void hydrateUser();
+        if (!isLoginPage) void hydrateUser(false);
     }, [hydrateUser, isLoginPage, pathname]);
+
+    useEffect(() => {
+        const refresh = () => { if (!document.hidden) void loadPublicSettings(false).catch(() => {}); };
+        const timer = window.setInterval(() => { if (!document.hidden) void loadPublicSettings().catch(() => {}); }, 30_000);
+        window.addEventListener("focus", refresh);
+        document.addEventListener("visibilitychange", refresh);
+        return () => {
+            window.clearInterval(timer);
+            window.removeEventListener("focus", refresh);
+            document.removeEventListener("visibilitychange", refresh);
+        };
+    }, [loadPublicSettings]);
 
     useEffect(() => {
         if (!token || isLoginPage) return;
         const refresh = () => { if (!document.hidden) void hydrateUser(); };
         const timer = window.setInterval(refresh, 30_000);
         window.addEventListener("focus", refresh);
-        return () => { window.clearInterval(timer); window.removeEventListener("focus", refresh); };
+        document.addEventListener("visibilitychange", refresh);
+        return () => { window.clearInterval(timer); window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", refresh); };
     }, [hydrateUser, isLoginPage, token]);
 
     useEffect(() => {

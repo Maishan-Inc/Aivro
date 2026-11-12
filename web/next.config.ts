@@ -30,6 +30,7 @@ export default function nextConfig(phase: string): NextConfig {
         output: process.env.NEXT_OUTPUT_STANDALONE === "1" ? "standalone" : undefined,
         allowedDevOrigins: isDev ? ["127.0.0.1", "localhost"] : [],
         images: { unoptimized: true },
+        experimental: { staleTimes: { dynamic: 30 } },
         env: {
             NEXT_PUBLIC_APP_VERSION: localVersion,
             NEXT_PUBLIC_APP_RELEASES: JSON.stringify(releases),

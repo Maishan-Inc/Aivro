@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Alert, App, Button, Empty, Form, Input, Modal, Select, Space, Spin, Table, Tag } from "antd";
+import { Alert, App, Button, Empty, Form, Input, Modal, Pagination, Select, Spin, Table, Tag } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { LifeBuoy, Plus, RefreshCw } from "lucide-react";
+import { Plus, RefreshCw } from "lucide-react";
 
 import { SupportTicketCharge } from "@/components/support-ticket-charge";
 import { SupportTicketDetail } from "@/components/support-ticket-detail";
@@ -96,17 +96,36 @@ export default function TicketsPage() {
 
     return <div className="thin-scrollbar h-full overflow-y-auto p-4 lg:p-8">
         <div className="mx-auto max-w-6xl space-y-6">
-            <header className="flex flex-wrap items-end justify-between gap-5 border-b border-border pb-6">
-                <div><div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground"><LifeBuoy className="size-4" />{tr("客户支持")}</div><h1 className="text-2xl font-semibold">{tr("工单服务")}</h1><p className="mt-2 text-sm leading-6 text-muted-foreground">{tr("遇到扣费、生成或账号问题？提交工单，与客服继续沟通。")}</p></div>
-                <Button type="primary" icon={<Plus className="size-4" />} onClick={() => { setDraftLogID(""); setCreateOpen(true); }}>{tr("创建工单")}</Button>
+            <header className="flex items-center justify-between gap-3 border-b border-border pb-6">
+                <h1 className="min-w-0 text-xl font-semibold sm:text-2xl">{tr("工单服务")}</h1>
+                <Button className="shrink-0" type="primary" icon={<Plus className="size-4" />} onClick={() => { setDraftLogID(""); setCreateOpen(true); }}>{tr("创建工单")}</Button>
             </header>
-            <section className="rounded-xl border border-border p-4 sm:p-6">
-                <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-                    <Space wrap><Input.Search value={keywordText} onChange={(event) => setKeywordText(event.target.value)} placeholder={tr("搜索工单标题或编号")} allowClear onSearch={(value) => { setKeyword(value.trim()); setPage(1); }} className="w-60" /><Select aria-label={tr("筛选工单状态")} value={status} className="min-w-44" onChange={(value) => { setStatus(value); setPage(1); }} options={[{ value: "", label: tr("全部状态") }, ...Object.entries(ticketStatusLabels).map(([value, label]) => ({ value, label: tr(label) }))]} /></Space>
-                    <Button type="text" icon={<RefreshCw className="size-4" />} loading={query.isFetching} onClick={() => query.refetch()}>{tr("刷新")}</Button>
+            <section className="min-w-0 rounded-xl border border-border p-3 sm:p-6">
+                <div className="mb-5 flex min-w-0 items-center gap-2 sm:gap-3">
+                    <Select aria-label={tr("筛选工单状态")} value={status} className="w-28 min-w-0 shrink-0 sm:w-44" onChange={(value) => { setStatus(value); setPage(1); }} options={[{ value: "", label: tr("全部状态") }, ...Object.entries(ticketStatusLabels).map(([value, label]) => ({ value, label: tr(label) }))]} />
+                    <Input.Search value={keywordText} onChange={(event) => setKeywordText(event.target.value)} placeholder={tr("搜索工单标题或编号")} aria-label={tr("搜索工单标题或编号")} allowClear onSearch={(value) => { setKeyword(value.trim()); setPage(1); }} className="min-w-0 flex-1 sm:w-60 sm:flex-none" />
+                    <Button className="shrink-0 !px-2 sm:ml-auto" type="text" icon={<RefreshCw className="size-4" />} aria-label={tr("刷新")} title={tr("刷新")} loading={query.isFetching} onClick={() => query.refetch()}><span className="hidden sm:inline">{tr("刷新")}</span></Button>
                 </div>
                 {query.isError ? <Alert className="mb-4" type="error" showIcon title={tr(query.error instanceof Error ? query.error.message : "读取工单失败")} /> : null}
-                <Table<SupportTicket> rowKey="id" columns={columns} dataSource={query.data?.items || []} loading={query.isFetching} scroll={{ x: 880 }} pagination={{ current: page, pageSize, total: query.data?.total || 0, showSizeChanger: true, onChange: (value, size) => { setPage(size === pageSize ? value : 1); setPageSize(size); } }} locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={tr(query.isError ? "暂时无法加载工单" : "暂无工单，遇到问题可以创建工单")} /> }} />
+                <div className="sm:hidden">
+                    <Spin spinning={query.isFetching}>
+                        <div className="divide-y divide-border">
+                            {query.data?.items.length ? query.data.items.map((item) => <button key={item.id} type="button" className="block w-full space-y-2 py-4 text-left first:pt-0 hover:bg-muted/30" onClick={() => setSelectedID(item.id)} aria-label={`${tr("查看详情")} ${item.title}`} data-i18n-skip>
+                                <div className="flex items-start justify-between gap-2">
+                                    <span className="line-clamp-2 min-w-0 flex-1 break-words text-sm font-medium leading-6" data-i18n-skip>{item.title}</span>
+                                    <Tag className="max-w-[48%] shrink-0" style={{ marginInlineEnd: 0, whiteSpace: "normal" }} color={ticketStatusColors[item.status]}>{tr(ticketStatusLabels[item.status])}</Tag>
+                                </div>
+                                <p className="line-clamp-2 whitespace-pre-wrap break-words text-xs leading-5 text-muted-foreground" data-i18n-skip>{item.content}</p>
+                                <p className="truncate text-[11px] text-muted-foreground" title={item.id}>{tr("工单编号")} <code data-i18n-skip>{item.id}</code></p>
+                                <div className="flex items-end justify-between gap-2 text-[11px] text-muted-foreground"><span>{tr(ticketCategoryLabels[item.category])}</span><time dateTime={item.updatedAt} title={tr("更新时间")} className="text-right">{formatDateTime(item.updatedAt)}</time></div>
+                            </button>) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={tr(query.isError ? "暂时无法加载工单" : "暂无工单，遇到问题可以创建工单")} />}
+                        </div>
+                    </Spin>
+                    {query.data?.total ? <Pagination simple current={page} pageSize={pageSize} total={query.data.total} showSizeChanger={false} onChange={setPage} className="mt-5 flex justify-center" /> : null}
+                </div>
+                <div className="hidden sm:block">
+                    <Table<SupportTicket> rowKey="id" columns={columns} dataSource={query.data?.items || []} loading={query.isFetching} scroll={{ x: 880 }} pagination={{ current: page, pageSize, total: query.data?.total || 0, showSizeChanger: true, onChange: (value, size) => { setPage(size === pageSize ? value : 1); setPageSize(size); } }} locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={tr(query.isError ? "暂时无法加载工单" : "暂无工单，遇到问题可以创建工单")} /> }} />
+                </div>
             </section>
         </div>
         <Modal title={tr("创建工单")} open={createOpen} onCancel={closeCreate} onOk={() => form.submit()} okText={tr("提交工单")} cancelText={tr("取消")} confirmLoading={creating} okButtonProps={{ disabled: !ready }} cancelButtonProps={{ disabled: creating }} closable={!creating} mask={{ closable: !creating }} destroyOnHidden width={640}>

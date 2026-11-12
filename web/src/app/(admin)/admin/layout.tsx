@@ -1,6 +1,7 @@
 "use client";
 
 import { ApiOutlined, AuditOutlined, CommentOutlined, DatabaseOutlined, DollarOutlined, FileTextOutlined, GlobalOutlined, HomeOutlined, LogoutOutlined, MailOutlined, MenuOutlined, PictureOutlined, ShareAltOutlined, ShoppingOutlined, SettingOutlined, TagsOutlined, TransactionOutlined, UserOutlined } from "@ant-design/icons";
+import { ProConfigProvider } from "@ant-design/pro-components";
 import { Button, Drawer, Dropdown, Flex, Layout, Menu, Typography, theme } from "antd";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -11,6 +12,7 @@ import { UserStatusActions } from "@/components/layout/user-status-actions";
 import { adminLocaleOptions, localeLabels, type Locale } from "@/i18n/messages";
 import { adminLayoutStyle } from "@/lib/app-theme";
 import { useLocaleStore } from "@/stores/use-locale-store";
+import { useThemeStore } from "@/stores/use-theme-store";
 import { useUserStore } from "@/stores/use-user-store";
 
 const adminMenus = [
@@ -35,6 +37,7 @@ const adminMenus = [
 ];
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
+    const dark = useThemeStore((state) => state.theme === "dark");
     const { token: antToken } = theme.useToken();
     const router = useRouter();
     const pathname = usePathname();
@@ -80,7 +83,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
     useEffect(() => {
         if (!isReady || !token) return;
-        void hydrateUser();
+        void hydrateUser(false);
     }, [hydrateUser, isReady, pathname, token]);
 
     useEffect(() => {
@@ -147,7 +150,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                     </Flex>
                 </Layout.Header>
                 <Layout.Content style={{ minHeight: 0, overflow: "auto" }}>
-                    {children}
+                    <ProConfigProvider dark={dark}>{children}</ProConfigProvider>
                     <div lang="en" data-i18n-skip className="px-3 py-3 lg:px-6" style={{ textAlign: "center", color: antToken.colorTextTertiary, fontSize: 12 }}>© 2026 Maishan Inc. · Aivro. All rights reserved.</div>
                 </Layout.Content>
             </Layout>

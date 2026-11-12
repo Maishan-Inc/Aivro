@@ -127,6 +127,8 @@ export default function ImagePage() {
     const model = effectiveConfig.imageModel || effectiveConfig.model;
     const visibleLogs = pendingLog ? [pendingLog, ...logs] : logs;
 
+    useEffect(() => setLogs([]), [userId]);
+
     useEffect(() => {
         if (!running || !startedAt) return;
         const timer = window.setInterval(() => setElapsedMs(performance.now() - startedAt), 1000);
@@ -134,8 +136,8 @@ export default function ImagePage() {
     }, [running, startedAt]);
 
     useEffect(() => {
-        void refreshLogs().catch(() => {});
-    }, [token, retention.dataUpdatedAt]);
+        void refreshLogs(false).catch(() => {});
+    }, [token, userId, retention.dataUpdatedAt]);
 
     useEffect(() => {
         const urlPrompt = searchParams.get("prompt");
@@ -287,6 +289,7 @@ export default function ImagePage() {
 
     const createSession = () => {
         if (running || submittingRef.current) return;
+        setLogsOpen(false);
         setPrompt("");
         setReferences([]);
         setResults([]);
@@ -298,7 +301,7 @@ export default function ImagePage() {
 
     const deleteSelectedLogs = () => {
         if (!token) return;
-        void Promise.all(selectedLogIds.map((id) => deleteGenerationHistory(token, id))).then(refreshLogs);
+        void Promise.all(selectedLogIds.map((id) => deleteGenerationHistory(token, id))).then(() => refreshLogs());
         if (previewLog && selectedLogIds.includes(previewLog.id)) {
             setPreviewLog(null);
             setResults([]);
@@ -344,12 +347,13 @@ export default function ImagePage() {
         await refreshLogs();
     };
 
-    const refreshLogs = async () => {
+    const refreshLogs = async (force = true) => {
         if (!token) {
             setLogs([]);
             return;
         }
-        const data = await fetchGenerationHistories(token, { type: "image", pageSize: 100 });
+        const data = await fetchGenerationHistories(token, { type: "image", pageSize: 100 }, force);
+        if (useUserStore.getState().user?.id !== userId) return;
         setLogs(data.items.map(historyToImageLog));
     };
 
@@ -481,12 +485,7 @@ export default function ImagePage() {
                         </div>
                     </header>
                     <div className={studio.results} style={{ containerType: "size" }}>
-                        <div className="mb-4 flex items-center justify-between gap-3">
-                            <div>
-                                <h2 className="text-xl font-semibold">生成结果</h2>
-                            </div>
-                            {running ? <Tag className="m-0 px-2 py-1">等待 {formatDuration(elapsedMs)}</Tag> : null}
-                        </div>
+                        {running ? <div className="mb-4 flex justify-end"><Tag className="m-0 px-2 py-1">等待 {formatDuration(elapsedMs)}</Tag></div> : null}
                         {results.length ? (
                             <div className={`grid items-start gap-4 ${results.length > 1 ? "sm:grid-cols-2 2xl:grid-cols-3" : "justify-items-center"}`}>
                                 {results.map((result, index) => {

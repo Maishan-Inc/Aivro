@@ -55,7 +55,8 @@ type ConfigStore = {
     isPublicSettingsLoading: boolean;
     updateConfig: <K extends keyof AiConfig>(key: K, value: AiConfig[K], sync?: boolean) => void;
     setConfig: (config: Partial<AiConfig>, sync?: boolean) => void;
-    loadPublicSettings: () => Promise<void>;
+    loadPublicSettings: (force?: boolean) => Promise<void>;
+    invalidatePublicSettings: () => Promise<void>;
     isAiConfigReady: (config: AiConfig, model: string) => boolean;
 };
 
@@ -132,6 +133,9 @@ function syncPreference(config: AiConfig) {
     if (token) void saveUserPreference(token, { config });
 }
 
+let publicSettingsLoadedAt = 0;
+let publicSettingsRequest: Promise<void> | null = null;
+
 export const useConfigStore = create<ConfigStore>()((set, get) => ({
     config: defaultConfig,
     publicSettings: null,
@@ -148,14 +152,23 @@ export const useConfigStore = create<ConfigStore>()((set, get) => ({
             if (sync) syncPreference(config);
             return { config };
         }),
-    loadPublicSettings: async () => {
-        if (get().isPublicSettingsLoading) return;
+    loadPublicSettings: (force = true) => {
+        if (publicSettingsRequest) return publicSettingsRequest;
+        if (!force && get().publicSettings && Date.now() - publicSettingsLoadedAt < 30_000) return Promise.resolve();
         set({ isPublicSettingsLoading: true });
-        try {
-            set({ publicSettings: await apiGet<AdminPublicSettings>("/api/settings") });
-        } finally {
+        publicSettingsRequest = apiGet<AdminPublicSettings>("/api/settings").then((publicSettings) => {
+            publicSettingsLoadedAt = Date.now();
+            set({ publicSettings });
+        }).finally(() => {
+            publicSettingsRequest = null;
             set({ isPublicSettingsLoading: false });
-        }
+        });
+        return publicSettingsRequest;
+    },
+    invalidatePublicSettings: async () => {
+        await publicSettingsRequest?.catch(() => {});
+        publicSettingsLoadedAt = 0;
+        await get().loadPublicSettings();
     },
     isAiConfigReady: (config, model) => isAiConfigReady(config, model),
 }));

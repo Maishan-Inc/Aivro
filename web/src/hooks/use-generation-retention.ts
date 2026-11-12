@@ -9,6 +9,6 @@ export function useGenerationRetention() {
     const userId = useUserStore((state) => state.user?.id);
     return useQuery({
         queryKey: ["generation-retention", token, userId], queryFn: () => fetchGenerationRetention(token),
-        enabled: Boolean(token && userId), staleTime: 0, refetchOnWindowFocus: true, refetchInterval: 30000,
+        enabled: Boolean(token && userId), staleTime: 30_000, refetchOnWindowFocus: true, refetchInterval: 30000,
     });
 }

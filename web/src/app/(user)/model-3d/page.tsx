@@ -52,7 +52,7 @@ export default function Model3DPage() {
     const searchParams = useSearchParams();
     const { tr } = useI18n();
     const { message, modal } = App.useApp();
-    const { token } = useUserStore();
+    const { token, user } = useUserStore();
     const { addAsset } = useAssetStore();
     const effectiveConfig = useEffectiveConfig();
     const updateConfig = useConfigStore((state) => state.updateConfig);
@@ -240,33 +240,37 @@ export default function Model3DPage() {
         }
     };
 
-    const handleLoadHistory = useCallback(async () => {
+    const handleLoadHistory = useCallback(async (force = true) => {
         if (!token) {
             setHistories([]);
             return;
         }
         setLoadingHistory(true);
         try {
-            const result = await fetchGenerationHistories(token, { type: "model3d", page: 1, pageSize: 20 });
+            const result = await fetchGenerationHistories(token, { type: "model3d", page: 1, pageSize: 20 }, force);
+            if (useUserStore.getState().user?.id !== user?.id) return;
             setHistories(result.items);
         } catch (err) {
             console.error(err);
         } finally {
             setLoadingHistory(false);
         }
-    }, [token]);
+    }, [token, user?.id]);
 
     useEffect(() => {
-        void handleLoadHistory();
+        void handleLoadHistory(false);
     }, [handleLoadHistory, retention.dataUpdatedAt]);
+
+    useEffect(() => setHistories([]), [user?.id]);
 
     const openHistory = () => {
         setHistoryOpen(true);
-        void handleLoadHistory();
+        void handleLoadHistory(false);
     };
 
     const createSession = () => {
         if (generating || uploading) return;
+        setHistoryOpen(false);
         setPrompt("");
         setImages([]);
         setCurrentResult(null);
@@ -319,8 +323,7 @@ export default function Model3DPage() {
                         </div>
                     </header>
                     <div ref={resultsRef} className={studio.results}>
-                        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                            <h2 className="text-xl font-semibold">生成结果</h2>
+                        <div className="mb-4 flex justify-end">
                             <div className="flex gap-2">
                                 <Button type={viewMode === "default" ? "primary" : "default"} onClick={() => setViewMode("default")} size="small">
                                     贴图
@@ -449,7 +452,7 @@ export default function Model3DPage() {
                     </div>
                 </section>
                 <StudioHistorySidebar onNew={createSession} newDisabled={generating || uploading} activeId={currentResult?.id} items={histories.map((item) => ({ id: item.id, title: item.title, prompt: item.prompt, preview: item.references[0]?.url }))} onSelect={(id) => { const item = histories.find((history) => history.id === id); if (item) previewHistory(item); }} onOpenDetail={(id) => { const item = histories.find((history) => history.id === id); if (item) setDetailHistory(item); }}>
-                    <HistoryPanel histories={histories} retentionDays={retentionDays} activeId={currentResult?.id} loading={loadingHistory} onNew={generating || uploading ? undefined : createSession} onRefresh={handleLoadHistory} onPreview={previewHistory} onOpenDetail={setDetailHistory} />
+                    <HistoryPanel histories={histories} retentionDays={retentionDays} activeId={currentResult?.id} loading={loadingHistory} onNew={generating || uploading ? undefined : createSession} onRefresh={() => void handleLoadHistory()} onPreview={previewHistory} onOpenDetail={setDetailHistory} />
                 </StudioHistorySidebar>
             </main>
 
@@ -467,7 +470,7 @@ export default function Model3DPage() {
             />
 
             <Drawer title="生成记录" placement="right" size={340} open={historyOpen} onClose={() => setHistoryOpen(false)}>
-                <HistoryPanel histories={histories} retentionDays={retentionDays} activeId={currentResult?.id} loading={loadingHistory} onNew={generating || uploading ? undefined : () => { createSession(); setHistoryOpen(false); }} onRefresh={handleLoadHistory} onPreview={previewHistory} onOpenDetail={setDetailHistory} />
+                <HistoryPanel histories={histories} retentionDays={retentionDays} activeId={currentResult?.id} loading={loadingHistory} onNew={generating || uploading ? undefined : createSession} onRefresh={() => void handleLoadHistory()} onPreview={previewHistory} onOpenDetail={setDetailHistory} />
             </Drawer>
             <Modal centered title="模型生成参数" open={settingsOpen && !generating} onCancel={() => setSettingsOpen(false)} footer={<Button type="primary" onClick={() => setSettingsOpen(false)}>完成</Button>} width={500}>
                 <div className="grid grid-cols-2 gap-5 py-4">

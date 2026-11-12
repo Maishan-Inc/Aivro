@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Alert, App, Button, Empty, Form, Input, Modal, Table, Tag } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { ArrowUpRight, BookOpen, Copy, KeyRound, Plus, RefreshCw } from "lucide-react";
+import { ArrowUpRight, BookOpen, Copy, Plus, RefreshCw } from "lucide-react";
 
 import { useCopyText } from "@/hooks/use-copy-text";
 import { useLocalizedPath } from "@/hooks/use-localized-path";
@@ -89,11 +89,11 @@ export default function APIKeysPage() {
 
     return <div className="thin-scrollbar h-full overflow-y-auto p-4 lg:p-8">
         <div className="mx-auto max-w-6xl space-y-6">
-            <header className="flex flex-wrap items-end justify-between gap-5 border-b border-border pb-6">
-                <div><div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground"><KeyRound className="size-4" />程序化调用</div><h1 className="text-2xl font-semibold tracking-tight">密钥管理</h1><p className="mt-2 text-sm leading-6 text-muted-foreground">用一个密钥连接本站模型，在你的应用中调用图片、对话、视频和 3D 生成。</p></div>
-                <Button type="primary" icon={<Plus className="size-4" />} onClick={() => setCreateOpen(true)}>创建密钥</Button>
+            <header className="flex items-center justify-between gap-3 border-b border-border pb-6">
+                <h1 className="min-w-0 text-xl font-semibold tracking-tight sm:text-2xl">密钥管理</h1>
+                <Button className="shrink-0" type="primary" icon={<Plus className="size-4" />} onClick={() => setCreateOpen(true)}>创建密钥</Button>
             </header>
-            <Alert type="info" showIcon title="完整密钥只显示一次" description="创建成功后请立即复制保存。本站仅保存密钥摘要，之后无法再次查看。名称在当前账号内唯一，忽略首尾空格与字母大小写；已撤销的名称仍保留。" />
+            <Alert type="info" showIcon classNames={{ description: "hidden sm:block" }} title="完整密钥只显示一次" description="创建成功后请立即复制保存。本站仅保存密钥摘要，之后无法再次查看。名称在当前账号内唯一，忽略首尾空格与字母大小写；已撤销的名称仍保留。" />
             <section className="min-w-0 rounded-xl border border-border p-4 sm:p-6">
                 <div className="mb-5 flex items-center justify-between gap-3"><h2 className="text-sm font-medium">我的密钥 <span className="ml-2 font-normal tabular-nums text-muted-foreground">{data.total}</span></h2><Button type="text" icon={<RefreshCw className="size-3.5" />} loading={loading} onClick={() => setRevision((value) => value + 1)}>刷新</Button></div>
                 {error ? <Alert className="mb-4" type="error" showIcon title={error} /> : null}
