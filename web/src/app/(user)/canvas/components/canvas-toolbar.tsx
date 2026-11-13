@@ -6,6 +6,7 @@ import { Box, CircleDot, Eraser, FolderOpen, Grid2x2, Hand, Image as ImageIcon, 
 import { canvasThemes, type CanvasBackgroundMode, type CanvasColorTheme, type CanvasTheme } from "@/lib/canvas-theme";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
+import styles from "./canvas-controls.module.css";
 
 export function CanvasToolbar({
     selectedCount,
@@ -64,9 +65,9 @@ export function CanvasToolbar({
     const tip = hovered ? toolLabel(hovered) : "";
 
     return (
-        <div className="pointer-events-none absolute bottom-[calc(env(safe-area-inset-bottom)+76px)] right-[max(8px,env(safe-area-inset-right))] top-[calc(env(safe-area-inset-top)+60px)] z-50 flex w-14 flex-col justify-end md:bottom-5 md:left-[300px] md:right-4 md:top-auto md:w-auto md:flex-row md:justify-center min-[1200px]:left-1/2 min-[1200px]:right-auto min-[1200px]:max-w-[calc(100%_-_32px)] min-[1200px]:-translate-x-1/2">
+        <div className={styles.toolbar}>
             {tip ? <DockTip label={tip} x={tipX} theme={theme} /> : null}
-            <div ref={wrapRef} className="thin-scrollbar pointer-events-auto flex min-h-0 max-h-full w-full flex-col items-center gap-1 overflow-y-auto overscroll-contain rounded-xl border py-2 shadow-lg backdrop-blur md:h-14 md:w-auto md:flex-row md:overflow-x-auto md:overflow-y-hidden md:px-2 md:py-0 [&>*]:shrink-0" style={dockStyle}>
+            <div ref={wrapRef} className={`${styles.dock} pointer-events-auto flex h-14 max-w-full items-center gap-1 overflow-x-auto overflow-y-hidden overscroll-contain rounded-xl border px-2 backdrop-blur [&>*]:shrink-0`} style={dockStyle}>
                 <ToolbarButton id="tool-hand" label="移动/选择" active={!selectedCount} hovered={hovered} activeStyle={activeStyle} hoverStyle={hoverStyle} wrapRef={wrapRef} onTipX={setTipX} onHover={setHovered} onClick={onDeselect}>
                     <Hand className="size-4.5" />
                 </ToolbarButton>
@@ -133,7 +134,7 @@ export function CanvasToolbar({
 
             {appearanceOpen ? (
                 <div
-                    className="thin-scrollbar pointer-events-auto absolute bottom-0 right-[calc(100%+8px)] z-30 max-h-full w-[248px] max-w-[calc(100vw-88px)] overflow-y-auto overscroll-contain rounded-xl border p-2.5 shadow-xl backdrop-blur md:bottom-[72px] md:left-[var(--canvas-panel-x)] md:right-auto md:max-h-[calc(100dvh-120px)] md:max-w-none md:-translate-x-1/2"
+                    className={`${styles.appearance} ${styles.dock} pointer-events-auto z-30 overscroll-contain rounded-xl border p-2.5 shadow-xl backdrop-blur`}
                     style={{ "--canvas-panel-x": panelX ? `${panelX}px` : "50%", background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.toolbar.item } as CSSProperties}
                 >
                     <div className="px-1 pb-2 text-sm font-medium opacity-65">画布外观</div>
@@ -244,7 +245,7 @@ function ToolbarButton({
 }
 
 function Divider({ theme }: { theme: CanvasTheme }) {
-    return <div className="my-1 h-px w-6 md:mx-1 md:my-0 md:h-6 md:w-px" style={{ background: theme.toolbar.border }} />;
+    return <div className="mx-1 h-6 w-px" style={{ background: theme.toolbar.border }} />;
 }
 
 function CanvasThemeButton({ colorTheme, targetTheme, onThemeChange, children }: { colorTheme: CanvasColorTheme; targetTheme: CanvasColorTheme; onThemeChange: (theme: CanvasColorTheme) => void; children: ReactNode }) {

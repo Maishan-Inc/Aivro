@@ -465,7 +465,7 @@ function AssistantComposer({
     previewing?: boolean;
 }) {
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
-    const promptComposer = usePromptComposer(isRunning);
+    const promptComposer = usePromptComposer(isRunning, true, false);
     return (
         <div ref={promptComposer.ref} className="px-2 pb-2" onWheelCapture={(event) => event.stopPropagation()} onFocus={promptComposer.open} onBlur={promptComposer.onBlur}>
             {promptComposer.expanded && references.length ? (
@@ -494,7 +494,6 @@ function AssistantComposer({
                     onKeyDown={(event) => {
                         if (isRunning || event.nativeEvent.isComposing || event.key !== "Enter" || event.ctrlKey || event.metaKey || event.shiftKey) return;
                         event.preventDefault();
-                        promptComposer.close();
                         void onSubmit();
                     }}
                     className="thin-scrollbar w-full resize-none border-0 bg-transparent px-1 py-1 text-sm leading-5 outline-none"
@@ -521,7 +520,7 @@ function AssistantComposer({
                         type="primary"
                         className="!ml-auto !h-auto !min-h-10 !max-w-full !rounded-full !px-3 !py-2"
                         disabled={isRunning || !prompt.trim()}
-                        onClick={() => { promptComposer.close(); void onSubmit(); }}
+                        onClick={() => { void onSubmit(); }}
                         aria-label="发送"
                     >
                         <ModelBilling summaryOnly model={model} kind="text" />

@@ -169,8 +169,8 @@ export async function playCanvasPlayback(canvas: HTMLDivElement, cursor: HTMLDiv
     await waitForPlayback(2600, signal);
     onStep(2);
     await click(find('[data-node-id="config"] > div'));
-    const promptPreview = canvas.querySelector<HTMLElement>('[data-node-id="config"] [data-canvas-prompt-panel] button[aria-expanded="false"]');
-    if (promptPreview) await click(promptPreview);
+    // The editor now keeps the prompt panel open throughout editing and generation.
+    find('[data-node-id="config"] [data-canvas-prompt-panel]');
     const referenceChip = canvas.querySelector<HTMLElement>('[data-node-id="config"] [data-canvas-prompt-panel] [data-canvas-reference="reference"]');
     if (referenceChip) {
         await click(referenceChip);

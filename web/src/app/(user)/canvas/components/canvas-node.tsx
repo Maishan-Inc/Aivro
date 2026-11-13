@@ -44,7 +44,7 @@ type CanvasNodeProps = {
     onMouseDown: (event: React.MouseEvent, nodeId: string) => void;
     onHoverStart: (nodeId: string) => void;
     onHoverEnd: (nodeId: string) => void;
-    onConnectStart: (event: React.MouseEvent, nodeId: string, handleType: "source" | "target") => void;
+    onConnectStart: (event: React.PointerEvent, nodeId: string, handleType: "source" | "target") => void;
     onResize: (nodeId: string, width: number, height: number, position?: Position) => void;
     onContentChange: (nodeId: string, content: string) => void;
     onToggleBatch?: (nodeId: string) => void;
@@ -365,8 +365,8 @@ export const CanvasNode = React.memo(function CanvasNode({
 
             {!readOnly ? (
                 <>
-                    <ConnectionHandleDot side="left" visible={hovered || isSelected || isConnecting} onMouseDown={(event) => onConnectStart(event, data.id, "target")} />
-                    <ConnectionHandleDot side="right" visible={data.type !== CanvasNodeType.Config && (hovered || isSelected || isConnecting)} onMouseDown={(event) => onConnectStart(event, data.id, "source")} />
+                    <ConnectionHandleDot side="left" visible={hovered || isSelected || isConnecting} onPointerDown={(event) => onConnectStart(event, data.id, "target")} />
+                    {data.type !== CanvasNodeType.Config ? <ConnectionHandleDot side="right" visible={hovered || isSelected || isConnecting} onPointerDown={(event) => onConnectStart(event, data.id, "source")} /> : null}
                 </>
             ) : null}
 
@@ -719,17 +719,22 @@ function ResizeHandle({ corner, onMouseDown }: { corner: ResizeCorner; onMouseDo
     return <div className={`absolute z-50 size-7 ${positionClass}`} onMouseDown={(event) => onMouseDown(event, corner)} />;
 }
 
-function ConnectionHandleDot({ side, visible, onMouseDown }: { side: "left" | "right"; visible: boolean; onMouseDown: (event: React.MouseEvent) => void }) {
+function ConnectionHandleDot({ side, visible, onPointerDown }: { side: "left" | "right"; visible: boolean; onPointerDown: (event: React.PointerEvent) => void }) {
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
+    const { tr } = useI18n();
 
     return (
-        <div
-            className={`absolute top-1/2 z-30 flex size-12 -translate-y-1/2 cursor-crosshair items-center justify-center transition-opacity duration-150 ${
+        <button
+            type="button"
+            data-canvas-connection-handle
+            aria-label={tr(side === "left" ? "输入连接点" : "输出连接点")}
+            className={`absolute top-1/2 z-30 flex size-12 touch-none -translate-y-1/2 cursor-crosshair items-center justify-center border-0 bg-transparent p-0 transition-opacity duration-150 [@media(pointer:coarse)]:pointer-events-auto [@media(pointer:coarse)]:opacity-100 ${
                 side === "left" ? "-left-6" : "-right-6"
             } ${visible ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"}`}
-            onMouseDown={onMouseDown}
+            onPointerDown={onPointerDown}
+            onMouseDown={(event) => event.stopPropagation()}
         >
             <div className="size-3 rounded-full border-2 transition-all hover:scale-125" style={{ background: theme.node.panel, borderColor: theme.node.muted }} />
-        </div>
+        </button>
     );
 }

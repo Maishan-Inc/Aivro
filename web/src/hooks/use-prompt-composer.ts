@@ -4,14 +4,14 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FocusEv
 
 const popupSelector = ".ant-select-dropdown, .ant-dropdown, .ant-popover, .ant-modal, .ant-drawer";
 
-export function usePromptComposer(running: boolean, initiallyExpanded = false) {
+export function usePromptComposer(running: boolean, initiallyExpanded = false, autoCollapse = true) {
     const ref = useRef<HTMLDivElement>(null);
     const collapseHeight = useRef<number | null>(null);
-    const [expanded, setExpanded] = useState(initiallyExpanded && !running);
+    const [expanded, setExpanded] = useState(initiallyExpanded && (!running || !autoCollapse));
     const [previousRunning, setPreviousRunning] = useState(running);
     if (previousRunning !== running) {
         setPreviousRunning(running);
-        if (running) setExpanded(false);
+        if (running && autoCollapse) setExpanded(false);
     }
     const open = useCallback(() => setExpanded(true), []);
     const close = useCallback(() => {
@@ -33,17 +33,17 @@ export function usePromptComposer(running: boolean, initiallyExpanded = false) {
         return () => animation.cancel();
     }, [expanded]);
     useEffect(() => {
-        if (!expanded) return;
+        if (!expanded || !autoCollapse) return;
         const outside = (event: PointerEvent) => {
             const target = event.target as Element;
             if (!ref.current?.contains(target) && !target.closest(popupSelector)) close();
         };
         document.addEventListener("pointerdown", outside, true);
         return () => document.removeEventListener("pointerdown", outside, true);
-    }, [expanded, close]);
+    }, [expanded, close, autoCollapse]);
     const onBlur = (event: FocusEvent<HTMLDivElement>) => {
         const target = event.relatedTarget as Element | null;
-        if (target && !event.currentTarget.contains(target) && !target.closest(popupSelector)) close();
+        if (autoCollapse && target && !event.currentTarget.contains(target) && !target.closest(popupSelector)) close();
     };
     return { ref, expanded, open, close, onBlur };
 }

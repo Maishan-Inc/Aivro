@@ -5,6 +5,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { CanvasNodeType, type CanvasNodeData, type ViewportTransform } from "../types";
+import styles from "./canvas-controls.module.css";
 
 export function Minimap({ nodes, viewport, viewportSize, onViewportChange }: { nodes: CanvasNodeData[]; viewport: ViewportTransform; viewportSize: { width: number; height: number }; onViewportChange: (viewport: ViewportTransform) => void }) {
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
@@ -97,7 +98,7 @@ export function Minimap({ nodes, viewport, viewportSize, onViewportChange }: { n
     };
 
     return (
-        <div className="absolute bottom-[calc(env(safe-area-inset-bottom)+76px)] left-[max(8px,env(safe-area-inset-left))] z-50 origin-bottom-left scale-[0.833333] overflow-hidden rounded-lg border shadow-2xl backdrop-blur-sm md:bottom-24 md:left-6 md:scale-100" style={{ width, height, background: theme.toolbar.panel, borderColor: theme.toolbar.border }}>
+        <div className={`${styles.minimap} overflow-hidden rounded-lg border shadow-2xl backdrop-blur-sm`} style={{ width, height, background: theme.toolbar.panel, borderColor: theme.toolbar.border }}>
             <div
                 ref={containerRef}
                 className="relative h-full w-full touch-none cursor-crosshair"

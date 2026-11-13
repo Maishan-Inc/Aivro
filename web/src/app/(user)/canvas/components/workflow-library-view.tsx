@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { App, Button, Drawer, Input, Modal, Select, Segmented, Spin, Tag } from "antd";
-import { BarChart3, BookOpen, Layers3, Link2, Plus, Search, Send, Sparkles, UploadCloud, UserRound } from "lucide-react";
+import { BarChart3, BookOpen, Layers3, Link2, Plus, Search, Send, Sparkles, Trash2, UploadCloud, UserRound } from "lucide-react";
 
 import {
     createWorkflow,
@@ -248,16 +248,12 @@ export function WorkflowLibraryView({ initialTab = "workflows", lockTab = false,
         />
     ) : (
         <WorkflowControls
-            projects={activeTab === "shares" ? shareProjects : filteredProjects}
-            allProjects={projects}
             keyword={keyword}
             filter={filter}
-            selectedIds={selectedIds}
             isCreating={isCreating}
             onKeywordChange={setKeyword}
             onFilterChange={setFilter}
             onCreate={createAndEnter}
-            onDelete={deleteProjects}
         />
     );
     const renderMetrics = () => (
@@ -284,15 +280,14 @@ export function WorkflowLibraryView({ initialTab = "workflows", lockTab = false,
                 </aside>
             ) : null}
 
-            <section className={`${lockTab ? "flex-1" : "order-1 lg:order-2"} flex min-h-0 flex-col`}>
-                <header className="shrink-0 border-b border-border bg-background px-4 lg:h-20 lg:overflow-x-auto lg:px-6">
-                    <div className="flex min-w-0 flex-wrap items-center gap-2 py-2 lg:h-full lg:min-w-max lg:flex-nowrap lg:py-0">
-                        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 lg:flex-none lg:flex-nowrap">{controlBar}</div>
-                        <Button className="lg:hidden" icon={<BarChart3 className="size-4" />} onClick={() => setStatsOpen(true)}>
-                            统计
-                        </Button>
-                        <div className="hidden w-full min-w-0 gap-2 overflow-x-auto lg:ml-auto lg:flex lg:w-auto lg:min-w-max lg:overflow-visible">
-                            {renderMetrics()}
+            <section className={`${lockTab ? "flex-1" : "order-1 lg:order-2"} flex min-h-0 min-w-0 flex-col`}>
+                <header className="shrink-0 border-b border-border bg-background px-4 py-4 lg:px-6">
+                    <div className={`${activeTab === "community" ? "flex" : "grid grid-cols-[minmax(0,1fr)_auto] sm:flex"} min-w-0 flex-wrap items-center gap-3`}>
+                        {controlBar}
+                        <div className="ml-auto flex shrink-0 items-center gap-2">
+                            {activeTab !== "community" && selectedIds.length ? <Button danger disabled={!canAccessPath(user, "/canvas")} icon={<Trash2 className="size-4" />} onClick={() => deleteProjects(selectedIds)}>删除选中</Button> : null}
+                            <Button className="min-[1600px]:!hidden" icon={<BarChart3 className="size-4" />} onClick={() => setStatsOpen(true)}>统计</Button>
+                            <div className="hidden items-center gap-2 min-[1600px]:flex">{renderMetrics()}</div>
                         </div>
                     </div>
                 </header>
@@ -412,7 +407,7 @@ function WorkflowSection({
                 <section className="flex min-h-0 flex-1 items-center justify-center"><Spin /></section>
             ) : projects.length ? (
                 <div className="thin-scrollbar min-h-0 flex-1 overflow-auto p-4 lg:p-6">
-                    <div className="grid gap-4 min-[520px]:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                    <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,300px),1fr))] gap-4 xl:gap-5">
                         {projects.map((project) => <CanvasProjectCard key={project.id} project={project} onRename={onRename} onDelete={(id) => onDelete([id])} />)}
                     </div>
                 </div>
@@ -424,33 +419,28 @@ function WorkflowSection({
 }
 
 function WorkflowControls({
-    projects,
-    allProjects,
     keyword,
     filter,
-    selectedIds,
     isCreating,
     onKeywordChange,
     onFilterChange,
     onCreate,
-    onDelete,
 }: {
-    projects: CloudWorkflow[];
-    allProjects: CloudWorkflow[];
     keyword: string;
     filter: WorkflowFilter;
-    selectedIds: string[];
     isCreating: boolean;
     onKeywordChange: (value: string) => void;
     onFilterChange: (value: WorkflowFilter) => void;
     onCreate: () => void;
-    onDelete: (ids: string[]) => void;
 }) {
     const workflowEnabled = useUserStore((state) => canAccessPath(state.user, "/canvas"));
     return (
         <>
-            <Input allowClear value={keyword} onChange={(event) => onKeywordChange(event.target.value)} prefix={<Search className="size-4 text-stone-400" />} placeholder="搜索工作流名称" className="!w-full min-[520px]:!w-[220px]" />
-            <Segmented
+            <div className="col-span-2 flex w-full min-w-0 items-center gap-2 sm:w-auto">
+                <Input allowClear value={keyword} onChange={(event) => onKeywordChange(event.target.value)} prefix={<Search className="size-4 text-stone-400" />} placeholder="搜索工作流名称" className="!w-auto min-w-0 flex-1 sm:!w-[240px]" />
+                <Button disabled={!workflowEnabled} className="shrink-0" type="primary" icon={<Plus className="size-4" />} loading={isCreating} onClick={onCreate}>新建工作流</Button>
+            </div>
+            <div className="min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"><Segmented
                 value={filter}
                 onChange={(value) => onFilterChange(value as WorkflowFilter)}
                 options={[
@@ -458,11 +448,7 @@ function WorkflowControls({
                     { label: "自动更新", value: "linked" },
                     { label: "独立副本", value: "detached" },
                 ]}
-            />
-            <span className="shrink-0 text-xs text-stone-500 dark:text-stone-400">显示 {projects.length}/{allProjects.length}</span>
-            {selectedIds.length ? <Button disabled={!workflowEnabled} className="max-[519px]:flex-1" onClick={() => onDelete(selectedIds)}>删除选中</Button> : null}
-            {projects.length ? <Button disabled={!workflowEnabled} className="max-[519px]:flex-1" onClick={() => onDelete(projects.map((project) => project.id))}>删除全部</Button> : null}
-            <Button disabled={!workflowEnabled} className="max-[519px]:flex-1" type="primary" icon={<Plus className="size-4" />} loading={isCreating} onClick={onCreate}>新建工作流</Button>
+            /></div>
         </>
     );
 }

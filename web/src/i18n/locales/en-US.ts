@@ -2119,6 +2119,13 @@ const enUS = {
     "修改工作流名称": "Rename workflow",
     "单指拖动": "Drag with one finger",
     "双指缩放/移动": "Pinch or pan with two fingers",
+    "输入连接点": "Input connector",
+    "输出连接点": "Output connector",
+    "横屏/全屏画布": "Landscape / fullscreen canvas",
+    "退出全屏": "Exit fullscreen",
+    "请旋转手机以横屏使用画布": "Rotate your phone to use the canvas in landscape",
+    "选择工作流": "Select workflow",
+    "工作流操作": "Workflow actions",
 };
 
 export default enUS;

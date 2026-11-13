@@ -39,7 +39,7 @@ export function useCanvasTouch({ containerRef, viewport, onViewportChange, onCan
         };
         const start = (event: TouchEvent) => {
             const target = event.target instanceof Element ? event.target : null;
-            if (target?.closest("[data-canvas-no-zoom],[data-canvas-prompt-panel],[data-connection-create-menu],input,textarea,button,a,select,[contenteditable='true'],video,.ant-popover,.ant-dropdown,.ant-select-dropdown")) return;
+            if (target?.closest("[data-canvas-no-zoom],[data-canvas-prompt-panel],[data-canvas-connection-handle],[data-connection-create-menu],input,textarea,button,a,select,[contenteditable='true'],video,.ant-popover,.ant-dropdown,.ant-select-dropdown")) return;
             Array.from(event.changedTouches).forEach((touch) => touchIds.add(touch.identifier));
             const touches = points(event);
             const background = !target?.closest("[data-node-id],[data-connection-id]");

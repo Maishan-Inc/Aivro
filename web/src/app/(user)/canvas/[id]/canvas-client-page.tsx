@@ -8,7 +8,7 @@ import { resolveVideoConfig } from "@/lib/video-models";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent as ReactChangeEvent, DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Box, CheckSquare, ClipboardPaste, Copy, Home, ImageIcon, Images, Info, List, Maximize2, Menu, MessageSquare, Plus, Redo2, Settings2, Share2, Trash2, Undo2, Upload, Video } from "lucide-react";
+import { Box, CheckSquare, ClipboardPaste, Copy, Home, ImageIcon, Images, Info, List, Maximize2, Menu, MessageSquare, Minimize2, Plus, Redo2, Settings2, Share2, Trash2, Undo2, Upload, Video } from "lucide-react";
 import { saveAs } from "file-saver";
 
 import { requestEdit, requestGeneration, requestImageQuestion } from "@/services/api/image";
@@ -50,6 +50,8 @@ import { CanvasNodePromptPanel, type CanvasNodeGenerationMode } from "../compone
 import { CanvasToolbar } from "../components/canvas-toolbar";
 import { AssetPickerModal, type AssetPickerTab, type InsertAssetPayload } from "../components/asset-picker-modal";
 import { CanvasZoomControls } from "../components/canvas-zoom-controls";
+import controls from "../components/canvas-controls.module.css";
+import { useCanvasFullscreen } from "../hooks/use-canvas-fullscreen";
 import { useCanvasStore } from "../stores/use-canvas-store";
 import { applyCanvasAgentOps, sanitizeCanvasAgentSnapshot, type CanvasAgentOp, type CanvasAgentSnapshot } from "../utils/canvas-agent-ops";
 import {
@@ -140,37 +142,37 @@ function CanvasRefreshShell() {
                 }}
             />
 
-            <div className="absolute bottom-[calc(env(safe-area-inset-bottom)+76px)] right-2 z-50 flex w-14 flex-col items-center gap-1 rounded-xl border py-2 shadow-lg backdrop-blur md:bottom-5 md:left-1/2 md:right-auto md:h-14 md:w-auto md:-translate-x-1/2 md:flex-row md:px-2 md:py-0" style={{ background: "var(--background)", borderColor: "var(--border)" }} aria-hidden="true">
+            <div className={controls.toolbar} aria-hidden="true"><div className="flex h-14 max-w-full items-center gap-1 overflow-hidden rounded-xl border px-2 backdrop-blur" style={{ background: "var(--background)", borderColor: "var(--border)" }}>
                 {Array.from({ length: 7 }).map((_, index) => (
                     <div key={index} className="size-8 rounded-md bg-current opacity-10" />
                 ))}
-            </div>
+            </div></div>
 
-            <div className="absolute bottom-24 left-6 z-50 hidden h-40 w-[240px] rounded-lg border shadow-2xl backdrop-blur-sm md:block" style={{ background: "var(--background)", borderColor: "var(--border)" }} aria-hidden="true">
+            <div className={`${controls.minimap} hidden h-40 w-[240px] rounded-lg border shadow-2xl backdrop-blur-sm md:block`} style={{ background: "var(--background)", borderColor: "var(--border)" }} aria-hidden="true">
                 <div className="absolute left-7 top-7 h-5 w-12 rounded-sm bg-current opacity-10" />
                 <div className="absolute left-28 top-16 h-6 w-16 rounded-sm bg-current opacity-10" />
                 <div className="absolute bottom-7 left-16 h-8 w-20 rounded-sm bg-current opacity-10" />
                 <div className="absolute inset-5 rounded border border-current opacity-15" />
             </div>
 
-            <div className="absolute bottom-[calc(env(safe-area-inset-bottom)+12px)] left-2 right-2 z-50 flex h-12 items-center gap-2 rounded-xl border px-2 shadow-lg backdrop-blur md:bottom-5 md:left-5 md:right-auto md:h-14 md:w-[260px]" style={{ background: "var(--background)", borderColor: "var(--border)" }} aria-hidden="true">
+            <div className={`${controls.zoom} flex h-12 items-center gap-2 rounded-xl border px-2 backdrop-blur`} style={{ background: "var(--background)", borderColor: "var(--border)" }} aria-hidden="true">
                 <div className="size-8 rounded-md bg-current opacity-10" />
                 <div className="size-8 rounded-md bg-current opacity-10" />
                 <div className="h-1 flex-1 rounded-full bg-current opacity-10" />
                 <div className="h-4 w-10 rounded bg-current opacity-10" />
-                <div className="size-8 rounded-md bg-current opacity-10" />
             </div>
         </main>
     );
 }
 
-function ConnectionCreateMenu({ pending, onCreate, onClose }: { pending: PendingConnectionCreate; onCreate: (type: CanvasNodeType) => void; onClose: () => void }) {
+function ConnectionCreateMenu({ pending, bounds, onCreate, onClose }: { pending: PendingConnectionCreate; bounds: { x: number; y: number; width: number; height: number }; onCreate: (type: CanvasNodeType) => void; onClose: () => void }) {
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
+    const width = Math.min(300, bounds.width);
     return (
         <div
-            className="absolute z-[120] w-[300px] rounded-[18px] border p-3 shadow-2xl backdrop-blur"
+            className="absolute z-[120] overflow-y-auto overscroll-contain rounded-[18px] border p-3 shadow-2xl backdrop-blur [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             data-connection-create-menu
-            style={{ left: pending.position.x, top: pending.position.y, background: theme.node.panel, borderColor: theme.node.stroke, color: theme.node.text }}
+            style={{ width, maxHeight: bounds.height, left: Math.max(bounds.x, Math.min(pending.position.x, bounds.x + bounds.width - width)), top: Math.max(bounds.y, Math.min(pending.position.y, bounds.y + bounds.height - Math.min(480, bounds.height))), background: theme.node.panel, borderColor: theme.node.stroke, color: theme.node.text }}
             onMouseDown={(event) => event.stopPropagation()}
             onPointerDown={(event) => event.stopPropagation()}
         >
@@ -216,6 +218,7 @@ export function InfiniteCanvasPage({ playback }: { playback?: CanvasPlayback } =
     const router = useRouter();
     const projectId = playback ? "" : params.id;
     const containerRef = useRef<HTMLDivElement>(null);
+    const connectionPointerIdRef = useRef<number | null>(null);
     const imageInputRef = useRef<HTMLInputElement>(null);
     const uploadTargetRef = useRef<{ nodeId?: string; position?: Position } | null>(null);
     const clipboardRef = useRef<CanvasClipboard | null>(null);
@@ -494,6 +497,7 @@ export function InfiniteCanvasPage({ playback }: { playback?: CanvasPlayback } =
     useEffect(() => {
         const el = containerRef.current;
         if (!el) return;
+        let previousSize: { width: number; height: number } | null = null;
 
         const updateSize = () => {
             const width = el.clientWidth;
@@ -502,7 +506,12 @@ export function InfiniteCanvasPage({ playback }: { playback?: CanvasPlayback } =
             if (!didInitialCenterRef.current) {
                 didInitialCenterRef.current = true;
                 setViewport({ x: width / 2, y: height / 2, k: 1 });
+            } else if (previousSize && (width !== previousSize.width || height !== previousSize.height)) {
+                const dx = (width - previousSize.width) / 2;
+                const dy = (height - previousSize.height) / 2;
+                setViewport((current) => ({ ...current, x: current.x + dx, y: current.y + dy }));
             }
+            previousSize = { width, height };
         };
 
         updateSize();
@@ -532,6 +541,7 @@ export function InfiniteCanvasPage({ playback }: { playback?: CanvasPlayback } =
         connectingParamsRef.current = next;
         setConnectingParams(next);
         if (!next) {
+            connectionPointerIdRef.current = null;
             connectionTargetNodeIdRef.current = null;
             setConnectionTargetNodeId(null);
         }
@@ -609,6 +619,7 @@ export function InfiniteCanvasPage({ playback }: { playback?: CanvasPlayback } =
     const getConnectableNodeAtPoint = useCallback(
         (clientX: number, clientY: number, current: ConnectionHandle) => {
             const world = screenToCanvas(clientX, clientY);
+            const padding = 24 / viewportRef.current.k;
             return (
                 [...nodesRef.current]
                     .filter((node) => !isHiddenBatchChild(node, nodesRef.current))
@@ -617,10 +628,10 @@ export function InfiniteCanvasPage({ playback }: { playback?: CanvasPlayback } =
                         (node) =>
                             node.id !== current.nodeId &&
                             Boolean(normalizeConnection(current.nodeId, node.id, nodesRef.current, current.handleType)) &&
-                            world.x >= node.position.x &&
-                            world.x <= node.position.x + node.width &&
-                            world.y >= node.position.y &&
-                            world.y <= node.position.y + node.height,
+                            world.x >= node.position.x - padding &&
+                            world.x <= node.position.x + node.width + padding &&
+                            world.y >= node.position.y - padding &&
+                            world.y <= node.position.y + node.height + padding,
                     )?.id || null
             );
         },
@@ -1209,6 +1220,10 @@ export function InfiniteCanvasPage({ playback }: { playback?: CanvasPlayback } =
 
     const handleGlobalPointerMove = useCallback(
         (event: PointerEvent) => {
+            if (connectionPointerIdRef.current === event.pointerId) {
+                handleGlobalMouseMove(event);
+                return;
+            }
             const currentSelection = selectionBoxRef.current;
             if (!currentSelection) return;
 
@@ -1238,7 +1253,7 @@ export function InfiniteCanvasPage({ playback }: { playback?: CanvasPlayback } =
             setSelectionBox(nextSelectionBox);
             setSelectedNodeIds(nextSelected);
         },
-        [screenToCanvas],
+        [handleGlobalMouseMove, screenToCanvas],
     );
 
     const handleGlobalMouseUp = useCallback(
@@ -1266,8 +1281,13 @@ export function InfiniteCanvasPage({ playback }: { playback?: CanvasPlayback } =
     );
 
     useEffect(() => {
-        const handlePointerUp = (event: PointerEvent) => finishNodeDrag(event.clientX, event.clientY);
-        const cancelNodeDrag = () => finishNodeDrag();
+        const handlePointerUp = (event: PointerEvent) => {
+            if (connectionPointerIdRef.current === event.pointerId) {
+                connectionPointerIdRef.current = null;
+                handleGlobalMouseUp(event);
+            } else finishNodeDrag(event.clientX, event.clientY);
+        };
+        const cancelNodeDrag = () => { finishNodeDrag(); setConnecting(null); };
         window.addEventListener("mousemove", handleGlobalMouseMove);
         window.addEventListener("mouseup", handleGlobalMouseUp);
         window.addEventListener("pointerup", handlePointerUp);
@@ -1282,7 +1302,7 @@ export function InfiniteCanvasPage({ playback }: { playback?: CanvasPlayback } =
             window.removeEventListener("blur", cancelNodeDrag);
             window.removeEventListener("pointermove", handleGlobalPointerMove);
         };
-    }, [finishNodeDrag, handleGlobalMouseMove, handleGlobalMouseUp, handleGlobalPointerMove]);
+    }, [finishNodeDrag, handleGlobalMouseMove, handleGlobalMouseUp, handleGlobalPointerMove, setConnecting]);
 
     const createImageFileNode = useCallback(async (file: File, position: Position) => {
         const image = await uploadImage(file);
@@ -1462,15 +1482,20 @@ export function InfiniteCanvasPage({ playback }: { playback?: CanvasPlayback } =
     }, [agentPreview, cancelAgentPreview, copySelectedNodes, deleteNodes, pasteCopiedNodes, pasteSystemClipboard, playback, redoCanvas, selectedConnectionId, setConnecting, undoCanvas]);
 
     const handleConnectStart = useCallback(
-        (event: ReactMouseEvent, nodeId: string, handleType: "source" | "target") => {
+        (event: ReactPointerEvent, nodeId: string, handleType: "source" | "target") => {
             event.stopPropagation();
+            event.preventDefault();
+            if (event.button !== 0 || agentPreview) return;
+            event.currentTarget.setPointerCapture(event.pointerId);
+            connectionPointerIdRef.current = event.pointerId;
+            setPendingConnectionCreate(null);
             setMouseWorld(screenToCanvas(event.clientX, event.clientY));
             setConnecting({ nodeId, handleType });
             connectionTargetNodeIdRef.current = null;
             setConnectionTargetNodeId(null);
             setSelectedConnectionId(null);
         },
-        [screenToCanvas, setConnecting],
+        [agentPreview, screenToCanvas, setConnecting],
     );
 
     const handleNodeResize = useCallback((nodeId: string, width: number, height: number, position?: Position) => {
@@ -2658,7 +2683,7 @@ export function InfiniteCanvasPage({ playback }: { playback?: CanvasPlayback } =
                             }}
                         />
                     ) : null}
-                    {pendingConnectionCreate ? <ConnectionCreateMenu pending={pendingConnectionCreate} onCreate={(type) => createConnectedNode(type, pendingConnectionCreate)} onClose={cancelPendingConnectionCreate} /> : null}
+                    {pendingConnectionCreate ? <ConnectionCreateMenu pending={pendingConnectionCreate} bounds={{ x: (8 - displayViewport.x) / displayViewport.k, y: (64 - displayViewport.y) / displayViewport.k, width: (size.width - 16) / displayViewport.k, height: Math.max(100, size.height - 144) / displayViewport.k }} onCreate={(type) => createConnectedNode(type, pendingConnectionCreate)} onClose={cancelPendingConnectionCreate} /> : null}
                 </InfiniteCanvas>
 
                 <CanvasNodeHoverToolbar
@@ -2878,6 +2903,7 @@ function CanvasTopBar({
 }) {
     const colorTheme = useThemeStore((state) => state.theme);
     const retention = useGenerationRetention();
+    const { fullscreen, toggleFullscreen } = useCanvasFullscreen();
     const { tr } = useI18n();
     const theme = canvasThemes[colorTheme];
     const titleRef = useRef<HTMLDivElement>(null);
@@ -2906,14 +2932,14 @@ function CanvasTopBar({
 
     return (
         <>
-            <div className="pointer-events-none absolute left-0 right-0 top-[env(safe-area-inset-top)] z-50 flex h-14 items-center justify-between gap-2 pl-[max(8px,env(safe-area-inset-left))] pr-[max(8px,env(safe-area-inset-right))] md:h-16 md:px-4">
+            <div className="pointer-events-none absolute left-0 right-0 top-[env(safe-area-inset-top)] z-50 flex h-14 items-center justify-between gap-2 pl-[max(8px,env(safe-area-inset-left))] pr-[max(8px,env(safe-area-inset-right))] md:h-16 md:pl-[max(16px,env(safe-area-inset-left))] md:pr-[max(16px,env(safe-area-inset-right))]">
                 <div className="pointer-events-auto flex min-w-0 flex-1 items-center gap-2 md:gap-3">
                     <Dropdown
                         trigger={["click"]}
                         styles={{ root: { maxWidth: "calc(100vw - 16px)", maxHeight: "calc(100dvh - 80px)", overflowY: "auto" } }}
                         popupRender={(menu) => <div style={{ background: theme.node.panel }}>
                             {menu}
-                            <div className="border-t p-2 md:hidden" style={{ borderColor: theme.toolbar.border }}>
+                            <div className={`${controls.mobile} border-t p-2`} style={{ borderColor: theme.toolbar.border }}>
                                 <div className="max-w-64 space-y-1 px-1 pb-2 text-xs opacity-60">
                                     {saveLabel ? <p>{tr(saveLabel)}</p> : null}
                                     {retention.data ? <p>{tr("工作流生成文件保存 {0} 天，具体到期时间见节点信息").replace("{0}", String(retention.data.days.workflow))}</p> : null}
@@ -2970,13 +2996,13 @@ function CanvasTopBar({
                                 {title}
                             </button>
                         )}
-                        <div className="hidden shrink-0 md:block"><Button type="text" size="small" icon={<Share2 className="size-4" />} onClick={onShare}>分享</Button></div>
-                        <span className="hidden shrink-0 text-xs opacity-55 md:inline">{saveLabel}</span>
+                        <div className={`${controls.desktop} shrink-0`}><Button type="text" size="small" icon={<Share2 className="size-4" />} onClick={onShare}>分享</Button></div>
+                        <span className={`${controls.desktop} shrink-0 text-xs opacity-55`}>{saveLabel}</span>
                     </div>
                 </div>
 
                 <div className="pointer-events-auto flex shrink-0 items-center gap-1.5">
-                    <div className="hidden md:block"><UserStatusActions
+                    <div className={controls.desktop}><UserStatusActions
                         variant="canvas"
                         accountOpen={accountOpen}
                         onAccountOpenChange={setAccountOpen}
@@ -2987,6 +3013,7 @@ function CanvasTopBar({
                             setAccountOpen(false);
                         }}
                     /></div>
+                    <Button type="text" className="!h-10 !w-10 !p-0" style={{ color: theme.node.text }} icon={fullscreen ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />} onClick={() => void toggleFullscreen()} aria-label={tr(fullscreen ? "退出全屏" : "横屏/全屏画布")} title={tr(fullscreen ? "退出全屏" : "横屏/全屏画布")} />
                     {assistantCollapsed ? (
                         <>
                             <span className="hidden h-6 w-px md:block" style={{ background: theme.toolbar.border }} />
@@ -3016,8 +3043,8 @@ function CanvasTopBar({
                 <div className="space-y-2 border-t pt-4 text-sm" style={{ borderColor: theme.node.stroke }}>
                     <Shortcut keys={["拖动画布"]} value="平移视图" />
                     <Shortcut keys={["滚轮"]} value="缩放画布" />
-                    <Shortcut keys={["单指拖动"]} value="平移视图" />
-                    <Shortcut keys={["双指缩放/移动"]} value="缩放画布" />
+                    <Shortcut keys={[tr("单指拖动")]} value="平移视图" />
+                    <Shortcut keys={[tr("双指缩放/移动")]} value="缩放画布" />
                     <Shortcut keys={["缩放滑杆"]} value="精确调整缩放" />
                     <Shortcut keys={["Ctrl / Cmd", "拖动"]} value="框选多个节点" />
                     <Shortcut keys={["Shift / Ctrl / Cmd", "点击"]} value="追加选择节点" />

@@ -2107,6 +2107,13 @@ const frFR = {
     "修改工作流名称": "Renommer le workflow",
     "单指拖动": "Glisser avec un doigt",
     "双指缩放/移动": "Zoomer ou déplacer avec deux doigts",
+    "输入连接点": "Connecteur d’entrée",
+    "输出连接点": "Connecteur de sortie",
+    "横屏/全屏画布": "Canevas paysage / plein écran",
+    "退出全屏": "Quitter le plein écran",
+    "请旋转手机以横屏使用画布": "Tournez votre téléphone pour utiliser le canevas en mode paysage",
+    "选择工作流": "Sélectionner le workflow",
+    "工作流操作": "Actions du workflow",
 };
 
 export default frFR;

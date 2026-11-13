@@ -48,7 +48,7 @@ export function CanvasNodePromptPanel({ node, isRunning, inputs, onHighlightInpu
     const hasImageContent = node.type === CanvasNodeType.Image && Boolean(node.metadata?.content);
     const isEditingExistingContent = hasTextContent || hasImageContent;
     const [prompt, setPrompt] = useState(isEditingExistingContent ? "" : node.metadata?.prompt || "");
-    const promptComposer = usePromptComposer(isRunning, true);
+    const promptComposer = usePromptComposer(isRunning, true, false);
     const canGenerate = Boolean(prompt.trim() || inputs.some((input) => input.text?.trim() || (!hasImageContent && input.image)));
     const warnMissingModel = () => message.warning(tr("管理员尚未配置可用模型"));
 
@@ -65,7 +65,6 @@ export function CanvasNodePromptPanel({ node, isRunning, inputs, onHighlightInpu
     const submit = () => {
         const text = prompt.trim();
         if (!canGenerate || isRunning) return;
-        promptComposer.close();
         onGenerate(node.id, mode, text);
     };
 
